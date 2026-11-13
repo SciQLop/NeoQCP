@@ -69,7 +69,7 @@ static QWidget* createSpansTab()
     plot->yAxis->setRange(0, 100);
 
     // some data behind the spans
-    auto* graph = plot->addGraph();
+    QCPMultiGraph* graph = plot->addGraph();
     QVector<double> x(200), y(200);
     for (int i = 0; i < 200; ++i) {
         x[i] = i * 0.5;
@@ -207,8 +207,8 @@ static QWidget* createGraphTab()
     auto* plot = makePlot();
     const int n = 10000;
 
-    // QCPGraph (legacy)
-    auto* g1 = plot->addGraph();
+    // QCPMultiGraph (legacy)
+    QCPMultiGraph* g1 = plot->addGraph();
     QVector<double> x1(n), y1(n);
     for (int i = 0; i < n; ++i) {
         x1[i] = i / double(n) * 10 - 5;
@@ -640,7 +640,7 @@ static QWidget* createItemsTab()
     curveItem->setHead(QCPLineEnding::esSpikeArrow);
 
     // tracer on a graph
-    auto* graph = plot->addGraph();
+    QCPMultiGraph* graph = plot->addGraph();
     QVector<double> x(100), y(100);
     for (int i = 0; i < 100; ++i) {
         x[i] = i * 0.1;
@@ -738,7 +738,7 @@ static QWidget* createScatterTab()
     };
 
     for (int s = 0; s < 10; ++s) {
-        auto* g = plot->addGraph();
+        QCPMultiGraph* g = plot->addGraph();
         QVector<double> x(15), y(15);
         for (int i = 0; i < 15; ++i) {
             x[i] = i;
@@ -747,7 +747,7 @@ static QWidget* createScatterTab()
         g->setData(x, y);
         g->setPen(QPen(colors[s], 1));
         g->setScatterStyle(QCPScatterStyle(shapes[s], colors[s], colors[s], 8));
-        g->setLineStyle(QCPGraph::lsLine);
+        g->setLineStyle(QCPMultiGraph::lsLine);
         g->setName(shapeNames[s]);
     }
 
@@ -765,8 +765,8 @@ static QWidget* createThemeTab()
     auto* plot = makePlot();
     plot->setTheme(QCPTheme::dark(plot));
 
-    auto* g1 = plot->addGraph();
-    auto* g2 = plot->addGraph();
+    QCPMultiGraph* g1 = plot->addGraph();
+    QCPMultiGraph* g2 = plot->addGraph();
     QVector<double> x(500), y1(500), y2(500);
     for (int i = 0; i < 500; ++i) {
         x[i] = i * 0.02;
@@ -1149,7 +1149,7 @@ static QWidget* createOverlayTab()
     auto* plot = makePlot();
     plot->xAxis->setRange(0, 10);
     plot->yAxis->setRange(-1.5, 1.5);
-    auto* graph = plot->addGraph();
+    QCPMultiGraph* graph = plot->addGraph();
     QVector<double> x(200), y(200);
     for (int i = 0; i < 200; ++i) {
         x[i] = i * 0.05;
@@ -1485,12 +1485,12 @@ static QWidget* createLatexTab()
         y[i] = qPow(x[i], -5.0 / 3.0);
         y2[i] = 0.6 * qPow(x[i], -1.0) * (1 + 0.15 * qSin(x[i] * 9));
     }
-    auto* g1 = plot->addGraph();
+    QCPMultiGraph* g1 = plot->addGraph();
     g1->setData(x, y);
     g1->setPen(QPen(Qt::blue, 1.5));
     g1->setName("$f^{-5/3}$ Kolmogorov");
 
-    auto* g2 = plot->addGraph();
+    QCPMultiGraph* g2 = plot->addGraph();
     g2->setData(x, y2);
     g2->setPen(QPen(QColor(200, 60, 0), 1.5));
     g2->setName("plain text entry");   // untouched: no math span

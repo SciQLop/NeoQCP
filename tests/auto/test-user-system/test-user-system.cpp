@@ -627,7 +627,7 @@ void TestUserSystem::addGraphOnASkewRectJoinsIt()
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
 
-    QCPGraph* graph = plot.addGraph(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
+    QCPMultiGraph* graph = plot.addGraph(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
     QVERIFY(graph);
     QCOMPARE(graph->system(), static_cast<QCPCoordinateSystem*>(rect->skew()));
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
@@ -1706,7 +1706,7 @@ void TestUserSystem::theTracerFollowsASkewGraph()
     graph->setData(QVector<double> { 2, 4, 6 }, QVector<double> { 2, 6, 4 });
 
     auto* tracer = new QCPItemTracer(&plot);
-    tracer->setLineGraph(graph);
+    tracer->setGraph(graph);
     tracer->setGraphKey(4);
     tracer->setClipToAxisRect(true);
     tracer->setClipArea(rect);
@@ -1731,7 +1731,7 @@ void TestUserSystem::theTracerFollowsAMultiGraphOnASkewRect()
                    std::vector<QVector<double>> { QVector<double> { 1, 1, 1 },
                                                   QVector<double> { 2, 6, 4 } });
     auto* tracer = new QCPItemTracer(&plot);
-    tracer->setLineGraph(graph, 1);
+    tracer->setGraph(graph, 1);
     tracer->setGraphKey(4);
     tracer->setClipToAxisRect(true);
     tracer->setClipArea(rect);

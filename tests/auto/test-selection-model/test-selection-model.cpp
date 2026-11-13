@@ -57,9 +57,9 @@ Target partsTarget(T* object, typename T::SelectableParts part)
     };
 }
 
-QCPGraph* addGraph(QCustomPlot* plot)
+QCPMultiGraph* addGraph(QCustomPlot* plot)
 {
-    QCPGraph* graph = plot->addGraph();
+    QCPMultiGraph* graph = plot->addGraph();
     graph->setData(QVector<double> { 0, 5, 10 }, QVector<double> { 0, 5, 10 });
     return graph;
 }
@@ -68,7 +68,7 @@ Target targetFor(QCustomPlot* plot, const QString& name)
 {
     if (name == QLatin1String("plottable"))
     {
-        QCPGraph* graph = addGraph(plot);
+        QCPMultiGraph* graph = addGraph(plot);
         return { graph, [graph] { return graph->selected(); },
                  [graph] { graph->setSelection(QCPDataSelection(QCPDataRange(0, 2))); },
                  [graph] { return graph->selectable(); },
@@ -207,7 +207,7 @@ void TestSelectionModel::itemRefusesAPartialSelectionType()
 
 void TestSelectionModel::userSelectionStillAnnounced()
 {
-    QCPGraph* graph = addGraph(mPlot);
+    QCPMultiGraph* graph = addGraph(mPlot);
     graph->setData(QVector<double> { 0, 5, 10 }, QVector<double> { 5, 5, 5 });
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);

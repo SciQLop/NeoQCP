@@ -63,6 +63,7 @@
 #include "plottables/plottable-colormap.h"
 #include "plottables/plottable-colormap2.h"
 #include "plottables/plottable-graph.h"
+#include "plottables/plottable-multigraph.h"
 #include "plottables/plottable-histogram2d.h"
 #include "selectionrect.h"
 #include "theme.h"
@@ -1471,7 +1472,7 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     // pointer would stay valid while the graph is no longer in this plot.
     for (QCPAbstractItem* item : std::as_const(mItems))
         if (auto* tracer = qobject_cast<QCPItemTracer*>(item);
-            tracer && (tracer->graph() == plottable || tracer->lineGraph() == plottable))
+            tracer && tracer->graph().get() == plottable)
             tracer->setGraph(nullptr);
     const QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
     plottable->moveToLayer(nullptr, false);
@@ -1659,7 +1660,7 @@ QPointer<QCPPlottableGroup> QCustomPlot::unlistPlottable(QCPAbstractPlottable* p
         group->detach(plottable, false);
     if (legend)
         plottable->removeFromLegend(legend);
-    mGraphs.removeIf([plottable](const QCPGraph* graph) { return graph == plottable; });
+    mGraphs.removeIf([plottable](const QCPMultiGraph* graph) { return graph == plottable; });
     mPlottables.removeOne(plottable);
     return group;
 }
@@ -1810,16 +1811,16 @@ bool QCustomPlot::hasPlottable(QCPAbstractPlottable* plottable) const
 
   \see graphCount, addGraph
 */
-QCPGraph* QCustomPlot::graph(int index) const
+QCPHandle<QCPMultiGraph> QCustomPlot::graph(int index) const
 {
     if (index >= 0 && index < mGraphs.size())
     {
-        return mGraphs.at(index);
+        return QCPHandle<QCPMultiGraph>(mGraphs.at(index));
     }
     else
     {
         qDebug() << Q_FUNC_INFO << "index out of bounds:" << index;
-        return nullptr;
+        return {};
     }
 }
 
@@ -1830,14 +1831,11 @@ QCPGraph* QCustomPlot::graph(int index) const
 
   \see graphCount, addGraph
 */
-QCPGraph* QCustomPlot::graph() const
+QCPHandle<QCPMultiGraph> QCustomPlot::graph() const
 {
     if (!mGraphs.isEmpty())
-    {
-        return mGraphs.last();
-    }
-    else
-        return nullptr;
+        return QCPHandle<QCPMultiGraph>(mGraphs.last());
+    return {};
 }
 
 /*!
@@ -1864,9 +1862,9 @@ std::pair<QCPAxis*, QCPAxis*> QCustomPlot::axesForAdd() const
     return {keyAxes.first(), valueAxes.first()};
 }
 
-QCPGraph* QCustomPlot::addGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
+QCPMultiGraphOps<QCPMultiGraph> QCustomPlot::addGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
 {
-    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", nullptr);
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", {});
     if (!keyAxis)
         keyAxis = xAxis;
     if (!valueAxis)
@@ -1876,31 +1874,30 @@ QCPGraph* QCustomPlot::addGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
         qDebug() << Q_FUNC_INFO
                  << "can't use default QCustomPlot xAxis or yAxis, because at least one is invalid "
                     "(has been deleted)";
-        return nullptr;
+        return {};
     }
     if (keyAxis->parentPlot() != this || valueAxis->parentPlot() != this)
     {
         qDebug() << Q_FUNC_INFO
                  << "passed keyAxis or valueAxis doesn't have this QCustomPlot as parent";
-        return nullptr;
+        return {};
     }
 
-    QCPGraph* newGraph = new QCPGraph(keyAxis, valueAxis);
+    auto* newGraph = new QCPMultiGraph(keyAxis, valueAxis);
     newGraph->setName(QLatin1String("Graph ") + QString::number(mGraphs.size()));
-    return newGraph;
+    return qcp::makeHandle<QCPMultiGraphOps<QCPMultiGraph>>(newGraph);
 }
 
 /*!
   Removes the specified \a graph from the plot and deletes it. If necessary, the corresponding
-  legend item is also removed from the default legend (QCustomPlot::legend). If any other graphs in
-  the plot have a channel fill set towards the removed graph, the channel fill property of those
-  graphs is reset to \c nullptr (no channel fill).
+  legend item is also removed from the default legend (QCustomPlot::legend). A fill of another
+  graph towards the removed graph goes with it.
 
   Returns true on success.
 
   \see clearGraphs
 */
-bool QCustomPlot::removeGraph(QCPGraph* graph)
+bool QCustomPlot::removeGraph(QCPMultiGraph* graph)
 {
     return removePlottable(graph);
 }
@@ -1954,13 +1951,13 @@ int QCustomPlot::graphCount() const
   \see setInteractions, selectedPlottables, QCPAbstractPlottable::setSelectable,
   QCPAbstractPlottable::setSelection
 */
-QList<QCPGraph*> QCustomPlot::selectedGraphs() const
+QList<QCPHandle<QCPMultiGraph>> QCustomPlot::selectedGraphs() const
 {
-    QList<QCPGraph*> result;
-    for (QCPGraph* graph : mGraphs)
+    QList<QCPHandle<QCPMultiGraph>> result;
+    for (QCPMultiGraph* graph : mGraphs)
     {
         if (graph->selected())
-            result.append(graph);
+            result.append(QCPHandle<QCPMultiGraph>(graph));
     }
     return result;
 }
@@ -4900,7 +4897,7 @@ bool QCustomPlot::registerJoinedPlottable(QCPAbstractPlottable* plottable)
     if (!registerPlottable(plottable))
         return false;
     plottable->mRegisteredPlot = this;
-    if (auto* graph = qobject_cast<QCPGraph*>(plottable))
+    if (auto* graph = qobject_cast<QCPMultiGraph*>(plottable))
         registerGraph(graph);
     // The scale it followed belonged to the plot it left: join the new rect's, as a fresh one does.
     if (auto* mapped = qobject_cast<QCPAbstractColorMapped*>(plottable);
@@ -4912,13 +4909,13 @@ bool QCustomPlot::registerJoinedPlottable(QCPAbstractPlottable* plottable)
 /*! \internal
 
   In order to maintain the simplified graph interface of QCustomPlot, this method is called by the
-  QCPGraph constructor to register itself with this QCustomPlot's internal graph list. Returns true
+  QCPMultiGraph constructor to register itself with this QCustomPlot's internal graph list. Returns true
   on success, i.e. if \a graph is valid and wasn't already registered with this QCustomPlot.
 
   This graph specific registration happens in addition to the call to \ref registerPlottable by the
   QCPAbstractPlottable base class.
 */
-bool QCustomPlot::registerGraph(QCPGraph* graph)
+bool QCustomPlot::registerGraph(QCPMultiGraph* graph)
 {
     if (mBeingDestroyed) // registerPlottable reported it already
         return false;

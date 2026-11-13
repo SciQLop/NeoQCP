@@ -29,7 +29,7 @@
 #include "../misuse.h"
 #include "../painting/draw-context.h"
 #include "../plottables/graph-data.h"
-#include "../plottables/plottable-graph.h"
+#include "../plottables/plottable-multigraph.h"
 #include <array>
 #include <cmath>
 
@@ -38,15 +38,15 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /*! \class QCPItemTracer
-  \brief Item that sticks to QCPGraph data points
+  \brief Item that sticks to the data points of a QCPMultiGraph component
 
   \image html QCPItemTracer.png "Tracer example. Blue dotted circles are anchors, solid blue discs
   are positions."
 
-  The tracer can be connected with a QCPGraph via \ref setGraph. Then it will automatically adopt
+  The tracer can be connected with a component of a QCPMultiGraph via \ref setGraph. Then it will automatically adopt
   the coordinate axes of the graph and update its \a position to be on the graph's data. This means
   the key stays controllable via \ref setGraphKey, but the value will follow the graph data. If a
-  QCPGraph is connected, note that setting the coordinates of the tracer item directly via \a
+  graph is connected, note that setting the coordinates of the tracer item directly via \a
   position will have no effect because they will be overriden in the next redraw (this is when the
   coordinate update happens).
 
@@ -171,26 +171,25 @@ void QCPItemTracer::setStyle(QCPItemTracer::TracerStyle style)
 }
 
 /*!
-  Sets the QCPGraph this tracer sticks to. The tracer \a position will be set to type
-  QCPItemPosition::ptPlotCoords and the axes will be set to the axes of \a graph.
+  Sets the graph, and its component \a component, this tracer sticks to. The tracer \a position
+  will be set to type QCPItemPosition::ptPlotCoords and the system of \a graph. Keys are read
+  through the graph's 1D interface, values from the component.
 
   To free the tracer from any graph, set \a graph to \c nullptr. The tracer \a position can then be
   placed freely like any other item position. A tracer whose graph gets deleted while still
-  attached to it is neither drawn nor selectable, and \ref graph returns \c nullptr, until the
-  next call of this function.
+  attached to it, or whose graph lost the followed component, is neither drawn nor selectable, and
+  \ref graph returns an empty handle once the graph is gone, until the next call of this function.
 
-  \see setGraphKey
+  A component outside the graph's columns is a misuse and nothing changes.
+
+  \see setGraphKey, setComponent
 */
-void QCPItemTracer::setGraph(QCPGraph* graph)
+void QCPItemTracer::setGraph(QCPMultiGraph* graph, int component)
 {
-    // One target: taking the old graph clears a multigraph target and its dependency.
-    const bool hadLineGraph = mLineGraph || mFollowsLineGraph;
-    if (mLineGraph)
-        mLineGraph->removeDependent(this);
-    mLineGraph = nullptr;
-    mFollowsLineGraph = false;
-
-    if (graph == mGraph && !graph && !hadLineGraph)
+    if (graph)
+        QCP_CHECK_OR_RETURN(graph->isValidColumn(component),
+                            "the component is outside the graph's columns");
+    if (!graph && !mGraph && !mFollowsGraph)
         return;
     if (mGraph)
         mGraph->removeDependent(this);
@@ -200,70 +199,27 @@ void QCPItemTracer::setGraph(QCPGraph* graph)
         position->setType(QCPItemPosition::ptPlotCoords);
         position->setSystem(graph->system());
         mGraph = graph;
+        mComponent = component;
         mFollowsGraph = true;
         // The tracer follows the graph's data wherever its own layer is: a data change must
         // repaint it even when the graph's layer is the only one the change marks.
         graph->addDependent(this);
         updatePosition();
+        return;
     }
-    else
-    {
-        if (graph)
-            qDebug() << Q_FUNC_INFO << "graph isn't in same QCustomPlot instance as this item";
-        mGraph = nullptr;
-        mFollowsGraph = false;
-    }
-}
-
-/*!
-  Sets the component of the \ref QCPMultiGraph this tracer sticks to. The tracer \a position will be
-  set to type QCPItemPosition::ptPlotCoords and the system of \a graph. Setting this target clears
-  the \ref QCPGraph target of \ref setGraph, and the other way round.
-*/
-void QCPItemTracer::setLineGraph(QCPMultiGraph* graph, int component)
-{
     if (graph)
-        QCP_CHECK_OR_RETURN(graph->isValidColumn(component),
-                            "the component is outside the graph's columns");
-
-    // One target: taking the multigraph clears an old QCPGraph target and its dependency.
-    if (mGraph)
-        mGraph->removeDependent(this);
+        qDebug() << Q_FUNC_INFO << "graph isn't in same QCustomPlot instance as this item";
     mGraph = nullptr;
     mFollowsGraph = false;
-
-    if (mLineGraph)
-        mLineGraph->removeDependent(this);
-    markDirty();
-    if (!graph)
-    {
-        mLineGraph = nullptr;
-        mFollowsLineGraph = false;
-        return;
-    }
-    if (graph->parentPlot() != mParentPlot)
-    {
-        qDebug() << Q_FUNC_INFO << "graph isn't in same QCustomPlot instance as this item";
-        mLineGraph = nullptr;
-        mFollowsLineGraph = false;
-        return;
-    }
-    position->setType(QCPItemPosition::ptPlotCoords);
-    position->setSystem(graph->system());
-    mLineGraph = graph;
-    mComponent = component;
-    mFollowsLineGraph = true;
-    graph->addDependent(this);
-    updatePosition();
 }
 
 void QCPItemTracer::setComponent(int component)
 {
-    if (!mLineGraph)
+    if (!mGraph)
         return; // no target: nothing to select a column of
     if (component == mComponent)
         return;
-    QCP_CHECK_OR_RETURN(component >= 0 && mLineGraph->isValidColumn(component),
+    QCP_CHECK_OR_RETURN(component >= 0 && mGraph->isValidColumn(component),
                         "the component is outside the graph's columns");
     markDirty();
     mComponent = component;
@@ -426,10 +382,8 @@ void QCPItemTracer::draw(QCPDrawContext& context) const
 */
 quint64 QCPItemTracer::dependencyRevision() const
 {
-    const quint64 lineGraph
-        = mLineGraph ? qHashMulti(qcpDependencyKey(mLineGraph.data()), mComponent) : 0;
-    return qHashMulti(qcpDependencyKey(mGraph.data()), lineGraph,
-                      QCPAbstractItem::dependencyRevision());
+    const quint64 graph = mGraph ? qHashMulti(qcpDependencyKey(mGraph.data()), mComponent) : 0;
+    return qHashMulti(graph, QCPAbstractItem::dependencyRevision());
 }
 
 /*!
@@ -446,15 +400,15 @@ quint64 QCPItemTracer::dependencyRevision() const
 */
 void QCPItemTracer::updatePosition()
 {
-    if (mLineGraph)
+    if (mGraph)
     {
-        if (!mParentPlot->hasPlottable(mLineGraph))
+        if (!mParentPlot->hasPlottable(mGraph))
         {
             qDebug() << Q_FUNC_INFO << "graph not contained in QCustomPlot instance (anymore)";
             return;
         }
-        QCPPlottableInterface1D* data = mLineGraph->interface1D();
-        if (!data || mComponent < 0 || mComponent >= mLineGraph->componentCount())
+        QCPPlottableInterface1D* data = mGraph->interface1D();
+        if (!data || mComponent < 0 || mComponent >= mGraph->componentCount())
             return;
         const int count = data->dataCount();
         if (count > 1)
@@ -462,10 +416,10 @@ void QCPItemTracer::updatePosition()
             const double firstKey = data->dataSortKey(0);
             const double lastKey = data->dataSortKey(count - 1);
             if (mGraphKey <= firstKey)
-                position->assignCoords(firstKey, mLineGraph->componentValueAt(mComponent, 0));
+                position->assignCoords(firstKey, mGraph->componentValueAt(mComponent, 0));
             else if (mGraphKey >= lastKey)
                 position->assignCoords(lastKey,
-                                       mLineGraph->componentValueAt(mComponent, count - 1));
+                                       mGraph->componentValueAt(mComponent, count - 1));
             else
             {
                 int previous = data->findBegin(mGraphKey);
@@ -474,14 +428,14 @@ void QCPItemTracer::updatePosition()
                 const int next = previous + 1;
                 if (next >= count)
                     position->assignCoords(lastKey,
-                                           mLineGraph->componentValueAt(mComponent, count - 1));
+                                           mGraph->componentValueAt(mComponent, count - 1));
                 else
                 {
                     const double previousKey = data->dataSortKey(previous);
                     const double nextKey = data->dataSortKey(next);
                     const double previousValue
-                        = mLineGraph->componentValueAt(mComponent, previous);
-                    const double nextValue = mLineGraph->componentValueAt(mComponent, next);
+                        = mGraph->componentValueAt(mComponent, previous);
+                    const double nextValue = mGraph->componentValueAt(mComponent, next);
                     if (mInterpolating)
                     {
                         double slope = 0;
@@ -500,67 +454,9 @@ void QCPItemTracer::updatePosition()
         }
         else if (count == 1)
             position->assignCoords(data->dataSortKey(0),
-                                   mLineGraph->componentValueAt(mComponent, 0));
+                                   mGraph->componentValueAt(mComponent, 0));
         else
             qDebug() << Q_FUNC_INFO << "graph has no data";
-        return;
-    }
-
-    if (mGraph)
-    {
-        if (mParentPlot->hasPlottable(mGraph))
-        {
-            if (mGraph->data()->size() > 1)
-            {
-                QCPGraphDataContainer::const_iterator first = mGraph->data()->constBegin();
-                QCPGraphDataContainer::const_iterator last = mGraph->data()->constEnd() - 1;
-                if (mGraphKey <= first->key)
-                    position->assignCoords(first->key, first->value);
-                else if (mGraphKey >= last->key)
-                    position->assignCoords(last->key, last->value);
-                else
-                {
-                    QCPGraphDataContainer::const_iterator it = mGraph->data()->findBegin(mGraphKey);
-                    if (it
-                        != mGraph->data()->constEnd()) // mGraphKey is not exactly on last iterator,
-                                                       // but somewhere between iterators
-                    {
-                        QCPGraphDataContainer::const_iterator prevIt = it;
-                        ++it; // won't advance to constEnd because we handled that case (mGraphKey
-                              // >= last->key) before
-                        if (mInterpolating)
-                        {
-                            // interpolate between iterators around mGraphKey:
-                            double slope = 0;
-                            if (!qFuzzyCompare(double(it->key), double(prevIt->key)))
-                                slope = (it->value - prevIt->value) / (it->key - prevIt->key);
-                            position->assignCoords(mGraphKey,
-                                                (mGraphKey - prevIt->key) * slope + prevIt->value);
-                        }
-                        else
-                        {
-                            // find iterator with key closest to mGraphKey:
-                            if (mGraphKey < (prevIt->key + it->key) * 0.5)
-                                position->assignCoords(prevIt->key, prevIt->value);
-                            else
-                                position->assignCoords(it->key, it->value);
-                        }
-                    }
-                    else // mGraphKey is exactly on last iterator (should actually be caught when
-                         // comparing first/last keys, but this is a failsafe for fp uncertainty)
-                        position->assignCoords(it->key, it->value);
-                }
-            }
-            else if (mGraph->data()->size() == 1)
-            {
-                QCPGraphDataContainer::const_iterator it = mGraph->data()->constBegin();
-                position->assignCoords(it->key, it->value);
-            }
-            else
-                qDebug() << Q_FUNC_INFO << "graph has no data";
-        }
-        else
-            qDebug() << Q_FUNC_INFO << "graph not contained in QCustomPlot instance (anymore)";
     }
 }
 

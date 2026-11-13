@@ -17,7 +17,8 @@ bool isShown(const QCPAbstractPlottable* plottable)
     if (!plottable->visible())
         return false;
     auto* multiGraph = qobject_cast<const QCPMultiGraph*>(plottable);
-    if (!multiGraph)
+    // A graph with no data yet has no component the user could have hidden: it is shown.
+    if (!multiGraph || multiGraph->componentCount() == 0)
         return true;
     for (int i = 0; i < multiGraph->componentCount(); ++i)
         if (multiGraph->component(i).visible)
@@ -25,7 +26,7 @@ bool isShown(const QCPAbstractPlottable* plottable)
     return false;
 }
 
-// A multi-graph is shown when visible with visible components (see isShown), so showing or hiding
+// A multi-graph is shown when visible with a visible component, or none yet (see isShown), so showing or hiding
 // it as a group member sets its components too.
 void setShown(const QPointer<QCPAbstractPlottable>& plottable, bool shown)
 {

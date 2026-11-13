@@ -15,7 +15,7 @@ void TestDataLocator::cleanup()
 
 void TestDataLocator::locateOnGraph()
 {
-    auto* graph = mPlot->addGraph();
+    QCPMultiGraph* graph = mPlot->addGraph();
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
     graph->addData(5.0, 5.0);
@@ -107,7 +107,7 @@ void TestDataLocator::locateOnColorMap()
 
 void TestDataLocator::locateOnEmptyPlottable()
 {
-    auto* graph = mPlot->addGraph();
+    QCPMultiGraph* graph = mPlot->addGraph();
     mPlot->replot();
 
     QCPDataLocator locator;

@@ -1,5 +1,6 @@
 #pragma once
 #include "layoutelement-legend.h"
+#include "../handle.h"
 #include <QPointer>
 
 class QCPMultiGraph;
@@ -12,7 +13,8 @@ class QCP_LIB_DECL QCPGroupLegendItem : public QCPPlottableLegendItem
 public:
     QCPGroupLegendItem(QCPLegend* parent, QCPMultiGraph* multiGraph);
 
-    QCPMultiGraph* multiGraph() const;
+    //! The graph this row shows.
+    [[nodiscard]] QCPHandle<QCPMultiGraph> graph() const;
     bool expanded() const { return mExpanded; }
     void setExpanded(bool expanded);
     int selectedComponent() const { return mSelectedComponent; }

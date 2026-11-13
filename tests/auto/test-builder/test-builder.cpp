@@ -300,7 +300,7 @@ void TestBuilder::addUserSubclass()
 void TestBuilder::addRefusedDuringTeardown()
 {
     auto* plot = new QCustomPlot;
-    auto* graph = plot->addGraph();
+    QCPMultiGraph* graph = plot->addGraph();
     bool refused = false;
     connect(graph, &QObject::destroyed, [plot, &refused] { refused = !plot->add<QCPMultiGraph>(); });
 
@@ -877,12 +877,12 @@ void TestBuilder::tracerGraphIsClearedOnTake()
     QCustomPlot plot;
     auto g = plot.add<QCPMultiGraph>(kKeys, kValues);
     auto tracer = plot.add<QCPItemTracer>();
-    tracer->setLineGraph(g.get());
-    QCOMPARE(tracer->lineGraph(), g.get());
+    tracer->setGraph(g.get());
+    QCOMPARE(tracer->graph(), g.get());
 
     auto taken = plot.take(tracer);
     QVERIFY(taken);
-    QCOMPARE(tracer->lineGraph(), nullptr); // the graph belongs to the plot it left
+    QCOMPARE(tracer->graph(), nullptr); // the graph belongs to the plot it left
 
     QCustomPlot other;
     auto moved = other.add(std::move(taken));
@@ -1091,12 +1091,12 @@ void TestBuilder::tracerTakesItsGraphByHandle()
 {
     QCustomPlot plot;
     auto graph = plot.add<QCPMultiGraph>(kKeys, kValues);
-    auto tracer = plot.add<QCPItemTracer>().setLineGraph(graph).setGraphKey(2);
-    QCOMPARE(tracer->lineGraph(), graph.get());
+    auto tracer = plot.add<QCPItemTracer>().setGraph(graph).setGraphKey(2);
+    QCOMPARE(tracer->graph(), graph.get());
     QCOMPARE(gMisuses, 0);
 
     graph.remove();
-    tracer.setLineGraph(graph);
+    tracer.setGraph(graph);
     QCOMPARE(gMisuses, 1);
 }
 
@@ -1340,7 +1340,7 @@ void TestBuilder::takeGraphClearsTracers()
     plot.resize(400, 300);
     auto graph = plot.add<QCPMultiGraph>(QVector<double> { 0, 1, 2 }, QVector<double> { 0, 1, 0 });
     auto tracer = plot.add<QCPItemTracer>();
-    tracer->setLineGraph(graph.get());
+    tracer->setGraph(graph.get());
     tracer->setGraphKey(1.0);
     plot.xAxis->setRange(0, 2);
     plot.yAxis->setRange(-1, 2);
@@ -1348,7 +1348,7 @@ void TestBuilder::takeGraphClearsTracers()
 
     auto taken = plot.take(graph);
     QVERIFY(taken);
-    QVERIFY2(!tracer->lineGraph(), "the tracer still points at the taken graph");
+    QVERIFY2(!tracer->graph(), "the tracer still points at the taken graph");
 
     gLoggedMessages.clear();
     const QtMessageHandler previous = qInstallMessageHandler(

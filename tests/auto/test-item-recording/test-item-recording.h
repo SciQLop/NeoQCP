@@ -39,7 +39,7 @@ private slots:
     void setComponentWithoutATargetDoesNothing();
     void deletingTheTracedMultiGraphLeavesTheTracerInert();
     void takingTheTracedMultiGraphLeavesTheTracerInert();
-    void retargetingFromAnOldGraphClearsIt();
+    void retargetingToAnotherGraphLeavesTheFirst();
     void theTracerOpsHandleSetsALineGraph();
     void theTracerRefusesAnOutOfRangeComponent();
     void aSwappedGraphContainerReRecords();

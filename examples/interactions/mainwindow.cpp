@@ -142,12 +142,12 @@ void MainWindow::selectionChanged()
   // synchronize selection of graphs with selection of corresponding legend items:
   for (int i=0; i<ui->customPlot->graphCount(); ++i)
   {
-    QCPGraph *graph = ui->customPlot->graph(i);
+    QCPMultiGraph *graph = ui->customPlot->graph(i);
     QCPPlottableLegendItem *item = ui->customPlot->legend->itemWithPlottable(graph);
     if (item->selected() || graph->selected())
     {
       item->setSelected(true);
-      graph->setSelection(QCPDataSelection(graph->data()->dataRange()));
+      graph->setSelection(QCPDataSelection(QCPDataRange(0, graph->dataCount())));
     }
   }
 }
@@ -205,10 +205,10 @@ void MainWindow::addRandomGraph()
     y[i] = (qSin(x[i]*r1*5)*qSin(qCos(x[i]*r2)*r4*3)+r3*qCos(qSin(x[i])*r4*2))*yScale + yOffset;
   }
   
-  ui->customPlot->add<QCPGraph>();
+  ui->customPlot->add<QCPMultiGraph>();
   ui->customPlot->graph()->setName(QString("New graph %1").arg(ui->customPlot->graphCount()-1));
   ui->customPlot->graph()->setData(x, y);
-  ui->customPlot->graph()->setLineStyle((QCPGraph::LineStyle)(std::rand()%5+1));
+  ui->customPlot->graph()->setLineStyle((QCPMultiGraph::LineStyle)(std::rand()%5+1));
   if (std::rand()%100 > 50)
     ui->customPlot->graph()->setScatterStyle(QCPScatterStyle((QCPScatterStyle::ScatterShape)(std::rand()%14+1)));
   QPen graphPen;

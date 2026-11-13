@@ -280,7 +280,7 @@ QImage itemScene(const char* kind)
                 graph->setPen(QPen(Qt::blue, 0));
                 graph->setData(keys, values);
                 auto* tracer = new QCPItemTracer(&plot);
-                tracer->setLineGraph(graph);
+                tracer->setGraph(graph);
                 tracer->setGraphKey(3.2);
                 tracer->setStyle(QCPItemTracer::tsCircle);
                 tracer->setSize(9);

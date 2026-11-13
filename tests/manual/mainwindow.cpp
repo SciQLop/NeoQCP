@@ -151,7 +151,7 @@ void MainWindow::setupItemTracerTest(QCustomPlot *customPlot)
   tracer4->setStyle(QCPItemTracer::tsSquare);
   tracer4->setSize(20);
 
-  QCPGraph *graph = customPlot->addGraph();
+  QCPMultiGraph *graph = customPlot->addGraph();
   int n = 20;
   QVector<double> x(n), y(n);
   for (int i=0; i<n; ++i)
@@ -200,16 +200,17 @@ void MainWindow::setupGraphTest(QCustomPlot *customPlot)
 {
   customPlot->addGraph();
 
-  QSharedPointer<QCPGraphDataContainer> data(new QCPGraphDataContainer);
   int n = 10e6;
   QElapsedTimer t;
   t.start();
+  std::vector<double> keys(n), values(n);
   for (int i=0; i<n; ++i)
   {
-    data->add(QCPGraphData(i, i));
+    keys[i] = i;
+    values[i] = i;
   }
   qDebug() << "data" << t.restart();
-  customPlot->graph(0)->setData(data);
+  customPlot->graph(0)->setData(keys, values, true);
   qDebug() << "set" << t.restart();
   customPlot->xAxis->setRange(0, 50);
   customPlot->yAxis->setRange(-1, 1);
@@ -250,7 +251,7 @@ void MainWindow::setupExportTest(QCustomPlot *customPlot)
   customPlot->clearPlottables();
   
   // test floating-point precision of vectorized (pdf) export:
-  QCPGraph *graph = customPlot->addGraph();
+  QCPMultiGraph *graph = customPlot->addGraph();
   QVector<double> x, y;
   for (int i=1; i<100; ++i)
   {
@@ -260,7 +261,7 @@ void MainWindow::setupExportTest(QCustomPlot *customPlot)
   x << 0.3 << 0.6; // point that should perfectly match grid
   y << 15 << 45; // point that should perfectly match grid
   graph->setData(x, y);
-  graph->setLineStyle(QCPGraph::lsNone);
+  graph->setLineStyle(QCPMultiGraph::lsNone);
   graph->setScatterStyle(QCPScatterStyle::ssPlus);
   customPlot->xAxis->setRange(0, 1.1);
   customPlot->yAxis->setRange(0, 101);
@@ -464,8 +465,8 @@ void MainWindow::setupSelectTest(QCustomPlot *customPlot)
   customPlot->yAxis->setRange(160, 220);
   */
   
-  // QCPGraph:
-  QCPGraph *g = customPlot->addGraph();
+  // QCPMultiGraph:
+  QCPMultiGraph *g = customPlot->addGraph();
   g->addData(QVector<double>() << -15 << -12 << -5 << 0 << 0.1 << 0.1 << 5 << 10 << 11,
              QVector<double>() << 0 << -5 << 5 << 0 << 6 << -2 << 4 << 7 << 5);
   
@@ -477,7 +478,7 @@ void MainWindow::setupDateTest(QCustomPlot *customPlot)
   customPlot->xAxis->setTicker(QSharedPointer<QCPAxisTicker>(new QCPAxisTickerDateTime));
   customPlot->xAxis->setRange(QDateTime(QDate(2015, 1, 1).startOfDay()).toMSecsSinceEpoch()/1000.0,
                               QDateTime(QDate(2020, 1, 1).startOfDay()).toMSecsSinceEpoch()/1000.0);
-  QCPGraph *g = customPlot->addGraph();
+  QCPMultiGraph *g = customPlot->addGraph();
   g->addData(QCPAxisTickerDateTime::dateTimeToKey(QDate(2015,1,1)), 1);
   g->addData(QCPAxisTickerDateTime::dateTimeToKey(QDate(2015,6,1)), 2);
   g->addData(QCPAxisTickerDateTime::dateTimeToKey(QDate(2015,6,12)), 4);
@@ -1086,11 +1087,14 @@ void MainWindow::setupLargeDataSetDelete(QCustomPlot *customPlot)
   timer.start();
   for (int n=0; n<50; ++n)
   {
-    QCPGraph *g = customPlot->addGraph();
-    QSharedPointer<QCPGraphDataContainer> data(new QCPGraphDataContainer);
+    QCPMultiGraph *g = customPlot->addGraph();
+    QVector<double> keys(82000), values(82000);
     for (int i=0; i<82000; ++i)
-      data->add(QCPGraphData(i, n+rand()/double(RAND_MAX)*0.3));
-    g->setData(data);
+    {
+      keys[i] = i;
+      values[i] = n+rand()/double(RAND_MAX)*0.3;
+    }
+    g->setData(keys, values, true);
   }
   qDebug() << "create" << timer.nsecsElapsed()/1e6 << "ms";
   customPlot->rescaleAxes();
@@ -1105,11 +1109,14 @@ void MainWindow::setupLargeDataSetDelete(QCustomPlot *customPlot)
   // create next set right away:
   for (int n=0; n<10; ++n)
   {
-    QCPGraph *g = customPlot->addGraph();
-    QSharedPointer<QCPGraphDataContainer> data(new QCPGraphDataContainer);
+    QCPMultiGraph *g = customPlot->addGraph();
+    QVector<double> keys(5000), values(5000);
     for (int i=0; i<5000; ++i)
-      data->add(QCPGraphData(i, n+rand()/double(RAND_MAX)*0.3));
-    g->setData(data);
+    {
+      keys[i] = i;
+      values[i] = n+rand()/double(RAND_MAX)*0.3;
+    }
+    g->setData(keys, values, true);
   }
   customPlot->rescaleAxes();
   customPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -1120,7 +1127,7 @@ void MainWindow::setupLargeDataSetDelete(QCustomPlot *customPlot)
 
 void MainWindow::setupMultiValueGraph(QCustomPlot *customPlot)
 {
-  QCPGraph *g = customPlot->addGraph();
+  QCPMultiGraph *g = customPlot->addGraph();
   
   QVector<double> x, y;
   x << 1 << 2 << 3 << 4 << 3 << 5 << 3; // three values at key 3, with exit point in center but out of order key data
@@ -1163,7 +1170,7 @@ void MainWindow::setupDataSelectTest(QCustomPlot *customPlot)
   std::srand(1);
   customPlot->setSelectionRectMode(QCP::srmSelect);
   
-  QCPGraph *g = customPlot->addGraph();
+  QCPMultiGraph *g = customPlot->addGraph();
   int n = 10000;
   QVector<double> x, y;
   x << -6;
@@ -1190,7 +1197,7 @@ void MainWindow::setupDataSelectTest(QCustomPlot *customPlot)
   y << -1;
   g->setData(x, y);
   g->setScatterStyle(QCPScatterStyle::ssPlus);
-  g->setLineStyle(QCPGraph::lsLine);
+  g->setLineStyle(QCPMultiGraph::lsLine);
   g->selectionDecorator()->setPen(QPen(Qt::red));
   g->selectionDecorator()->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, Qt::red));
   g->selectionDecorator()->setUsedScatterProperties(QCPScatterStyle::spPen|QCPScatterStyle::spShape);
@@ -1265,7 +1272,7 @@ void MainWindow::setupTimeZoneTest(QCustomPlot *customPlot)
 # if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
   QSharedPointer<QCPAxisTickerDateTime> ticker(new QCPAxisTickerDateTime);
   customPlot->xAxis->setTicker(ticker);
-  QCPGraph *graph = customPlot->addGraph();
+  QCPMultiGraph *graph = customPlot->addGraph();
   
   double timeStamp = 1577883600; // Wednesday, January 1, 2020 13:00:00 (UTC)
   graph->setData({timeStamp+3600*0, timeStamp+3600*1, timeStamp+3600*2, timeStamp+3600*3}, {1.0, 2.0, 2.5, 2.75});
@@ -1329,7 +1336,7 @@ void MainWindow::setupPolarAxisTest(QCustomPlot *customPlot)
 void MainWindow::setupAdaptiveSamplingTest(QCustomPlot *customPlot)
 {
   std::srand(1);
-  QCPGraph *g = customPlot->addGraph();
+  QCPMultiGraph *g = customPlot->addGraph();
   int n = 200000;
   QVector<double> x, y;
   x << -6;
@@ -1356,7 +1363,7 @@ void MainWindow::setupAdaptiveSamplingTest(QCustomPlot *customPlot)
   y << -1;
   g->setData(x, y);
   //g->setScatterStyle(QCPScatterStyle::ssPlus);
-  //g->setLineStyle(QCPGraph::lsNone);
+  //g->setLineStyle(QCPMultiGraph::lsNone);
   g->setAdaptiveSampling(true);
   
   customPlot->setPlottingHint(QCP::phFastPolylines, true);
@@ -1413,8 +1420,8 @@ void MainWindow::setupOneColumnMultiGraphTest(QCustomPlot *customPlot)
   g3->setDataSource(shared);
   g3->setPen(QPen(QColor(0, 180, 0), 1.0));
 
-  // Graph 4: legacy QCPGraph for visual comparison
-  QCPGraph *gLegacy = customPlot->addGraph();
+  // Graph 4: a one-column graph from addGraph, for visual comparison
+  QCPMultiGraph *gLegacy = customPlot->addGraph();
   {
     QVector<double> x(n / 5), y(n / 5);
     for (int i = 0; i < n / 5; ++i) {
@@ -1483,7 +1490,7 @@ void MainWindow::setupColorMap2Test(QCustomPlot *customPlot)
   cm->setGradient(gradient);
 
   // Add a line plot on top to verify z-ordering
-  auto *graph = customPlot->addGraph();
+  QCPMultiGraph* graph = customPlot->addGraph();
   graph->setPen(QPen(Qt::red, 2));
   QVector<double> gx(200), gy(200);
   for (int i = 0; i < 200; ++i)
@@ -1707,7 +1714,8 @@ void MainWindow::daqPerformanceDataSlot()
   }
   static int dir = 1;
   static bool grow = true;
-  if (mCustomPlot->graph()->data()->size() > 100000)
+  // The graph has no point removal (3.0): the demo stops growing at 100 000 points and ends.
+  if (mCustomPlot->graph()->dataCount() > 100000)
     grow = false;
   
   if (std::rand()%100000 < 100)
@@ -1738,11 +1746,7 @@ void MainWindow::daqPerformanceDataSlot()
     }
   } else
   {
-    if (std::rand()%10 < 1)
-      mCustomPlot->graph(0)->data()->removeBefore(mCustomPlot->graph(0)->data()->constBegin()->key+0.00000001);
-    else
-      mCustomPlot->graph(0)->data()->remove((mCustomPlot->graph(0)->data()->constEnd()-1)->key);
-    if (mCustomPlot->graph(0)->data()->isEmpty())
+    if (!grow)
       qApp->quit();
   }
 }
@@ -1757,7 +1761,7 @@ void MainWindow::daqPerformanceReplotSlot()
   }
   mCustomPlot->replot();
   
-  int dataPoints = mCustomPlot->graph(0)->data()->size();
+  int dataPoints = mCustomPlot->graph(0)->dataCount();
   static int lastDataPoints = dataPoints;
   qint64 now = qint64(QCPAxisTickerDateTime::dateTimeToKey(QDateTime::currentDateTime())*1000);
   static qint64 lastT = now;

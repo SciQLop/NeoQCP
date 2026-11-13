@@ -263,7 +263,7 @@ DOC_CODE(interactions_signals)
                      });
 
     QObject::connect(customPlot, &QCustomPlot::selectionChangedByUser, [customPlot] {
-        for (QCPGraph* graph : customPlot->selectedGraphs())
+        for (QCPMultiGraph* graph : customPlot->selectedGraphs())
             qDebug() << graph->name() << "has" << graph->selection().dataPointCount() << "selected points";
     });
     // [/interactions_signals]

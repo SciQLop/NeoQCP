@@ -29,7 +29,6 @@
 #include "../global.h"
 #include "../items/item.h"
 #include "../plottables/graph-data.h"
-#include "../plottables/plottable-graph.h"
 #include "../plottables/plottable-multigraph.h"
 
 class QCPPainter;
@@ -48,7 +47,7 @@ class QCP_LIB_DECL QCPItemTracer : public QCPAbstractItem
     Q_PROPERTY(QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush)
     Q_PROPERTY(double size READ size WRITE setSize)
     Q_PROPERTY(TracerStyle style READ style WRITE setStyle)
-    Q_PROPERTY(QCPGraph* graph READ graph WRITE setGraph)
+    Q_PROPERTY(QCPMultiGraph* graph READ graph WRITE setGraph)
     Q_PROPERTY(double graphKey READ graphKey WRITE setGraphKey)
     Q_PROPERTY(bool interpolating READ interpolating WRITE setInterpolating)
     /// \endcond
@@ -93,12 +92,13 @@ public:
 
     TracerStyle style() const { return mStyle; }
 
-    QCPGraph* graph() const { return mGraph.data(); }
+    //! The graph this tracer follows, or an empty handle.
+    [[nodiscard]] QCPHandle<QCPMultiGraph> graph() const
+    {
+        return QCPHandle<QCPMultiGraph>(mGraph.data());
+    }
 
-    //! The multigraph component this tracer follows, or null. Setting it clears \ref graph.
-    QCPMultiGraph* lineGraph() const { return mLineGraph.data(); }
-
-    //! The followed multigraph component index (0 when none).
+    //! The followed component index (0 when none).
     int component() const { return mComponent; }
 
     double graphKey() const { return mGraphKey; }
@@ -112,11 +112,10 @@ public:
     void setSelectedBrush(const QBrush& brush);
     void setSize(double size);
     void setStyle(TracerStyle style);
-    void setGraph(QCPGraph* graph);
-    //! Follows component \a component of \a graph. Setting it clears \ref graph; a component
-    //! outside the graph's columns is a misuse. This sets the component on the new target.
-    void setLineGraph(QCPMultiGraph* graph, int component = 0);
-    //! Changes the followed component; out of range is a misuse. Does nothing without a line graph
+    //! Follows component \a component of \a graph; null frees the tracer. A component outside the
+    //! graph's columns is a misuse.
+    void setGraph(QCPMultiGraph* graph, int component = 0);
+    //! Changes the followed component; out of range is a misuse. Does nothing without a graph
     //! (there is no target to select a column of).
     void setComponent(int component);
     void setGraphKey(double key);
@@ -126,10 +125,7 @@ public:
     void draw(QCPDrawContext& context) const override;
 
     //! The graph the recorded position comes from: another one makes the recording stale.
-    [[nodiscard]] const void* dataSourceIdentity() const override
-    {
-        return mLineGraph ? static_cast<const void*>(mLineGraph.data()) : mGraph.data();
-    }
+    [[nodiscard]] const void* dataSourceIdentity() const override { return mGraph.data(); }
 
     //! The graph's revision: a new sample moves the tracer without a call on it.
     [[nodiscard]] quint64 dependencyRevision() const override;
@@ -145,25 +141,20 @@ protected:
     QBrush mBrush, mSelectedBrush;
     double mSize;
     TracerStyle mStyle;
-    QPointer<QCPGraph> mGraph;
-    //! The multigraph target (B7): at most one of mGraph and mLineGraph is set.
-    QPointer<QCPMultiGraph> mLineGraph;
+    QPointer<QCPMultiGraph> mGraph;
     int mComponent = 0;
     bool mFollowsGraph = false; // set by setGraph, so a graph's death is told from no graph
-    bool mFollowsLineGraph = false;
     double mGraphKey;
     bool mInterpolating;
 
     bool lostGraph() const
     {
-        if (mFollowsGraph && !mGraph)
-            return true;
-        if (!mFollowsLineGraph)
+        if (!mFollowsGraph)
             return false;
-        if (!mLineGraph)
+        if (!mGraph)
             return true;
         // M3: the graph lost the column the tracer followed: the last sample is not the target.
-        return mComponent < 0 || mComponent >= mLineGraph->componentCount();
+        return mComponent < 0 || mComponent >= mGraph->componentCount();
     }
 
     // non-virtual methods:
@@ -207,25 +198,15 @@ public:
         return this->apply([&](T& o) { o.setSelectedBrush(brush); });
     }
 
-    // The graph to follow; a dead handle is refused with one misuse (use with() and nullptr to detach).
-    Ret setGraph(const QCPHandle<QCPGraph>& graph)
+    // The graph component to follow; a dead handle is refused with one misuse (use with() and
+    // nullptr to detach).
+    Ret setGraph(const QCPHandle<QCPMultiGraph>& graph, int component = 0)
     {
         return this->apply(
             [&](T& o)
             {
                 QCP_CHECK_OR_RETURN(graph, "the graph handle is dead");
-                o.setGraph(graph.get());
-            });
-    }
-
-    //! The multigraph component to follow; a dead handle is refused with one misuse.
-    Ret setLineGraph(const QCPHandle<QCPMultiGraph>& graph, int component = 0)
-    {
-        return this->apply(
-            [&](T& o)
-            {
-                QCP_CHECK_OR_RETURN(graph, "the graph handle is dead");
-                o.setLineGraph(graph.get(), component);
+                o.setGraph(graph.get(), component);
             });
     }
 

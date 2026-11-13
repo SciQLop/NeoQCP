@@ -9,13 +9,14 @@ private slots:
   void cleanup();
   
   void specializedGraphInterface();
+  void multiColumnAndWaterfallGraphsAreListed();
+  void selectedGraphsAndAxisGraphsListTheMultigraph();
   void dataManipulation();
-  void dataSharing();
   void channelFill();
   
 private:
   QCustomPlot *mPlot;
-  QCPGraph *mGraph;
+  QCPMultiGraph *mGraph;
 };
 
 

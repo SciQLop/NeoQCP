@@ -102,7 +102,7 @@ DOC_SNIPPET(layout_axis_rects, 720, 520)
             x[i] = i / 30.0;
             y[i] = std::sin(frequency * x[i]) * std::exp(-x[i] / 5);
         }
-        QCPGraph* graph = customPlot->addGraph(rect->axis(QCPAxis::atBottom),
+        QCPMultiGraph* graph = customPlot->addGraph(rect->axis(QCPAxis::atBottom),
                                                rect->axis(QCPAxis::atLeft));
         graph->setData(x, y);
         graph->setPen(QPen(color, 2));
@@ -128,7 +128,7 @@ DOC_SNIPPET(layout_margin_group, 600, 460)
         counts[i] = 40000 * (1 + std::cos(0.7 * t[i]));
     }
     customPlot->addGraph()->setData(t, ratio);
-    QCPGraph* lowerGraph = customPlot->addGraph(lower->axis(QCPAxis::atBottom),
+    QCPMultiGraph* lowerGraph = customPlot->addGraph(lower->axis(QCPAxis::atBottom),
                                                 lower->axis(QCPAxis::atLeft));
     lowerGraph->setData(t, counts);
     lowerGraph->setPen(QPen(QColor(255, 127, 14)));

@@ -35,6 +35,7 @@
 #include "../misuse.h"
 #include "../painting/painter.h"
 #include "../plottables/plottable-graph.h"
+#include "../plottables/plottable-multigraph.h"
 #include "../plottables/plottable.h"
 #include <QSet>
 #include <algorithm>
@@ -811,14 +812,14 @@ QList<QCPHandle<QCPAbstractPlottable>> QCPAxisRect::plottables() const
 
   \see plottables, items
 */
-QList<QCPGraph*> QCPAxisRect::graphs() const
+QList<QCPHandle<QCPMultiGraph>> QCPAxisRect::graphs() const
 {
     // Note: don't append all QCPAxis::graphs() into a list, because we might get duplicate entries
-    QList<QCPGraph*> result;
-    for (QCPGraph* graph : mParentPlot->mGraphs)
+    QList<QCPHandle<QCPMultiGraph>> result;
+    for (QCPMultiGraph* graph : mParentPlot->mGraphs)
     {
         if (graph->system() && graph->system()->area() == this)
-            result.append(graph);
+            result.append(QCPHandle<QCPMultiGraph>(graph));
     }
     return result;
 }

@@ -265,7 +265,7 @@ void TestItemSystem::theTracerFollowsItsGraphSystem()
     QVERIFY(graph->system());
 
     auto* tracer = new QCPItemTracer(mPlot);
-    tracer->setLineGraph(graph);
+    tracer->setGraph(graph);
     QCOMPARE(tracer->position->system(), graph->system());
     QCOMPARE(tracer->position->area(), static_cast<QCPArea*>(mPlot->axisRect()));
 }

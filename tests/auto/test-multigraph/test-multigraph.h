@@ -32,6 +32,7 @@ private slots:
     void addDataColumnCountMismatchIsAMisuse();
     void aPipelineSeesTheAppend();
     void oneColumnSetDataTakesQVectors();
+    void bracedListsSetOneColumn();
     void addDataSinglePointOnAMultiColumnGraphIsAMisuse();
     void addDataOnAUserSystemRedrawsWithoutPipeline();
     void aSourceStagedInDataSpaceGetsAPipelineJobAfterReturningToCartesian();

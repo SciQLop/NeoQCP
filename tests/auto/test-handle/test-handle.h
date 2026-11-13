@@ -24,6 +24,7 @@ private slots:
     void aDeletedDefaultAxisTestsFalse();
     void aDeletedLegendTestsFalse();
     void addGraphReturnsTheSameHandleAsAdd();
+    void aConstructedGraphIsInTheGraphList();
     void theLayoutHandsOutHandles();
     void theAxesHandOutHandles();
     void theLegendHandsOutHandles();

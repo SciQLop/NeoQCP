@@ -739,12 +739,12 @@ const QVector<PlottableAppearanceCase>& plottableAppearanceCases()
     static const QVector<PlottableAppearanceCase> cases {
         { "graph.setLineStyle", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
           [](QCPAbstractPlottable* p)
-          { static_cast<QCPGraph*>(p)->setLineStyle(QCPGraph::lsStepLeft); } },
+          { static_cast<QCPMultiGraph*>(p)->setLineStyle(QCPMultiGraph::lsStepLeft); } },
         { "graph.setScatterSkip", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPGraph*>(p)->setScatterSkip(2); } },
+          [](QCPAbstractPlottable* p) { static_cast<QCPMultiGraph*>(p)->setScatterSkip(2); } },
         { "graph.setAdaptiveSampling",
           [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPGraph*>(p)->setAdaptiveSampling(false); } },
+          [](QCPAbstractPlottable* p) { static_cast<QCPMultiGraph*>(p)->setAdaptiveSampling(false); } },
         { "graph.setPen", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
           [](QCPAbstractPlottable* p) { p->setPen(QPen(Qt::darkGreen, 3)); } },
         { "graph.setBrush", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
@@ -2510,7 +2510,7 @@ void TestRepaint::itemsDefaultToAnnotations()
     QCOMPARE(span->layer(), annotations);
 
     QVERIFY(plot.setCurrentLayer(QStringLiteral("grid")));
-    auto* graph = plot.addGraph();
+    QCPMultiGraph* graph = plot.addGraph();
     QCOMPARE(graph->layer(), plot.layer(QStringLiteral("grid")));
     auto* other = new QCPItemText(&plot);
     QCOMPARE(other->layer(), annotations);
@@ -2597,7 +2597,7 @@ void TestRepaint::textAboveGraphLine()
     text->setBrush(background);
     text->setPadding(QMargins(10, 10, 10, 10));
 
-    auto* graph = plot->addGraph();
+    QCPMultiGraph* graph = plot->addGraph();
     graph->setData(QVector<double> { 0, 1 }, QVector<double> { 0.5, 0.5 });
     graph->setPen(QPen(Qt::black, 8));
     plot->replot();
@@ -2742,7 +2742,7 @@ void TestRepaint::dashedLineStacksLikeSolid()
         rect->bottomRight->setCoords(0.8, 0.3);
         rect->setPen(Qt::NoPen);
         rect->setBrush(QColor(210, 40, 40));
-        auto* graph = plot->addGraph();
+        QCPMultiGraph* graph = plot->addGraph();
         QVector<double> keys, values;
         for (int i = 0; i <= 400; ++i)
         {
@@ -2796,7 +2796,7 @@ void TestRepaint::dashPhaseSurvivesPan()
     QCustomPlot* plot = shownGpuPlot(host);
     if (!plot)
         QSKIP("no QRhi on this platform");
-    auto* graph = plot->addGraph();
+    QCPMultiGraph* graph = plot->addGraph();
     QVector<double> keys, values;
     for (int i = 0; i <= 400; ++i)
     {
@@ -2839,7 +2839,7 @@ void TestRepaint::dashedLineMatchesExportDashes()
     QCustomPlot* plot = shownGpuPlot(host);
     if (!plot)
         QSKIP("no QRhi on this platform");
-    auto* graph = plot->addGraph();
+    QCPMultiGraph* graph = plot->addGraph();
     QVector<double> keys, values;
     for (int i = 0; i <= 400; ++i)
     {
@@ -2877,7 +2877,7 @@ void TestRepaint::solidLinesKeepTheirVertexFormat()
     QCustomPlot* plot = shownGpuPlot(host);
     if (!plot)
         QSKIP("no QRhi on this platform");
-    auto* graph = plot->addGraph();
+    QCPMultiGraph* graph = plot->addGraph();
     QVector<double> keys, values;
     for (int i = 0; i <= 100; ++i)
     {
@@ -2977,12 +2977,12 @@ void TestRepaint::dashedUnderSolidStaysUnder()
     plot->yAxis->setRange(0, 1);
 
     // Dashed first, solid second: the solid line crosses the dashed one and must be on top.
-    auto* dashed = plot->addGraph();
+    QCPMultiGraph* dashed = plot->addGraph();
     QPen alwaysOnDash(Qt::red, 6, Qt::CustomDashLine);
     alwaysOnDash.setDashPattern({ 1000.0, 1.0 }); // on for 6000 px: the crossing is mid-dash
     dashed->setPen(alwaysOnDash);
     dashed->setData(QVector<double> { 0, 1 }, QVector<double> { 0.5, 0.5 });
-    auto* solid = plot->addGraph();
+    QCPMultiGraph* solid = plot->addGraph();
     solid->setPen(QPen(Qt::blue, 6, Qt::SolidLine));
     solid->setData(QVector<double> { 0.5, 0.5 }, QVector<double> { 0, 1 });
     waitUntilSettled(*plot);
@@ -3000,10 +3000,10 @@ void TestRepaint::dashedUnderSolidStaysUnder()
     plot2->resize(400, 300);
     plot2->xAxis->setRange(0, 1);
     plot2->yAxis->setRange(0, 1);
-    auto* solid2 = plot2->addGraph();
+    QCPMultiGraph* solid2 = plot2->addGraph();
     solid2->setPen(QPen(Qt::blue, 6, Qt::SolidLine));
     solid2->setData(QVector<double> { 0.5, 0.5 }, QVector<double> { 0, 1 });
-    auto* dashed2 = plot2->addGraph();
+    QCPMultiGraph* dashed2 = plot2->addGraph();
     QPen longDash(Qt::red, 6, Qt::CustomDashLine);
     longDash.setDashPattern({ 1000.0, 1.0 }); // on for 6000 px: the crossing is mid-dash
     dashed2->setPen(longDash);
@@ -3022,7 +3022,7 @@ void TestRepaint::panDoesNotMarkTheLayerDirty()
     QCustomPlot* plot = shownGpuPlot(host);
     if (!plot)
         QSKIP("no QRhi on this platform");
-    auto* graph = plot->addGraph();
+    QCPMultiGraph* graph = plot->addGraph();
     QVector<double> keys, values;
     for (int i = 0; i <= 100; ++i)
     {

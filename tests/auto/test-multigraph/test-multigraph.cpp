@@ -350,6 +350,21 @@ void TestMultiGraph::oneColumnSetDataTakesQVectors()
     QCOMPARE(handle->componentValueAt(0, 1), 8.0);
 }
 
+// 2.x's setData({keys}, {values}) took QVectors; the QVector and std::vector overloads must not
+// make the braced call ambiguous.
+void TestMultiGraph::bracedListsSetOneColumn()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData({3, 1, 2}, {6, 4, 5});
+    QCOMPARE(mg->componentCount(), 1);
+    QCOMPARE(mg->dataCount(), 3);
+    QCOMPARE(mg->dataMainKey(0), 1.0);
+    QCOMPARE(mg->componentValueAt(0, 2), 6.0);
+
+    auto handle = mPlot->add<QCPMultiGraph>().setData({1.0, 2.0}, {7.0, 8.0}, true);
+    QCOMPARE(handle->componentValueAt(0, 1), 8.0);
+}
+
 void TestMultiGraph::addDataSinglePointOnAMultiColumnGraphIsAMisuse()
 {
     MisuseScope misuse;
@@ -902,7 +917,7 @@ void TestMultiGraph::addToLegendCreatesGroupItem()
     QCOMPARE(mPlot->legend->itemCount(), 1);
     auto* item = qobject_cast<QCPGroupLegendItem*>(mPlot->legend->item(0));
     QVERIFY(item != nullptr);
-    QCOMPARE(item->multiGraph(), mg);
+    QCOMPARE(item->graph(), mg);
 }
 
 void TestMultiGraph::legendHeaderDoesNotLeakClassNameWhenEmpty()
@@ -1759,7 +1774,7 @@ static QCPGroupLegendItem* groupItemOf(QCustomPlot* plot, QCPMultiGraph* mg)
 {
     for (int i = 0; i < plot->legend->itemCount(); ++i)
         if (auto* gi = qobject_cast<QCPGroupLegendItem*>(plot->legend->item(i)))
-            if (gi->multiGraph() == mg)
+            if (gi->graph() == mg)
                 return gi;
     return nullptr;
 }
@@ -4254,7 +4269,7 @@ void TestMultiGraph::legendIconShowsEachComponent()
     QCOMPARE(lines, 3);
 }
 
-// --- R1-R4: the multigraph behaves as 2.x's QCPGraph ---
+// --- R1-R4: the multigraph behaves as 2.x's QCPMultiGraph ---
 
 namespace
 {

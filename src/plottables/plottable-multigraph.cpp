@@ -31,6 +31,12 @@ QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis, QCP::Capabili
         : QCPAbstractLine(keyAxis, valueAxis, required)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
 {
+    // The graph list (2.x's addGraph/graph(i)): a graph its frame refused registered nowhere and
+    // must not leave a dangling entry there either. A graph the base registered (a cross-plot pair
+    // it owns but keeps inert included) is listed.
+    if (mParentPlot && isRegistered())
+        mParentPlot->registerGraph(this);
+
     // Base constructor auto-adds a QCPPlottableLegendItem (vtable not yet set up
     // for virtual addToLegend). Replace it with our group legend item. A refused object has no
     // system and no row to replace.
@@ -2797,7 +2803,7 @@ bool QCPMultiGraph::addToLegend(QCPLegend* legend)
         return false;
     for (int i = 0; i < legend->itemCount(); ++i)
         if (auto* gi = qobject_cast<QCPGroupLegendItem*>(legend->item(i)))
-            if (gi->multiGraph() == this)
+            if (gi->graph().get() == this)
                 return false;
     auto* item = new QCPGroupLegendItem(legend, this);
     return legend->addItem(item);
@@ -2813,7 +2819,7 @@ bool QCPMultiGraph::removeFromLegend(QCPLegend* legend) const
     }
     for (int i = 0; i < legend->itemCount(); ++i) {
         if (auto* groupItem = qobject_cast<QCPGroupLegendItem*>(legend->item(i))) {
-            if (groupItem->multiGraph() == this)
+            if (groupItem->graph().get() == this)
                 return legend->removeItem(i);
         }
     }

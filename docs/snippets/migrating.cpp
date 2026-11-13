@@ -10,7 +10,7 @@ QT_WARNING_DISABLE_CLANG("-Wunused-result")
 QT_WARNING_DISABLE_MSVC(4834)
 DOC_CODE(migrating_nodiscard)
 {
-    customPlot->add<QCPGraph>();
+    customPlot->add<QCPMultiGraph>();
     QTemporaryDir dir;
     const QString previous = QDir::currentPath();
     QDir::setCurrent(dir.path());

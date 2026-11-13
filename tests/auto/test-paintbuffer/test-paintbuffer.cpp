@@ -93,7 +93,7 @@ QCPLayer* ownBufferedLayer(QCustomPlot* plot, const QString& name)
 void TestPaintBuffer::axisDelete_dirtiesPlottableLayer()
 {
     QCPLayer* layer = ownBufferedLayer(mPlot, "graph_layer");
-    QCPGraph* graph = mPlot->addGraph();
+    QCPMultiGraph* graph = mPlot->addGraph();
     graph->setLayer(layer);
     graph->setData(QVector<double>{0, 1, 2}, QVector<double>{0, 1, 0});
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -140,7 +140,7 @@ void TestPaintBuffer::contentDirty_incrementalReplotSkipsCleanBuffers()
     QCPLayer* overlay = mPlot->layer("overlay");
     overlay->setMode(QCPLayer::lmBuffered);
 
-    QCPGraph* graph = mPlot->addGraph();
+    QCPMultiGraph* graph = mPlot->addGraph();
     graph->setData({1.0, 2.0, 3.0}, {1.0, 4.0, 2.0});
     auto* line = new QCPItemLine(mPlot);
     line->setLayer(overlay);
@@ -165,7 +165,7 @@ void TestPaintBuffer::contentDirty_incrementalReplotPreservesContent()
     QCPLayer* overlay = mPlot->layer("overlay");
     overlay->setMode(QCPLayer::lmBuffered);
 
-    auto* graph = mPlot->addGraph();
+    QCPMultiGraph* graph = mPlot->addGraph();
     graph->setData({1.0, 2.0, 3.0}, {1.0, 4.0, 2.0});
     auto* line = new QCPItemLine(mPlot);
     line->setLayer(overlay);
@@ -318,21 +318,6 @@ void TestPaintBuffer::skipRepaint_disabledWithItems()
     line->start->setCoords(1, 1);
     line->end->setCoords(3, 3);
 
-    mPlot->xAxis->setRange(0, 6);
-    mPlot->yAxis->setRange(0, 6);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    mPlot->xAxis->setRange(0.5, 6.5);
-    mPlot->axisRect()->markAffectedLayersDirty();
-
-    QCPLayer* mainLayer = mPlot->layer("main");
-    QVERIFY(!mainLayer->canSkipRepaintForTranslation());
-}
-
-void TestPaintBuffer::skipRepaint_disabledWithLegacyGraph()
-{
-    auto* graph = mPlot->addGraph();
-    graph->setData({1.0, 2.0, 3.0}, {1.0, 4.0, 2.0});
     mPlot->xAxis->setRange(0, 6);
     mPlot->yAxis->setRange(0, 6);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);

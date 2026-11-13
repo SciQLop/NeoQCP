@@ -49,6 +49,18 @@
 #include <QMessageBox>
 #include <QMetaEnum>
 
+// The demos build (key, value) points; a graph takes the keys and the values as two columns.
+static void setGraphPoints(QCPMultiGraph *graph, const QVector<QCPGraphData> &points)
+{
+  QVector<double> keys, values;
+  for (const QCPGraphData &point : points)
+  {
+    keys.append(point.key);
+    values.append(point.value);
+  }
+  graph->setData(keys, values);
+}
+
 MainWindow::MainWindow(QWidget *parent) :
   QMainWindow(parent),
   ui(new Ui::MainWindow)
@@ -128,7 +140,7 @@ void MainWindow::setupQuadraticDemo(QCustomPlot *customPlot)
     y[i] = x[i]*x[i];  // let's plot a quadratic function
   }
   // create graph and assign data to it:
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   customPlot->graph(0)->setData(x, y);
   // give the axes some labels:
   customPlot->xAxis->setLabel("x");
@@ -143,10 +155,10 @@ void MainWindow::setupSimpleDemo(QCustomPlot *customPlot)
   demoName = "Simple Demo";
   
   // add two new graphs and set their look:
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   customPlot->graph(0)->setPen(QPen(Qt::blue)); // line color blue for first graph
   customPlot->graph(0)->setBrush(QBrush(QColor(0, 0, 255, 20))); // first graph will be filled with translucent blue
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   customPlot->graph(1)->setPen(QPen(Qt::red)); // line color red for second graph
   // generate some points of data (y0 for first, y1 for second graph):
   QVector<double> x(251), y0(251), y1(251);
@@ -185,7 +197,7 @@ void MainWindow::setupSincScatterDemo(QCustomPlot *customPlot)
   // set locale to english, so we get english decimal separator:
   customPlot->setLocale(QLocale(QLocale::English, QLocale::UnitedKingdom));
   // add confidence band graphs:
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   QPen pen;
   pen.setStyle(Qt::DotLine);
   pen.setWidth(1);
@@ -193,22 +205,22 @@ void MainWindow::setupSincScatterDemo(QCustomPlot *customPlot)
   customPlot->graph(0)->setName("Confidence Band 68%");
   customPlot->graph(0)->setPen(pen);
   customPlot->graph(0)->setBrush(QBrush(QColor(255,50,30,20)));
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   customPlot->legend->removeItem(customPlot->legend->itemCount()-1); // don't show two confidence band graphs in legend
   customPlot->graph(1)->setPen(pen);
-  customPlot->graph(0)->setChannelFillGraph(customPlot->graph(1));
+  customPlot->graph(0)->setComponentFillToGraph(0, customPlot->graph(1), 0);
   // add theory curve graph:
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   pen.setStyle(Qt::DashLine);
   pen.setWidth(2);
   pen.setColor(Qt::red);
   customPlot->graph(2)->setPen(pen);
   customPlot->graph(2)->setName("Theory Curve");
   // add data point graph:
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   customPlot->graph(3)->setPen(QPen(Qt::blue));
   customPlot->graph(3)->setName("Measurement");
-  customPlot->graph(3)->setLineStyle(QCPGraph::lsNone);
+  customPlot->graph(3)->setLineStyle(QCPMultiGraph::lsNone);
   customPlot->graph(3)->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCross, 4));
   // add error bars:
   auto errorBars = customPlot->add<QCPErrorBars>();
@@ -286,7 +298,7 @@ void MainWindow::setupScatterStyleDemo(QCustomPlot *customPlot)
   // add graphs with different scatter styles:
   for (int i=0; i<shapes.size(); ++i)
   {
-    customPlot->add<QCPGraph>();
+    customPlot->add<QCPMultiGraph>();
     pen.setColor(QColor(qSin(i*0.3)*100+100, qSin(i*0.6+0.7)*100+100, qSin(i*0.4+0.6)*100+100));
     // generate data:
     QVector<double> x(10), y(10);
@@ -299,7 +311,7 @@ void MainWindow::setupScatterStyleDemo(QCustomPlot *customPlot)
     customPlot->graph()->rescaleAxes(true);
     customPlot->graph()->setPen(pen);
     customPlot->graph()->setName(QCPScatterStyle::staticMetaObject.enumerator(QCPScatterStyle::staticMetaObject.indexOfEnumerator("ScatterShape")).valueToKey(shapes.at(i)));
-    customPlot->graph()->setLineStyle(QCPGraph::lsLine);
+    customPlot->graph()->setLineStyle(QCPMultiGraph::lsLine);
     // set scatter style:
     if (shapes.at(i) != QCPScatterStyle::ssCustom)
     {
@@ -332,20 +344,20 @@ void MainWindow::setupLineStyleDemo(QCustomPlot *customPlot)
   QStringList lineNames;
   lineNames << "lsNone" << "lsLine" << "lsStepLeft" << "lsStepRight" << "lsStepCenter" << "lsImpulse";
   // add graphs with different line styles:
-  for (int i=QCPGraph::lsNone; i<=QCPGraph::lsImpulse; ++i)
+  for (int i=QCPMultiGraph::lsNone; i<=QCPMultiGraph::lsImpulse; ++i)
   {
-    customPlot->add<QCPGraph>();
+    customPlot->add<QCPMultiGraph>();
     pen.setColor(QColor(qSin(i*1+1.2)*80+80, qSin(i*0.3+0)*80+80, qSin(i*0.3+1.5)*80+80));
     customPlot->graph()->setPen(pen);
-    customPlot->graph()->setName(lineNames.at(i-QCPGraph::lsNone));
-    customPlot->graph()->setLineStyle((QCPGraph::LineStyle)i);
+    customPlot->graph()->setName(lineNames.at(i-QCPMultiGraph::lsNone));
+    customPlot->graph()->setLineStyle((QCPMultiGraph::LineStyle)i);
     customPlot->graph()->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 5));
     // generate data:
     QVector<double> x(15), y(15);
     for (int j=0; j<15; ++j)
     {
       x[j] = j/15.0 * 5*3.14 + 0.01;
-      y[j] = 7*qSin(x[j])/x[j] - (i-QCPGraph::lsNone)*5 + (QCPGraph::lsImpulse)*5 + 2;
+      y[j] = 7*qSin(x[j])/x[j] - (i-QCPMultiGraph::lsNone)*5 + (QCPMultiGraph::lsImpulse)*5 + 2;
     }
     customPlot->graph()->setData(x, y);
     customPlot->graph()->rescaleAxes(true);
@@ -366,8 +378,8 @@ void MainWindow::setupScatterPixmapDemo(QCustomPlot *customPlot)
 {
   demoName = "Scatter Pixmap Demo";
   customPlot->axisRect()->setBackground(QPixmap("./solarpanels.jpg"));
-  customPlot->add<QCPGraph>();
-  customPlot->graph()->setLineStyle(QCPGraph::lsLine);
+  customPlot->add<QCPMultiGraph>();
+  customPlot->graph()->setLineStyle(QCPMultiGraph::lsLine);
   QPen pen;
   pen.setColor(QColor(255, 200, 20, 200));
   pen.setStyle(Qt::DashLine);
@@ -417,9 +429,9 @@ void MainWindow::setupDateDemo(QCustomPlot *customPlot)
   // create multiple graphs:
   for (int gi=0; gi<5; ++gi)
   {
-    customPlot->add<QCPGraph>();
+    customPlot->add<QCPMultiGraph>();
     QColor color(20+200/4.0*gi,70*(1.6-gi/4.0), 150, 150);
-    customPlot->graph()->setLineStyle(QCPGraph::lsLine);
+    customPlot->graph()->setLineStyle(QCPMultiGraph::lsLine);
     customPlot->graph()->setPen(QPen(color.lighter(200)));
     customPlot->graph()->setBrush(QBrush(color));
     // generate random walk data:
@@ -432,7 +444,7 @@ void MainWindow::setupDateDemo(QCustomPlot *customPlot)
       else
         timeData[i].value = qFabs(timeData[i-1].value)*(1+0.02/4.0*(4-gi)) + (i/50.0+1)*(rand()/(double)RAND_MAX-0.5);
     }
-    customPlot->graph()->data()->set(timeData);
+    setGraphPoints(customPlot->graph(), timeData);
   }
   // configure bottom axis to show date instead of number:
   QSharedPointer<QCPAxisTickerDateTime> dateTicker(new QCPAxisTickerDateTime);
@@ -468,7 +480,7 @@ void MainWindow::setupTextureBrushDemo(QCustomPlot *customPlot)
 {
   demoName = "Texture Brush Demo";
   // add two graphs with a textured fill:
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   QPen redDotPen;
   redDotPen.setStyle(Qt::DotLine);
   redDotPen.setColor(QColor(170, 100, 100, 180));
@@ -476,11 +488,11 @@ void MainWindow::setupTextureBrushDemo(QCustomPlot *customPlot)
   customPlot->graph(0)->setPen(redDotPen);
   customPlot->graph(0)->setBrush(QBrush(QPixmap("./balboa.jpg"))); // fill with texture of specified image
   
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   customPlot->graph(1)->setPen(QPen(Qt::red));
   
   // activate channel fill for graph 0 towards graph 1:
-  customPlot->graph(0)->setChannelFillGraph(customPlot->graph(1));
+  customPlot->graph(0)->setComponentFillToGraph(0, customPlot->graph(1), 0);
   
   // generate data:
   QVector<double> x(250);
@@ -528,16 +540,16 @@ void MainWindow::setupMultiAxisDemo(QCustomPlot *customPlot)
   customPlot->addGraph(customPlot->yAxis, customPlot->xAxis);
   customPlot->graph(0)->setPen(QPen(QColor(255, 100, 0)));
   customPlot->graph(0)->setBrush(QBrush(QPixmap("./balboa.jpg"))); // fill with texture of specified image
-  customPlot->graph(0)->setLineStyle(QCPGraph::lsLine);
+  customPlot->graph(0)->setLineStyle(QCPMultiGraph::lsLine);
   customPlot->graph(0)->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 5));
   customPlot->graph(0)->setName("Left maxwell function");
   
   // setup for graph 1: key axis bottom, value axis left (those are the default axes)
   // will contain bottom maxwell-like function with error bars
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   customPlot->graph(1)->setPen(QPen(Qt::red));
   customPlot->graph(1)->setBrush(QBrush(QPixmap("./balboa.jpg"))); // same fill as we used for graph 0
-  customPlot->graph(1)->setLineStyle(QCPGraph::lsStepCenter);
+  customPlot->graph(1)->setLineStyle(QCPMultiGraph::lsStepCenter);
   customPlot->graph(1)->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, Qt::red, Qt::white, 7));
   customPlot->graph(1)->setName("Bottom maxwell function");
   auto errorBars = customPlot->add<QCPErrorBars>();
@@ -564,7 +576,7 @@ void MainWindow::setupMultiAxisDemo(QCustomPlot *customPlot)
   // will contain parabolically distributed data points with some random perturbance
   customPlot->addGraph(customPlot->yAxis2, customPlot->xAxis2);
   customPlot->graph(4)->setPen(QColor(50, 50, 50, 255));
-  customPlot->graph(4)->setLineStyle(QCPGraph::lsNone);
+  customPlot->graph(4)->setLineStyle(QCPMultiGraph::lsNone);
   customPlot->graph(4)->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 4));
   customPlot->graph(4)->setName("Some random data around\na quadratic function");
   
@@ -632,7 +644,7 @@ void MainWindow::setupLogarithmicDemo(QCustomPlot *customPlot)
 {
   demoName = "Logarithmic Demo";
   customPlot->setNoAntialiasingOnDrag(true); // more performance/responsiveness during dragging
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   QPen pen;
   pen.setColor(QColor(255,170,100));
   pen.setWidth(2);
@@ -640,23 +652,23 @@ void MainWindow::setupLogarithmicDemo(QCustomPlot *customPlot)
   customPlot->graph(0)->setPen(pen);
   customPlot->graph(0)->setName("x");
   
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   customPlot->graph(1)->setPen(QPen(Qt::red));
   customPlot->graph(1)->setBrush(QBrush(QColor(255, 0, 0, 20)));
   customPlot->graph(1)->setName("-sin(x)exp(x)");
   
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   customPlot->graph(2)->setPen(QPen(Qt::blue));
   customPlot->graph(2)->setBrush(QBrush(QColor(0, 0, 255, 20)));
   customPlot->graph(2)->setName(" sin(x)exp(x)");
   
-  customPlot->add<QCPGraph>();
+  customPlot->add<QCPMultiGraph>();
   pen.setColor(QColor(0,0,0));
   pen.setWidth(1);
   pen.setStyle(Qt::DashLine);
   customPlot->graph(3)->setPen(pen);
   customPlot->graph(3)->setBrush(QBrush(QColor(0,0,0,15)));
-  customPlot->graph(3)->setLineStyle(QCPGraph::lsStepCenter);
+  customPlot->graph(3)->setLineStyle(QCPMultiGraph::lsStepCenter);
   customPlot->graph(3)->setName("x!");
   
   const int dataCount = 200;
@@ -677,10 +689,10 @@ void MainWindow::setupLogarithmicDemo(QCustomPlot *customPlot)
     dataFactorial[i].value = 1.0;
     for (int k=1; k<=i; ++k) dataFactorial[i].value *= k; // factorial
   }
-  customPlot->graph(0)->data()->set(dataLinear);
-  customPlot->graph(1)->data()->set(dataMinusSinExp);
-  customPlot->graph(2)->data()->set(dataPlusSinExp);
-  customPlot->graph(3)->data()->set(dataFactorial);
+  setGraphPoints(customPlot->graph(0), dataLinear);
+  setGraphPoints(customPlot->graph(1), dataMinusSinExp);
+  setGraphPoints(customPlot->graph(2), dataPlusSinExp);
+  setGraphPoints(customPlot->graph(3), dataFactorial);
 
   customPlot->yAxis->grid()->setSubGridVisible(true);
   customPlot->xAxis->grid()->setSubGridVisible(true);
@@ -720,9 +732,9 @@ void MainWindow::setupRealtimeDataDemo(QCustomPlot *customPlot)
   customPlot->yAxis->setTickLabelFont(font);
   customPlot->legend->setFont(font);
   */
-  customPlot->add<QCPGraph>(); // blue line
+  customPlot->add<QCPMultiGraph>(); // blue line
   customPlot->graph(0)->setPen(QPen(QColor(40, 110, 255)));
-  customPlot->add<QCPGraph>(); // red line
+  customPlot->add<QCPMultiGraph>(); // red line
   customPlot->graph(1)->setPen(QPen(QColor(255, 110, 40)));
 
   QSharedPointer<QCPAxisTickerTime> timeTicker(new QCPAxisTickerTime);
@@ -956,7 +968,7 @@ void MainWindow::setupItemDemo(QCustomPlot *customPlot)
   // add the phase tracer (red circle) which sticks to the graph data (and gets updated in bracketDataSlot by timer event):
   auto phaseTracer = customPlot->add<QCPItemTracer>();
   itemDemoPhaseTracer = phaseTracer.get(); // so we can access it later in the bracketDataSlot for animation
-  phaseTracer->setLineGraph(graph.get());
+  phaseTracer->setGraph(graph.get());
   phaseTracer->setGraphKey((M_PI*1.5-phase)/k);
   phaseTracer->setInterpolating(true);
   phaseTracer->setStyle(QCPItemTracer::tsCircle);
@@ -988,7 +1000,7 @@ void MainWindow::setupItemDemo(QCustomPlot *customPlot)
   
   // add the group velocity tracer (green circle):
   auto groupTracer = customPlot->add<QCPItemTracer>();
-  groupTracer->setLineGraph(graph.get());
+  groupTracer->setGraph(graph.get());
   groupTracer->setGraphKey(5.5);
   groupTracer->setInterpolating(true);
   groupTracer->setStyle(QCPItemTracer::tsCircle);
@@ -1217,9 +1229,9 @@ void MainWindow::setupAdvancedAxesDemo(QCustomPlot *customPlot)
   mainGraphGauss->valueAxis()->setRange(0, 1000);
   mainGraphGauss->rescaleKeyAxis();
   
-  auto subGraphRandom = customPlot->add<QCPGraph>().setAxes(subRectLeft->axis(QCPAxis::atBottom), subRectLeft->axis(QCPAxis::atLeft));
-  subGraphRandom->data()->set(dataRandom);
-  subGraphRandom->setLineStyle(QCPGraph::lsImpulse);
+  auto subGraphRandom = customPlot->add<QCPMultiGraph>().setAxes(subRectLeft->axis(QCPAxis::atBottom), subRectLeft->axis(QCPAxis::atLeft));
+  setGraphPoints(subGraphRandom.get(), dataRandom);
+  subGraphRandom->setLineStyle(QCPMultiGraph::lsImpulse);
   subGraphRandom->setPen(QPen(QColor("#FFA100"), 1.5));
   subGraphRandom->rescaleAxes();
   
@@ -1452,7 +1464,7 @@ void MainWindow::realtimeDataSlot()
     ui->statusBar->showMessage(
           QString("%1 FPS, Total Data points: %2")
           .arg(frameCount/(key-lastFpsKey), 0, 'f', 0)
-          .arg(ui->customPlot->graph(0)->data()->size()+ui->customPlot->graph(1)->data()->size())
+          .arg(ui->customPlot->graph(0)->dataCount()+ui->customPlot->graph(1)->dataCount())
           , 0);
     lastFpsKey = key;
     frameCount = 0;
@@ -1489,7 +1501,7 @@ void MainWindow::bracketDataSlot()
     ui->statusBar->showMessage(
           QString("%1 FPS, Total Data points: %2")
           .arg(frameCount/(key-lastFpsKey), 0, 'f', 0)
-          .arg(ui->customPlot->graph(0)->data()->size())
+          .arg(ui->customPlot->graph(0)->dataCount())
           , 0);
     lastFpsKey = key;
     frameCount = 0;

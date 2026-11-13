@@ -49,7 +49,7 @@ class QCPAxis;
 class QCPAxisRect;
 class QCPAxisPainterPrivate;
 class QCPAbstractPlottable;
-class QCPGraph;
+class QCPMultiGraph;
 class QCPAbstractItem;
 class QCPGridRhiLayer;
 class QCPContourOverlay;
@@ -335,7 +335,7 @@ public:
     QCPAxis* moveTarget() const override;
     /*! \internal \a pixel seen on the move target's rect, at the same fraction of the axis. */
     double pixelOnMoveTarget(double pixel) const;
-    QList<QCPGraph*> graphs() const;
+    QList<QCPHandle<QCPMultiGraph>> graphs() const;
     QList<QCPHandle<QCPAbstractItem>> items() const;
 
     static AxisType marginSideToAxisType(QCP::MarginSide side);

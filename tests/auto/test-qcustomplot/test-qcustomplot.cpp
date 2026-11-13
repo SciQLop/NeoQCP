@@ -568,19 +568,19 @@ void TestQCustomPlot::rectSelectionKeepsThePlotOrder()
   right->setRange(0, 10);
 
   const auto add = [this](QCPAxis* key, QCPAxis* value, double keyAt) {
-    QCPGraph* graph = mPlot->addGraph(key, value);
+    QCPMultiGraph* graph = mPlot->addGraph(key, value);
     graph->setData(QVector<double>{ keyAt - 1, keyAt, keyAt + 1 }, QVector<double>{ 5, 5, 5 });
     graph->setSelectable(QCP::stWhole);
     return graph;
   };
-  QCPGraph* first = add(mPlot->xAxis, mPlot->yAxis, 2);
-  QCPGraph* second = add(top, right, 5); // another system, made between the other two
-  QCPGraph* third = add(mPlot->xAxis, mPlot->yAxis, 8);
+  QCPMultiGraph* first = add(mPlot->xAxis, mPlot->yAxis, 2);
+  QCPMultiGraph* second = add(top, right, 5); // another system, made between the other two
+  QCPMultiGraph* third = add(mPlot->xAxis, mPlot->yAxis, 8);
   QCOMPARE(rect->systems().size(), 2);
   mPlot->replot();
 
   QList<QCPAbstractPlottable*> selected;
-  for (QCPGraph* graph : { first, second, third })
+  for (QCPMultiGraph* graph : { first, second, third })
     connect(graph, &QCPAbstractPlottable::selectionChanged, this,
             [&selected, graph] { selected << graph; });
 

@@ -46,7 +46,7 @@ class QCPPainter;
 class QCustomPlot;
 class QCPAxis;
 class QCPAbstractPlottable;
-class QCPGraph;
+class QCPMultiGraph;
 class QCPAbstractItem;
 class QCPColorScale;
 
@@ -138,7 +138,7 @@ public:
     void zoomAt(const QPointF& pos, double factor);
     void setupFullAxesBox(bool connectRanges = false);
     QList<QCPHandle<QCPAbstractPlottable>> plottables() const;
-    QList<QCPGraph*> graphs() const;
+    QList<QCPHandle<QCPMultiGraph>> graphs() const;
     QList<QCPHandle<QCPAbstractItem>> items() const;
     //! The colour scale this rect owns and places in its margin, made on first call. It is visible
     //! exactly while a plottable uses it.

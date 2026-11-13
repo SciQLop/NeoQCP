@@ -116,14 +116,14 @@ DOC_SNIPPET(systems_shear, 600, 420)
         key[i] = i * 0.1;
         value[i] = std::sin(key[i] * std::numbers::pi / 2.5);
     }
-    auto* wave = customPlot->addGraph(x, y);   // a QCPGraph: it joins the shear system
+    QCPMultiGraph* wave = customPlot->addGraph(x, y);   // a QCPMultiGraph: it joins the shear system
     wave->setData(key, value);
     wave->setPen(QPen(QColor(31, 119, 180), 2));
     wave->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 5));
 
-    auto* steps = customPlot->addGraph(x, y);
+    QCPMultiGraph* steps = customPlot->addGraph(x, y);
     steps->setData({ 1, 3, 5, 7, 9 }, { -0.8, -0.2, -0.6, 0.1, -0.4 });
-    steps->setLineStyle(QCPGraph::lsStepLeft);
+    steps->setLineStyle(QCPMultiGraph::lsStepLeft);
     steps->setPen(QPen(QColor(214, 39, 40), 2));
     // [/systems_shear]
 }

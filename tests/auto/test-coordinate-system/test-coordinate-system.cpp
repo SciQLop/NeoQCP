@@ -817,7 +817,7 @@ void TestCoordinateSystem::aMisusedPairIsOwnedAndInert()
 
     // Axes of two rects: 2.x drew this clipped to both rects. Now it is no frame, but the plot
     // still owns it, and the one misuse report is the diagnostic.
-    auto* across = new QCPGraph(left->axis(QCPAxis::atBottom), right->axis(QCPAxis::atLeft));
+    auto* across = new QCPMultiGraph(left->axis(QCPAxis::atBottom), right->axis(QCPAxis::atLeft));
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear();
     QVERIFY(!across->system());
@@ -826,7 +826,7 @@ void TestCoordinateSystem::aMisusedPairIsOwnedAndInert()
     QCOMPARE(plot.plottableCount(), 1);
 
     // Two axes of one orientation: same story, not just a debug line.
-    auto* flat = new QCPGraph(left->axis(QCPAxis::atBottom), left->axis(QCPAxis::atTop));
+    auto* flat = new QCPMultiGraph(left->axis(QCPAxis::atBottom), left->axis(QCPAxis::atTop));
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear();
     QVERIFY(!flat->system());
@@ -997,14 +997,14 @@ void TestCoordinateSystem::axisPlottablesKeepTheirOrder()
     QCPAxisRect* rect1 = plot.axisRect();
     auto* rect2 = new QCPAxisRect(&plot);
     plot.plotLayout()->addElement(0, 1, rect2);
-    QCPGraph* g1 = plot.addGraph(rect1->axis(QCPAxis::atBottom), rect1->axis(QCPAxis::atLeft));
-    QCPGraph* g2 = plot.addGraph(rect1->axis(QCPAxis::atBottom), rect1->axis(QCPAxis::atLeft));
-    QCPGraph* g3 = plot.addGraph(rect2->axis(QCPAxis::atBottom), rect2->axis(QCPAxis::atLeft));
+    QCPMultiGraph* g1 = plot.addGraph(rect1->axis(QCPAxis::atBottom), rect1->axis(QCPAxis::atLeft));
+    QCPMultiGraph* g2 = plot.addGraph(rect1->axis(QCPAxis::atBottom), rect1->axis(QCPAxis::atLeft));
+    QCPMultiGraph* g3 = plot.addGraph(rect2->axis(QCPAxis::atBottom), rect2->axis(QCPAxis::atLeft));
     // Selection by system, but the plot's own order, as the axes have always answered.
     QCOMPARE(qcp::pointers(plot.xAxis->plottables()), (QList<QCPAbstractPlottable*> { g1, g2 }));
     QCOMPARE(qcp::pointers(rect1->plottables()), (QList<QCPAbstractPlottable*> { g1, g2 }));
     QCOMPARE(qcp::pointers(rect2->plottables()), (QList<QCPAbstractPlottable*> { g3 }));
-    QCOMPARE(rect1->axis(QCPAxis::atLeft)->graphs(), (QList<QCPGraph*> { g1, g2 }));
+    QCOMPARE(qcp::pointers(rect1->axis(QCPAxis::atLeft)->graphs()), (QList<QCPMultiGraph*> { g1, g2 }));
 }
 
 void TestCoordinateSystem::aBracketDecorationNeedsAKeyAxis()

@@ -141,7 +141,7 @@ void TestSpanRhi::spanOnALowerLayerStaysUnderTheData()
     span->setRange(QCPRange(5, 9));
     span->setBrush(QColor(0, 0, 255));
     span->setLayer("background");
-    auto* graph = mPlot->addGraph();
+    QCPMultiGraph* graph = mPlot->addGraph();
     graph->setData(QVector<double> { 0, 10 }, QVector<double> { 5, 5 });
     graph->setPen(QPen(Qt::red, 4));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);

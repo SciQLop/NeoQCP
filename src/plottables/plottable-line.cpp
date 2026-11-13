@@ -75,6 +75,12 @@ void QCPAbstractLine::setComponentPens(const QList<QPen>& pens)
 // drawn. The fan-out is cheap.
 void QCPAbstractLine::setPen(const QPen& pen)
 {
+    // An equal pen everywhere draws nothing new (2.x's setPen did not repaint either).
+    const QPen selected = defaultSelectedPen(pen);
+    if (mExplicitPen == pen
+        && std::all_of(mComponents.cbegin(), mComponents.cend(), [&](const Component& c)
+                       { return c.pen == pen && c.selectedPen == selected; }))
+        return;
     mPen = pen;
     mExplicitPen = pen;
     for (auto& c : mComponents) {

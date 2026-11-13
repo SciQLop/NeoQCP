@@ -246,8 +246,8 @@ void MainWindow::snippetQCPAxisTickers()
 
 void MainWindow::snippetQCPGraphDataSharing()
 {
-  QCPGraph *graph1 = customPlot->addGraph();
-  QCPGraph *graph2 = customPlot->addGraph();
+  QCPMultiGraph *graph1 = customPlot->addGraph();
+  QCPMultiGraph *graph2 = customPlot->addGraph();
   //! [qcpgraph-datasharing-1]
   graph2->setData(graph1->data()); // graph1 and graph2 now share data container
   //! [qcpgraph-datasharing-1]
@@ -324,7 +324,7 @@ void MainWindow::snippetQCPErrorBarsDataSharing()
 
 void MainWindow::snippetQCPDataSelectionIterating()
 {
-  QCPGraph *graph = customPlot->addGraph();
+  QCPMultiGraph *graph = customPlot->addGraph();
   for (int i=0; i<100; ++i)
     graph->addData(i, i);
   graph->setSelection(QCPDataRange(10, 15) + QCPDataRange(20, 40) + QCPDataRange(60, 80));
@@ -334,12 +334,10 @@ void MainWindow::snippetQCPDataSelectionIterating()
   double sum = 0;
   foreach (QCPDataRange dataRange, selection.dataRanges())
   {
-    QCPGraphDataContainer::const_iterator begin = graph->data()->at(dataRange.begin()); // get range begin iterator from index
-    QCPGraphDataContainer::const_iterator end = graph->data()->at(dataRange.end()); // get range end iterator from index
-    for (QCPGraphDataContainer::const_iterator it=begin; it!=end; ++it)
+    for (int i=dataRange.begin(); i<dataRange.end(); ++i)
     {
-      // iterator "it" will go through all selected data points, as an example, we calculate the value average
-      sum += it->value;
+      // index "i" will go through all selected data points, as an example, we calculate the value average
+      sum += graph->dataMainValue(i);
     }
   }
   double average = sum/selection.dataPointCount();
@@ -350,18 +348,15 @@ void MainWindow::snippetQCPDataSelectionIterating()
 
 void MainWindow::snippetQCPDataSelectionPointAtPos()
 {
-  QCPGraph *graph = customPlot->addGraph();
+  QCPMultiGraph *graph = customPlot->addGraph();
   //! [qcpdataselection-pointatpos]
-  QCPGraphDataContainer::const_iterator it = graph->data()->constEnd();
+  int index = -1;
   QVariant details;
-  if (graph->selectTest(QPoint(123, 456), false, &details)) // QPoint could be e.g. event->pos() of a mouse event
-  {
-    QCPDataSelection dataPoints = details.value<QCPDataSelection>();
-    if (dataPoints.dataPointCount() > 0)
-      it = graph->data()->at(dataPoints.dataRange().begin());
-  }
-  // iterator "it" now carries the data point at pixel coordinates (123, 456), or constEnd if no data point was hit.
+  if (graph->selectTest(QPoint(123, 456), false, &details) >= 0) // QPoint could be e.g. event->pos() of a mouse event
+    index = qcp::hitDataIndex(details).value_or(-1);
+  // "index" now is the data point at pixel coordinates (123, 456), or -1 if no data point was hit.
   //! [qcpdataselection-pointatpos]
+  Q_UNUSED(index)
 }
 
 void MainWindow::websiteBasicPlottingBars()

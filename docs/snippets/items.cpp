@@ -55,7 +55,7 @@ DOC_SNIPPET(items_tracer_bracket, 600, 360)
     customPlot->yAxis->setRange(-1.3, 1.9);
 
     auto tracer = customPlot->add<QCPItemTracer>();
-    tracer->setLineGraph(graph.get());
+    tracer->setGraph(graph.get());
     tracer->setGraphKey(12.5);
     tracer->setInterpolating(true);
     tracer->setStyle(QCPItemTracer::tsCircle);

@@ -22,6 +22,7 @@
 #include <atomic>
 #include <cmath>
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -102,6 +103,13 @@ public:
     //! One-column data: keys and values as std::vectors.
     void setData(const std::vector<double>& keys, const std::vector<double>& values,
                  bool alreadySorted = false);
+    //! One-column data from braced lists, `setData({1, 2}, {3, 4})`: 2.x's QVector call, which
+    //! the two container overloads above would make ambiguous.
+    void setData(std::initializer_list<double> keys, std::initializer_list<double> values,
+                 bool alreadySorted = false)
+    {
+        setData(std::vector<double>(keys), std::vector<double>(values), alreadySorted);
+    }
 
     //! Appends rows to the source this graph owns. A view, a shared source, a waterfall adapter
     //! or a source the graph does not own is a misuse and nothing changes.
@@ -478,6 +486,12 @@ public:
     }
 
     Ret setData(const std::vector<double>& keys, const std::vector<double>& values,
+                bool alreadySorted = false)
+    {
+        return this->apply([&](T& o) { o.setData(keys, values, alreadySorted); });
+    }
+
+    Ret setData(std::initializer_list<double> keys, std::initializer_list<double> values,
                 bool alreadySorted = false)
     {
         return this->apply([&](T& o) { o.setData(keys, values, alreadySorted); });

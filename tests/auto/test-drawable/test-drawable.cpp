@@ -1226,7 +1226,7 @@ void TestDrawable::gradientBarsStackAsOne()
     if (!f.hasRhi())
         QSKIP("No QRhi available - the rasterised fills are a GPU path only");
     // The graph is created first, so it must stay under every bar.
-    auto* graph = f.plot->addGraph();
+    QCPMultiGraph* graph = f.plot->addGraph();
     graph->setData(QVector<double> { 1, 9 }, QVector<double> { 2, 2 });
     graph->setPen(QPen(Qt::red, 24));
     auto* shape = new TestShape(f.plot.get());
@@ -1303,7 +1303,7 @@ void TestDrawable::drawnPolygonStacksAboveAnEarlierGpuGraph()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - this checks the order of two GPU submissions");
-    auto* graph = f.plot->addGraph();
+    QCPMultiGraph* graph = f.plot->addGraph();
     graph->setData(QVector<double> { 1, 9 }, QVector<double> { 4, 4 });
     graph->setPen(QPen(Qt::red, 24));
     auto* shape = new TestShape(f.plot.get()); // created after the graph: it must land above it

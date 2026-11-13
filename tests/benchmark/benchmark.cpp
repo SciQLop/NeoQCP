@@ -23,22 +23,6 @@ private slots:
     void init();
     void cleanup();
 
-    void QCPGraph_Standard();
-    void QCPGraph_ManyPoints();
-    void QCPGraph_ManyLines();
-    void QCPGraph_ManyOffScreenLines();
-    void QCPGraph_RemoveDataBetween();
-    void QCPGraph_RemoveDataAfter();
-    void QCPGraph_RemoveDataBefore();
-    void QCPGraph_AddDataAtEndSorted();
-    void QCPGraph_AddDataAtBeginSorted();
-    void QCPGraph_AddDataMixedSorted();
-    void QCPGraph_AddDataAtEndUnsorted();
-    void QCPGraph_AddDataAtBeginUnsorted();
-    void QCPGraph_AddDataMixedUnsorted();
-    void QCPGraph_AddDataSingleAtEnd();
-    void QCPGraph_AddDataSingleAtBegin();
-    void QCPGraph_AddDataSingleRandom();
 
     void QCPColorMap_Standard();
     void QCPColorMap_ColorizeMap();
@@ -188,486 +172,6 @@ void Benchmark::init()
 void Benchmark::cleanup()
 {
     delete mPlot;
-}
-
-void Benchmark::QCPGraph_Standard()
-{
-    QCPGraph* graph1 = mPlot->addGraph();
-    QCPGraph* graph2 = mPlot->addGraph();
-    QCPGraph* graph3 = mPlot->addGraph();
-    graph1->setBrush(QBrush(QColor(100, 0, 0, 100)));
-    int n = 500;
-    QVector<double> x(n), y1(n), y2(n), y3(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x[i] = i / (double)n;
-        y1[i] = qSin(x[i] * 10 * M_PI);
-        y2[i] = qCos(x[i] * 40 * M_PI);
-        y3[i] = x[i];
-    }
-    graph1->setData(x, y1);
-    graph2->setData(x, y2);
-    graph3->setData(x, y3);
-    mPlot->rescaleAxes();
-    mPlot->xAxis->scaleRange(0.7, mPlot->xAxis->range().center());
-
-    QBENCHMARK
-    {
-        mPlot->replot();
-    }
-}
-
-void Benchmark::QCPGraph_ManyPoints()
-{
-    QCPGraph* graph1 = mPlot->addGraph();
-    QCPGraph* graph2 = mPlot->addGraph();
-    QCPGraph* graph3 = mPlot->addGraph();
-    graph1->setBrush(QBrush(QColor(100, 0, 0, 100)));
-    graph1->setScatterStyle(QCPScatterStyle::ssCross);
-    graph2->setScatterStyle(QCPScatterStyle::ssCircle);
-    graph3->setScatterStyle(QCPScatterStyle::ssDiamond);
-    graph1->setLineStyle(QCPGraph::lsNone);
-    graph2->setLineStyle(QCPGraph::lsNone);
-    graph3->setLineStyle(QCPGraph::lsNone);
-    int n = 50000;
-    QVector<double> x(n), y1(n), y2(n), y3(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x[i] = i / (double)n;
-        y1[i] = qSin(x[i] * 10 * M_PI);
-        y2[i] = qCos(x[i] * 40 * M_PI);
-        y3[i] = x[i];
-    }
-    graph1->setData(x, y1);
-    graph2->setData(x, y2);
-    graph3->setData(x, y3);
-    mPlot->rescaleAxes();
-    mPlot->xAxis->scaleRange(0.7, mPlot->xAxis->range().center());
-
-    QBENCHMARK
-    {
-        mPlot->replot();
-    }
-}
-
-void Benchmark::QCPGraph_ManyLines()
-{
-    QCPGraph* graph1 = mPlot->addGraph();
-    QCPGraph* graph2 = mPlot->addGraph();
-    QCPGraph* graph3 = mPlot->addGraph();
-    graph1->setBrush(QBrush(QColor(100, 0, 0, 100)));
-    graph1->setScatterStyle(QCPScatterStyle());
-    graph2->setScatterStyle(QCPScatterStyle());
-    graph3->setScatterStyle(QCPScatterStyle());
-    graph1->setLineStyle(QCPGraph::lsLine);
-    graph2->setLineStyle(QCPGraph::lsLine);
-    graph3->setLineStyle(QCPGraph::lsLine);
-    int n = 50000;
-    QVector<double> x(n), y1(n), y2(n), y3(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x[i] = i / (double)n;
-        y1[i] = qSin(x[i] * 10 * M_PI);
-        y2[i] = qCos(x[i] * 40 * M_PI);
-        y3[i] = x[i];
-    }
-    graph1->setData(x, y1);
-    graph2->setData(x, y2);
-    graph3->setData(x, y3);
-    mPlot->rescaleAxes();
-    mPlot->xAxis->scaleRange(0.7, mPlot->xAxis->range().center());
-
-    QBENCHMARK
-    {
-        mPlot->replot();
-    }
-}
-
-void Benchmark::QCPGraph_ManyOffScreenLines()
-{
-    QCPGraph* graph1 = mPlot->addGraph();
-    QCPGraph* graph2 = mPlot->addGraph();
-    QCPGraph* graph3 = mPlot->addGraph();
-    graph1->setBrush(QBrush(QColor(100, 0, 0, 100)));
-    graph1->setScatterStyle(QCPScatterStyle::ssNone);
-    graph2->setScatterStyle(QCPScatterStyle::ssNone);
-    graph3->setScatterStyle(QCPScatterStyle::ssNone);
-    graph1->setLineStyle(QCPGraph::lsLine);
-    graph2->setLineStyle(QCPGraph::lsLine);
-    graph3->setLineStyle(QCPGraph::lsLine);
-    int n = 50000;
-    QVector<double> x(n), y1(n), y2(n), y3(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x[i] = i / (double)n;
-        y1[i] = qSin(x[i] * 10 * M_PI);
-        y2[i] = qCos(x[i] * 40 * M_PI);
-        y3[i] = x[i];
-    }
-    graph1->setData(x, y1);
-    graph2->setData(x, y2);
-    graph3->setData(x, y3);
-    mPlot->rescaleAxes();
-    mPlot->xAxis->setRange(1.1, 2.1);
-
-    QBENCHMARK
-    {
-        mPlot->replot();
-    }
-}
-
-void Benchmark::QCPGraph_RemoveDataBetween()
-{
-    // we time and report this benchmark ourselves because it must be re-setup
-    // before every iteration, and a single iteration is not enough to
-    // provide sufficient precision
-
-    QCPGraph* graph = mPlot->addGraph();
-    int n = 1000000;
-    QVector<double> x1(n), y1(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x1[i] = 2.0 * i / (double)n;
-        y1[i] = qSin(x1[i] * 10 * M_PI);
-    }
-
-    QElapsedTimer timer;
-    bool done = false;
-    qint64 elapsed = 0;
-    int iterations = 0;
-    while (!done)
-    {
-        ++iterations;
-        graph->setData(x1, y1);
-        timer.restart();
-
-        graph->data()->remove(0.5, 1.5); // 50% of total data in center
-
-        elapsed += timer.nsecsElapsed();
-        done = elapsed > 25e3 && iterations > 3; // have 25us and done some iterations
-    }
-    QTest::setBenchmarkResult(elapsed / 1e6 / (double)iterations, QTest::WalltimeMilliseconds);
-}
-
-void Benchmark::QCPGraph_RemoveDataAfter()
-{
-    // we time and report this benchmark ourselves because it must be re-setup
-    // before every iteration, and a single iteration is not enough to
-    // provide sufficient precision
-
-    QCPGraph* graph = mPlot->addGraph();
-    int n = 1000000;
-    QVector<double> x1(n), y1(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x1[i] = 2.0 * i / (double)n;
-        y1[i] = qSin(x1[i] * 10 * M_PI);
-    }
-
-    QElapsedTimer timer;
-    bool done = false;
-    qint64 elapsed = 0;
-    int iterations = 0;
-    while (!done)
-    {
-        ++iterations;
-        graph->setData(x1, y1);
-        timer.restart();
-
-        graph->data()->removeAfter(1.0); // last 50% of total data
-
-        elapsed += timer.nsecsElapsed();
-        done = elapsed > 25e3 && iterations > 3; // have 25us and done some iterations
-    }
-    QTest::setBenchmarkResult(elapsed / 1e6 / (double)iterations, QTest::WalltimeMilliseconds);
-}
-
-void Benchmark::QCPGraph_RemoveDataBefore()
-{
-    // we time and report this benchmark ourselves because it must be re-setup
-    // before every iteration, and a single iteration is not enough to
-    // provide sufficient precision
-
-    QCPGraph* graph = mPlot->addGraph();
-    int n = 1000000;
-    QVector<double> x1(n), y1(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x1[i] = 2.0 * i / (double)n;
-        y1[i] = qSin(x1[i] * 10 * M_PI);
-    }
-
-    QElapsedTimer timer;
-    bool done = false;
-    qint64 elapsed = 0;
-    int iterations = 0;
-    while (!done)
-    {
-        ++iterations;
-        graph->setData(x1, y1);
-        timer.restart();
-
-        graph->data()->removeBefore(1.0); // first 50% of total data
-
-        elapsed += timer.nsecsElapsed();
-        done = elapsed > 25e3 && iterations > 3; // have 25us and done some iterations
-    }
-    QTest::setBenchmarkResult(elapsed / 1e6 / (double)iterations, QTest::WalltimeMilliseconds);
-}
-
-void Benchmark::QCPGraph_AddDataAtEndSorted()
-{
-    QCPGraph* graph = mPlot->addGraph();
-    int n = 500000;
-    QVector<double> x1(n), y1(n), x2(n), y2(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x1[i] = i / (double)n;
-        y1[i] = qSin(x1[i] * 10 * M_PI);
-        x2[i] = (i + n) / (double)n;
-        y2[i] = qSin(x2[i] * 10 * M_PI);
-    }
-
-    graph->setData(x1, y1);
-    QBENCHMARK_ONCE
-    {
-        graph->addData(x2, y2, true);
-    }
-}
-
-void Benchmark::QCPGraph_AddDataAtBeginSorted()
-{
-    QCPGraph* graph = mPlot->addGraph();
-    int n = 500000;
-    QVector<double> x1(n), y1(n), x2(n), y2(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x1[i] = (i + n) / (double)n;
-        y1[i] = qSin(x1[i] * 10 * M_PI);
-        x2[i] = i / (double)n;
-        y2[i] = qSin(x2[i] * 10 * M_PI);
-    }
-
-    graph->setData(x1, y1);
-    QBENCHMARK_ONCE
-    {
-        graph->addData(x2, y2, true);
-    }
-}
-
-void Benchmark::QCPGraph_AddDataMixedSorted()
-{
-    QCPGraph* graph = mPlot->addGraph();
-    int n = 500000;
-    QVector<double> x1(n), y1(n), x2(n), y2(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x1[i] = i / (double)n;
-        y1[i] = qSin(x1[i] * 10 * M_PI);
-        x2[i] = (i + 0.5) / (double)(3 * n);
-        y2[i] = qSin(x2[i] * 10 * M_PI);
-    }
-
-    graph->setData(x1, y1);
-    QBENCHMARK_ONCE
-    {
-        graph->addData(x2, y2, true);
-    }
-}
-
-void Benchmark::QCPGraph_AddDataAtEndUnsorted()
-{
-    QCPGraph* graph = mPlot->addGraph();
-    int n = 500000;
-    QVector<double> x1(n), y1(n), x2(n), y2(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x1[i] = i / (double)n;
-        y1[i] = qSin(x1[i] * 10 * M_PI);
-        x2[i] = (i + n + 0.1 * (std::rand() % 500))
-            / (double)n; // not completely randomized, but local disorder, global ascending order
-                         // (typical use-case for data acquisition)
-        y2[i] = qSin(x2[i] * 10 * M_PI);
-    }
-
-    graph->setData(x1, y1);
-    QBENCHMARK_ONCE
-    {
-        graph->addData(x2, y2, false);
-    }
-}
-
-void Benchmark::QCPGraph_AddDataAtBeginUnsorted()
-{
-    QCPGraph* graph = mPlot->addGraph();
-    int n = 500000;
-    QVector<double> x1(n), y1(n), x2(n), y2(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x1[i] = (i + n) / (double)n;
-        y1[i] = qSin(x1[i] * 10 * M_PI);
-        x2[i] = (i - 0.1 * (std::rand() % 500))
-            / (double)n; // not completely randomized, but local disorder, global ascending order
-                         // (typical use-case for data acquisition)
-        y2[i] = qSin(x2[i] * 10 * M_PI);
-    }
-
-    graph->setData(x1, y1);
-    QBENCHMARK_ONCE
-    {
-        graph->addData(x2, y2, false);
-    }
-}
-
-void Benchmark::QCPGraph_AddDataMixedUnsorted()
-{
-    QCPGraph* graph = mPlot->addGraph();
-    int n = 500000;
-    QVector<double> x1(n), y1(n), x2(n), y2(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x1[i] = i / (double)n;
-        y1[i] = qSin(x1[i] * 10 * M_PI);
-        x2[i] = (i + 0.1 * (std::rand() % 500))
-            / (double)(3 * n); // not completely randomized, but local disorder, global ascending
-                               // order (typical use-case for data acquisition)
-        y2[i] = qSin(x2[i] * 10 * M_PI);
-    }
-
-    graph->setData(x1, y1);
-    QBENCHMARK_ONCE
-    {
-        graph->addData(x2, y2, false);
-    }
-}
-
-void Benchmark::QCPGraph_AddDataSingleAtEnd()
-{
-    // we time and report this benchmark ourselves because it must be re-setup
-    // before every iteration, and a single iteration is not enough to
-    // provide sufficient precision
-
-    QCPGraph* graph = mPlot->addGraph();
-    int n = 50000;
-    QVector<double> x1(n), y1(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x1[i] = i / (double)n;
-        y1[i] = qSin(x1[i] * 10 * M_PI);
-    }
-    // prepare random data that can be used by qbenchmark-loops:
-    int n2 = 5000;
-    QVector<double> y2(n2);
-    for (int i = 0; i < n2; ++i)
-    {
-        y2[i] = qSin(i / (double)n * 10 * M_PI);
-    }
-
-    graph->setData(x1, y1);
-    double key = x1.last() + 0.1;
-    QElapsedTimer timer;
-    qint64 elapsed = 0;
-    int iteration = 0;
-    while (iteration < n2)
-    {
-        timer.restart();
-
-        graph->addData(key, y2[iteration]);
-
-        elapsed += timer.nsecsElapsed();
-        key += 0.1;
-        ++iteration;
-    }
-    QTest::setBenchmarkResult(
-        elapsed / 1e3 / (double)iteration,
-        QTest::WalltimeMilliseconds); // 1e3 instead of 1e6 is intentional to get time of 1000
-                                      // iterations (fits better to precision of benchmark script)
-}
-
-void Benchmark::QCPGraph_AddDataSingleAtBegin()
-{
-    // we time and report this benchmark ourselves because it must be re-setup
-    // before every iteration, and a single iteration is not enough to
-    // provide sufficient precision
-
-    QCPGraph* graph = mPlot->addGraph();
-    int n = 50000;
-    QVector<double> x1(n), y1(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x1[i] = i / (double)n;
-        y1[i] = qSin(x1[i] * 10 * M_PI);
-    }
-    // prepare random data that can be used by qbenchmark-loops:
-    int n2 = 5000;
-    QVector<double> y2(n2);
-    for (int i = 0; i < n2; ++i)
-    {
-        y2[i] = qSin(i / (double)n * 10 * M_PI);
-    }
-
-    graph->setData(x1, y1);
-    double key = x1.first() - 0.1;
-    QElapsedTimer timer;
-    qint64 elapsed = 0;
-    int iteration = 0;
-    while (iteration < n2)
-    {
-        timer.restart();
-
-        graph->addData(key, y2[iteration]);
-
-        elapsed += timer.nsecsElapsed();
-        key -= 0.1;
-        ++iteration;
-    }
-    QTest::setBenchmarkResult(
-        elapsed / 1e3 / (double)iteration,
-        QTest::WalltimeMilliseconds); // 1e3 instead of 1e6 is intentional to get time of 1000
-                                      // iterations (fits better to precision of benchmark script)
-}
-
-void Benchmark::QCPGraph_AddDataSingleRandom()
-{
-    // we time and report this benchmark ourselves because it must be re-setup
-    // before every iteration, and a single iteration is not enough to
-    // provide sufficient precision
-
-    QCPGraph* graph = mPlot->addGraph();
-    int n = 50000;
-    QVector<double> x1(n), y1(n);
-    for (int i = 0; i < n; ++i)
-    {
-        x1[i] = i / (double)n;
-        y1[i] = qSin(x1[i] * 10 * M_PI);
-    }
-    // prepare random data that can be used by qbenchmark-loops:
-    int n2 = 5000;
-    QVector<double> x2(n2), y2(n2);
-    for (int i = 0; i < n2; ++i)
-    {
-        x2[i] = (std::rand() % n + 0.5)
-            / (double)n; // randomly in range of existing data, that's why mod n
-        y2[i] = qSin(x2[i] * 10 * M_PI);
-    }
-
-    graph->setData(x1, y1);
-    QElapsedTimer timer;
-    qint64 elapsed = 0;
-    int iteration = 0;
-    while (iteration < n2)
-    {
-        timer.restart();
-
-        graph->addData(x2[iteration], y2[iteration]);
-
-        elapsed += timer.nsecsElapsed();
-        ++iteration;
-    }
-    QTest::setBenchmarkResult(
-        elapsed / 1e3 / (double)iteration,
-        QTest::WalltimeMilliseconds); // 1e3 instead of 1e6 is intentional to get time of 1000
-                                      // iterations (fits better to precision of benchmark script)
 }
 
 void Benchmark::QCPColorMap_Standard()
@@ -1693,7 +1197,7 @@ void Benchmark::QCPGpu_LineSolid100k()
     QCustomPlot* plot = nullptr;
     if (!makeGpuPlot(host, plot))
         QSKIP("no QRhi on this platform (qoffscreen)");
-    auto* graph = plot->addGraph();
+    QCPMultiGraph* graph = plot->addGraph();
     graph->setPen(QPen(Qt::black, 1, Qt::SolidLine));
     QVector<double> keys(100000), values(100000);
     fillSine(keys, values, 1.0);
@@ -1714,7 +1218,7 @@ void Benchmark::QCPGpu_LineDashed100k()
     QCustomPlot* plot = nullptr;
     if (!makeGpuPlot(host, plot))
         QSKIP("no QRhi on this platform (qoffscreen)");
-    auto* graph = plot->addGraph();
+    QCPMultiGraph* graph = plot->addGraph();
     graph->setPen(QPen(Qt::black, 1, Qt::DashLine)); // the QPainter branch, on a GPU surface
     QVector<double> keys(100000), values(100000);
     fillSine(keys, values, 1.0);
@@ -1735,7 +1239,7 @@ void Benchmark::QCPGpu_Pan100k()
     QCustomPlot* plot = nullptr;
     if (!makeGpuPlot(host, plot))
         QSKIP("no QRhi on this platform (qoffscreen)");
-    auto* graph = plot->addGraph();
+    QCPMultiGraph* graph = plot->addGraph();
     graph->setPen(QPen(Qt::black, 1, Qt::SolidLine));
     QVector<double> keys(100000), values(100000);
     fillSine(keys, values, 100.0);
@@ -2521,7 +2025,7 @@ void Benchmark::QCPGpu_MixedLayer()
     // one layer, which is what a default plot does today.
     for (int i = 0; i < 100; ++i)
     {
-        auto* graph = plot->addGraph();
+        QCPMultiGraph* graph = plot->addGraph();
         graph->setPen(QPen(QColor::fromHsv((i * 7) % 360, 200, 160), 1, Qt::SolidLine));
         QVector<double> keys(1000), values(1000);
         for (int j = 0; j < 1000; ++j)
@@ -3023,7 +2527,7 @@ void Benchmark::QCPDrawn_Pan10kOneRecording()
 // QCPItems_Pan10k / QCPBars_Pan10k rows above.
 void Benchmark::QCPErrorBars_Pan10k()
 {
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(10000);
     QVector<double> values(10000);
     QVector<double> errors(10000);
@@ -3193,7 +2697,7 @@ void Benchmark::QCPItems_MixedKinds_Pan1k()
 {
     // 100 of every item kind plus 50 spans of each orientation, all inside 50..51: the pan
     // below draws each of them on every frame instead of culling almost all of them.
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(101);
     QVector<double> values(101);
     for (int i = 0; i < 101; ++i)
@@ -3273,7 +2777,7 @@ void Benchmark::QCPItems_Tracers_Pan1k()
 {
     // A thousand tracers on one graph, each at its own key inside the one-key window: every one of
     // them draws on each frame, and each asks its graph where it is.
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(1001);
     QVector<double> values(1001);
     for (int i = 0; i < 1001; ++i)
@@ -3419,7 +2923,7 @@ void Benchmark::QCPPlottables_Pan200()
         QVector<double> values(1000);
         for (int i = 0; i < 1000; ++i)
             values[i] = 0.5 + 0.4 * qSin(0.01 * i + 0.03 * g);
-        auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+        auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
         graph->setData(keys, values);
     }
     mPlot->xAxis->setRange(0, 1000);
@@ -3444,7 +2948,7 @@ void Benchmark::QCPPlottables_Zoom200()
         QVector<double> values(1000);
         for (int i = 0; i < 1000; ++i)
             values[i] = 0.5 + 0.4 * qSin(0.01 * i + 0.03 * g);
-        auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+        auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
         graph->setData(keys, values);
     }
     mPlot->xAxis->setRange(0, 1000);

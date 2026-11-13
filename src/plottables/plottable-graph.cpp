@@ -125,12 +125,6 @@ QCPGraph::QCPGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
         , mScatterSkip {}
         , mAdaptiveSampling {}
 {
-    // special handling for QCPGraphs to maintain the simple graph interface: a graph its frame
-    // refused registered nowhere, and must not leave a dangling entry in mGraphs either. A graph
-    // the base registered (including a cross-plot pair it owns but keeps inert) is listed here.
-    if (mParentPlot && isRegistered())
-        mParentPlot->registerGraph(this);
-
     setPen(QPen(Qt::blue, 0));
     setBrush(Qt::NoBrush);
 
