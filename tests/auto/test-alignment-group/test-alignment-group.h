@@ -38,6 +38,7 @@ private slots:
     void anUnsettledLayoutStopsAndRepaintsLater();
     void aSideSwitchedToManualStopsAligning();
     void anOscillatingLayoutGoesQuiet();
+    void aGroupDeletedByTheUserRelaysItsMembersOut();
 
     // The mixed-side margin-group layouts of 2.x, rebuilt with alignment groups (m5d B2).
     void jointDensityAlignsAfterOneRender();

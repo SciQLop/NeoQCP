@@ -46,7 +46,11 @@ constexpr int notLaidOut = INT_MIN;
 
 QCPAlignmentGroup::QCPAlignmentGroup(QCP::MarginSides sides) : mSides(sides) { }
 
-QCPAlignmentGroup::~QCPAlignmentGroup() = default;
+// Deleted by hand while members remain: they lay their freed sides out on their own.
+QCPAlignmentGroup::~QCPAlignmentGroup()
+{
+    invalidate();
+}
 
 bool QCPAlignmentGroup::eligible(const QCPLayoutElement* element)
 {

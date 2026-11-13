@@ -978,3 +978,24 @@ void TestAlignmentGroup::anOscillatingLayoutGoesQuiet()
     QVERIFY(!plot.isRepaintQueued());
     QCOMPARE(gMisuses, 1);
 }
+
+// Deleting a group by hand frees its members' edges: their plots lay them out on their own again
+// without waiting for an unrelated replot.
+void TestAlignmentGroup::aGroupDeletedByTheUserRelaysItsMembersOut()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    auto* reference = makePlot(false); // the same plot as B, never grouped
+    QScopedPointer<QWidget> window(makeFreeStack({ a, b, reference }, 24));
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    QPointer<QCPAlignmentGroup> group
+        = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() }, QCP::msLeft);
+    QVERIFY(group);
+    QVERIFY(settle({ a, b, reference }));
+    QVERIFY(innerLeft(b) > innerLeft(reference));
+
+    delete group.data();
+    QTest::qWait(150); // only the plots' own queued repaints run
+    QCOMPARE(innerLeft(b), innerLeft(reference));
+}
