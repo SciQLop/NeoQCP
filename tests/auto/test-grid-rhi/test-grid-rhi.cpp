@@ -286,6 +286,26 @@ void TestGridRhi::gradientGraphFillLooksTheSameOnScreenAndInExports()
 
 // The GPU grid drew every line solid: QCustomPlot's default dotted grid was solid on screen and
 // dotted only in exports.
+namespace {
+/*! The share of the axis rect's rows inked where the vertical grid line at \a coord is drawn.
+  The line may sit across a pixel boundary (the screen antialiases it, the export does not): a
+  row counts when any of the device columns around the line is dark. */
+double gridLineInk(const QImage& image, QCustomPlot* plot, double coord, double dpr)
+{
+    const int x = qRound(plot->xAxis->coordToPixel(coord) * dpr);
+    const QRect r = plot->axisRect()->rect();
+    int ink = 0, all = 0;
+    for (int y = qRound((r.top() + 5) * dpr); y < qRound((r.bottom() - 5) * dpr); ++y, ++all)
+    {
+        bool dark = false;
+        for (int dx = -qCeil(dpr); dx <= qCeil(dpr); ++dx)
+            dark = dark || image.pixelColor(x + dx, y).lightness() < 128;
+        ink += dark;
+    }
+    return double(ink) / all;
+}
+} // namespace
+
 void TestGridRhi::dashedGridPenIsDashedOnScreen()
 {
     if (!showAndHasRhiGrid(mPlot))
@@ -302,15 +322,8 @@ void TestGridRhi::dashedGridPenIsDashedOnScreen()
     for (double t : mPlot->xAxis->tickVector())
         if (t != 0 && t > mPlot->xAxis->range().lower && t < mPlot->xAxis->range().upper)
             tick = t;
-    const int x = qRound(mPlot->xAxis->coordToPixel(tick) * dpr);
-    const QRect r = mPlot->axisRect()->rect();
-    const auto inkFraction = [&](const QImage& image) {
-        int ink = 0, all = 0;
-        for (int y = qRound((r.top() + 5) * dpr); y < qRound((r.bottom() - 5) * dpr); ++y, ++all)
-            ink += image.pixelColor(x, y).lightness() < 128;
-        return double(ink) / all;
-    };
-    const double onScreen = inkFraction(frame), inExport = inkFraction(exported);
+    const double onScreen = gridLineInk(frame, mPlot, tick, dpr);
+    const double inExport = gridLineInk(exported, mPlot, tick, dpr);
     if (onScreen >= 0.95 || qAbs(onScreen - inExport) >= 0.1)
         keepImagesForCi(QStringLiteral("dashedGridPenIsDashedOnScreen"), frame, exported);
     QVERIFY2(onScreen < 0.95, qPrintable(QString("solid on screen: %1").arg(onScreen)));
