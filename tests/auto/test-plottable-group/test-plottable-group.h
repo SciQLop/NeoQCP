@@ -34,6 +34,7 @@ private slots:
     void foreignGroupIsNotRemoved();
     void iconIsTheFirstVisibleMembers();
     void anEmptyGraphsIconIsItsPen();
+    void financialAndErrorBarIconsShowInTheGroupRow();
 
 private:
     QCPPlottableGroupLegendItem* groupRow() const;

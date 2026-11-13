@@ -424,3 +424,50 @@ void TestPlottableGroup::anEmptyGraphsIconIsItsPen()
         + QPoint(iconSize.width() / 2, iconSize.height() / 2);
     QCOMPARE(img.pixelColor(iconCentre), QColor(Qt::blue));
 }
+
+// The two icons recorded as a bounding rect plus a painter callback (m5d D-1): a group row shows
+// the same pixels as the plottable's own row.
+void TestPlottableGroup::financialAndErrorBarIconsShowInTheGroupRow()
+{
+    const QList<std::function<QCPAbstractPlottable*(QCustomPlot&)>> makers {
+        [](QCustomPlot& plot) -> QCPAbstractPlottable* {
+            auto* financial = new QCPFinancial(plot.xAxis, plot.yAxis);
+            financial->setChartStyle(QCPFinancial::csOhlc);
+            financial->setPen(QPen(Qt::darkGreen, 2));
+            return financial;
+        },
+        [](QCustomPlot& plot) -> QCPAbstractPlottable* {
+            auto* bars = new QCPErrorBars(plot.xAxis, plot.yAxis);
+            bars->setPen(QPen(Qt::darkRed, 2));
+            return bars;
+        },
+    };
+    for (const auto& make : makers)
+    {
+        QCustomPlot plot;
+        plot.legend->setVisible(true);
+        QCPAbstractPlottable* plottable = make(plot);
+        plottable->setName("member");
+        const QSize iconSize = plot.legend->iconSize();
+        const auto iconAt = [&](const QCPLayoutElement* row) {
+            const QImage image = plot.toPixmap(400, 300).toImage(); // lays the legend out first
+            return image.copy(QRect(row->rect().topLeft(), iconSize));
+        };
+        const QImage own = iconAt(plot.legend->itemWithPlottable(plottable));
+
+        QCPPlottableGroup* group = plot.addPlottableGroup("member");
+        QVERIFY(group->addMember(plottable));
+        QCPPlottableGroupLegendItem* row = nullptr;
+        for (int i = 0; i < plot.legend->itemCount(); ++i)
+            if (auto* candidate = qobject_cast<QCPPlottableGroupLegendItem*>(plot.legend->item(i)))
+                row = candidate;
+        QVERIFY(row);
+        const QImage grouped = iconAt(row);
+        QVERIFY2(grouped == own, qPrintable(plottable->metaObject()->className()));
+        bool drawn = false;
+        for (int y = 0; y < own.height() && !drawn; ++y)
+            for (int x = 0; x < own.width() && !drawn; ++x)
+                drawn = own.pixelColor(x, y) != QColor(Qt::white);
+        QVERIFY2(drawn, "the icon is blank");
+    }
+}
