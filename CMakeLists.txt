@@ -37,8 +37,15 @@ add_library(NeoQCP STATIC
     ${CMAKE_CURRENT_BINARY_DIR}/embedded_shaders.h)
 add_library(NeoQCP::NeoQCP ALIAS NeoQCP)
 # No fused multiply-add contraction, as in meson.build: the same colours on every architecture.
+# clang-cl is CMAKE_CXX_COMPILER_ID Clang with the MSVC command line, where the flag needs /clang:
+# (older CMake leaves the front-end variant empty for GCC, so test for MSVC, not for GNU). MSVC
+# itself does not contract unless told to (/fp:contract).
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(NeoQCP PRIVATE -ffp-contract=off)
+    if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        target_compile_options(NeoQCP PRIVATE /clang:-ffp-contract=off)
+    else()
+        target_compile_options(NeoQCP PRIVATE -ffp-contract=off)
+    endif()
 endif()
 
 target_include_directories(NeoQCP PUBLIC
