@@ -258,6 +258,15 @@ void TestHandle::aHandleTakesPartInTheAmbiguityMatrix()
     QVERIFY(handle != nullptr);
     QVERIFY(!(handle != raw));
 
+    // A base handle against a const subclass pointer (`area() == this` in a const method): MSVC
+    // found no operator for it before the handle had its own.
+    const QCPHandle<QCPArea> area = plot.axisRect();
+    const QCPAxisRect* rect = plot.axisRect();
+    QVERIFY(area == rect);
+    QVERIFY(rect == area);
+    QVERIFY(!(area != rect));
+    QVERIFY(!(area == static_cast<const QCPAxisRect*>(nullptr)));
+
     QCPHandle<QCPAxis> dead;
     QCOMPARE(handle ? 1 : 2, 1);
     QCOMPARE(dead ? 1 : 2, 2);

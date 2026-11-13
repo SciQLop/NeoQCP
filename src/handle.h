@@ -11,6 +11,7 @@
 #include <concepts>
 #include <cstddef>
 #include <functional>
+#include <type_traits>
 #include <utility>
 
 class QCPAbstractItem;
@@ -124,6 +125,16 @@ public:
     // matches and beat the pointer comparison, which needs the handle's pointer conversion.
     friend bool operator==(const QCPHandle& a, std::nullptr_t) { return a.mObject.isNull(); }
     friend bool operator==(std::nullptr_t, const QCPHandle& b) { return b.mObject.isNull(); }
+    // A raw pointer to T or a subclass, const or not. GCC and Clang reach the built-in pointer
+    // comparison through operator T*, MSVC does not when the pointer is to a const subclass
+    // (`area() == this` in a const QCPAxisRect method). U* rather than const U*: an exact match
+    // that beats the built-in for a plain T* too, where const U* would be ambiguous with it.
+    template <typename U>
+        requires std::derived_from<std::remove_cv_t<U>, T>
+    friend bool operator==(const QCPHandle& a, U* b)
+    {
+        return a.get() == b;
+    }
 
 private:
     friend class ::TestHandle;
