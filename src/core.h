@@ -598,6 +598,8 @@ protected:
     bool mRepaintAskedDuringReplot = false;
     // An aligned element's layout moved an edge its margin was computed from (settleAlignment).
     bool mAlignmentUnsettled = false;
+    // Layout updates in a row that ended unsettled: the second one stops asking for more.
+    int mUnsettledLayouts = 0;
     quint64 mRepaintTicket = 0;
     void scheduleRepaint();
     void keepNotificationLayerOnTop();

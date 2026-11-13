@@ -4477,8 +4477,19 @@ void QCustomPlot::settleAlignment(QCPLayoutGrid* layout)
         layout->update(QCPLayoutElement::upMargins);
         layout->update(QCPLayoutElement::upLayout);
     }
-    if (std::exchange(mAlignmentUnsettled, false))
-        requestRepaint(); // still moving: the next replot carries on
+    if (!std::exchange(mAlignmentUnsettled, false))
+    {
+        mUnsettledLayouts = 0;
+        return;
+    }
+    // Still moving: the next replot carries on, once. A layout still moving after that oscillates
+    // (a size that follows its own margin) and would replot forever.
+    mUnsettledLayouts = qMin(mUnsettledLayouts + 1, 3); // 3: reported, quiet from now on
+    if (mUnsettledLayouts == 1)
+        requestRepaint();
+    else if (mUnsettledLayouts == 2)
+        qcp::reportMisuse(Q_FUNC_INFO, "an aligned layout never settles: an element's size follows "
+                                       "its own margin");
 }
 
 /*! \internal

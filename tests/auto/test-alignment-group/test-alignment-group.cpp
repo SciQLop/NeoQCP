@@ -952,3 +952,29 @@ void TestAlignmentGroup::aSideSwitchedToManualStopsAligning()
     QVERIFY(!plot.isRepaintQueued());
     QCOMPARE(gMisuses, 0);
 }
+
+/* A rect whose margin moves its own edge never settles. The replot that ends unsettled asks for
+   one more; when that one ends unsettled too, the plot stops asking and says so once, instead of
+   replotting forever (m5d final review M6). */
+void TestAlignmentGroup::anOscillatingLayoutGoesQuiet()
+{
+    QCustomPlot plot;
+    auto* restless = new RestlessRect(&plot);
+    plot.plotLayout()->addElement(0, 1, restless);
+    restless->setMinimumSize(100, 50);
+    restless->setMaximumSize(100, QWIDGETSIZE_MAX);
+    QVERIFY(QCPAlignmentGroup::create({ restless }, QCP::msLeft));
+    renderOnce(plot, QSize(400, 300));
+    int replots = 1;
+    while (plot.isRepaintQueued() && replots < 10)
+    {
+        plot.replot(); // what the queued repaint does
+        ++replots;
+    }
+    QCOMPARE(replots, 2);
+    QCOMPARE(gMisuses, 1);
+
+    plot.replot(); // a later replot of the same layout neither asks again nor repeats the report
+    QVERIFY(!plot.isRepaintQueued());
+    QCOMPARE(gMisuses, 1);
+}
