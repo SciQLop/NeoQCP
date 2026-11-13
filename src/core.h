@@ -314,6 +314,9 @@ public:
     // Non-lazy accessor: returns the grid RHI layer only if it already exists and
     // never creates one. Safe to call from destructors (e.g. ~QCPAxis).
     QCPGridRhiLayer* gridRhiLayerIfExists() const;
+    // True when the GPU grid layer draws \a axis' grid lines and tick marks on screen, so its
+    // painter leaves them out: an axis of one of the plot's axis rects, not linked.
+    bool gridLayerDraws(const QCPAxis* axis);
     // When enabled, replot() does nothing while the widget is hidden after having
     // been shown at least once, avoiding wasted CPU painting into invisible paint
     // buffers. Never-shown widgets (offscreen rendering, tests) keep the classic

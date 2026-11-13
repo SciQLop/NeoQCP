@@ -198,7 +198,7 @@ void QCPGrid::draw(QCPPainter* painter)
     // a linked axis' grid is painted here.
     if (QCustomPlot* plot = mParentAxis->parentPlot())
     {
-        if (plot->gridRhiLayer() && !painter->isExporting() && !mParentAxis->linkSource())
+        if (!painter->isExporting() && plot->gridLayerDraws(mParentAxis))
             return;
     }
 
@@ -1871,8 +1871,8 @@ void QCPAxis::draw(QCPPainter* painter)
     mAxisPainter->subTickPositions = subTickPositions;
     // A linked axis keeps its tick marks on the painter path: the grid layer would place them
     // from the axis' own range, which the link overrides.
-    mAxisPainter->skipTickDrawing = mParentPlot && mParentPlot->gridRhiLayer()
-        && !painter->isExporting() && !mLink;
+    mAxisPainter->skipTickDrawing
+        = mParentPlot && !painter->isExporting() && mParentPlot->gridLayerDraws(this);
     mAxisPainter->draw(painter);
 }
 

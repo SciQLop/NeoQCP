@@ -814,6 +814,13 @@ QCPGridRhiLayer* QCustomPlot::gridRhiLayerIfExists() const
     return mGridRhiLayer;
 }
 
+// The grid layer registers the axes of axisRectsRaw() only (see the frame setup): an axis
+// elsewhere, such as a colour scale's, keeps its ticks and grid on the painter path.
+bool QCustomPlot::gridLayerDraws(const QCPAxis* axis)
+{
+    return gridRhiLayer() && !axis->linkSource() && axisRectsRaw().contains(axis->axisRectRaw());
+}
+
 void QCustomPlot::setSkipReplotsWhenHidden(bool skip)
 {
     mSkipReplotsWhenHidden = skip;

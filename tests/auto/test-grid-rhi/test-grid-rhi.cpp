@@ -39,6 +39,52 @@ void TestGridRhi::gridRhiLayerCreatedLazily()
     QVERIFY(true);
 }
 
+// The GPU tick marks were only made for the plot's own axis rects, but every axis left its ticks
+// to them: a colour scale's axis (its private rect is no layout element) had none on screen.
+void TestGridRhi::colorScaleTicksAreDrawnOnScreen()
+{
+    if (!showAndHasRhiGrid(mPlot))
+        QSKIP("No QRhi available — the GPU grid needs a real backend");
+    auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+    map->data()->setSize(4, 4);
+    map->data()->setRange(QCPRange(-5, 5), QCPRange(-5, 5));
+    map->setColorScale(mPlot->axisRect()->colorScale());
+    QCPColorGradient light; // no dark texel: a dark pixel on the scale is its axis
+    light.setColorStopAt(0, Qt::white);
+    light.setColorStopAt(1, Qt::yellow);
+    map->setGradient(light);
+    map->setDataRange(QCPRange(0, 10));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+
+    const QImage frame = mPlot->grabFramebuffer();
+    const double dpr = frame.devicePixelRatio();
+    const QImage exported = mPlot->toPixmap(mPlot->width(), mPlot->height(), dpr).toImage();
+    // The bar itself: its ticks point inwards, where nothing else is dark. Counted as runs of
+    // inked rows, one per tick, so a tick's thickness (a cosmetic pen is one device pixel on a
+    // painted screen buffer, two in a 2x export) does not count.
+    const QRect bar = mPlot->axisRect()->colorScale()->axis()->axisRect()->rect();
+    const auto ticks = [&](const QImage& image)
+    {
+        int runs = 0;
+        bool previous = false;
+        for (int y = qRound((bar.top() + 2) * dpr); y < qRound((bar.bottom() - 1) * dpr); ++y)
+        {
+            bool inked = false;
+            for (int x = qRound((bar.left() + 2) * dpr); x < qRound((bar.right() - 1) * dpr); ++x)
+                inked = inked || image.pixelColor(x, y).lightness() < 160;
+            runs += inked && !previous;
+            previous = inked;
+        }
+        return runs;
+    };
+    const int onScreen = ticks(frame), inExport = ticks(exported);
+    if (inExport == 0 || onScreen != inExport)
+        keepImagesForCi(QStringLiteral("colorScaleTicksAreDrawnOnScreen"), frame, exported);
+    QVERIFY2(inExport > 0, "the export has no tick inside the bar");
+    QCOMPARE(onScreen, inExport);
+}
+
 void TestGridRhi::replotDoesNotCrash()
 {
     mPlot->replot();
