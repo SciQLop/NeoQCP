@@ -120,7 +120,8 @@ void QCPPainter::drawLine(const QLineF& line)
 /*! \internal
 
   Fills the rectangle a solid, non-cosmetic pen covers along a horizontal or vertical \a line, and
-  returns true; returns false for any other line or pen. Under \ref pmNonCosmetic (a HiDPI screen
+  returns true; returns false for any other line or pen, and for a point (what the stroker makes of
+  one depends on the cap: nothing for a flat one). Under \ref pmNonCosmetic (a HiDPI screen
   buffer, a scaled export) every axis line and tick is such a line, and Qt strokes a non-cosmetic
   pen through its general path stroker: filling the same rectangle is several times cheaper.
 */
@@ -129,7 +130,7 @@ bool QCPPainter::drawAlignedLineAsRect(const QLine& line)
     const QPen& p = pen();
     if (!mModes.testFlag(pmNonCosmetic) || p.isCosmetic() || p.style() != Qt::SolidLine
         || p.capStyle() == Qt::RoundCap || p.brush().style() != Qt::SolidPattern
-        || (line.dx() != 0 && line.dy() != 0)
+        || (line.dx() != 0 && line.dy() != 0) || line.p1() == line.p2()
         || deviceTransform().type() > QTransform::TxScale)
         return false;
     const double half = p.widthF() / 2;

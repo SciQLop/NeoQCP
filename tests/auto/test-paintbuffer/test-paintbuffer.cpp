@@ -652,45 +652,49 @@ void TestPaintBuffer::rhi_imageBytesMatchTextureChannelOrder()
 }
 
 // Under pmNonCosmetic a horizontal or vertical line is filled as the rectangle its pen covers,
-// not stroked: the pixels must be the stroker's, at every device pixel ratio.
+// not stroked: the pixels must be the stroker's, at every device pixel ratio. Each pen gets its own
+// picture, so a later, wider pen cannot hide what an earlier one drew (a zero-length line with a
+// flat cap is nothing to the stroker).
 void TestPaintBuffer::alignedLinesFillTheSamePixelsAsTheStroker()
 {
   const QList<QPen> pens { QPen(Qt::black, 0, Qt::SolidLine, Qt::SquareCap),
                            QPen(Qt::red, 2, Qt::SolidLine, Qt::FlatCap),
                            QPen(Qt::blue, 1, Qt::SolidLine, Qt::SquareCap),
-                           QPen(Qt::darkGreen, 3, Qt::SolidLine, Qt::SquareCap) };
+                           QPen(Qt::darkGreen, 3, Qt::SolidLine, Qt::SquareCap),
+                           QPen(Qt::magenta, 4, Qt::SolidLine, Qt::FlatCap) };
   const QList<QLine> lines { QLine(10, 10, 80, 10), QLine(80, 20, 15, 20), QLine(30, 5, 30, 90),
                              QLine(50, 90, 50, 40), QLine(60, 60, 60, 60) };
   for (const double dpr : { 1.0, 1.5, 2.0, 3.0 })
   {
-    QImage fast(qRound(100 * dpr), qRound(100 * dpr), QImage::Format_ARGB32_Premultiplied);
-    fast.setDevicePixelRatio(dpr);
-    fast.fill(Qt::white);
-    QImage stroked = fast;
+    for (const QPen& pen : pens)
     {
-      QCPPainter painter(&fast);
-      painter.setMode(QCPPainter::pmNonCosmetic);
-      for (const QPen& pen : pens)
+      QImage fast(qRound(100 * dpr), qRound(100 * dpr), QImage::Format_ARGB32_Premultiplied);
+      fast.setDevicePixelRatio(dpr);
+      fast.fill(Qt::white);
+      QImage stroked = fast;
       {
+        QCPPainter painter(&fast);
+        painter.setMode(QCPPainter::pmNonCosmetic);
         painter.setPen(pen);
         for (const QLine& line : lines)
           painter.drawLine(QLineF(line));
       }
-    }
-    {
-      QPainter painter(&stroked);
-      for (QPen pen : pens)
       {
-        if (pen.isCosmetic()) // what pmNonCosmetic makes of it
+        QPainter painter(&stroked);
+        QPen strokedPen = pen;
+        if (strokedPen.isCosmetic()) // what pmNonCosmetic makes of it
         {
-          pen.setWidth(qMax(1, pen.width()));
-          pen.setCosmetic(false);
+          strokedPen.setWidth(qMax(1, strokedPen.width()));
+          strokedPen.setCosmetic(false);
         }
-        painter.setPen(pen);
+        painter.setPen(strokedPen);
         for (const QLine& line : lines)
           painter.drawLine(line);
       }
+      QVERIFY2(fast == stroked, qPrintable(QStringLiteral("ratio %1, %2 px pen, cap %3")
+                                               .arg(dpr)
+                                               .arg(pen.widthF())
+                                               .arg(int(pen.capStyle()))));
     }
-    QVERIFY2(fast == stroked, qPrintable(QStringLiteral("ratio %1").arg(dpr)));
   }
 }
