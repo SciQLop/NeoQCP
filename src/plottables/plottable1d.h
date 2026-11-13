@@ -96,7 +96,6 @@ protected:
     // helpers for subclasses:
     void getDataSegments(QList<QCPDataRange>& selectedSegments,
                          QList<QCPDataRange>& unselectedSegments) const;
-    void drawPolyline(QCPPainter* painter, const QVector<QPointF>& lineData) const;
 
     const DataType* dataAt(int index) const
     {
@@ -525,89 +524,5 @@ void QCPAbstractPlottable1D<DataType, Base>::getDataSegments(
         unselectedSegments = sel.inverse(QCPDataRange(0, dataCount())).dataRanges();
     }
 }
-
-/*!
-  A helper method which draws a line with the passed \a painter, according to the pixel data in \a
-  lineData. NaN points create gaps in the line, as expected from QCustomPlot's plottables (this is
-  the main difference to QPainter's regular drawPolyline, which handles NaNs by lagging or
-  crashing).
-
-  Further it uses a faster line drawing technique based on \ref QCPPainter::drawLine rather than \c
-  QPainter::drawPolyline if the configured \ref QCustomPlot::setPlottingHints() and \a painter
-  style allows.
-*/
-template <class DataType, class Base>
-void QCPAbstractPlottable1D<DataType, Base>::drawPolyline(QCPPainter* painter,
-                                                    const QVector<QPointF>& lineData) const
-{
-    // GPU rendering path: extrude the polyline into triangles, dashed or solid.
-    if (qcp::strokePolylineOnGpu(painter, this->mParentPlot, this->mLayer,
-                                 std::span<const QPointF>(lineData.constData(), lineData.size()),
-                                 painter->pen(), QPointF(), this->clipRect()))
-        return;
-
-    // if drawing lines in plot (instead of PDF), reduce 1px lines to cosmetic, because at least in
-    // Qt6 drawing of "1px" width lines is much slower even though it has same appearance apart from
-    // High-DPI. In High-DPI cases people must set a pen width slightly larger than 1.0 to get
-    // correct DPI scaling of width, but of course with performance penalty.
-    if (!painter->modes().testFlag(QCPPainter::pmVectorized)
-        && qFuzzyCompare(painter->pen().widthF(), 1.0))
-    {
-        QPen newPen = painter->pen();
-        newPen.setWidth(0);
-        painter->setPen(newPen);
-    }
-
-    // if drawing solid line and not in PDF, use much faster line drawing instead of polyline:
-    if (this->mParentPlot->plottingHints().testFlag(QCP::phFastPolylines)
-        && painter->pen().style() == Qt::SolidLine
-        && !painter->isExporting())
-    {
-        int i = 0;
-        bool lastIsNan = false;
-        const int lineDataSize = lineData.size();
-        while (i < lineDataSize
-               && (qIsNaN(lineData.at(i).y())
-                   || qIsNaN(lineData.at(i).x()))) // make sure first point is not NaN
-            ++i;
-        ++i; // because drawing works in 1 point retrospect
-        while (i < lineDataSize)
-        {
-            if (!qIsNaN(lineData.at(i).y())
-                && !qIsNaN(lineData.at(i).x())) // NaNs create a gap in the line
-            {
-                if (!lastIsNan)
-                    painter->drawLine(lineData.at(i - 1), lineData.at(i));
-                else
-                    lastIsNan = false;
-            }
-            else
-                lastIsNan = true;
-            ++i;
-        }
-    }
-    else
-    {
-        int segmentStart = 0;
-        int i = 0;
-        const int lineDataSize = lineData.size();
-        while (i < lineDataSize)
-        {
-            if (qIsNaN(lineData.at(i).y()) || qIsNaN(lineData.at(i).x())
-                || qIsInf(lineData.at(i).y())) // NaNs create a gap in the line. Also filter Infs
-                                               // which make drawPolyline block
-            {
-                painter->drawPolyline(
-                    lineData.constData() + segmentStart,
-                    i - segmentStart); // i, because we don't want to include the current NaN point
-                segmentStart = i + 1;
-            }
-            ++i;
-        }
-        // draw last segment:
-        painter->drawPolyline(lineData.constData() + segmentStart, lineDataSize - segmentStart);
-    }
-}
-
 
 #endif // QCP_PLOTTABLE1D_H

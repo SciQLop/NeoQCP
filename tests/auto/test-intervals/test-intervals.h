@@ -142,6 +142,7 @@ private slots:
     void reapplyingAnUnchangedLayoutSettingDoesNotNotify();
     void reapplyingTheCategoryOrderDoesNotRestack();
     void theLegendIconIsRecorded();
+    void theLegendIconKeepsTheAntialiasingSetting();
 
 private:
     QCustomPlot* mPlot = nullptr;

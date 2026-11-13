@@ -132,32 +132,12 @@ void QCPSelectionDecorator::setUsedScatterProperties(
 }
 
 /*!
-  Sets the pen of \a painter to the pen of this selection decorator.
-
-  \see applyBrush, getFinalScatterStyle
-*/
-void QCPSelectionDecorator::applyPen(QCPPainter* painter) const
-{
-    painter->setPen(mPen);
-}
-
-/*!
-  Sets the brush of \a painter to the brush of this selection decorator.
-
-  \see applyPen, getFinalScatterStyle
-*/
-void QCPSelectionDecorator::applyBrush(QCPPainter* painter) const
-{
-    painter->setBrush(mBrush);
-}
-
-/*!
   Returns the scatter style that the parent plottable shall use for selected scatter points. The
   plottable's original (unselected) scatter style must be passed as \a unselectedStyle. Depending
   on the setting of \ref setUsedScatterProperties, the returned scatter style is a mixture of this
   selecion decorator's scatter style (\ref setScatterStyle), and \a unselectedStyle.
 
-  \see applyPen, applyBrush, setScatterStyle
+  \see setScatterStyle
 */
 QCPScatterStyle
 QCPSelectionDecorator::getFinalScatterStyle(const QCPScatterStyle& unselectedStyle) const
@@ -253,23 +233,16 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   data dimensions. If you want to display data with only one logical key dimension, you should
   rather derive from \ref QCPAbstractPlottable1D.
 
-  If subclassing QCPAbstractPlottable directly, these are the pure virtual functions you must
-  implement:
-  \li \ref selectTest
+  If subclassing QCPAbstractPlottable directly, these are the virtual functions you implement:
   \li \ref draw(QCPDrawContext&), which records what the plottable draws
   \li \ref drawLegendIcon(QCPDrawContext&), optionally, to record an icon of its own
-  \li \ref getKeyRange
-  \li \ref getValueRange
+  \li \ref selectTest, optionally: the base answers a click from the recording
+  \li \ref getKeyRange and \ref getValueRange, optionally: the base answers from the recording
 
-  See the documentation of those functions for what they need to do.
+  See the documentation of those functions for what they need to do, and
+  docs/writing-a-plot-type.md for a worked example.
 
-  For drawing your plot, you can use the \ref coordsToPixels functions to translate a point in plot
-  coordinates to pixel coordinates. This function is quite convenient, because it takes the
-  orientation of the key and value axes into account for you (x and y are swapped when the key axis
-  is vertical and the value axis horizontal). If you are worried about performance (i.e. you need
-  to translate many points in a loop), you can directly use \ref
-  QCPAxis::coordToPixel. However, you must then take care about the orientation of the axis
-  yourself.
+  Record positions as \c QCP::Data: the frame maps them to pixels, a vertical key axis included.
 
   Here are some important members you inherit from QCPAbstractPlottable:
   <table>
@@ -742,9 +715,11 @@ QCPRange QCPAbstractPlottable::getValueRange(bool& foundRange, QCP::SignDomain i
                          inSignDomain);
 }
 
-//! Replays the icon recording, fitted to \a rect.
+//! Replays the icon recording, fitted to \a rect, with this plottable's antialiasing: the replay
+//! keeps the painter's, which is the legend row's.
 void QCPAbstractPlottable::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
 {
+    applyDefaultAntialiasingHint(painter);
     mCore.paintIcon(*this, *painter, rect, view());
 }
 
@@ -1425,43 +1400,11 @@ QCP::Interaction QCPAbstractPlottable::selectionCategory() const
 
   \seebaseclassmethod
 
-  \see setAntialiased, applyFillAntialiasingHint, applyScattersAntialiasingHint
+  \see setAntialiased
 */
 void QCPAbstractPlottable::applyDefaultAntialiasingHint(QCPPainter* painter) const
 {
     applyAntialiasingHint(painter, mAntialiased, QCP::aePlottables);
-}
-
-/*! \internal
-
-  A convenience function to easily set the QPainter::Antialiased hint on the provided \a painter
-  before drawing plottable fills.
-
-  This function takes into account the local setting of the antialiasing flag as well as the
-  overrides set with \ref QCustomPlot::setAntialiasedElements and \ref
-  QCustomPlot::setNotAntialiasedElements.
-
-  \see setAntialiased, applyDefaultAntialiasingHint, applyScattersAntialiasingHint
-*/
-void QCPAbstractPlottable::applyFillAntialiasingHint(QCPPainter* painter) const
-{
-    applyAntialiasingHint(painter, mAntialiasedFill, QCP::aeFills);
-}
-
-/*! \internal
-
-  A convenience function to easily set the QPainter::Antialiased hint on the provided \a painter
-  before drawing plottable scatter points.
-
-  This function takes into account the local setting of the antialiasing flag as well as the
-  overrides set with \ref QCustomPlot::setAntialiasedElements and \ref
-  QCustomPlot::setNotAntialiasedElements.
-
-  \see setAntialiased, applyFillAntialiasingHint, applyDefaultAntialiasingHint
-*/
-void QCPAbstractPlottable::applyScattersAntialiasingHint(QCPPainter* painter) const
-{
-    applyAntialiasingHint(painter, mAntialiasedScatters, QCP::aeScatters);
 }
 
 /* inherits documentation from base class */

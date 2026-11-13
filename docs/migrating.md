@@ -236,6 +236,7 @@ Plot-wide settings:
 | Qt 4 / Qt 5 compatibility code | Qt 6.7 or newer |
 | Overriding `QCPAbstractItem::draw(QCPPainter*)` (it is final) | override `draw(QCPDrawContext&)` and record what the item draws |
 | Overriding `QCPAbstractPlottable::draw(QCPPainter*)` or `drawLegendIcon(QCPPainter*, const QRectF&)` (both final) | override `draw(QCPDrawContext&)`, and `drawLegendIcon(QCPDrawContext&)` for an icon of its own; `context.painter()` keeps painter code no command expresses |
+| `QCPAbstractPlottable1D::drawPolyline()`, `QCPAbstractPlottable::applyFillAntialiasingHint()`/`applyScattersAntialiasingHint()`, `QCPSelectionDecorator::applyPen()`/`applyBrush()` | record through `draw(QCPDrawContext&)`; inside a `context.painter()` callback, set the pen, brush and antialiasing on the painter directly |
 | Overriding `QCPStatisticalBox::drawStatisticalBox()` | override `draw(QCPDrawContext&)` |
 | `QCPPolarAxisAngular` as a layout element (`addElement`, its background, inset layout, drag and wheel, `addRadialAxis`, `add<QCPPolarGraph>`) | `QCPPolarArea`, which owns the angular axis, the radial axes and the grid |
 | `QCPPolarAxisRadial::ScaleType`, the polar axes' `SelectablePart(s)`, `rangeDrag`/`rangeZoom` | `QCPAxisBase::ScaleType`, `QCPAxisBase::SelectablePart(s)`, `rangeDraggable`/`rangeZoomable` |

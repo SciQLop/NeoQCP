@@ -566,20 +566,9 @@ QCPHandle<QCPLayerable> QCPLayerable::parentLayerable() const
   versions of this function before drawing each entity, effectively overriding the setting of the
   default antialiasing hint.
 
-  <b>First example:</b> a plottable has multiple entities that have an antialiasing setting: The
-  line, fills and scatters. Those can be configured via QCPAbstractPlottable::setAntialiased,
-  QCPAbstractPlottable::setAntialiasedFill and QCPAbstractPlottable::setAntialiasedScatters.
-  Consequently, there isn't only the applyDefaultAntialiasingHint function (which corresponds to the
-  line's antialiasing), but specialized ones like QCPAbstractPlottable::applyFillAntialiasingHint
-  and QCPAbstractPlottable::applyScattersAntialiasingHint. So before drawing one of those entities, a
-  plottable that draws with a painter calls the respective specialized applyAntialiasingHint
-  function.
-
-  <b>Second example:</b> QCPItemLine consists only of a line so there is only one antialiasing
+  <b>Example:</b> QCPItemLine consists only of a line so there is only one antialiasing
   setting which can be controlled with QCPItemLine::setAntialiased. (This function is inherited by
-  all layerables. The specialized functions, as seen on QCPAbstractPlottable, must be added explicitly to the
-  respective layerable subclass.) Consequently it only has the normal
-  QCPItemLine::applyDefaultAntialiasingHint. The \ref QCPItemLine::draw function doesn't need to
+  all layerables.) Consequently it only has the normal QCPItemLine::applyDefaultAntialiasingHint. The \ref QCPItemLine::draw function doesn't need to
   care about setting any antialiasing states, because the default antialiasing hint is already set
   on the painter when the \ref draw function is called, and that's the state it wants to draw the
   line with.

@@ -184,3 +184,47 @@ void TestStatisticalBox::theLegendIconIsRecorded()
     QCOMPARE(icon.data.bounds.valueLower, 0.0);
     QCOMPARE(icon.data.bounds.valueUpper, 1.0);
 }
+
+namespace
+{
+//! Pixels of the first legend row's icon that are neither the background nor \a fill: the soft
+//! edges antialiasing leaves.
+int blendedIconPixels(QCustomPlot& plot, const QColor& fill)
+{
+    // The export paints half a pixel off the grid: a 20 px icon puts every edge between pixels.
+    plot.legend->setIconSize(32, 20);
+    // The plot's default forces antialiasing on every plottable: each layerable keeps its own here.
+    plot.setAntialiasedElements(QCP::aeNone);
+    plot.resize(400, 300);
+    const QImage image = plot.toPixmap(400, 300, 1.0).toImage();
+    const QRect icon(plot.legend->item(0)->rect().topLeft(), plot.legend->iconSize());
+    int blended = 0;
+    for (int y = icon.top(); y <= icon.bottom(); ++y)
+        for (int x = icon.left(); x <= icon.right(); ++x)
+        {
+            const QColor pixel = image.pixelColor(x, y);
+            if (pixel != QColor(Qt::white) && pixel != fill)
+                ++blended;
+        }
+    return blended;
+}
+} // namespace
+
+// The icon is drawn with the plottable's antialiasing setting, not the legend row's: the box's
+// fractional edges stay hard when the box is not antialiased, and soften when it is.
+void TestStatisticalBox::theLegendIconKeepsTheAntialiasingSetting()
+{
+    const QColor fill(Qt::red);
+    const auto blended = [&](bool antialiased)
+    {
+        QCustomPlot plot;
+        auto* box = new QCPStatisticalBox(plot.xAxis, plot.yAxis);
+        box->setPen(Qt::NoPen);
+        box->setBrush(fill);
+        box->setAntialiased(antialiased);
+        plot.legend->setVisible(true);
+        return blendedIconPixels(plot, fill);
+    };
+    QCOMPARE(blended(false), 0);
+    QVERIFY2(blended(true) > 0, "the icon of an antialiased box has hard edges");
+}

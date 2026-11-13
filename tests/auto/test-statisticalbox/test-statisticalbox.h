@@ -10,4 +10,5 @@ private slots:
     void everyStyleSetterReRecords();
     void anUnstyledOutlierMarkerTakesTheBoxPen();
     void theLegendIconIsRecorded();
+    void theLegendIconKeepsTheAntialiasingSetting();
 };

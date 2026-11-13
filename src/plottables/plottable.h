@@ -81,8 +81,6 @@ public:
     void setUsedScatterProperties(const QCPScatterStyle::ScatterProperties& properties);
 
     // non-virtual methods:
-    void applyPen(QCPPainter* painter) const;
-    void applyBrush(QCPPainter* painter) const;
     QCPScatterStyle getFinalScatterStyle(const QCPScatterStyle& unselectedStyle) const;
 
     // introduced virtual methods:
@@ -395,8 +393,6 @@ protected:
     // non-virtual methods:
     bool legendAllowed() const { return mWantsLegend && !mGroup; }
     void emitSelectionChanged();
-    void applyFillAntialiasingHint(QCPPainter* painter) const;
-    void applyScattersAntialiasingHint(QCPPainter* painter) const;
     //! False, and one misuse the first time, while the key or value axis is gone.
     bool drawableAxes() const;
     void dropSystem();
