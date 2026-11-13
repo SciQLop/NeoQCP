@@ -623,6 +623,10 @@ protected:
     QMap<QCPLayer*, QCPPlottableRhiLayer*> mPlottableRhiLayers;
     QMap<QCPLayer*, QCPScatterRhiLayer*> mScatterRhiLayers;
     QCPGridRhiLayer* mGridRhiLayer = nullptr;
+    // axisRectsRaw() as gridLayerDraws() last read it, and the frame it read it in: one layout walk
+    // per frame instead of one per axis draw.
+    QList<QCPAxisRect*> mGridLayerRects;
+    quint64 mGridLayerRectsEpoch = 0;
     QCPPipelineScheduler* mPipelineScheduler = nullptr;
     QPointer<QCPOverlay> mOverlay;
     ItemCreator mItemCreator;

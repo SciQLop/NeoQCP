@@ -818,7 +818,15 @@ QCPGridRhiLayer* QCustomPlot::gridRhiLayerIfExists() const
 // elsewhere, such as a colour scale's, keeps its ticks and grid on the painter path.
 bool QCustomPlot::gridLayerDraws(const QCPAxis* axis)
 {
-    return gridRhiLayer() && !axis->linkSource() && axisRectsRaw().contains(axis->axisRectRaw());
+    if (!gridRhiLayer() || axis->linkSource())
+        return false;
+    // Every replot and layer replot starts a frame epoch, so the list follows the layout tree.
+    if (mGridLayerRectsEpoch != mFrameEpoch)
+    {
+        mGridLayerRects = axisRectsRaw();
+        mGridLayerRectsEpoch = mFrameEpoch;
+    }
+    return mGridLayerRects.contains(axis->axisRectRaw());
 }
 
 void QCustomPlot::setSkipReplotsWhenHidden(bool skip)
