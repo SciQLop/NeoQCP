@@ -287,16 +287,16 @@ std::shared_ptr<QCPGrowableMultiDataSource> QCPMultiGraph::ownedSourceForAppend(
     {
         if (mOwnedSource && mPendingSource == mOwnedSource)
             return mOwnedSource;
-        QCP_CHECK_OR_RETURN(false, "addData needs a source the graph owns", {});
+        QCP_CHECK_OR_RETURN(false, "adding or removing data needs a source the graph owns", {});
     }
     if (!mDataSource)
         return {}; // no data yet: addData() starts the owned source
     if (mOwnedSource && mDataSource == mOwnedSource)
         return mOwnedSource;
-    QCP_CHECK_OR_RETURN(false, "addData needs a source the graph owns", {});
+    QCP_CHECK_OR_RETURN(false, "adding or removing data needs a source the graph owns", {});
 }
 
-void QCPMultiGraph::appendChanged()
+void QCPMultiGraph::ownedSourceChanged()
 {
     if (mPendingSource)
     {
@@ -309,30 +309,30 @@ void QCPMultiGraph::appendChanged()
     dataChanged();
 }
 
-bool QCPMultiGraph::appendToOwnedSource(
-    const std::function<bool(QCPGrowableMultiDataSource&)>& append)
+bool QCPMultiGraph::editOwnedSource(
+    const std::function<bool(QCPGrowableMultiDataSource&)>& edit)
 {
     if (!mOwnedSource)
         return false;
     const bool pending = mPendingSource != nullptr;
     if (mPipeline.isBusy())
     {
-        // A job is reading the rows of the source it was started for. Grow a copy and install it;
-        // the old object stays alive in the job.
-        auto grown = mOwnedSource->clone();
-        if (!append(*grown))
+        // A job is reading the rows of the source it was started for. Edit a copy and install
+        // it; the old object stays alive in the job.
+        auto edited = mOwnedSource->clone();
+        if (!edit(*edited))
             return false;
-        mOwnedSource = grown;
+        mOwnedSource = edited;
         if (pending)
-            stagePendingSource(std::move(grown));
+            stagePendingSource(std::move(edited));
         else
-            installSource(std::move(grown)); // deferred swap on: keep the displayed geometry
+            installSource(std::move(edited)); // deferred swap on: keep the displayed geometry
         return true;
     }
 
-    if (!append(*mOwnedSource))
+    if (!edit(*mOwnedSource))
         return false;
-    appendChanged();
+    ownedSourceChanged();
     return true;
 }
 
@@ -388,7 +388,7 @@ void QCPMultiGraph::addData(const QVector<double>& keys, const QVector<double>& 
         setOwnedSource(std::move(source));
         return;
     }
-    (void)appendToOwnedSource(
+    (void)editOwnedSource(
         [&](QCPGrowableMultiDataSource& source)
         { return source.append(keys, std::vector<QVector<double>>{values}, alreadySorted); });
 }
@@ -416,7 +416,7 @@ void QCPMultiGraph::addData(double key, double value)
         setOwnedSource(std::move(source));
         return;
     }
-    (void)appendToOwnedSource(
+    (void)editOwnedSource(
         [&](QCPGrowableMultiDataSource& source)
         { return source.append(key, std::span<const double>(values, 1)); });
 }
@@ -449,9 +449,33 @@ void QCPMultiGraph::addData(const QVector<double>& keys, std::vector<QVector<dou
         setOwnedSource(std::move(source));
         return;
     }
-    (void)appendToOwnedSource(
+    (void)editOwnedSource(
         [&](QCPGrowableMultiDataSource& source)
         { return source.append(keys, std::move(columns), alreadySorted); });
+}
+
+void QCPMultiGraph::removeDataBefore(double key)
+{
+    removeOwnedRows([key](QCPGrowableMultiDataSource& source) { return source.removeBefore(key); });
+}
+
+void QCPMultiGraph::removeDataAfter(double key)
+{
+    removeOwnedRows([key](QCPGrowableMultiDataSource& source) { return source.removeAfter(key); });
+}
+
+void QCPMultiGraph::removeData(double fromKey, double toKey)
+{
+    removeOwnedRows([fromKey, toKey](QCPGrowableMultiDataSource& source)
+                    { return source.removeBetween(fromKey, toKey); });
+}
+
+void QCPMultiGraph::removeOwnedRows(const std::function<bool(QCPGrowableMultiDataSource&)>& remove)
+{
+    QCP_CHECK_OR_RETURN(acceptsAppend(), "removing data needs a source the graph owns");
+    // Null: no data yet (nothing to remove), or a source the graph does not own (reported).
+    if (ownedSourceForAppend())
+        (void)editOwnedSource(remove);
 }
 
 void QCPMultiGraph::addData(double key, std::span<const double> values)
@@ -479,7 +503,7 @@ void QCPMultiGraph::addData(double key, std::span<const double> values)
         setOwnedSource(std::move(source));
         return;
     }
-    (void)appendToOwnedSource([&](QCPGrowableMultiDataSource& source)
+    (void)editOwnedSource([&](QCPGrowableMultiDataSource& source)
                               { return source.append(key, values); });
 }
 
@@ -768,18 +792,24 @@ void QCPMultiGraph::markDirty()
     QCPAbstractLine::markDirty();
 }
 
+bool QCPMultiGraph::partnerDied(const Fill& fill)
+{
+    const auto* target = std::get_if<FillToGraph>(&fill.target);
+    return target && !target->graph;
+}
+
 // M1: a partner that lost the component is not a temporary no-band case: the fill is gone for good,
 // or a later, wider source would revive a band over unrelated data.
 void QCPMultiGraph::pruneLostPartnerFills()
 {
     const auto lost = [](const Fill& fill)
     {
+        if (partnerDied(fill))
+            return true;
         const auto* target = std::get_if<FillToGraph>(&fill.target);
         if (!target)
             return false;
         const QCPMultiGraph* partner = target->graph.data();
-        if (!partner)
-            return true;
         return partner->mDataSource
             && target->component >= partner->mDataSource->columnCount();
     };
@@ -953,10 +983,12 @@ void QCPMultiGraph::clearComponentFill(int owner)
     }
 }
 
+// A fill whose partner died stays in mFills until the next prune, but it is gone (2.x reset
+// channelFillGraph()).
 std::optional<QCPMultiGraph::Fill> QCPMultiGraph::componentFill(int owner) const
 {
     for (const auto& e : mFills)
-        if (e.owner == owner)
+        if (e.owner == owner && !partnerDied(e))
             return e;
     return std::nullopt;
 }
@@ -2696,6 +2728,13 @@ void QCPMultiGraph::recordErrorBars(QCPDrawContext& context, const QCPAbstractMu
 // rect by the replay, so it never depends on the plot's data or axis ranges.
 void QCPMultiGraph::drawLegendIcon(QCPDrawContext& icon) const
 {
+    if (mComponents.isEmpty())
+    {
+        icon.rect(QCP::Data { 0.0, -0.5 }, QCP::Data { 1.0, 0.5 }, QPen(Qt::NoPen),
+                  QBrush(Qt::NoBrush));
+        recordLegendSegment(icon, firstComponentStyle(), emptyGraphFillBrush(), 0.0);
+        return;
+    }
     const QVector<int> shown = legendComponents();
     if (shown.isEmpty())
         return;
@@ -2709,40 +2748,66 @@ void QCPMultiGraph::drawLegendIcon(QCPDrawContext& icon) const
         const Component& comp = mComponents[shown[k]];
         if (!comp.visible)
             continue;
-        const double x0 = k;
-        const double x1 = k + 1;
-        const double centre = 0.5 * (x0 + x1);
-        if (const auto fill = componentFill(shown[k]))
-            icon.rect(QCP::Data { x0, -0.3 }, QCP::Data { x1, 0.3 }, QPen(Qt::NoPen),
-                      effectiveFillBrush(*fill));
-        if (mColor.hasValues())
-        {
-            std::vector<QPointF> points;
-            std::vector<QRgb> colours;
-            for (int s = 0; s <= 4; ++s)
-            {
-                points.emplace_back(x0 + (x1 - x0) * s / 4.0, 0.0);
-                colours.push_back(qcp::runColor(mColor, s * 255 / 4).rgba());
-            }
-            icon.polyline(std::make_shared<const std::vector<QPointF>>(std::move(points)),
-                          std::make_shared<const std::vector<QRgb>>(std::move(colours)), comp.pen);
-        }
-        else if (comp.lineStyle != lsNone)
-        {
-            icon.polyline(sharedPoints(QVector<QPointF> { QPointF(x0, 0.0), QPointF(x1, 0.0) }),
-                          comp.pen);
-        }
-        if (!comp.scatterStyle.isNone())
-            icon.markers(sharedPoints(QVector<QPointF> { QPointF(centre, 0.0) }),
-                         markerStyle(comp.scatterStyle, comp.pen));
+        const auto fill = componentFill(shown[k]);
+        recordLegendSegment(icon, comp,
+                            fill ? std::optional<QBrush>(effectiveFillBrush(*fill)) : std::nullopt,
+                            k);
         if (const auto bars = componentErrorBars(shown[k]))
         {
             // 5 px half stem, 3 px half cap on a 20 px segment, in segment fractions.
-            icon.errorBars(sharedPoints(QVector<QPointF> { QPointF(centre, 0.0) }),
+            icon.errorBars(sharedPoints(QVector<QPointF> { QPointF(k + 0.5, 0.0) }),
                            sharedPoints(QVector<QPointF> { QPointF(0.15, 0.25) }),
                            errorBarPen(*bars));
         }
     }
+}
+
+void QCPMultiGraph::recordLegendSegment(QCPDrawContext& icon, const Component& comp,
+                                        const std::optional<QBrush>& fill, double x0) const
+{
+    const double x1 = x0 + 1;
+    const double centre = x0 + 0.5;
+    if (fill)
+        icon.rect(QCP::Data { x0, -0.3 }, QCP::Data { x1, 0.3 }, QPen(Qt::NoPen), *fill);
+    if (mColor.hasValues())
+    {
+        std::vector<QPointF> points;
+        std::vector<QRgb> colours;
+        for (int s = 0; s <= 4; ++s)
+        {
+            points.emplace_back(x0 + (x1 - x0) * s / 4.0, 0.0);
+            colours.push_back(qcp::runColor(mColor, s * 255 / 4).rgba());
+        }
+        icon.polyline(std::make_shared<const std::vector<QPointF>>(std::move(points)),
+                      std::make_shared<const std::vector<QRgb>>(std::move(colours)), comp.pen);
+    }
+    else if (comp.lineStyle != lsNone)
+    {
+        icon.polyline(sharedPoints(QVector<QPointF> { QPointF(x0, 0.0), QPointF(x1, 0.0) }),
+                      comp.pen);
+    }
+    if (!comp.scatterStyle.isNone())
+        icon.markers(sharedPoints(QVector<QPointF> { QPointF(centre, 0.0) }),
+                     markerStyle(comp.scatterStyle, comp.pen));
+}
+
+// A graph without data has no component: its legend shows the one its first column will be, as
+// 2.x drew an empty graph's pen.
+QCPAbstractLine::Component QCPMultiGraph::firstComponentStyle() const
+{
+    Component style;
+    style.pen = mExplicitPen.value_or(QPen(qcp::defaultPlottableColor(0), 0));
+    style.lineStyle = mLineStyle;
+    if (mExplicitScatterStyle)
+        style.scatterStyle = *mExplicitScatterStyle;
+    return style;
+}
+
+std::optional<QBrush> QCPMultiGraph::emptyGraphFillBrush() const
+{
+    if (mBrush.style() == Qt::NoBrush)
+        return std::nullopt;
+    return mBrush;
 }
 
 static void drawErrorBarGlyph(QCPPainter* painter, const QPointF& center, const QPen& pen)
@@ -2762,9 +2827,23 @@ static QRectF legendSwatchRect(const QLineF& line)
 
 void QCPMultiGraph::drawComponentLegendIcon(QCPPainter* painter, int component, const QLineF& line) const
 {
-    const Component& comp = mComponents[component];
-    if (const auto fill = componentFill(component))
-        painter->fillRect(legendSwatchRect(line), effectiveFillBrush(*fill));
+    const auto fill = componentFill(component);
+    drawLegendGlyph(painter, mComponents[component],
+                    fill ? std::optional<QBrush>(effectiveFillBrush(*fill)) : std::nullopt, line);
+    if (const auto bars = componentErrorBars(component))
+        drawErrorBarGlyph(painter, line.center(), errorBarPen(*bars));
+}
+
+void QCPMultiGraph::drawEmptyLegendIcon(QCPPainter* painter, const QLineF& line) const
+{
+    drawLegendGlyph(painter, firstComponentStyle(), emptyGraphFillBrush(), line);
+}
+
+void QCPMultiGraph::drawLegendGlyph(QCPPainter* painter, const Component& comp,
+                                    const std::optional<QBrush>& fill, const QLineF& line) const
+{
+    if (fill)
+        painter->fillRect(legendSwatchRect(line), *fill);
     QPen pen = comp.pen;
     if (mColor.hasValues())
     {
@@ -2783,8 +2862,6 @@ void QCPMultiGraph::drawComponentLegendIcon(QCPPainter* painter, int component, 
         icon.applyTo(painter, pen);
         icon.drawShape(painter, line.center().x(), line.center().y());
     }
-    if (const auto bars = componentErrorBars(component))
-        drawErrorBarGlyph(painter, line.center(), errorBarPen(*bars));
 }
 
 // --- Legend ---

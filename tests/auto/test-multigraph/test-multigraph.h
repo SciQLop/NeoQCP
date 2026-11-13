@@ -25,6 +25,13 @@ private slots:
     void addDataOnAFreshWaterfallIsAMisuse();
     void addDataWithAPendingSwapAppendsToTheStagedSource();
     void aBusyAppendGoesThroughTheDeferredSwap();
+    void removeDataBeforeKeepsTheRest();
+    void removeDataAfterKeepsTheRest();
+    void removeDataRangeKeepsTheRest();
+    void removeOnAViewIsAMisuse();
+    void aRollingWindowStaysBounded();
+    void aBusyRemoveGoesThroughTheDeferredSwap();
+    void removeWithAPendingSwapEditsTheStagedSource();
     void aSwapStagedBeforeASystemSwitchShowsOnTheUserSystem();
     void theGapThresholdIsSetOnTheInstalledSource();
     void setDataWithAShortValueColumnIsAMisuse();
@@ -70,6 +77,7 @@ private slots:
     void legendHeaderDoesNotLeakClassNameWhenEmpty();
     void legendHeaderShowsNameWhileEmpty();
     void aOneComponentGraphRowShowsTheGraphName();
+    void anEmptyGraphRowDrawsThePenLine();
     void anExplicitComponentNameWins();
     void legendCollapsedFitsExpanderMarker();
     void legendOneComponentHasNoExpander();
@@ -113,6 +121,7 @@ private slots:
     void aFillToAnotherGraphCropsAndInterpolates();
     void noOverlapNoBand();
     void theFillDropsWhenThePartnerDies();
+    void aDeadPartnersFillIsGone();
     void theFillDropsWhenThePartnerLosesTheComponent();
     void aFillToAGraphOfAnotherSystemIsAMisuse();
     void aFillToAGraphOnAnotherValueAxis();

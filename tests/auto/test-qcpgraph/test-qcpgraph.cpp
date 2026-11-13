@@ -139,9 +139,7 @@ void TestQCPGraph::channelFill()
   mPlot->replot();
 
   QVERIFY(mPlot->removeGraph(otherGraph));
-  // 2.x reset channelFillGraph to null: the fill has no partner any more.
-  const auto fill = mGraph->componentFill(0);
-  const auto *toGraph = fill ? std::get_if<QCPMultiGraph::FillToGraph>(&fill->target) : nullptr;
-  QVERIFY(!toGraph || !toGraph->graph);
+  // 2.x reset channelFillGraph to null: the fill is gone.
+  QVERIFY(!mGraph->componentFill(0));
   mPlot->replot();
 }

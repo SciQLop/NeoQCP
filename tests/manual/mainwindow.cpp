@@ -1714,7 +1714,6 @@ void MainWindow::daqPerformanceDataSlot()
   }
   static int dir = 1;
   static bool grow = true;
-  // The graph has no point removal (3.0): the demo stops growing at 100 000 points and ends.
   if (mCustomPlot->graph()->dataCount() > 100000)
     grow = false;
   
@@ -1746,7 +1745,15 @@ void MainWindow::daqPerformanceDataSlot()
     }
   } else
   {
-    if (!grow)
+    auto graph = mCustomPlot->graph(0);
+    if (std::rand()%10 < 1)
+      graph->removeDataBefore(graph->dataMainKey(0)+0.00000001);
+    else
+    {
+      const double lastKey = graph->dataMainKey(graph->dataCount()-1);
+      graph->removeData(lastKey, lastKey);
+    }
+    if (graph->dataCount() == 0)
       qApp->quit();
   }
 }

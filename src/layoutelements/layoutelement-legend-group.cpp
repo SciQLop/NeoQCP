@@ -199,6 +199,9 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
             double x1 = x0 + segWidth;
             mMultiGraph->drawComponentLegendIcon(painter, i, QLineF(x0, y, x1, y));
         }
+        if (mMultiGraph->componentCount() == 0)
+            mMultiGraph->drawEmptyLegendIcon(
+                painter, QLineF(inRect.left() + padding, y, inRect.left() + padding + iconWidth, y));
         if (showBusy)
             painter->restore();
 

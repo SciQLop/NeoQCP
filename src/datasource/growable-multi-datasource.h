@@ -198,7 +198,55 @@ public:
         return true;
     }
 
+    //! Removes the rows whose key is below \a key (2.x's removeBefore). False when none is.
+    bool removeBefore(double key)
+    {
+        return eraseRows(0, lowerIndex(key));
+    }
+
+    //! Removes the rows whose key is above \a key (2.x's removeAfter). False when none is.
+    bool removeAfter(double key)
+    {
+        return eraseRows(upperIndex(key), mKeys.size());
+    }
+
+    //! Removes the rows with \a from <= key <= \a to (2.x's remove). False when none is.
+    bool removeBetween(double from, double to)
+    {
+        if (!(from <= to))
+            return false;
+        return eraseRows(lowerIndex(from), upperIndex(to));
+    }
+
 private:
+    [[nodiscard]] std::size_t lowerIndex(double key) const
+    {
+        return static_cast<std::size_t>(std::lower_bound(mKeys.begin(), mKeys.end(), key)
+                                        - mKeys.begin());
+    }
+
+    [[nodiscard]] std::size_t upperIndex(double key) const
+    {
+        return static_cast<std::size_t>(std::upper_bound(mKeys.begin(), mKeys.end(), key)
+                                        - mKeys.begin());
+    }
+
+    bool eraseRows(std::size_t begin, std::size_t end)
+    {
+        if (begin >= end)
+            return false;
+        const auto erase = [begin, end](std::vector<double>& v)
+        {
+            v.erase(v.begin() + static_cast<std::ptrdiff_t>(begin),
+                    v.begin() + static_cast<std::ptrdiff_t>(end));
+        };
+        erase(mKeys);
+        for (auto& column : mColumns)
+            erase(column);
+        changed();
+        return true;
+    }
+
     template <typename Range>
     static std::vector<double> toDoubles(Range&& range)
     {

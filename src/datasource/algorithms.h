@@ -1,7 +1,5 @@
 #pragma once
 #include "abstract-datasource.h"
-#include "axis/axis.h"
-#include "layoutelements/layoutelement-axisrect.h"
 #include "../Profiling.hpp"
 #include <algorithm>
 #include <cmath>

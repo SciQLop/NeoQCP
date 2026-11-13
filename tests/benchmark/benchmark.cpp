@@ -6,6 +6,7 @@
 #include <datasource/resample.h>
 #include <datasource/soa-datasource-2d.h>
 #include <drawable.h>
+#include <functional>
 #include <memory>
 #include <painting/draw-commands.h>
 #include <painting/draw-context.h>
@@ -97,6 +98,9 @@ private slots:
     void QCPMultiGraph_AddDataSingleAtEnd();
     void QCPMultiGraph_AddDataSingleAtBegin();
     void QCPMultiGraph_AddDataSingleRandom();
+    void QCPMultiGraph_RemoveDataBetween();
+    void QCPMultiGraph_RemoveDataAfter();
+    void QCPMultiGraph_RemoveDataBefore();
     void QCPMultiGraph_FillToGraphPan10k();
     void QCPGpu_MultiGraphPan1M();
     void QCPGpu_MultiGraphRender1M();
@@ -1269,6 +1273,50 @@ void Benchmark::QCPMultiGraph_SetData1M()
         fillSineMulti(n, 1.0, 3, keys, values);
         mg->setData(std::move(keys), std::move(values));
     }
+}
+
+// The 2.x QCPGraph_RemoveData* workloads: 1M points set again before every timed removal, so
+// the timing is ours and averaged over enough iterations.
+static void timeRemoval(QCustomPlot* plot, const std::function<void(QCPMultiGraph*)>& remove)
+{
+    auto* graph = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    int n = 1000000;
+    QVector<double> x1(n), y1(n);
+    for (int i = 0; i < n; ++i)
+    {
+        x1[i] = 2.0 * i / (double)n;
+        y1[i] = qSin(x1[i] * 10 * M_PI);
+    }
+
+    QElapsedTimer timer;
+    bool done = false;
+    qint64 elapsed = 0;
+    int iterations = 0;
+    while (!done)
+    {
+        ++iterations;
+        graph->setData(x1, y1);
+        timer.restart();
+        remove(graph);
+        elapsed += timer.nsecsElapsed();
+        done = elapsed > 25e3 && iterations > 3; // have 25us and done some iterations
+    }
+    QTest::setBenchmarkResult(elapsed / 1e6 / (double)iterations, QTest::WalltimeMilliseconds);
+}
+
+void Benchmark::QCPMultiGraph_RemoveDataBetween()
+{
+    timeRemoval(mPlot, [](QCPMultiGraph* graph) { graph->removeData(0.5, 1.5); }); // 50% of total data in center
+}
+
+void Benchmark::QCPMultiGraph_RemoveDataAfter()
+{
+    timeRemoval(mPlot, [](QCPMultiGraph* graph) { graph->removeDataAfter(1.0); }); // last 50% of total data
+}
+
+void Benchmark::QCPMultiGraph_RemoveDataBefore()
+{
+    timeRemoval(mPlot, [](QCPMultiGraph* graph) { graph->removeDataBefore(1.0); }); // first 50% of total data
 }
 
 void Benchmark::QCPMultiGraph_AddDataAtEndSorted()

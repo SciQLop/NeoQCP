@@ -574,6 +574,164 @@ void TestMultiGraph::aBusyAppendGoesThroughTheDeferredSwap()
     QCOMPARE(mg->componentValueAt(0, n), 1.0);
 }
 
+static QCPMultiGraph* rampGraph(QCustomPlot* plot, int rows, int columns = 1)
+{
+    const auto rowCount = static_cast<std::size_t>(rows);
+    std::vector<double> keys(rowCount, 0.0);
+    std::vector<std::vector<double>> values(static_cast<std::size_t>(columns),
+                                            std::vector<double>(rowCount, 0.0));
+    for (int i = 0; i < rows; ++i)
+    {
+        keys[std::size_t(i)] = i;
+        for (int c = 0; c < columns; ++c)
+            values[std::size_t(c)][std::size_t(i)] = 10.0 * i + c;
+    }
+    auto* graph = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    graph->setData(std::move(keys), std::move(values));
+    return graph;
+}
+
+static QVector<double> keysOf(const QCPMultiGraph* graph)
+{
+    QVector<double> keys;
+    for (int i = 0; i < graph->dataCount(); ++i)
+        keys.append(graph->dataMainKey(i));
+    return keys;
+}
+
+void TestMultiGraph::removeDataBeforeKeepsTheRest()
+{
+    auto* mg = rampGraph(mPlot, 6, 2);
+    const quint64 revision = mg->dependencyRevision();
+    mg->removeDataBefore(2.0); // 2.x: keys below 2 go, 2 stays
+    QCOMPARE(keysOf(mg), (QVector<double>{2, 3, 4, 5}));
+    QCOMPARE(mg->componentValueAt(0, 0), 20.0);
+    QCOMPARE(mg->componentValueAt(1, 3), 51.0);
+    QVERIFY2(mg->dependencyRevision() != revision, "the pipeline does not see the removal");
+
+    const quint64 settled = mg->dependencyRevision();
+    mg->removeDataBefore(-5.0);
+    QCOMPARE(mg->dataCount(), 4);
+    QCOMPARE(mg->dependencyRevision(), settled); // nothing removed, nothing new to draw
+}
+
+void TestMultiGraph::removeDataAfterKeepsTheRest()
+{
+    auto* mg = rampGraph(mPlot, 6);
+    mg->removeDataAfter(3.0); // 2.x: keys above 3 go, 3 stays
+    QCOMPARE(keysOf(mg), (QVector<double>{0, 1, 2, 3}));
+    QCOMPARE(mg->componentValueAt(0, 3), 30.0);
+    mg->removeDataAfter(-1.0);
+    QCOMPARE(mg->dataCount(), 0);
+    mg->addData(7.0, 70.0); // the emptied graph still owns its source
+    QCOMPARE(keysOf(mg), (QVector<double>{7}));
+}
+
+void TestMultiGraph::removeDataRangeKeepsTheRest()
+{
+    auto* mg = rampGraph(mPlot, 6, 2);
+    mg->removeData(1.0, 3.0); // 2.x: both bounds included
+    QCOMPARE(keysOf(mg), (QVector<double>{0, 4, 5}));
+    QCOMPARE(mg->componentValueAt(1, 1), 41.0);
+    mg->removeData(4.5, 4.6);
+    QCOMPARE(mg->dataCount(), 3);
+    mg->removeData(5.0, 0.0); // a reversed range holds nothing
+    QCOMPARE(mg->dataCount(), 3);
+}
+
+void TestMultiGraph::removeOnAViewIsAMisuse()
+{
+    MisuseScope misuse;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    std::vector<double> keys = {0.0, 1.0, 2.0};
+    std::vector<double> values = {10.0, 20.0, 30.0};
+    mg->viewData(std::span<const double>(keys),
+                 std::vector<std::span<const double>>{std::span<const double>(values)});
+    mg->removeDataBefore(1.0);
+    mg->removeDataAfter(1.0);
+    mg->removeData(0.0, 1.0);
+    QCOMPARE(MisuseScope::count(), std::size_t(3));
+    QCOMPARE(mg->dataCount(), 3);
+
+    auto* waterfall = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    waterfall->setData(std::vector<double>{0.0, 1.0}, std::vector<std::vector<double>>{{1.0, 2.0}});
+    waterfall->removeDataBefore(1.0);
+    QCOMPARE(MisuseScope::count(), std::size_t(4));
+    QCOMPARE(waterfall->dataCount(), 2);
+
+    auto* empty = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    empty->removeDataBefore(1.0); // nothing to remove: 2.x did nothing either
+    QCOMPARE(MisuseScope::count(), std::size_t(4));
+}
+
+void TestMultiGraph::aRollingWindowStaysBounded()
+{
+    // 2.x's real-time demo: append the new point, drop what fell out of the window.
+    constexpr int window = 100;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    for (int i = 0; i < 1'000; ++i)
+    {
+        mg->addData(double(i), qSin(i * 0.1));
+        mg->removeDataBefore(double(i - window + 1));
+        QVERIFY(mg->dataCount() <= window);
+    }
+    QCOMPARE(mg->dataCount(), window);
+    QCOMPARE(mg->dataMainKey(0), double(1'000 - window));
+    QCOMPARE(mg->dataMainKey(window - 1), 999.0);
+}
+
+void TestMultiGraph::aBusyRemoveGoesThroughTheDeferredSwap()
+{
+    // A job reads the rows it was started for: the removal edits a copy, staged for the swap.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    constexpr int n = 120'000;
+    std::vector<double> keys(n), values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[std::size_t(i)] = i;
+        values[std::size_t(i)] = qSin(i * 0.001);
+    }
+    mg->setData(std::move(keys), std::vector<std::vector<double>>{std::move(values)});
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(mg->hasRenderedRange(), 10'000);
+
+    mPlot->setDataSwapDebounceMs(10'000);
+    mg->setDeferredDataSwap(true);
+    mg->dataChanged(); // a job over the displayed rows is now in flight
+    QVERIFY(mg->pipeline().isBusy());
+    const auto* displayed = mg->dataSource();
+
+    mg->removeDataBefore(1'000.0);
+    QVERIFY2(mg->hasPendingData(), "a busy removal skipped the deferred swap");
+    QCOMPARE(mg->dataSource(), displayed);
+    QCOMPARE(mg->dataCount(), n); // the rows the job reads are untouched until the swap
+
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 10'000);
+    QVERIFY(mg->commitPendingData());
+    QCOMPARE(mg->dataCount(), n - 1'000);
+    QCOMPARE(mg->dataMainKey(0), 1'000.0);
+}
+
+void TestMultiGraph::removeWithAPendingSwapEditsTheStagedSource()
+{
+    auto* mg = rampGraph(mPlot, 2);
+    mPlot->replot();
+    QVERIFY(mg->hasRenderedRange());
+
+    mPlot->setDataSwapDebounceMs(10'000);
+    mg->setDeferredDataSwap(true);
+    mg->setData(std::vector<double>{10.0, 20.0, 30.0}, std::vector<std::vector<double>>{{1.0, 2.0, 3.0}});
+    QVERIFY(mg->hasPendingData());
+    const auto staged = mg->mPendingSource;
+
+    mg->removeDataAfter(15.0);
+    QCOMPARE(staged->size(), 1);
+    QCOMPARE(mg->dataSource()->size(), 2); // the displayed geometry waits for the swap
+
+    QVERIFY(mg->commitPendingData());
+    QCOMPARE(keysOf(mg), (QVector<double>{10}));
+}
+
 void TestMultiGraph::aSwapStagedBeforeASystemSwitchShowsOnTheUserSystem()
 {
     // I1: the job staged on the cartesian branch may land after the move; the data-space branch
@@ -958,6 +1116,28 @@ void TestMultiGraph::aOneComponentGraphRowShowsTheGraphName()
     QCOMPARE(row->headerName(), QString());
     graph->setName("density");
     QCOMPARE(row->headerName(), QStringLiteral("density"));
+}
+
+static QCPGroupLegendItem* groupItemOf(QCustomPlot* plot, QCPMultiGraph* mg);
+
+// 2.x drew an empty graph's row with its pen line and its name, before any data arrived.
+void TestMultiGraph::anEmptyGraphRowDrawsThePenLine()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setName("loading");
+    mg->setPen(QPen(Qt::blue, 4));
+    mg->addToLegend(mPlot->legend);
+    mPlot->legend->setVisible(true);
+    QCOMPARE(mg->componentCount(), 0);
+    auto* row = groupItemOf(mPlot, mg);
+    QVERIFY(row);
+    QCOMPARE(row->headerName(), QStringLiteral("loading"));
+
+    const QImage image = renderOf(mPlot);
+    const QRect r = row->rect();
+    const QColor icon = image.pixelColor(r.left() + row->margins().left() + 10,
+                                         r.top() + row->rowHeight() / 2);
+    QVERIFY2(isBlue(icon), qPrintable(icon.name()));
 }
 
 void TestMultiGraph::anExplicitComponentNameWins()
@@ -3755,6 +3935,24 @@ void TestMultiGraph::theFillDropsWhenThePartnerDies()
     pair.partner = nullptr;
     QVERIFY2(!draws(renderOf(mPlot), mPlot->axisRect()->rect(), isBlue),
              "the band outlived its partner");
+}
+
+// 2.x reset channelFillGraph() to null when the partner died: the fill is gone, not a fill to nothing.
+void TestMultiGraph::aDeadPartnersFillIsGone()
+{
+    FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {2, 2, 2});
+    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    QVERIFY(pair.owner->componentFill(0));
+
+    delete pair.partner;
+    pair.partner = nullptr;
+    QVERIFY2(!pair.owner->componentFill(0), "a fill to a dead graph is still reported");
+
+    auto* second = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    second->setData(QVector<double>{0, 1, 2}, QVector<double>{2, 2, 2});
+    QVERIFY(pair.owner->setComponentFillToGraph(0, second, 0));
+    QVERIFY(mPlot->removeGraph(second));
+    QVERIFY2(!pair.owner->componentFill(0), "a fill to a removed graph is still reported");
 }
 
 void TestMultiGraph::theFillDropsWhenThePartnerLosesTheComponent()

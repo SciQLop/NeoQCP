@@ -33,6 +33,7 @@ private slots:
     void clearPlottablesEmptiesGroups();
     void foreignGroupIsNotRemoved();
     void iconIsTheFirstVisibleMembers();
+    void anEmptyGraphsIconIsItsPen();
 
 private:
     QCPPlottableGroupLegendItem* groupRow() const;

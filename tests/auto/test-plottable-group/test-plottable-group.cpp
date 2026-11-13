@@ -408,3 +408,19 @@ void TestPlottableGroup::iconIsTheFirstVisibleMembers()
         + QPoint(iconSize.width() / 2, iconSize.height() / 2);
     QCOMPARE(img.pixelColor(iconCentre), QColor(Qt::blue));
 }
+
+void TestPlottableGroup::anEmptyGraphsIconIsItsPen()
+{
+    // 2.x drew an empty graph's pen line in the legend; data arrives later.
+    QCPMultiGraph* empty = mPlot->addGraph();
+    empty->setPen(QPen(Qt::blue, 6));
+    QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
+    group->addMember(empty);
+
+    mPlot->resize(400, 300);
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+    const QSize iconSize = mPlot->legend->iconSize();
+    const QPoint iconCentre = groupRow()->rect().topLeft()
+        + QPoint(iconSize.width() / 2, iconSize.height() / 2);
+    QCOMPARE(img.pixelColor(iconCentre), QColor(Qt::blue));
+}

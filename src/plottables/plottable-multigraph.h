@@ -122,6 +122,14 @@ public:
                  bool alreadySorted = false);
     //! Appends one row of \a values, one per component.
     void addData(double key, std::span<const double> values);
+    //! Removes the rows whose key is below \a key (2.x's removeDataBefore: a rolling window).
+    //! Same rules as addData(): only the source the graph owns; a view, a shared source or a
+    //! waterfall is a misuse and nothing changes. A graph without data has nothing to remove.
+    void removeDataBefore(double key);
+    //! Removes the rows whose key is above \a key.
+    void removeDataAfter(double key);
+    //! Removes the rows whose key lies in [\a fromKey, \a toKey], both bounds included (2.x).
+    void removeData(double fromKey, double toKey);
 
     // Convenience: non-owning spans (column-major / Fortran-order)
     template <typename K, typename V>
@@ -243,6 +251,9 @@ public:
     //! Draws one component's legend line: its pen, or, when the graph is coloured, the pen
     //! with a gradient brush along `line` sampled from the colour mapper.
     void drawComponentLegendIcon(QCPPainter* painter, int component, const QLineF& line) const;
+    //! The row of a graph without data (no component yet): the pen line, marker and brush its
+    //! first column will take, as 2.x drew an empty graph.
+    void drawEmptyLegendIcon(QCPPainter* painter, const QLineF& line) const;
 
 protected:
     //! Records the lines and the markers: the pixels come from the replay.
@@ -356,19 +367,21 @@ protected:
     virtual void setOwnedSource(std::shared_ptr<QCPGrowableMultiDataSource> source);
     //! The one path a new source takes: applied now or staged for the deferred swap.
     void installSource(std::shared_ptr<QCPAbstractMultiDataSource> source);
-    //! The growable source addData() may write, or null when the graph has no data yet (a new
-    //! source starts) or a misuse has already been reported.
+    //! The growable source addData() or a removal may write, or null when the graph has no data
+    //! yet (a new source starts) or a misuse has already been reported.
     [[nodiscard]] std::shared_ptr<QCPGrowableMultiDataSource> ownedSourceForAppend() const;
     //! Whether addData() may write to a source this graph owns. A waterfall's source is its
     //! adapter, never owned: it refuses every addData, including the first.
     [[nodiscard]] virtual bool acceptsAppend() const { return true; }
-    //! After an append: re-stage the pending source (a new generation, a pipeline re-run) or
-    //! refresh the displayed one.
-    void appendChanged();
-    //! Applies an append to the owned source (the pending one when a swap is staged). A running
-    //! pipeline job reads the source it was started for, so the append clones it first when busy.
-    bool appendToOwnedSource(
-        const std::function<bool(QCPGrowableMultiDataSource&)>& append);
+    //! After an append or a removal: re-stage the pending source (a new generation, a pipeline
+    //! re-run) or refresh the displayed one.
+    void ownedSourceChanged();
+    //! Applies an append or a removal to the owned source (the pending one when a swap is staged).
+    //! A running pipeline job reads the source it was started for, so the edit clones it first
+    //! when busy. False, and nothing changes, when \a edit changed nothing.
+    bool editOwnedSource(const std::function<bool(QCPGrowableMultiDataSource&)>& edit);
+    //! removeDataBefore/After/removeData: addData()'s ownership rules, then the edit.
+    void removeOwnedRows(const std::function<bool(QCPGrowableMultiDataSource&)>& remove);
     void applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> source);
     void stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSource> source);
     void markPendingReady();
@@ -376,6 +389,13 @@ protected:
     void syncComponentCount(const QCPAbstractMultiDataSource* source);
     //! Drops FillToGraph entries whose partner is gone or no longer has the named component.
     void pruneLostPartnerFills();
+    [[nodiscard]] static bool partnerDied(const Fill& fill);
+    [[nodiscard]] Component firstComponentStyle() const;
+    [[nodiscard]] std::optional<QBrush> emptyGraphFillBrush() const;
+    void drawLegendGlyph(QCPPainter* painter, const Component& comp,
+                         const std::optional<QBrush>& fill, const QLineF& line) const;
+    void recordLegendSegment(QCPDrawContext& icon, const Component& comp,
+                             const std::optional<QBrush>& fill, double x0) const;
     void dropDecorationsBeyond(int columnCount);
     void hideErrorBound(int column);
     void releaseErrorBounds(const ErrorBars& removed);
@@ -518,6 +538,21 @@ public:
     Ret addData(double key, std::span<const double> values)
     {
         return this->apply([&](T& o) { o.addData(key, values); });
+    }
+
+    Ret removeDataBefore(double key)
+    {
+        return this->apply([&](T& o) { o.removeDataBefore(key); });
+    }
+
+    Ret removeDataAfter(double key)
+    {
+        return this->apply([&](T& o) { o.removeDataAfter(key); });
+    }
+
+    Ret removeData(double fromKey, double toKey)
+    {
+        return this->apply([&](T& o) { o.removeData(fromKey, toKey); });
     }
 
     Ret setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
