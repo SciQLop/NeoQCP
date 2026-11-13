@@ -55,6 +55,7 @@ private slots:
     void recordedIntervalsMatchTheirReferences();
     void aPannedIntervalStaysCorrect();
     void labelsStayAboveTheBars();
+    void labelsAndLaneNamesUseThePlotFont();
     void aDataChangeRedrawsTheLabels();
     void aTickLabelColourChangeReInksTheWaveBackdrop();
 

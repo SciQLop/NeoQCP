@@ -36,6 +36,7 @@ protected:
     {
         if (!mOwner->laidOut()) // its labels were laid out on the lost axis or lanes
             return;
+        painter->setFont(mParentPlot->font()); // the font the labels were measured with
         mOwner->drawLabels(painter);
         if (mOwner->drawsLaneNames())
             mOwner->drawLaneNames(painter);

@@ -680,6 +680,70 @@ void TestIntervals::labelsStayAboveTheBars()
     QVERIFY2(labelPixels(image, mPlot, centre) > 5, "the label is under the bars");
 }
 
+namespace {
+//! The rows of \a area holding a dark (text) pixel: the height of the text drawn there.
+int darkRows(const QImage& image, const QRect& area)
+{
+    int rows = 0;
+    for (int y = area.top(); y <= area.bottom(); ++y)
+        for (int x = area.left(); x <= area.right(); ++x)
+            if (image.pixelColor(x, y).lightness() < 100)
+            {
+                ++rows;
+                break;
+            }
+    return rows;
+}
+
+//! The columns of \a area holding a dark (text) pixel: the width of the text drawn there.
+int darkColumns(const QImage& image, const QRect& area)
+{
+    return darkRows(image.transformed(QTransform().rotate(90)),
+                    QRect(image.height() - 1 - area.bottom(), area.left(), area.height(), area.width()));
+}
+} // namespace
+
+// The labels are measured with the plot's font, so they are drawn with it too: drawn with the
+// painter's leftover font, they took the application's size instead.
+void TestIntervals::labelsAndLaneNamesUseThePlotFont()
+{
+    QFont font = mPlot->font();
+    font.setPixelSize(24);
+    mPlot->setFont(font);
+    const int capHeight = qRound(QFontMetricsF(font).capHeight());
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->xAxis->setVisible(false); // no tick marks inside the measured areas
+    mPlot->yAxis->setVisible(false);
+
+    QCPLaneLayout lanes;
+    lanes.setPlacement(QCPLaneLayout::plLanes);
+    lanes.setLaneHeight(40);
+    auto* labelled = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &lanes);
+    labelled->setCategoryColors({ Qt::red });
+    mPlot->replot();
+    auto c = columns({ 0 }, { 100 }, { lanes.laneIndex("A") });
+    c.labels = QStringList { QStringLiteral("WW") };
+    labelled->setData(std::move(c));
+    const QRect rect = mPlot->axisRect()->rect();
+    const int laneHeight = qRound(lanes.lanePixelHeight(rect));
+    const QImage withLabel = mPlot->toPixmap(400, 300).toImage();
+    const int label = darkRows(withLabel, QRect(rect.left() + 2, rect.top() + 1, rect.width() - 4,
+                                                laneHeight - 2));
+    QVERIFY2(label >= capHeight - 2,
+             qPrintable(QStringLiteral("label %1 rows high, cap height %2").arg(label).arg(capHeight)));
+    delete labelled;
+
+    // A strip's lane is thinner than the font: the name's top is clipped, its width is not.
+    QCPLaneLayout strip; // plStrip: the lane names are drawn at the left edge
+    auto* named = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &strip);
+    named->setData(columns({ 60 }, { 90 }, { strip.laneIndex("A") }));
+    const QImage withName = mPlot->toPixmap(400, 300).toImage();
+    const int name = darkColumns(withName, QRect(rect.left() + 2, rect.top() + 1, 60, rect.height() - 2));
+    const int width = QFontMetrics(font).boundingRect(QLatin1Char('A')).width();
+    QVERIFY2(name >= width - 2,
+             qPrintable(QStringLiteral("lane name %1 columns wide, glyph %2").arg(name).arg(width)));
+}
+
 void TestIntervals::aDataChangeRedrawsTheLabels()
 {
     QCPLaneLayout layout;
