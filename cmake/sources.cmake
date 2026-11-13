@@ -15,6 +15,7 @@ set(NEOQCP_SOURCES
     src/drawable.cpp
     src/overlay.cpp
     src/layout.cpp
+    src/alignment-group.cpp
     src/lineending.cpp
     src/painting/paintbuffer.cpp
     src/painting/painter.cpp
@@ -25,9 +26,7 @@ set(NEOQCP_SOURCES
     src/painting/paintbuffer-pixmap.cpp
     src/painting/paintbuffer-rhi.cpp
     src/painting/plottable-rhi-layer.cpp
-    src/painting/span-rhi-layer.cpp
     src/painting/grid-rhi-layer.cpp
-    src/painting/colormap-rhi-layer.cpp
     src/painting/scatter-rhi-layer.cpp
     src/painting/colormap-renderer.cpp
     src/painting/line-extruder.cpp
@@ -62,9 +61,8 @@ set(NEOQCP_SOURCES
     src/items/item-richtext.cpp
     src/items/item-tracer.cpp
     src/items/item-spanbase.cpp
-    src/items/item-hspan.cpp
     src/items/item-rspan.cpp
-    src/items/item-vspan.cpp
+    src/items/item-span.cpp
     src/layoutelements/area.cpp
     src/layoutelements/layoutelement-axisrect.cpp
     src/layoutelements/layoutelement-colorscale.cpp
@@ -93,6 +91,7 @@ set(NEOQCP_SOURCES
     src/datasource/async-pipeline.cpp
     src/datasource/abstract-multi-datasource.cpp
     src/plottables/plottable-colormap2.cpp
+    src/plottables/plottable-colormapped.cpp
     src/plottables/plottable-histogram2d.cpp
     src/plottables/plottable-histogram.cpp
     src/plottables/plottable-statisticalbox.cpp
@@ -139,9 +138,8 @@ set(NEOQCP_MOC_HEADERS
     src/items/item-richtext.h
     src/items/item-tracer.h
     src/items/item-spanbase.h
-    src/items/item-hspan.h
     src/items/item-rspan.h
-    src/items/item-vspan.h
+    src/items/item-span.h
     src/layer.h
     src/spatial-index.h
     src/coords.h
@@ -149,6 +147,7 @@ set(NEOQCP_MOC_HEADERS
     src/coordinate-system.h
     src/coordinate-system-polar.h
     src/layout.h
+    src/alignment-group.h
     src/layoutelements/area.h
     src/layoutelements/layoutelement-axisrect.h
     src/layoutelements/layoutelement-colorscale.h
@@ -158,6 +157,9 @@ set(NEOQCP_MOC_HEADERS
     src/layoutelements/layoutelement-textelement.h
     src/lineending.h
     src/painting/paintbuffer.h
+    src/painting/command-replay-rhi.h
+    src/painting/draw-commands.h
+    src/painting/draw-context.h
     src/painting/painter.h
     src/painting/paintbuffer-pixmap.h
     src/plottables/plottable.h
@@ -178,6 +180,7 @@ set(NEOQCP_MOC_HEADERS
     src/datasource/async-pipeline.h
     src/datasource/growable-multi-datasource.h
     src/plottables/plottable-colormap2.h
+    src/plottables/plottable-colormapped.h
     src/plottables/plottable-histogram2d.h
     src/plottables/plottable-histogram.h
     src/qcp.h
@@ -203,8 +206,6 @@ set(NEOQCP_SHADERS
     src/painting/shaders/plottable_image.vert
     src/painting/shaders/plottable_image.frag
     src/painting/shaders/span.vert
-    src/painting/shaders/contour_line.vert
-    src/painting/shaders/contour_line.frag
     src/painting/shaders/scatter.vert
     src/painting/shaders/scatter.frag
     src/painting/shaders/scatter_colored.vert

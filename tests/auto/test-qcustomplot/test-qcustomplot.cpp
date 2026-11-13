@@ -1,4 +1,5 @@
 #include <QSignalSpy>
+#include <QTest>
 #include <QtTest/qtestspontaneevent.h>
 #include "test-qcustomplot.h"
 
