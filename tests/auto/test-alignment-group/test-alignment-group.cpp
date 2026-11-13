@@ -928,3 +928,27 @@ void TestAlignmentGroup::anUnsettledLayoutStopsAndRepaintsLater()
     QCOMPARE(restless->passes, 4); // the pass, then the three extra ones
     QVERIFY(plot.isRepaintQueued()); // the next replot carries on
 }
+
+/* A side whose automatic margin is switched off takes no part in its group. Its edge, as the
+   group last used it, must not keep the layout unsettled once a resize moves it: every replot
+   would run the extra passes and ask for another replot, forever (m5d final review I1). */
+void TestAlignmentGroup::aSideSwitchedToManualStopsAligning()
+{
+    QCustomPlot plot;
+    auto* lower = new PassCountingRect(&plot);
+    plot.plotLayout()->addElement(1, 0, lower);
+    lower->axis(QCPAxis::atLeft)->setRange(0, 1e9);
+    QVERIFY(QCPAlignmentGroup::create({ plot.axisRect(), lower }, QCP::msLeft | QCP::msRight));
+    renderOnce(plot, QSize(400, 300));
+    QVERIFY(!plot.isRepaintQueued());
+
+    lower->setAutoMargins(QCP::msTop | QCP::msBottom);
+    lower->setMargins(QMargins(80, 0, 20, 0));
+    renderOnce(plot, QSize(400, 300));
+    renderOnce(plot, QSize(320, 300)); // moves the right edge the group last used
+    lower->passes = 0;
+    plot.replot();
+    QCOMPARE(lower->passes, 1);
+    QVERIFY(!plot.isRepaintQueued());
+    QCOMPARE(gMisuses, 0);
+}

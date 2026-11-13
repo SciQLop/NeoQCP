@@ -225,10 +225,21 @@ bool QCPAlignmentGroup::edgeMoved(const QCPLayoutElement* element) const
     const auto used = mUsedEdges.constFind(element);
     if (used == mUsedEdges.constEnd() || !laidOut(element))
         return false;
+    // The record of a side outlives its part in the group (a margin switched to manual keeps it
+    // until the next invalidate): only a side the element still aligns can be unsettled.
+    const QCP::MarginSides aligned = alignedSides(element);
     for (auto it = used->constBegin(); it != used->constEnd(); ++it)
-        if (windowEdge(element, it.key()) != it.value())
+        if (aligned.testFlag(it.key()) && windowEdge(element, it.key()) != it.value())
             return true;
     return false;
+}
+
+QCP::MarginSides QCPAlignmentGroup::alignedSides(const QCPLayoutElement* element) const
+{
+    const auto member
+        = std::find_if(mMembers.cbegin(), mMembers.cend(),
+                       [element](const Member& candidate) { return candidate.element == element; });
+    return member == mMembers.cend() ? QCP::msNone : member->sides & element->autoMargins();
 }
 
 void QCPAlignmentGroup::invalidate()

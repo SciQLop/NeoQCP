@@ -74,6 +74,8 @@ private:
     static bool comparable(const QCPLayoutElement* asker, const QCPLayoutElement* member);
     QList<QCPLayoutElement*> liveMembers() const;
     QList<Member>::iterator findMember(const QCPLayoutElement* element);
+    //! The sides \a element holds in this group with an automatic margin: the ones it aligns.
+    QCP::MarginSides alignedSides(const QCPLayoutElement* element) const;
     //! Drops \a element from the group on \a sides; it goes from the list once it holds none.
     void leave(QCPLayoutElement* element, QCP::MarginSides sides);
 
