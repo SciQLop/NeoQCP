@@ -650,3 +650,41 @@ void TestItemSystem::aTakeClearsAOneAxisPosition()
     QVERIFY2(!position->keyAxis() && !position->valueAxis(),
              "take left an axis on a one-axis position");
 }
+
+void TestItemSystem::theProjectionsFollowEveryFrame()
+{
+    // The getters answer from the position's cached 2.x projections: the cartesian system's pair,
+    // the one axis of a one-axis position (axistag.cpp), null on a polar frame.
+    QCPAxisRect* rect = mPlot->axisRect();
+    auto* polar = secondPolar(mPlot);
+    auto* item = new QCPItemTracer(mPlot);
+    QCPItemPosition* position = item->position;
+
+    position->setAxes(mPlot->xAxis, mPlot->yAxis);
+    QCOMPARE(position->keyAxis(), mPlot->xAxis);
+    QCOMPARE(position->valueAxis(), mPlot->yAxis);
+    QCOMPARE(position->axisRect(), rect);
+    QCOMPARE(position->system(), rect->system(mPlot->xAxis, mPlot->yAxis));
+
+    position->setAxisRect(rect);
+    position->setAxes(nullptr, mPlot->yAxis);
+    QCOMPARE(position->keyAxis(), nullptr);
+    QCOMPARE(position->valueAxis(), mPlot->yAxis);
+    QCOMPARE(position->axisRect(), rect);
+    QCOMPARE(position->system(), nullptr);
+
+    position->setArea(polar);
+    QCOMPARE(position->axisRect(), nullptr);
+    QCOMPARE(position->area(), static_cast<QCPArea*>(polar));
+    QCOMPARE(position->valueAxis(), mPlot->yAxis);
+
+    position->setSystem(polar->system(polar->angularAxis(), polar->radialAxis()));
+    QCOMPARE(position->keyAxis(), nullptr);
+    QCOMPARE(position->valueAxis(), nullptr);
+    QCOMPARE(position->axisRect(), nullptr);
+
+    position->setAxes(mPlot->xAxis, mPlot->yAxis);
+    QCOMPARE(position->keyAxis(), mPlot->xAxis);
+    QCOMPARE(position->valueAxis(), mPlot->yAxis);
+    QCOMPARE(position->axisRect(), rect);
+}

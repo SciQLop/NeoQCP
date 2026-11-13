@@ -380,13 +380,10 @@ QCPItemPosition::~QCPItemPosition()
  * see QTBUG-29588 */
 QCPHandle<QCPAxisRect> QCPItemPosition::axisRect() const
 {
-    return QCPHandle<QCPAxisRect>(qobject_cast<QCPAxisRect*>(mArea.data()));
+    return QCPHandle<QCPAxisRect>(mAxisRect.data());
 }
 
-QCPAxisRect* QCPItemPosition::axisRectRaw() const
-{
-    return qobject_cast<QCPAxisRect*>(mArea.data());
-}
+QCPAxisRect* QCPItemPosition::axisRectRaw() const { return mAxisRect.data(); }
 
 QCPCoordinateSystem* QCPItemPosition::systemRaw() const { return mSystem.data(); }
 
@@ -440,7 +437,7 @@ bool QCPItemPosition::needsFrame() const
     const auto slot = [this](PositionType type)
     {
         if (type == ptPlotCoords)
-            return !(mKeyAxis && mValueAxis) && mSystem;
+            return !(keyAxisRaw() && valueAxisRaw()) && mSystem;
         if (type == ptAxisRectRatio)
             return !mAxisRect && mArea && !mArea->ratioTransform().separable();
         return false;
@@ -527,7 +524,7 @@ void QCPItemPosition::setTypeX(QCPItemPosition::PositionType type)
         // warning.
         bool retainPixelPosition = true;
         if ((mPositionTypeX == ptPlotCoords || type == ptPlotCoords) && !mSystem
-            && (!mKeyAxis || !mValueAxis))
+            && (!keyAxisRaw() || !valueAxisRaw()))
             retainPixelPosition = false;
         const bool areaReady = mArea && !mArea->rect().isEmpty();
         if ((mPositionTypeX == ptAxisRectRatio || type == ptAxisRectRatio
@@ -570,7 +567,7 @@ void QCPItemPosition::setTypeY(QCPItemPosition::PositionType type)
         // warning.
         bool retainPixelPosition = true;
         if ((mPositionTypeY == ptPlotCoords || type == ptPlotCoords) && !mSystem
-            && (!mKeyAxis || !mValueAxis))
+            && (!keyAxisRaw() || !valueAxisRaw()))
             retainPixelPosition = false;
         const bool areaReady = mArea && !mArea->rect().isEmpty();
         if ((mPositionTypeY == ptAxisRectRatio || type == ptAxisRectRatio
@@ -830,15 +827,16 @@ QPointF QCPItemPosition::pixelPosition() const
     // and the switches below would cross the slots on a vertical key axis.
     const bool dataAndRatio = (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptAxisRectRatio)
         || (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptPlotCoords);
-    if (dataAndRatio && !mParentAnchorX && !mParentAnchorY && mKeyAxis && mValueAxis && mAxisRect)
-        return qcpResolvePosition(qcpMakeFrame(mKeyAxis.data(), mValueAxis.data(), mAxisRect.data(),
-                                               mAxisRect.data()->rect()),
+    QCPAxisRect* const rect = mAxisRect.data();
+    if (dataAndRatio && !mParentAnchorX && !mParentAnchorY && keyAxisRaw() && valueAxisRaw()
+        && rect)
+        return qcpResolvePosition(qcpMakeFrame(keyAxisRaw(), valueAxisRaw(), rect, rect->rect()),
                                   asPosition(), false); // a position may ask before it has landed
 
     // An anchored pair of plot coordinates on a frame that has no axis pair is an offset in that
     // frame's data space: the anchor pixel is read back, the offset added, and the result mapped.
     // This is what 2.x does on a linear cartesian frame, and the only reading left on a skewed one.
-    if (mSystem && !mKeyAxis && !mValueAxis && mParentAnchorX && mParentAnchorY
+    if (mSystem && !keyAxisRaw() && !valueAxisRaw() && mParentAnchorX && mParentAnchorY
         && mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
     {
         const QPointF anchorPixel(mParentAnchorX->pixelPosition().x(),
@@ -861,7 +859,7 @@ QPointF QCPItemPosition::pixelPosition() const
     if (frameResolved)
     {
         QCPDrawFrame frame;
-        frame.transform = mSystem ? mSystem->transform() : QCPTransform(mKeyAxis, mValueAxis);
+        frame.transform = mSystem ? mSystem->transform() : QCPTransform(keyAxisRaw(), valueAxisRaw());
         frame.ratio = mArea ? mArea->ratioTransform() : QCPRatioTransform();
         frame.clip = mArea ? QRectF(mArea->rect()) : QRectF();
         // A pixel read never reports: a type transition asks before the position has landed.
@@ -880,10 +878,10 @@ QPointF QCPItemPosition::pixelPosition() const
     // axis every slot stays on the screen axis it names.
     const bool xPlot = mPositionTypeX == ptPlotCoords;
     const bool yPlot = mPositionTypeY == ptPlotCoords;
-    const bool keyVertical = mKeyAxis && mKeyAxis.data()->orientation() == Qt::Vertical;
+    const bool keyVertical = keyAxisRaw() && keyAxisRaw()->orientation() == Qt::Vertical;
     const bool crossing = keyVertical && xPlot != yPlot
         && !(xPlot ? mParentAnchorX : mParentAnchorY) // an anchor on the plot slot keeps its axis
-        && (xPlot || (mValueAxis && mValueAxis.data()->orientation() == Qt::Horizontal));
+        && (xPlot || (valueAxisRaw() && valueAxisRaw()->orientation() == Qt::Horizontal));
 
     // A slot whose axes or area went away answers 0, quietly: a taken or inert item must not report
     // on a pixel read. Drawing reports the missing frame once.
@@ -911,11 +909,11 @@ QPointF QCPItemPosition::pixelPosition() const
     if (crossing && xPlot)
     {
         result.rx() = otherSlot(mValue, mPositionTypeY, true, mParentAnchorY);
-        result.ry() = plotSlot(mKeyAxis.data(), nullptr, mKey, false);
+        result.ry() = plotSlot(keyAxisRaw(), nullptr, mKey, false);
     }
     else if (crossing)
     {
-        result.rx() = plotSlot(mValueAxis.data(), nullptr, mValue, true);
+        result.rx() = plotSlot(valueAxisRaw(), nullptr, mValue, true);
         result.ry() = otherSlot(mKey, mPositionTypeX, false, mParentAnchorX);
     }
     else
@@ -924,12 +922,12 @@ QPointF QCPItemPosition::pixelPosition() const
         // key runs along, the Y slot (the value) on the value axis's. With a vertical key that
         // swaps the screen axes, the same crossing the one-plot-slot branch above resolves.
         if (xPlot)
-            result.rx() = plotSlot(keyVertical ? mValueAxis.data() : mKeyAxis.data(), nullptr,
+            result.rx() = plotSlot(keyVertical ? valueAxisRaw() : keyAxisRaw(), nullptr,
                                    keyVertical ? mValue : mKey, true);
         else
             result.rx() = otherSlot(mKey, mPositionTypeX, true, mParentAnchorX);
         if (yPlot)
-            result.ry() = plotSlot(keyVertical ? mKeyAxis.data() : mValueAxis.data(), nullptr,
+            result.ry() = plotSlot(keyVertical ? keyAxisRaw() : valueAxisRaw(), nullptr,
                                    keyVertical ? mKey : mValue, false);
         else
             result.ry() = otherSlot(mValue, mPositionTypeY, false, mParentAnchorY);
@@ -953,7 +951,7 @@ void QCPItemPosition::setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
 {
     // Both null is not a no-op: it unbinds a system whose projections are already null (a polar
     // one), and the take path relies on it.
-    if (keyAxis == mKeyAxis && valueAxis == mValueAxis && (keyAxis || valueAxis))
+    if (keyAxis == keyAxisRaw() && valueAxis == valueAxisRaw() && (keyAxis || valueAxis))
         return;
     QCPCoordinateSystem* resolved = nullptr;
     if (keyAxis && valueAxis)
@@ -1011,7 +1009,7 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
         mParentItem->markDirty();
     // The inverse of the anchored frame above: the pixel read back, the anchor read back, and the
     // difference stored as the offset in data space.
-    if (mSystem && !mKeyAxis && !mValueAxis && mParentAnchorX && mParentAnchorY
+    if (mSystem && !keyAxisRaw() && !valueAxisRaw() && mParentAnchorX && mParentAnchorY
         && mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
     {
         const QPointF anchorPixel(mParentAnchorX->pixelPosition().x(),
@@ -1050,7 +1048,7 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
     }
     // A frame without the 2.x axis pair can place only the anchored pair above. Everything else
     // (a one-sided anchor while a child detaches, say) is inert: a pixel write is not reported.
-    if (mSystem && !mKeyAxis && !mValueAxis
+    if (mSystem && !keyAxisRaw() && !valueAxisRaw()
         && (mPositionTypeX == ptPlotCoords || mPositionTypeY == ptPlotCoords))
         return;
     // The screen coordinates as asked: a slot's branch may translate the numbers it reads, and the
@@ -1110,10 +1108,10 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
         }
         case ptPlotCoords:
         {
-            if (mKeyAxis && mKeyAxis.data()->orientation() == Qt::Horizontal)
-                x = mKeyAxis.data()->pixelToCoord(x);
-            else if (mValueAxis && mValueAxis.data()->orientation() == Qt::Horizontal)
-                y = mValueAxis.data()->pixelToCoord(pixelX);
+            if (keyAxisRaw() && keyAxisRaw()->orientation() == Qt::Horizontal)
+                x = keyAxisRaw()->pixelToCoord(x);
+            else if (valueAxisRaw() && valueAxisRaw()->orientation() == Qt::Horizontal)
+                y = valueAxisRaw()->pixelToCoord(pixelX);
             else
                 resolvedX = false;
             break;
@@ -1166,10 +1164,10 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
         }
         case ptPlotCoords:
         {
-            if (mKeyAxis && mKeyAxis.data()->orientation() == Qt::Vertical)
-                x = mKeyAxis.data()->pixelToCoord(pixelY);
-            else if (mValueAxis && mValueAxis.data()->orientation() == Qt::Vertical)
-                y = mValueAxis.data()->pixelToCoord(y);
+            if (keyAxisRaw() && keyAxisRaw()->orientation() == Qt::Vertical)
+                x = keyAxisRaw()->pixelToCoord(pixelY);
+            else if (valueAxisRaw() && valueAxisRaw()->orientation() == Qt::Vertical)
+                y = valueAxisRaw()->pixelToCoord(y);
             else
                 resolvedY = false;
             break;

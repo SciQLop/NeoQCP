@@ -202,10 +202,7 @@ public:
 protected:
     // property members:
     PositionType mPositionTypeX, mPositionTypeY;
-    QPointer<QCPAxis> mKeyAxis, mValueAxis;
-    QPointer<QCPAxisRect> mAxisRect;
-    //! The frame the plot-coordinate slots map through, when the position has one; the axes above
-    //! stay its cartesian projections.
+    //! The frame the plot-coordinate slots map through, when the position has one.
     QPointer<QCPCoordinateSystem> mSystem;
     QPointer<QCPArea> mArea;
     double mKey, mValue;
@@ -217,10 +214,19 @@ protected:
 private:
     Q_DISABLE_COPY(QCPItemPosition)
     friend class QCPItemTracer;
+    friend class QCPItemRSpan; // reads its edge's axes on every anchor read
+    // The 2.x projections, cached so per-frame paths read them without a qobject_cast. With a
+    // cartesian system, the pair is its projection; with no system, the unresolved pair (a one-axis
+    // position keeps its axis, 4i R-2); null on any other system. The rect is the area as an axis
+    // rect, null on any other area. Only setSystem, setAxes and setArea write them.
+    QPointer<QCPAxis> mKeyAxis, mValueAxis;
+    QPointer<QCPAxisRect> mAxisRect;
     // K8: the per-item-per-frame paths read the frame raw instead of building a handle per
     // position. The accessors are out of line, where their types are complete.
     [[nodiscard]] QCPAxis* keyAxisRaw() const { return mKeyAxis.data(); }
     [[nodiscard]] QCPAxis* valueAxisRaw() const { return mValueAxis.data(); }
+    // Out of line, so a PIC build does not inline it even in item.cpp (+6 % on item creation):
+    // the position's own code reads mAxisRect directly.
     [[nodiscard]] QCPAxisRect* axisRectRaw() const;
     [[nodiscard]] QCPCoordinateSystem* systemRaw() const;
     [[nodiscard]] QCPArea* areaRaw() const;

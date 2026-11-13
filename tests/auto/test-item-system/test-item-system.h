@@ -35,6 +35,7 @@ private slots:
     void setAxesNullUnbindsAPolarSystem();
     void setSystemTwiceRetakesTheArea();
     void aTakeClearsAOneAxisPosition();
+    void theProjectionsFollowEveryFrame();
 private:
     QCustomPlot* mPlot = nullptr;
 };
