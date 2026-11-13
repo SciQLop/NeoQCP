@@ -638,6 +638,35 @@ void TestItemSystem::setSystemTwiceRetakesTheArea()
     QVERIFY2(position->area() == area, "a repeated setSystem did not retake the system's area");
 }
 
+// The cached projections go with the axis rect they came from, and an item moved to another plot
+// takes that plot's default axes and rect.
+void TestItemSystem::theProjectionsFollowDeletionAndAMoveToAnotherPlot()
+{
+    auto* lower = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(1, 0, lower);
+    auto* item = new QCPItemTracer(mPlot);
+    QCPItemPosition* position = item->position;
+    position->setAxes(lower->axis(QCPAxis::atBottom), lower->axis(QCPAxis::atLeft));
+    QCOMPARE(position->axisRect(), lower);
+    delete lower;
+    QCOMPARE(position->keyAxis(), nullptr);
+    QCOMPARE(position->valueAxis(), nullptr);
+    QCOMPARE(position->axisRect(), nullptr);
+    QCOMPARE(position->area(), nullptr);
+    QCOMPARE(position->system(), nullptr);
+
+    QCustomPlot other;
+    auto handle = mPlot->add<QCPItemEllipse>();
+    QCPItemPosition* moved = handle.get()->positions().first();
+    QCOMPARE(moved->axisRect(), mPlot->axisRect());
+    auto readded = other.add(mPlot->take(handle));
+    QVERIFY(readded);
+    QCOMPARE(moved->keyAxis(), other.xAxis);
+    QCOMPARE(moved->valueAxis(), other.yAxis);
+    QCOMPARE(moved->axisRect(), other.axisRect());
+    QCOMPARE(moved->system(), other.axisRect()->system(other.xAxis, other.yAxis));
+}
+
 void TestItemSystem::aTakeClearsAOneAxisPosition()
 {
     auto item = mPlot->add<QCPItemEllipse>();

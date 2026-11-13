@@ -1190,12 +1190,12 @@ void QCPColorMap::draw(QCPDrawContext& context) const
 /* inherits documentation from base class */
 void QCPColorMap::drawLegendIcon(QCPDrawContext& icon) const
 {
-    if (!keyAxisRaw() || !valueAxisRaw() || mLegendIcon.isNull())
+    QCPAxis* key = keyAxisRaw();
+    QCPAxis* value = valueAxisRaw();
+    if (!key || !value || mLegendIcon.isNull())
         return;
-    const bool mirrorX
-        = (keyAxis()->orientation() == Qt::Horizontal ? keyAxis() : valueAxis())->rangeReversed();
-    const bool mirrorY
-        = (valueAxis()->orientation() == Qt::Vertical ? valueAxis() : keyAxis())->rangeReversed();
+    const bool mirrorX = (key->orientation() == Qt::Horizontal ? key : value)->rangeReversed();
+    const bool mirrorY = (value->orientation() == Qt::Vertical ? value : key)->rangeReversed();
     const QCP::Data leftTop { mirrorX ? 1.0 : 0.0, mirrorY ? 0.0 : 1.0 };
     const QCP::Data rightBottom { mirrorX ? 0.0 : 1.0, mirrorY ? 1.0 : 0.0 };
     icon.image(leftTop, rightBottom, mLegendIcon.toImage());

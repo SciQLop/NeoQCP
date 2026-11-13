@@ -222,7 +222,7 @@ private:
     QPointer<QCPAxis> mKeyAxis, mValueAxis;
     QPointer<QCPAxisRect> mAxisRect;
     // K8: the per-item-per-frame paths read the frame raw instead of building a handle per
-    // position. The accessors are out of line, where their types are complete.
+    // position. keyAxisRaw and valueAxisRaw are inline; the other three are out of line.
     [[nodiscard]] QCPAxis* keyAxisRaw() const { return mKeyAxis.data(); }
     [[nodiscard]] QCPAxis* valueAxisRaw() const { return mValueAxis.data(); }
     // Out of line, so a PIC build does not inline it even in item.cpp (+6 % on item creation):

@@ -827,7 +827,7 @@ QPointF QCPItemPosition::pixelPosition() const
     // and the switches below would cross the slots on a vertical key axis.
     const bool dataAndRatio = (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptAxisRectRatio)
         || (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptPlotCoords);
-    QCPAxisRect* const rect = mAxisRect.data();
+    QCPAxisRect* const rect = mAxisRect.data(); // not axisRectRaw(): see item.h
     if (dataAndRatio && !mParentAnchorX && !mParentAnchorY && keyAxisRaw() && valueAxisRaw()
         && rect)
         return qcpResolvePosition(qcpMakeFrame(keyAxisRaw(), valueAxisRaw(), rect, rect->rect()),

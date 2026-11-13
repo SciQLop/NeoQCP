@@ -380,10 +380,7 @@ QCPSelectionDecoratorBracket::getPixelCoordinates(const QCPPlottableInterface1D*
     QCPAxis* keyAxis = mPlottable->keyAxis();
     QCPAxis* valueAxis = mPlottable->valueAxis();
     if (!keyAxis || !valueAxis)
-    {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
         return { 0, 0 };
-    }
 
     if (keyAxis->orientation() == Qt::Horizontal)
         return { keyAxis->coordToPixel(interface1d->dataMainKey(dataIndex)),

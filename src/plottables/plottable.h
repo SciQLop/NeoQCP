@@ -412,7 +412,8 @@ private:
     // The 2.x axis pair, cached so that no per-point path casts the system's axes. With a cartesian
     // system it is that system's projection; with no system it is the unresolved pair (a half-set
     // pair keeps the axis it was given); null in any other system. Written only by the
-    // constructors, setSystem, resolveAxes and forgetSystem.
+    // constructors, setSystem, resolveAxes and forgetSystem. setSystem(nullptr) clears it only when
+    // it drops a system: on a plottable that has none it returns early, and a half-set pair stays.
     QPointer<QCPAxis> mKeyAxis, mValueAxis;
     bool mWantsLegend = true;
     bool mRowOnLeave = false; // while grouped: get a legend row back on leaving
