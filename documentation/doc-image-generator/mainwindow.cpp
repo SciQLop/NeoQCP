@@ -885,8 +885,8 @@ void MainWindow::genQCPErrorBars()
     errY2[i] = 0.02+std::rand()/(double)RAND_MAX*0.2;
   }
   
-  QCPGraph *graph = new QCPGraph(customPlot->xAxis, customPlot->yAxis);
-  graph->setLineStyle(QCPGraph::lsLine);
+  QCPMultiGraph *graph = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
+  graph->setLineStyle(QCPMultiGraph::lsLine);
   graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, QColor(200, 200, 200), 6));
   graph->setPen(QPen(QColor(200, 200, 200)));
   graph->setData(x, y);

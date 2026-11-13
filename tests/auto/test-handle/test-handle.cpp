@@ -645,7 +645,7 @@ void TestHandle::theLayersHandOutHandles()
     QCustomPlot plot;
     QCPLayer* mainLayer = plot.layer("main");
     QCOMPARE(mainLayer->parentPlot().get(), &plot);
-    auto graph = plot.add<QCPGraph>();
+    auto graph = plot.add<QCPMultiGraph>();
     QVERIFY(graph);
     QCOMPARE(graph->layer().get(), mainLayer);
     QCOMPARE(graph->parentPlot().get(), &plot);
@@ -1041,7 +1041,7 @@ void TestHandle::removeLayerThroughHandle()
 {
     QCustomPlot plot;
     plot.addLayer("extra", plot.layer("main"));
-    auto graph = plot.add<QCPGraph>();
+    auto graph = plot.add<QCPMultiGraph>();
     QCPLayer* extra = plot.layer("extra");
     QVERIFY(extra);
     graph->setLayer(extra);
@@ -1081,7 +1081,7 @@ void TestHandle::removeAxisRectThroughHandle()
     auto rect = plot.add<QCPAxisRect>(1, 0);
     QVERIFY(rect);
     QPointer<QCPAxis> axis(rect->axis(QCPAxis::atBottom));
-    auto graph = plot.add<QCPGraph>();
+    auto graph = plot.add<QCPMultiGraph>();
     graph->setKeyAxis(rect->axis(QCPAxis::atBottom));
     graph->setValueAxis(rect->axis(QCPAxis::atLeft));
     QCOMPARE(graph->keyAxis(), rect->axis(QCPAxis::atBottom));
@@ -1131,7 +1131,7 @@ void TestHandle::removeLastAxisRectThenAddIsRefused()
     QVERIFY(!rect);
     QCOMPARE(gMisuses, 0);
     QVERIFY(!plot.axisRect());
-    QVERIFY(!plot.add<QCPGraph>());
+    QVERIFY(!plot.add<QCPMultiGraph>());
     QCOMPARE(gMisuses, 1);
 }
 

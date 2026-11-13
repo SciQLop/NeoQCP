@@ -93,7 +93,7 @@ int redPixelsNear(const QImage& image, const QPointF& at, int radius)
 //! The scene the reference suite renders: \a verticalKey and \a logValue move the axes, \a selected
 //! selects the middle two bars. \a tweak runs on the graph and the bars before the replot.
 Scene errorBarsScene(bool verticalKey, bool logValue, bool selected,
-                     const std::function<void(QCPGraph&, RecordingErrorBars&)>& tweak = {})
+                     const std::function<void(QCPMultiGraph&, RecordingErrorBars&)>& tweak = {})
 {
     QCustomPlot plot;
     plot.resize(400, 300);
@@ -109,8 +109,9 @@ Scene errorBarsScene(bool verticalKey, bool logValue, bool selected,
     QCPAxis* value = verticalKey ? plot.xAxis : plot.yAxis;
     key->setRange(0, 6);
     value->setRange(logValue ? 0.5 : -1, logValue ? 10 : 1.5);
-    auto* graph = new QCPGraph(key, value);
-    graph->setLineStyle(QCPGraph::lsNone);
+    auto* graph = new QCPMultiGraph(key, value);
+    graph->setLineStyle(QCPMultiGraph::lsNone);
+    graph->setPen(QPen(Qt::blue, 0));
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
     graph->setData(QVector<double> { 0.5, 1.5, 2.5, 3.5, 4.5, 5.5 },
                    logValue ? QVector<double> { 0.7, 1.2, 2.4, 1.6, 3.4, 5.5 }
@@ -141,8 +142,8 @@ std::unique_ptr<QCustomPlot> makeBarsPlot(RecordingErrorBars** out)
     plot->resize(400, 300);
     plot->xAxis->setRange(0, 6);
     plot->yAxis->setRange(-1, 1.5);
-    auto* graph = new QCPGraph(plot->xAxis, plot->yAxis);
-    graph->setLineStyle(QCPGraph::lsNone);
+    auto* graph = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    graph->setLineStyle(QCPMultiGraph::lsNone);
     graph->setData(QVector<double> { 0.5, 1.5, 2.5 }, QVector<double> { 0.2, 0.2, 0.2 });
     auto* bars = new RecordingErrorBars(plot->xAxis, plot->yAxis);
     bars->setDataPlottable(graph);
@@ -201,8 +202,8 @@ void TestErrorBarGeometry::barsFollowTheirPlottablesData()
     plot.resize(400, 300);
     plot.xAxis->setRange(0, 6);
     plot.yAxis->setRange(-1, 1.5);
-    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
-    graph->setLineStyle(QCPGraph::lsNone);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    graph->setLineStyle(QCPMultiGraph::lsNone);
     graph->setData(QVector<double> { 0.5, 1.5, 2.5, 3.5, 4.5, 5.5 },
                    QVector<double> { 0.2, 0.2, 0.2, 0.2, 0.2, 0.2 });
     auto* bars = new RecordingErrorBars(plot.xAxis, plot.yAxis);
@@ -232,8 +233,8 @@ void TestErrorBarGeometry::attachDetachReattach()
 {
     RecordingErrorBars* bars = nullptr;
     auto plot = makeBarsPlot(&bars);
-    auto* other = new QCPGraph(plot->xAxis, plot->yAxis);
-    other->setLineStyle(QCPGraph::lsNone);
+    auto* other = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    other->setLineStyle(QCPMultiGraph::lsNone);
     other->setData(QVector<double> { 2.5, 3.5, 4.5 }, QVector<double> { 0.2, 0.2, 0.2 });
     plot->replot();
     const QPointF onFirst(plot->xAxis->coordToPixel(0.5), plot->yAxis->coordToPixel(0.6));
@@ -305,7 +306,7 @@ void TestErrorBarGeometry::swappingThePlottablesAxesReRecords()
 {
     RecordingErrorBars* bars = nullptr;
     auto plot = makeBarsPlot(&bars);
-    auto* graph = qobject_cast<QCPGraph*>(bars->dataPlottable());
+    auto* graph = qobject_cast<QCPMultiGraph*>(bars->dataPlottable());
     QVERIFY(graph);
     const int before = bars->recordings();
     graph->setKeyAxis(plot->yAxis);
@@ -407,32 +408,25 @@ void TestErrorBarGeometry::aDecoratorScatterStyleReachesTheSelectedOutliers()
     QVERIFY2(big > small, "the decorator's scatter style is not on the selected outlier");
 }
 
-// The bars key on the attached plottable's revision, which is per container: a container swapped for
-// another one at the same revision (two refilled buffers) must still remake the recording.
+// A graph whose source is replaced by another one of the same size must remake the bars' recording.
 void TestErrorBarGeometry::aSwappedPlottableContainerReRecords()
 {
     RecordingErrorBars* bars = nullptr;
     auto plot = makeBarsPlot(&bars);
-    auto* graph = qobject_cast<QCPGraph*>(bars->dataPlottable());
+    auto* graph = qobject_cast<QCPMultiGraph*>(bars->dataPlottable());
     QVERIFY(graph);
-    auto first = QSharedPointer<QCPGraphDataContainer>::create();
-    auto second = QSharedPointer<QCPGraphDataContainer>::create();
-    first->set(QVector<QCPGraphData> { { 0.5, 0.2 }, { 1.5, 0.2 }, { 2.5, 0.2 } });
-    second->set(QVector<QCPGraphData> { { 0.5, 0.8 }, { 1.5, 0.8 }, { 2.5, 0.8 } });
-    QCOMPARE(first->revision(), second->revision());
-    graph->setData(first);
+    graph->setData(QVector<double> { 0.5, 1.5, 2.5 }, QVector<double> { 0.2, 0.2, 0.2 });
     plot->replot();
     const int recorded = bars->recordings();
     const QPointF oldEnd(plot->xAxis->coordToPixel(0.5), plot->yAxis->coordToPixel(0.6));
     QVERIFY2(redPixelsNear(imageOf(*plot), oldEnd, 2) > 0, "the whisker is not at the first value");
 
-    graph->setData(second);
+    graph->setData(QVector<double> { 0.5, 1.5, 2.5 }, QVector<double> { 0.8, 0.8, 0.8 });
     plot->replot();
-    QVERIFY2(bars->recordings() > recorded,
-             "a swapped container with the same revision kept the recording");
+    QVERIFY2(bars->recordings() > recorded, "a replaced source kept the recording");
     const QPointF newEnd(plot->xAxis->coordToPixel(0.5), plot->yAxis->coordToPixel(1.2));
     QVERIFY2(redPixelsNear(imageOf(*plot), newEnd, 2) > 0,
-             "the bars did not follow the swapped container");
+             "the bars did not follow the replaced source");
 }
 
 // A curve sorts by t, not by key: culling it with a key window drops the bars whose t is outside it.

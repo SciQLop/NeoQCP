@@ -38,12 +38,12 @@ QCPLegend* TestOwnership::addSecondLegend()
     return second;
 }
 
-QCPGraph* TestOwnership::addRedGraph()
+QCPMultiGraph* TestOwnership::addRedGraph()
 {
     mPlot->legend->setVisible(false); // its icon would be red too
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
-    auto* graph = mPlot->addGraph();
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     graph->setPen(QPen(Qt::red, 6));
     graph->setData(QVector<double> { 1, 9 }, QVector<double> { 5, 5 });
     return graph;
@@ -267,7 +267,7 @@ void TestOwnership::nullAxisPlottableIsDetachedHalfAxedIsRefused()
     QCOMPARE(gMisuses, 1);
     QVERIFY(halfAxed->parentPlot() == nullptr);
 
-    auto* graph = new QCPGraph(nullptr, nullptr);
+    auto* graph = new QCPMultiGraph(nullptr, nullptr);
     auto* histogram = new QCPHistogram2D(nullptr, nullptr);
     QCOMPARE(gMisuses, 1);
 
@@ -369,7 +369,7 @@ void TestOwnership::clearItemsWhileASlotDeletesAnother()
 
 void TestOwnership::clearItemsKeepsOtherLayersOrder()
 {
-    auto graph = mPlot->add<QCPGraph>();
+    auto graph = mPlot->add<QCPMultiGraph>();
     QVERIFY(mPlot->addLayer(QStringLiteral("upper")));
     QCPLayer* upper = mPlot->layer(QStringLiteral("upper"));
     auto* a = new QCPItemLine(mPlot);
@@ -436,8 +436,8 @@ void TestOwnership::layerOrderAfterMoves()
     QCPLayer* upper = mPlot->layer(QStringLiteral("upper"));
     QVERIFY(mPlot->addLayer(QStringLiteral("third")));
     QCPLayer* third = mPlot->layer(QStringLiteral("third"));
-    auto first = mPlot->add<QCPGraph>();
-    auto second = mPlot->add<QCPGraph>();
+    auto first = mPlot->add<QCPMultiGraph>();
+    auto second = mPlot->add<QCPMultiGraph>();
     first->setLayer(upper);
     second->setLayer(upper);
     QVERIFY(qcp::pointers(upper->children()) == (QList<QCPLayerable*> { first.get(), second.get() }));
@@ -496,7 +496,7 @@ void TestOwnership::plottablesOfAnotherRectAfterAxisRemoval()
     mPlot->setSelectionRectMode(QCP::srmSelect);
     auto* second = new QCPAxisRect(mPlot);
     mPlot->plotLayout()->addElement(1, 0, second);
-    auto* graph = new QCPGraph(second->axis(QCPAxis::atBottom), second->axis(QCPAxis::atLeft));
+    auto* graph = new QCPMultiGraph(second->axis(QCPAxis::atBottom), second->axis(QCPAxis::atLeft));
     graph->setData(QVector<double> { 1, 9 }, QVector<double> { 5, 5 });
     auto* line = new QCPItemLine(mPlot);
     line->start->setAxes(second->axis(QCPAxis::atBottom), second->axis(QCPAxis::atLeft));
@@ -683,13 +683,13 @@ void TestOwnership::deleteTracedGraph()
     tracer->setStyle(QCPItemTracer::tsCircle);
     tracer->setPen(QPen(Qt::red, 6));
     tracer->setSize(20);
-    tracer->setGraph(graph);
+    tracer->setLineGraph(graph);
     tracer->setGraphKey(5);
     QVERIFY(drawsRed());
 
     delete graph;
 
-    QVERIFY(tracer->graph() == nullptr);
+    QVERIFY(tracer->lineGraph() == nullptr);
     QVERIFY(!drawsRed());
     draw();
     QCOMPARE(gMisuses, 0);

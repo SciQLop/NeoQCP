@@ -538,7 +538,7 @@ void TestCoordinateSystem::twoConstructorsShareTheSystem()
     QCPAxis* x = rect->axis(QCPAxis::atBottom);
     QCPAxis* y = rect->axis(QCPAxis::atLeft);
 
-    std::unique_ptr<QCPGraph> graph(new QCPGraph(x, y));
+    std::unique_ptr<QCPMultiGraph> graph(new QCPMultiGraph(x, y));
     std::unique_ptr<QCPCurve> curve(new QCPCurve(x, y));
     QVERIFY(graph->system());
     QCOMPARE(graph->system(), curve->system());
@@ -767,10 +767,10 @@ void TestCoordinateSystem::relationshipsAcrossAreasAreRefused()
     // A channel fill spans one frame: two areas are refused.
     auto [leftKey, leftValue] = pairOf(left);
     auto [rightKey, rightValue] = pairOf(right);
-    auto* here = new QCPGraph(leftKey, leftValue);
-    auto* there = new QCPGraph(rightKey, rightValue);
-    here->setChannelFillGraph(there);
-    QVERIFY(!here->channelFillGraph());
+    auto* here = new QCPMultiGraph(leftKey, leftValue);
+    auto* there = new QCPMultiGraph(rightKey, rightValue);
+    here->setComponentFillToGraph(0, there, 0);
+    QVERIFY(!here->componentFill(0));
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear();
 

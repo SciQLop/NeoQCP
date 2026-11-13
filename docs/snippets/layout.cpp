@@ -12,7 +12,7 @@ DOC_SNIPPET(layout_title, 600, 380)
         x[i] = i / 20.0;
         y[i] = std::exp(-0.3 * x[i]) * std::cos(2 * x[i]);
     }
-    auto graph = customPlot->add<QCPGraph>()
+    auto graph = customPlot->add<QCPMultiGraph>()
         .setData(x, y)
         .setPen(QPen(QColor(31, 119, 180), 2));
     customPlot->rescaleAxes();
@@ -64,7 +64,7 @@ DOC_SNIPPET(layout_legend_outside, 600, 400)
             x[i] = i / 20.0;
             y[i] = std::sin(x[i] + g) * std::exp(-x[i] / (4 + 3 * g));
         }
-        auto graph = customPlot->add<QCPGraph>()
+        auto graph = customPlot->add<QCPMultiGraph>()
             .setData(x, y)
             .setName(QString("channel %1").arg(g + 1))
             .setPen(QPen(colors[g], 2));

@@ -13,7 +13,7 @@ int main(int argc, char** argv)
         x[i] = i / 50.0 - 1;   // -1 to 1
         y[i] = x[i] * x[i];
     }
-    customPlot.add<QCPGraph>(x, y);
+    customPlot.add<QCPMultiGraph>(x, y);
     customPlot.xAxis->setLabel("x");
     customPlot.yAxis->setLabel("y");
     customPlot.xAxis->setRange(-1, 1);

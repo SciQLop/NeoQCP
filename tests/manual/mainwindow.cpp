@@ -1240,7 +1240,7 @@ void MainWindow::setupScatterSkipTest(QCustomPlot *customPlot)
   for (int i=0; i<n; ++i)
     c->addData(qCos(i/double(n)*10*M_PI)*i/double(n)*2+2, qSin(i/double(n)*10*M_PI)*i/double(n)*2);
   
-  QCPGraph *g = new QCPGraph(customPlot->xAxis, customPlot->yAxis);
+  QCPMultiGraph *g = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
   n = 10000;
   QVector<double> x, y;
   x << -6;

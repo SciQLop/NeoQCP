@@ -536,7 +536,7 @@ void TestRepaint::legendShowsAddedGraphAndItsName()
     waitUntilSettled(plot);
     const QImage empty = screenOf(&plot);
 
-    auto g = plot.add<QCPGraph>(QVector<double> { 0, 1 }, QVector<double> { 0, 1 }).setName("Bx");
+    auto g = plot.add<QCPMultiGraph>(QVector<double> { 0, 1 }, QVector<double> { 0, 1 }).setName("Bx");
     waitUntilSettled(plot);
     const QImage oneRow = screenOf(&plot);
     const QRect rowArea = plot.legend->outerRect();
@@ -1376,7 +1376,7 @@ void TestRepaint::orphanPlottableKeepsName()
 {
     // A plottable with null axes is a valid detached object: it has no legend to mark, but its name
     // is still its own.
-    QCPGraph graph(nullptr, nullptr);
+    QCPMultiGraph graph(nullptr, nullptr);
     graph.setName(QStringLiteral("orphan"));
     QCOMPARE(graph.name(), QStringLiteral("orphan"));
 }

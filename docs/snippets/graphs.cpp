@@ -18,10 +18,10 @@ DOC_SNIPPET(graphs_line_styles, 600, 400)
         x[i] = i;
         y[i] = std::sin(i / 2.0);
     }
-    const QList<std::pair<QCPGraph::LineStyle, QString>> styles {
-        { QCPGraph::lsImpulse, "lsImpulse" },     { QCPGraph::lsLine, "lsLine" },
-        { QCPGraph::lsStepLeft, "lsStepLeft" },   { QCPGraph::lsStepRight, "lsStepRight" },
-        { QCPGraph::lsStepCenter, "lsStepCenter" } };
+    const QList<std::pair<QCPMultiGraph::LineStyle, QString>> styles {
+        { QCPMultiGraph::lsImpulse, "lsImpulse" },     { QCPMultiGraph::lsLine, "lsLine" },
+        { QCPMultiGraph::lsStepLeft, "lsStepLeft" },   { QCPMultiGraph::lsStepRight, "lsStepRight" },
+        { QCPMultiGraph::lsStepCenter, "lsStepCenter" } };
     const QList<QColor> colors { QColor(31, 119, 180), QColor(255, 127, 14), QColor(44, 160, 44),
                                  QColor(214, 39, 40), QColor(148, 103, 189) };
     for (int s = 0; s < styles.size(); ++s)
@@ -29,7 +29,7 @@ DOC_SNIPPET(graphs_line_styles, 600, 400)
         QVector<double> shifted = y;
         for (double& v : shifted)
             v += 3 * s;   // stack the graphs; impulses (s = 0) start from value 0
-        auto graph = customPlot->add<QCPGraph>()
+        auto graph = customPlot->add<QCPMultiGraph>()
             .setData(x, shifted)
             .setLineStyle(styles[s].first)
             .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 5))
@@ -58,13 +58,13 @@ DOC_SNIPPET(graphs_scatter, 600, 360)
         modelX[i] = i / 30.0;
         model[i] = std::exp(-modelX[i] / 4) * std::cos(modelX[i]);
     }
-    auto points = customPlot->add<QCPGraph>()
+    auto points = customPlot->add<QCPMultiGraph>()
         .setData(x, measured)
-        .setLineStyle(QCPGraph::lsNone);
+        .setLineStyle(QCPMultiGraph::lsNone);
     points->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, QColor(31, 119, 180),
                                             QColor(31, 119, 180, 60), 7));
     points->setName("measurement");
-    auto fit = customPlot->add<QCPGraph>()
+    auto fit = customPlot->add<QCPMultiGraph>()
         .setData(modelX, model)
         .setPen(QPen(QColor(214, 39, 40), 2))
         .setName("model");
@@ -83,7 +83,7 @@ DOC_SNIPPET(graphs_fill_under, 600, 360)
         power[i] = std::exp(-std::pow((f[i] - 30) / 6, 2))
                    + 0.5 * std::exp(-std::pow((f[i] - 65) / 10, 2));
     }
-    auto spectrum = customPlot->add<QCPGraph>()
+    auto spectrum = customPlot->add<QCPMultiGraph>()
         .setData(f, power)
         .setPen(QPen(QColor(31, 119, 180), 1.5));
     spectrum->setBrush(QColor(31, 119, 180, 70));   // a brush fills down to value 0
@@ -106,17 +106,17 @@ DOC_SNIPPET(graphs_channel_fill, 600, 360)
         upper[i] = mean[i] + spread;
         lower[i] = mean[i] - spread;
     }
-    auto low = customPlot->add<QCPGraph>()
+    auto low = customPlot->add<QCPMultiGraph>()
         .setData(t, lower)
         .setPen(Qt::NoPen);
     low->removeFromLegend();
-    auto high = customPlot->add<QCPGraph>()
+    auto high = customPlot->add<QCPMultiGraph>()
         .setData(t, upper)
         .setPen(Qt::NoPen)
         .setBrush(QColor(255, 127, 14, 70));
-    high->setChannelFillGraph(low.get());   // fill between high and low, with high's brush
+    high->setComponentFillToGraph(0, low.get(), 0);   // fill between high and low, with high's brush
     high->setName("±1σ");
-    auto centre = customPlot->add<QCPGraph>()
+    auto centre = customPlot->add<QCPMultiGraph>()
         .setData(t, mean)
         .setPen(QPen(QColor(255, 127, 14), 2))
         .setName("mean");
@@ -399,7 +399,7 @@ DOC_SNIPPET(graphs_gaps, 600, 360)
             values.push_back(std::sin(x) + 2.5);
         }
     }
-    auto classic = customPlot->add<QCPGraph>()
+    auto classic = customPlot->add<QCPMultiGraph>()
         .setData(t, withNan)
         .setPen(QPen(QColor(31, 119, 180), 2))
         .setName("QCPGraph, NaN values");

@@ -67,7 +67,7 @@ private slots:
 private:
     void draw();
     QCPLegend* addSecondLegend();
-    QCPGraph* addRedGraph();
+    QCPMultiGraph* addRedGraph();
     bool drawsRed();
     void showAndExpose();
 

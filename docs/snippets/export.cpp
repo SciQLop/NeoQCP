@@ -13,7 +13,7 @@ DOC_SNIPPET(export_png, 600, 360)
         x[i] = (i - 200) / 10.0;
         y[i] = x[i] == 0 ? 1 : std::sin(x[i]) / x[i];
     }
-    auto graph = customPlot->add<QCPGraph>()
+    auto graph = customPlot->add<QCPMultiGraph>()
         .setData(x, y)
         .setPen(QPen(QColor(31, 119, 180), 2));
     customPlot->xAxis->setLabel("x");
@@ -61,9 +61,9 @@ DOC_CODE(export_formats)
         x[i] = i;
         y[i] = std::sqrt(i) * std::sin(i / 8.0);
     }
-    auto graph = customPlot->add<QCPGraph>()
+    auto graph = customPlot->add<QCPMultiGraph>()
         .setData(x, y)
-        .setLineStyle(QCPGraph::lsStepCenter)
+        .setLineStyle(QCPMultiGraph::lsStepCenter)
         .setBrush(QColor(31, 119, 180, 50));
     customPlot->rescaleAxes();
 

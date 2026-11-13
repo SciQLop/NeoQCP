@@ -11,7 +11,7 @@ DOC_SNIPPET(concepts_anatomy, 720, 480)
         x[i] = i / 20.0;
         y[i] = std::sin(x[i]) * std::exp(-x[i] / 6);
     }
-    auto graph = customPlot->add<QCPGraph>()
+    auto graph = customPlot->add<QCPMultiGraph>()
         .setData(x, y)
         .setName("plottable: QCPGraph")
         .setPen(QPen(QColor(31, 119, 180), 2));
@@ -68,7 +68,7 @@ DOC_SNIPPET(concepts_layers, 600, 360)
         x[i] = i / 40.0;
         y[i] = std::sin(x[i]) + 0.3 * std::sin(5 * x[i]);
     }
-    auto graph = customPlot->add<QCPGraph>()
+    auto graph = customPlot->add<QCPMultiGraph>()
         .setData(x, y)
         .setPen(QPen(QColor(31, 119, 180), 2))
         .setBrush(QColor(174, 199, 232));
@@ -123,7 +123,7 @@ DOC_SNIPPET(concepts_coordinates, 600, 360)
 
 DOC_CODE(concepts_replot_batch)
 {
-    auto graph = customPlot->add<QCPGraph>();
+    auto graph = customPlot->add<QCPMultiGraph>();
     const QVector<double> x { 0, 5, 10 }, y { 1, 3, 2 };
     // [concepts_replot_batch]
     graph->setData(x, y);

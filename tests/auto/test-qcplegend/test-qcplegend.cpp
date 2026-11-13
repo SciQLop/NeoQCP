@@ -38,8 +38,8 @@ void TestQCPLegend::addAndRemove()
 {
   mPlot->setAutoAddPlottableToLegend(false);
   
-  QCPGraph *g1 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
-  QCPGraph *g2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  QCPMultiGraph *g1 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+  QCPMultiGraph *g2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
   QCPBars *b1 = new QCPBars(mPlot->xAxis, mPlot->yAxis);
   QCOMPARE(mPlot->legend->itemCount(), 0);
   

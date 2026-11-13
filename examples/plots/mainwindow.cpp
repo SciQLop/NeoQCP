@@ -923,7 +923,7 @@ void MainWindow::setupItemDemo(QCustomPlot *customPlot)
   demoName = "Item Demo";
   
   customPlot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
-  auto graph = customPlot->add<QCPGraph>();
+  auto graph = customPlot->add<QCPMultiGraph>();
   int n = 500;
   double phase = 0;
   double k = 3;
@@ -956,7 +956,7 @@ void MainWindow::setupItemDemo(QCustomPlot *customPlot)
   // add the phase tracer (red circle) which sticks to the graph data (and gets updated in bracketDataSlot by timer event):
   auto phaseTracer = customPlot->add<QCPItemTracer>();
   itemDemoPhaseTracer = phaseTracer.get(); // so we can access it later in the bracketDataSlot for animation
-  phaseTracer->setGraph(graph.get());
+  phaseTracer->setLineGraph(graph.get());
   phaseTracer->setGraphKey((M_PI*1.5-phase)/k);
   phaseTracer->setInterpolating(true);
   phaseTracer->setStyle(QCPItemTracer::tsCircle);
@@ -988,7 +988,7 @@ void MainWindow::setupItemDemo(QCustomPlot *customPlot)
   
   // add the group velocity tracer (green circle):
   auto groupTracer = customPlot->add<QCPItemTracer>();
-  groupTracer->setGraph(graph.get());
+  groupTracer->setLineGraph(graph.get());
   groupTracer->setGraphKey(5.5);
   groupTracer->setInterpolating(true);
   groupTracer->setStyle(QCPItemTracer::tsCircle);
@@ -1068,16 +1068,16 @@ void MainWindow::setupStyledDemo(QCustomPlot *customPlot)
   }
   
   // create and configure plottables:
-  auto graph1 = customPlot->add<QCPGraph>();
+  auto graph1 = customPlot->add<QCPMultiGraph>();
   graph1->setData(x1, y1);
   graph1->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, QPen(Qt::black, 1.5), QBrush(Qt::white), 9));
   graph1->setPen(QPen(QColor(120, 120, 120), 2));
 
-  auto graph2 = customPlot->add<QCPGraph>();
+  auto graph2 = customPlot->add<QCPMultiGraph>();
   graph2->setData(x2, y2);
   graph2->setPen(Qt::NoPen);
   graph2->setBrush(QColor(200, 200, 200, 20));
-  graph2->setChannelFillGraph(graph1.get());
+  graph2->setComponentFillToGraph(0, graph1.get(), 0);
   
   auto bars1 = customPlot->add<QCPBars>();
   bars1->setWidth(9/(double)x3.size());

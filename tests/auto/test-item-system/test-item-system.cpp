@@ -261,12 +261,11 @@ void TestItemSystem::takeClearsAndAdoptRebindsItemSystems()
 
 void TestItemSystem::theTracerFollowsItsGraphSystem()
 {
-    QCPGraph* graph = mPlot->addGraph();
-    QVERIFY(graph);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QVERIFY(graph->system());
 
     auto* tracer = new QCPItemTracer(mPlot);
-    tracer->setGraph(graph);
+    tracer->setLineGraph(graph);
     QCOMPARE(tracer->position->system(), graph->system());
     QCOMPARE(tracer->position->area(), static_cast<QCPArea*>(mPlot->axisRect()));
 }

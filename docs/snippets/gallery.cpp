@@ -421,7 +421,7 @@ DOC_SNIPPET(gallery_stock_chart, 800, 520)
         (it->close >= it->open ? upDays : downDays).append(it->key);
         (it->close >= it->open ? volumeUp : volumeDown).append(traded);
     }
-    auto trend = customPlot->add<QCPGraph>()
+    auto trend = customPlot->add<QCPMultiGraph>()
         .setData(days, average)
         .setPen(QPen(QColor(255, 152, 0), 2))
         .setName("20-day average");
@@ -535,13 +535,13 @@ DOC_SNIPPET(gallery_fit_residuals, 680, 560)
         fineX.append(model(fineT.last()));
     }
 
-    auto curve = customPlot->add<QCPGraph>()
+    auto curve = customPlot->add<QCPMultiGraph>()
         .setData(fineT, fineX)
         .setPen(QPen(QColor(214, 39, 40), 2))
         .setName("model");
-    auto points = customPlot->add<QCPGraph>()
+    auto points = customPlot->add<QCPMultiGraph>()
         .setData(t, x)
-        .setLineStyle(QCPGraph::lsNone)
+        .setLineStyle(QCPMultiGraph::lsNone)
         .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(31, 119, 180), 6))
         .setName("measurements");
     auto errors = customPlot->add<QCPErrorBars>();
@@ -564,9 +564,9 @@ DOC_SNIPPET(gallery_fit_residuals, 680, 560)
     band->setBrush(QColor(127, 127, 127, 45));
     band->setBorderPen(Qt::NoPen);
     band->setMovable(false);
-    auto residuals = customPlot->add<QCPGraph>().setAxes(residualT, residualAxis)
+    auto residuals = customPlot->add<QCPMultiGraph>().setAxes(residualT, residualAxis)
         .setData(t, pull)
-        .setLineStyle(QCPGraph::lsImpulse)
+        .setLineStyle(QCPMultiGraph::lsImpulse)
         .setPen(QPen(QColor(31, 119, 180)))
         .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(31, 119, 180), 5));
     residuals->removeFromLegend();

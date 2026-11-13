@@ -217,6 +217,14 @@ public:
     void icon(QCPPainter* painter, const QRectF& rect) const { drawLegendIcon(painter, rect); }
 };
 
+//! The graph component 0 is filled to, or null.
+QCPMultiGraph* fillPartner(const QCPMultiGraph* graph)
+{
+    const auto fill = graph->componentFill(0);
+    const auto* toGraph = fill ? std::get_if<QCPMultiGraph::FillToGraph>(&fill->target) : nullptr;
+    return toGraph ? toGraph->graph.data() : nullptr;
+}
+
 InspectableGraph* graphOn(SkewRect* rect, QCPGraph::LineStyle style = QCPGraph::lsLine)
 {
     auto* graph = new InspectableGraph(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
@@ -545,7 +553,7 @@ void TestUserSystem::rescaleWalksTheOverriddenPlottables()
     QCPCoordinateSystem* flatSystem = flat->system(flat->key(), flat->value());
     QVERIFY(flatSystem);
 
-    auto* graph = new QCPGraph(cartesian->axis(QCPAxis::atBottom),
+    auto* graph = new QCPMultiGraph(cartesian->axis(QCPAxis::atBottom),
                                cartesian->axis(QCPAxis::atLeft));
     graph->setData(QVector<double> { 0.0, 10.0 }, QVector<double> { 0.0, 1.0 });
     graph->setSystem(flatSystem);
@@ -598,7 +606,7 @@ void TestUserSystem::aGraphOnASkewRectHasNoProjection()
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
-    InspectableGraph* graph = graphOn(rect);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
 
     // A11: the mask the graph was built with is the one its system has to offer, so a graph joins
     // the skew rect at construction, and J-2 leaves it without a 2.x projection.
@@ -694,7 +702,7 @@ void TestUserSystem::rectAddOfARefusedGraphLeavesNothingDangling()
     QCustomPlot plot;
     BendRect* rect = bendRect(plot);
 
-    auto graph = rect->add<QCPGraph>(rect->axis(QCPAxis::atBottom),
+    auto graph = rect->add<QCPMultiGraph>(rect->axis(QCPAxis::atBottom),
                                      rect->axis(QCPAxis::atLeft));
     QVERIFY2(!graph, "the rect handed out a graph its system refused");
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
@@ -1113,7 +1121,7 @@ void TestUserSystem::rescaleAxesFitsASkewGraph()
     SkewRect* rect = skewRect(plot);
     rect->axis(QCPAxis::atBottom)->setRange(0, 50);
     rect->axis(QCPAxis::atLeft)->setRange(0, 50);
-    InspectableGraph* graph = graphOn(rect);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 1, 5, 9 }, QVector<double> { 20, 30, 40 });
     settle(plot);
 
@@ -1129,7 +1137,7 @@ void TestUserSystem::aSkewGraphRescalesItsAxes()
     SkewRect* rect = skewRect(plot);
     rect->axis(QCPAxis::atBottom)->setRange(0, 50);
     rect->axis(QCPAxis::atLeft)->setRange(0, 50);
-    InspectableGraph* graph = graphOn(rect);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 1, 5, 9 }, QVector<double> { 20, 30, 40 });
     settle(plot);
 
@@ -1153,7 +1161,7 @@ void TestUserSystem::anAxisRangeChangeRepaintsASkewGraph()
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
-    InspectableGraph* graph = graphOn(rect);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 2, 8 }, QVector<double> { 1, 1 });
     settle(plot);
 
@@ -1301,7 +1309,7 @@ void TestUserSystem::aFillWithAnUnrepresentableInverseStaysFinite()
     auto* rect = bareRect<TunedSkewRect<NaNSkewMapping>>(plot);
     auto* system = static_cast<TunedSkewSystem<NaNSkewMapping>*>(
             rect->system(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)).get());
-    auto* graph = new InspectableGraph(rect->axis(QCPAxis::atBottom),
+    auto* graph = new InspectableMultiGraph(rect->axis(QCPAxis::atBottom),
                                        rect->axis(QCPAxis::atLeft));
     graph->setSystem(system);
     graph->setData(QVector<double> { 2, 4 }, QVector<double> { 2, 8 });
@@ -1367,7 +1375,7 @@ void TestUserSystem::aGraphIsHitAndRectSelectedThroughTheMapping()
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
-    InspectableGraph* graph = graphOn(rect);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 2, 5, 8 }, QVector<double> { 2, 5, 8 });
     settle(plot);
 
@@ -1392,7 +1400,7 @@ void TestUserSystem::aShearedPointOutsideTheKeyWindowIsHit()
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
-    InspectableGraph* graph = graphOn(rect);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 1 }, QVector<double> { 9 });
     settle(plot);
 
@@ -1415,7 +1423,7 @@ void TestUserSystem::hoveringASkewGraphDoesNotCrash()
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
-    InspectableGraph* graph = graphOn(rect);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
     settle(plot);
 
@@ -1433,21 +1441,21 @@ void TestUserSystem::channelFillNeedsOneSystem()
 {
     QCustomPlot plot;
     TwoRects rects = twoRects(plot);
-    InspectableGraph* graph = graphOn(rects.skew);
-    auto* cartesian = new QCPGraph(rects.cartesian->axis(QCPAxis::atBottom),
+    InspectableMultiGraph* graph = multiGraphOn(rects.skew);
+    auto* cartesian = new QCPMultiGraph(rects.cartesian->axis(QCPAxis::atBottom),
                                    rects.cartesian->axis(QCPAxis::atLeft));
 
     // A5: on a user system both ends of a channel must be mapped by the same system, otherwise the
     // polygon would join two different frames.
-    graph->setChannelFillGraph(cartesian);
+    graph->setComponentFillToGraph(0, cartesian, 0);
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
-    QVERIFY2(!graph->channelFillGraph(), "a channel joined a graph of another frame");
+    QVERIFY2(!fillPartner(graph), "a channel joined a graph of another frame");
     test_misuse::calls.clear();
 
-    InspectableGraph* other = graphOn(rects.skew);
-    graph->setChannelFillGraph(other);
+    InspectableMultiGraph* other = multiGraphOn(rects.skew);
+    graph->setComponentFillToGraph(0, other, 0);
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
-    QCOMPARE(graph->channelFillGraph(), other);
+    QCOMPARE(fillPartner(graph), other);
 
     graph->setData(QVector<double> { 2, 8 }, QVector<double> { 2, 2 });
     other->setData(QVector<double> { 2, 8 }, QVector<double> { 8, 8 });
@@ -1463,13 +1471,13 @@ void TestUserSystem::aSelectedChannelFillSegmentPaintsOnlyItsBand()
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
-    InspectableGraph* graph = graphOn(rect);
-    InspectableGraph* other = graphOn(rect);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    InspectableMultiGraph* other = multiGraphOn(rect);
     graph->setData(QVector<double> { 1, 2, 3, 4, 5 }, QVector<double> { 2, 2, 2, 2, 2 });
     other->setData(QVector<double> { 1, 2, 3, 4, 5 }, QVector<double> { 8, 8, 8, 8, 8 });
     const QColor brush(255, 0, 0, 80);
     graph->setBrush(brush);
-    graph->setChannelFillGraph(other);
+    graph->setComponentFillToGraph(0, other, 0);
     graph->setSelectable(QCP::stMultipleDataRanges);
     settle(plot);
 
@@ -1490,12 +1498,12 @@ void TestUserSystem::aChannelFillAcrossSystemsDrawsNoBand()
 {
     QCustomPlot plot;
     TwoRects rects = twoRects(plot);
-    InspectableGraph* graph = graphOn(rects.skew);
-    InspectableGraph* other = graphOn(rects.skew);
+    InspectableMultiGraph* graph = multiGraphOn(rects.skew);
+    InspectableMultiGraph* other = multiGraphOn(rects.skew);
     graph->setData(QVector<double> { 2, 8 }, QVector<double> { 2, 2 });
     other->setData(QVector<double> { 2, 8 }, QVector<double> { 8, 8 });
     graph->setBrush(QColor(255, 0, 0));
-    graph->setChannelFillGraph(other);
+    graph->setComponentFillToGraph(0, other, 0);
     settle(plot);
 
     const QPointF inside = pixelOf(rects.skew->skew()->pixelOf(5, 5));
@@ -1519,12 +1527,12 @@ void TestUserSystem::aCartesianChannelFillPartnerThatLostItsSystemDrawsNoBand()
     plot.xAxis->setRange(0, 10);
     plot.yAxis->setRange(0, 10);
 
-    auto* lower = new QCPGraph(plot.xAxis, plot.yAxis);
-    auto* upper = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* lower = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* upper = new QCPMultiGraph(plot.xAxis, plot.yAxis);
     lower->setData(QVector<double> { 0, 10 }, QVector<double> { 2, 2 });
     upper->setData(QVector<double> { 0, 10 }, QVector<double> { 8, 8 });
     lower->setBrush(QColor(255, 0, 0));
-    lower->setChannelFillGraph(upper);
+    lower->setComponentFillToGraph(0, upper, 0);
     settle(plot);
     const QPointF inside(plot.xAxis->coordToPixel(5), plot.yAxis->coordToPixel(5));
     QVERIFY2(isRed(render(plot), inside), "the cartesian channel is not filled");
@@ -1694,11 +1702,11 @@ void TestUserSystem::theTracerFollowsASkewGraph()
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
-    InspectableGraph* graph = graphOn(rect);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 2, 4, 6 }, QVector<double> { 2, 6, 4 });
 
     auto* tracer = new QCPItemTracer(&plot);
-    tracer->setGraph(graph);
+    tracer->setLineGraph(graph);
     tracer->setGraphKey(4);
     tracer->setClipToAxisRect(true);
     tracer->setClipArea(rect);
@@ -1782,7 +1790,7 @@ void TestUserSystem::takeAndAdoptAGraphAndAnItemOnASkewRect()
 {
     QCustomPlot from;
     SkewRect* rect = skewRect(from);
-    InspectableGraph* graph = graphOn(rect);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 1, 9 }, QVector<double> { 1, 9 });
     QCOMPARE(graph->system(), rect->skew());
     auto* line = new QCPItemLine(&from);
@@ -1794,7 +1802,7 @@ void TestUserSystem::takeAndAdoptAGraphAndAnItemOnASkewRect()
     line->end->setCoords(9, 9);
     settle(from);
 
-    std::unique_ptr<QCPGraph> takenGraph = from.take(QCPHandle<QCPGraph>(graph));
+    std::unique_ptr<QCPMultiGraph> takenGraph = from.take(QCPHandle<QCPMultiGraph>(graph));
     std::unique_ptr<QCPItemLine> takenLine = from.take(QCPHandle<QCPItemLine>(line));
     QVERIFY(takenGraph);
     QVERIFY(takenLine);
@@ -1823,7 +1831,7 @@ void TestUserSystem::anAxisDeletedMidDragLeavesThemInert()
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
     QCPAxis* keyAxis = rect->axis(QCPAxis::atBottom);
-    InspectableGraph* graph = graphOn(rect);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
     InspectableCurve* curve = curveOn(rect);
     curve->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
@@ -1854,7 +1862,7 @@ void TestUserSystem::deletingTheSkewRectLeavesThemInert()
 {
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
-    InspectableGraph* graph = graphOn(rect);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
     InspectableCurve* curve = curveOn(rect);
     curve->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });

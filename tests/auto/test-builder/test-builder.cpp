@@ -24,13 +24,13 @@ void settle(QCustomPlot& plot)
 }
 
 // A leaf subclass: its Handle adds one setter.
-class LeafGraph : public QCPGraph
+class LeafGraph : public QCPMultiGraph
 {
 public:
-    using QCPGraph::QCPGraph;
+    using QCPMultiGraph::QCPMultiGraph;
     int tag = 0;
 
-    class Handle : public QCPGraphOps<LeafGraph, Handle>
+    class Handle : public QCPMultiGraphOps<LeafGraph, Handle>
     {
     public:
         Handle setTag(int t)
@@ -41,14 +41,14 @@ public:
 };
 
 // A subclass meant to be subclassed again: its setters are written once, for any final type.
-class MyGraph : public QCPGraph
+class MyGraph : public QCPMultiGraph
 {
 public:
-    using QCPGraph::QCPGraph;
+    using QCPMultiGraph::QCPMultiGraph;
     int tag = 0;
 
     template <typename T, typename Self = void>
-    class Ops : public QCPGraphOps<T, qcp::OpsRet<Self, Ops<T>>>
+    class Ops : public QCPMultiGraphOps<T, qcp::OpsRet<Self, Ops<T>>>
     {
     public:
         auto setTag(int t)
@@ -86,7 +86,7 @@ int pixelsOfColor(QCustomPlot& plot, const QColor& color)
     return count;
 }
 
-void showRedLine(QCustomPlot& plot, QCPGraph& graph)
+void showRedLine(QCustomPlot& plot, QCPMultiGraph& graph)
 {
     graph.setPen(QPen(Qt::red, 3));
     plot.xAxis->setRange(0, 4);
@@ -94,16 +94,16 @@ void showRedLine(QCustomPlot& plot, QCPGraph& graph)
     settle(plot);
 }
 
-class UserGraph : public QCPGraph
+class UserGraph : public QCPMultiGraph
 {
 public:
-    using QCPGraph::QCPGraph;
+    using QCPMultiGraph::QCPMultiGraph;
 };
 
-class PlainSub : public QCPGraph
+class PlainSub : public QCPMultiGraph
 {
 public:
-    using QCPGraph::QCPGraph;
+    using QCPMultiGraph::QCPMultiGraph;
 };
 
 class LeafSub : public LeafGraph
@@ -124,14 +124,14 @@ void TestBuilder::cleanup() { qcp::setMisuseHandler(nullptr); }
 void TestBuilder::addGraphWithData()
 {
     QCustomPlot plot;
-    auto g = plot.add<QCPGraph>(QVector<double>{1, 2, 3}, QVector<double>{4, 5, 6})
+    auto g = plot.add<QCPMultiGraph>(QVector<double>{1, 2, 3}, QVector<double>{4, 5, 6})
                  .setName("Bx")
                  .setPen(QPen(Qt::red));
     QVERIFY(g);
     QCOMPARE(g->name(), QString("Bx"));
     QCOMPARE(g->pen().color(), QColor(Qt::red));
     QCOMPARE(g->dataCount(), 3);
-    QCOMPARE(plot.graphCount(), 1);
+    QCOMPARE(plot.plottableCount(), 1);
     QCOMPARE(g->keyAxis(), plot.xAxis);
     QCOMPARE(g->valueAxis(), plot.yAxis);
     QCOMPARE(g->layer(), plot.currentLayer());
@@ -141,21 +141,21 @@ void TestBuilder::addGraphWithData()
 void TestBuilder::addWithoutData()
 {
     QCustomPlot plot;
-    auto g = plot.add<QCPGraph>();
+    auto g = plot.add<QCPMultiGraph>();
     QVERIFY(g);
     QCOMPARE(g->dataCount(), 0);
-    QCOMPARE(plot.graphCount(), 1);
+    QCOMPARE(plot.plottableCount(), 1);
 }
 
 void TestBuilder::handleIsTheHandle()
 {
     QCustomPlot plot;
-    static_assert(std::is_base_of_v<QCPHandle<QCPGraph>, decltype(plot.add<QCPGraph>())>);
-    auto g = plot.add<QCPGraph>();
+    static_assert(std::is_base_of_v<QCPHandle<QCPMultiGraph>, decltype(plot.add<QCPMultiGraph>())>);
+    auto g = plot.add<QCPMultiGraph>();
     static_assert(!std::is_reference_v<decltype(g.setName(""))>);
-    static_assert(std::is_same_v<decltype(g.setName("")), QCPGraphOps<QCPGraph>>);
+    static_assert(std::is_same_v<decltype(g.setName("")), QCPMultiGraphOps<QCPMultiGraph>>);
     // 5b H-1: a handle converts to its pointer (2.x code keeps compiling); see TestHandle.
-    static_assert(std::is_convertible_v<decltype(g), QCPGraph*>);
+    static_assert(std::is_convertible_v<decltype(g), QCPMultiGraph*>);
     QVERIFY(g.setName("a") == g);
 }
 
@@ -164,11 +164,11 @@ void TestBuilder::oneChainOneRepaint()
     QCustomPlot plot;
     settle(plot);
     QSignalSpy after(&plot, &QCustomPlot::afterReplot);
-    auto g = plot.add<QCPGraph>(kKeys, kValues)
+    auto g = plot.add<QCPMultiGraph>(kKeys, kValues)
                  .setName("a")
                  .setPen(QPen(Qt::red))
                  .setBrush(QBrush(Qt::blue))
-                 .setLineStyle(QCPGraph::lsStepLeft)
+                 .setLineStyle(QCPMultiGraph::lsStepLeft)
                  .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle));
     QVERIFY(plot.isRepaintQueued());
     QCOMPARE(after.count(), 0);
@@ -181,25 +181,25 @@ void TestBuilder::oneChainOneRepaint()
 void TestBuilder::deadHandleSettersAreNoOps()
 {
     QCustomPlot plot;
-    auto g = plot.add<QCPGraph>(kKeys, kValues);
+    auto g = plot.add<QCPMultiGraph>(kKeys, kValues);
     g.remove();
-    g.setName("x").setPen(QPen()).setLineStyle(QCPGraph::lsNone).setData(kKeys, kValues);
+    g.setName("x").setPen(QPen()).setLineStyle(QCPMultiGraph::lsNone).setData(kKeys, kValues);
     QVERIFY(!g);
-    QCOMPARE(plot.graphCount(), 0);
+    QCOMPARE(plot.plottableCount(), 0);
     QCOMPARE(gMisuses, 0);
 }
 
-// QCPGraph has no data signal; visibleChanged is the setter signal a slot can react to mid-chain.
+// QCPMultiGraph has no data signal; visibleChanged is the setter signal a slot can react to mid-chain.
 void TestBuilder::slotDeletesMidChain()
 {
     QCustomPlot plot;
     settle(plot);
-    auto g = plot.add<QCPGraph>(kKeys, kValues);
+    auto g = plot.add<QCPMultiGraph>(kKeys, kValues);
     connect(g.get(), &QCPLayerable::visibleChanged, &plot, [g]() mutable { g.remove(); });
     auto after = g.setVisible(false).setName("x").setPen(QPen());
     QVERIFY(!g);
     QVERIFY(!after);
-    QCOMPARE(plot.graphCount(), 0);
+    QCOMPARE(plot.plottableCount(), 0);
     QCOMPARE(gMisuses, 0);
     QSignalSpy replots(&plot, &QCustomPlot::afterReplot);
     plot.replot();
@@ -209,7 +209,7 @@ void TestBuilder::slotDeletesMidChain()
 void TestBuilder::setAxesByRole()
 {
     QCustomPlot plot;
-    auto g = plot.add<QCPGraph>().setAxes(QCPAxis::atTop, QCPAxis::atRight);
+    auto g = plot.add<QCPMultiGraph>().setAxes(QCPAxis::atTop, QCPAxis::atRight);
     QCOMPARE(g->keyAxis(), plot.xAxis2);
     QCOMPARE(g->valueAxis(), plot.yAxis2);
     QCOMPARE(gMisuses, 0);
@@ -240,7 +240,7 @@ void TestBuilder::setAxisRectAndLayerAreChecked()
     rect->addAxes(QCPAxis::atBottom | QCPAxis::atLeft);
     plot.plotLayout()->addElement(0, 1, rect);
 
-    auto g = plot.add<QCPGraph>().setAxisRect(rect);
+    auto g = plot.add<QCPMultiGraph>().setAxisRect(rect);
     QCOMPARE(g->keyAxis(), rect->axis(QCPAxis::atBottom));
     QCOMPARE(g->valueAxis(), rect->axis(QCPAxis::atLeft));
     QCOMPARE(gMisuses, 0);
@@ -277,23 +277,23 @@ void TestBuilder::addUserSubclass()
     QCOMPARE(my->tag, 3);
     QCOMPARE(my->dataCount(), 3);
 
-    auto d = plot.add<Deeper>().setName("d").setTag(1).setDepth(2).setLineStyle(QCPGraph::lsNone);
+    auto d = plot.add<Deeper>().setName("d").setTag(1).setDepth(2).setLineStyle(QCPMultiGraph::lsNone);
     static_assert(std::is_same_v<decltype(d), Deeper::Handle>);
     QCOMPARE(d->name(), QString("d"));
     QCOMPARE(d->tag, 1);
     QCOMPARE(d->depth, 2);
-    QCOMPARE(d->lineStyle(), QCPGraph::lsNone);
+    QCOMPARE(d->lineStyle(), QCPMultiGraph::lsNone);
 
-    auto plain = plot.add<PlainSub>().setLineStyle(QCPGraph::lsImpulse);
+    auto plain = plot.add<PlainSub>().setLineStyle(QCPMultiGraph::lsImpulse);
     static_assert(std::is_base_of_v<QCPHandle<PlainSub>, decltype(plain)>);
-    QCOMPARE(plain->lineStyle(), QCPGraph::lsImpulse);
+    QCOMPARE(plain->lineStyle(), QCPMultiGraph::lsImpulse);
 
     // An inherited Handle wraps the base type, so it is not this type's handle.
     auto leafSub = plot.add<LeafSub>();
-    static_assert(std::is_same_v<decltype(leafSub), QCPGraphOps<LeafSub>>);
+    static_assert(std::is_same_v<decltype(leafSub), QCPMultiGraphOps<LeafSub>>);
     QVERIFY(leafSub);
 
-    QCOMPARE(plot.graphCount(), 5);
+    QCOMPARE(plot.plottableCount(), 5);
     QCOMPARE(gMisuses, 0);
 }
 
@@ -302,7 +302,7 @@ void TestBuilder::addRefusedDuringTeardown()
     auto* plot = new QCustomPlot;
     auto* graph = plot->addGraph();
     bool refused = false;
-    connect(graph, &QObject::destroyed, [plot, &refused] { refused = !plot->add<QCPGraph>(); });
+    connect(graph, &QObject::destroyed, [plot, &refused] { refused = !plot->add<QCPMultiGraph>(); });
 
     delete plot;
 
@@ -314,16 +314,16 @@ void TestBuilder::addRefusedWithoutAxisRect()
 {
     QCustomPlot plot;
     plot.plotLayout()->clear();
-    QVERIFY(!plot.add<QCPGraph>());
+    QVERIFY(!plot.add<QCPMultiGraph>());
     QCOMPARE(gMisuses, 1);
-    QCOMPARE(plot.graphCount(), 0);
+    QCOMPARE(plot.plottableCount(), 0);
 }
 
 void TestBuilder::addPutsOneLegendRow()
 {
     QCustomPlot plot;
     const int rows = plot.legend->itemCount();
-    auto g = plot.add<QCPGraph>(kKeys, kValues).setName("Bx");
+    auto g = plot.add<QCPMultiGraph>(kKeys, kValues).setName("Bx");
     QCOMPARE(plot.legend->itemCount(), rows + 1);
     QVERIFY(plot.legend->itemWithPlottable(g.get()));
 }
@@ -341,14 +341,14 @@ void TestBuilder::addGraphWithContainer()
 void TestBuilder::withReachesAnySetter()
 {
     QCustomPlot plot;
-    auto g = plot.add<QCPGraph>().with([](QCPGraph& graph) { graph.setScatterSkip(3); }).setName("w");
-    static_assert(std::is_same_v<decltype(g), QCPGraphOps<QCPGraph>>);
+    auto g = plot.add<QCPMultiGraph>().with([](QCPMultiGraph& graph) { graph.setScatterSkip(3); }).setName("w");
+    static_assert(std::is_same_v<decltype(g), QCPMultiGraphOps<QCPMultiGraph>>);
     QCOMPARE(g->scatterSkip(), 3);
     QCOMPARE(g->name(), QString("w"));
 
     int calls = 0;
     g.remove();
-    g.with([&calls](QCPGraph&) { ++calls; });
+    g.with([&calls](QCPMultiGraph&) { ++calls; });
     QCOMPARE(calls, 0);
     QCOMPARE(gMisuses, 0);
 }
@@ -357,14 +357,14 @@ void TestBuilder::withReachesAnySetter()
 void TestBuilder::setterSlotDeletesInsideTheSetter()
 {
     QCustomPlot plot;
-    auto g = plot.add<QCPGraph>(kKeys, kValues);
+    auto g = plot.add<QCPMultiGraph>(kKeys, kValues);
     connect(g.get(), &QCPAbstractPlottable::selectionChanged, &plot,
             [g]() mutable { g.remove(); });
-    auto after = g.with([](QCPGraph& graph) { graph.setSelection(QCPDataSelection(QCPDataRange(0, 1))); })
+    auto after = g.with([](QCPMultiGraph& graph) { graph.setSelection(QCPDataSelection(QCPDataRange(0, 1))); })
                      .setName("gone");
     QVERIFY(!g);
     QVERIFY(!after);
-    QCOMPARE(plot.graphCount(), 0);
+    QCOMPARE(plot.plottableCount(), 0);
     QCOMPARE(gMisuses, 0);
 }
 
@@ -375,7 +375,7 @@ void TestBuilder::addEveryPlottable_data()
 {
     QTest::addColumn<Check>("add");
     const auto row = [](const char* name, Check check) { QTest::newRow(name) << check; };
-    row("graph", [](QCustomPlot& p) { return p.add<QCPGraph>(kKeys, kValues).get()->dataCount() == 3; });
+    row("multigraphOneColumn", [](QCustomPlot& p) { return p.add<QCPMultiGraph>(kKeys, kValues).get()->dataCount() == 3; });
     row("curve",
         [](QCustomPlot& p)
         {
@@ -613,7 +613,7 @@ void TestBuilder::addOnAnArea()
 {
     QCustomPlot plot;
     QCPAxisRect* rect = plot.add<QCPAxisRect>(1, 0).get();
-    QCPGraph* graph = rect->add<QCPGraph>().setData(kKeys, kValues).get();
+    QCPMultiGraph* graph = rect->add<QCPMultiGraph>().setData(kKeys, kValues).get();
     QCOMPARE(graph->keyAxis(), rect->axis(QCPAxis::atBottom));
     QCOMPARE(graph->valueAxis(), rect->axis(QCPAxis::atLeft));
     QCOMPARE(graph->system(),
@@ -622,7 +622,7 @@ void TestBuilder::addOnAnArea()
 
     // An explicit pair of this rect (another value axis) is another system.
     QCPAxis* right = rect->add<QCPAxis>(QCPAxis::atRight).get();
-    QCPGraph* second = rect->add<QCPGraph>(rect->axis(QCPAxis::atBottom), right).get();
+    QCPMultiGraph* second = rect->add<QCPMultiGraph>(rect->axis(QCPAxis::atBottom), right).get();
     QCOMPARE(second->valueAxis(), right);
     QVERIFY(second->system() != graph->system());
     QCOMPARE(qcp::pointers(rect->plottables()), (QList<QCPAbstractPlottable*> { graph, second }));
@@ -672,8 +672,8 @@ void TestBuilder::groupsOwnedByPlot()
 void TestBuilder::groupHandlesSetAndAddMembers()
 {
     QCustomPlot plot;
-    auto a = plot.add<QCPGraph>(kKeys, kValues);
-    auto b = plot.add<QCPGraph>(kKeys, kValues);
+    auto a = plot.add<QCPMultiGraph>(kKeys, kValues);
+    auto b = plot.add<QCPMultiGraph>(kKeys, kValues);
     auto group = plot.add<QCPPlottableGroup>("g").setName("renamed").addMember(a).addMember(b);
     QCOMPARE(group->name(), QString("renamed"));
     QCOMPARE(group->members().size(), 2);
@@ -702,15 +702,15 @@ void TestBuilder::takeAndReAdd()
 {
     QCustomPlot a;
     QCustomPlot b;
-    auto g = a.add<QCPGraph>(kKeys, kValues).setName("moved");
+    auto g = a.add<QCPMultiGraph>(kKeys, kValues).setName("moved");
     auto group = a.add<QCPPlottableGroup>("pair").addMember(g);
     showRedLine(a, *g.get());
     QVERIFY(pixelsOfColor(a, Qt::red) > 20);
 
-    std::unique_ptr<QCPGraph> taken = a.take(g);
+    std::unique_ptr<QCPMultiGraph> taken = a.take(g);
     QVERIFY(taken);
     QVERIFY(!g || g.get() == taken.get());
-    QCOMPARE(a.graphCount(), 0);
+    QCOMPARE(a.plottableCount(), 0);
     QCOMPARE(a.plottableCount(), 0);
     QVERIFY(!a.legend->hasItemWithPlottable(taken.get()));
     QCOMPARE(group->members().size(), 0);
@@ -721,7 +721,7 @@ void TestBuilder::takeAndReAdd()
     QCOMPARE(pixelsOfColor(a, Qt::red), 0);
 
     auto moved = b.add(std::move(taken));
-    QCOMPARE(b.graphCount(), 1);
+    QCOMPARE(b.plottableCount(), 1);
     QCOMPARE(moved->keyAxis(), b.xAxis);
     QCOMPARE(moved->layer(), b.currentLayer());
     QVERIFY(b.legend->hasItemWithPlottable(moved.get()));
@@ -794,7 +794,7 @@ void TestBuilder::takeBarsLeavesGroupAndStack()
 void TestBuilder::takeDeadHandle()
 {
     QCustomPlot plot;
-    auto g = plot.add<QCPGraph>(kKeys, kValues);
+    auto g = plot.add<QCPMultiGraph>(kKeys, kValues);
     g.remove();
     QVERIFY(!plot.take(g));
     QCOMPARE(gMisuses, 1);
@@ -804,18 +804,18 @@ void TestBuilder::takeForeignObject()
 {
     QCustomPlot owner;
     QCustomPlot other;
-    auto g = owner.add<QCPGraph>(kKeys, kValues);
+    auto g = owner.add<QCPMultiGraph>(kKeys, kValues);
     QVERIFY(!other.take(g));
     QCOMPARE(gMisuses, 1);
-    QCOMPARE(owner.graphCount(), 1);
+    QCOMPARE(owner.plottableCount(), 1);
     QVERIFY(g);
 }
 
 void TestBuilder::takeDuringTeardown()
 {
     auto* plot = new QCustomPlot;
-    auto first = plot->add<QCPGraph>(kKeys, kValues);
-    auto second = plot->add<QCPGraph>(kKeys, kValues);
+    auto first = plot->add<QCPMultiGraph>(kKeys, kValues);
+    auto second = plot->add<QCPMultiGraph>(kKeys, kValues);
     bool refused = false;
     connect(first.get(), &QObject::destroyed,
             [plot, second, &refused] { refused = plot->take(second) == nullptr; });
@@ -835,7 +835,7 @@ void TestBuilder::addUserBuilt()
     QCOMPARE(handle->keyAxis(), plot.xAxis);
     QCOMPARE(handle->valueAxis(), plot.yAxis);
     QCOMPARE(handle->layer(), plot.currentLayer());
-    QCOMPARE(plot.graphCount(), 1);
+    QCOMPARE(plot.plottableCount(), 1);
     QVERIFY(plot.legend->hasItemWithPlottable(handle.get()));
     handle.setName("user").setPen(QPen(Qt::red));
     QCOMPARE(handle->name(), QString("user"));
@@ -846,16 +846,16 @@ void TestBuilder::addRefusesObjectOfAPlot()
 {
     QCustomPlot plot;
     QCustomPlot other;
-    auto handle = plot.add(std::make_unique<QCPGraph>(other.xAxis, other.yAxis));
+    auto handle = plot.add(std::make_unique<QCPMultiGraph>(other.xAxis, other.yAxis));
     QVERIFY(!handle);
     QCOMPARE(gMisuses, 1);
-    QCOMPARE(plot.graphCount(), 0);
-    QCOMPARE(other.graphCount(), 0);
-    QVERIFY(!plot.add(std::unique_ptr<QCPGraph>()));
+    QCOMPARE(plot.plottableCount(), 0);
+    QCOMPARE(other.plottableCount(), 0);
+    QVERIFY(!plot.add(std::unique_ptr<QCPMultiGraph>()));
     QCOMPARE(gMisuses, 2);
 
     plot.plotLayout()->clear();
-    QVERIFY(!plot.add(std::make_unique<QCPGraph>(other.xAxis, other.yAxis)));
+    QVERIFY(!plot.add(std::make_unique<QCPMultiGraph>(other.xAxis, other.yAxis)));
     QCOMPARE(gMisuses, 3); // the object is the cause; the missing axis rect is not reported too
 }
 
@@ -863,7 +863,7 @@ void TestBuilder::axesOfTwoPlotsAreRefused()
 {
     QCustomPlot plot;
     QCustomPlot other;
-    auto built = std::make_unique<QCPGraph>(plot.xAxis, other.yAxis);
+    auto built = std::make_unique<QCPMultiGraph>(plot.xAxis, other.yAxis);
     QCOMPARE(gMisuses, 1);
     QCOMPARE(plot.plottableCount(), 0);
     QCOMPARE(other.plottableCount(), 0);
@@ -875,14 +875,14 @@ void TestBuilder::axesOfTwoPlotsAreRefused()
 void TestBuilder::tracerGraphIsClearedOnTake()
 {
     QCustomPlot plot;
-    auto g = plot.add<QCPGraph>(kKeys, kValues);
+    auto g = plot.add<QCPMultiGraph>(kKeys, kValues);
     auto tracer = plot.add<QCPItemTracer>();
-    tracer->setGraph(g.get());
-    QCOMPARE(tracer->graph(), g.get());
+    tracer->setLineGraph(g.get());
+    QCOMPARE(tracer->lineGraph(), g.get());
 
     auto taken = plot.take(tracer);
     QVERIFY(taken);
-    QCOMPARE(tracer->graph(), nullptr); // the graph belongs to the plot it left
+    QCOMPARE(tracer->lineGraph(), nullptr); // the graph belongs to the plot it left
 
     QCustomPlot other;
     auto moved = other.add(std::move(taken));
@@ -894,7 +894,7 @@ void TestBuilder::tracerGraphIsClearedOnTake()
 void TestBuilder::takenPointerDeletedIsClean()
 {
     QCustomPlot plot;
-    auto g = plot.add<QCPGraph>(kKeys, kValues);
+    auto g = plot.add<QCPMultiGraph>(kKeys, kValues);
     auto line = plot.add<QCPItemLine>();
     auto bars = plot.add<QCPBars>(kKeys, kValues);
     auto map = plot.add<QCPColorMap>();
@@ -986,11 +986,11 @@ void TestBuilder::pixelPositionOfATakenItemIsNull()
 void TestBuilder::addPlottableDuringTeardownIsRefused()
 {
     auto* plot = new QCustomPlot;
-    auto first = plot->add<QCPGraph>(kKeys, kValues);
+    auto first = plot->add<QCPMultiGraph>(kKeys, kValues);
     bool refused = false;
     connect(first.get(), &QObject::destroyed,
             [plot, &refused]
-            { refused = !plot->add(std::make_unique<QCPGraph>(nullptr, nullptr)); });
+            { refused = !plot->add(std::make_unique<QCPMultiGraph>(nullptr, nullptr)); });
     delete plot;
     QVERIFY(refused);
     QCOMPARE(gMisuses, 1);
@@ -1077,7 +1077,7 @@ void TestBuilder::takenPipelinePlottablesOutliveTheirPlot()
 void TestBuilder::errorBarsTakeTheirPlottableByHandle()
 {
     QCustomPlot plot;
-    auto graph = plot.add<QCPGraph>(kKeys, kValues);
+    auto graph = plot.add<QCPMultiGraph>(kKeys, kValues);
     auto bars = plot.add<QCPErrorBars>().setDataPlottable(graph).setWhiskerWidth(5);
     QCOMPARE(bars->dataPlottable(), graph.get());
     QCOMPARE(gMisuses, 0);
@@ -1090,13 +1090,13 @@ void TestBuilder::errorBarsTakeTheirPlottableByHandle()
 void TestBuilder::tracerTakesItsGraphByHandle()
 {
     QCustomPlot plot;
-    auto graph = plot.add<QCPGraph>(kKeys, kValues);
-    auto tracer = plot.add<QCPItemTracer>().setGraph(graph).setGraphKey(2);
-    QCOMPARE(tracer->graph(), graph.get());
+    auto graph = plot.add<QCPMultiGraph>(kKeys, kValues);
+    auto tracer = plot.add<QCPItemTracer>().setLineGraph(graph).setGraphKey(2);
+    QCOMPARE(tracer->lineGraph(), graph.get());
     QCOMPARE(gMisuses, 0);
 
     graph.remove();
-    tracer.setGraph(graph);
+    tracer.setLineGraph(graph);
     QCOMPARE(gMisuses, 1);
 }
 
@@ -1338,9 +1338,9 @@ void TestBuilder::takeGraphClearsTracers()
 {
     QCustomPlot plot;
     plot.resize(400, 300);
-    auto graph = plot.add<QCPGraph>(QVector<double> { 0, 1, 2 }, QVector<double> { 0, 1, 0 });
+    auto graph = plot.add<QCPMultiGraph>(QVector<double> { 0, 1, 2 }, QVector<double> { 0, 1, 0 });
     auto tracer = plot.add<QCPItemTracer>();
-    tracer->setGraph(graph.get());
+    tracer->setLineGraph(graph.get());
     tracer->setGraphKey(1.0);
     plot.xAxis->setRange(0, 2);
     plot.yAxis->setRange(-1, 2);
@@ -1348,7 +1348,7 @@ void TestBuilder::takeGraphClearsTracers()
 
     auto taken = plot.take(graph);
     QVERIFY(taken);
-    QVERIFY2(!tracer->graph(), "the tracer still points at the taken graph");
+    QVERIFY2(!tracer->lineGraph(), "the tracer still points at the taken graph");
 
     gLoggedMessages.clear();
     const QtMessageHandler previous = qInstallMessageHandler(

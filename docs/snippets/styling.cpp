@@ -12,11 +12,11 @@ DOC_SNIPPET(styling_dark_theme, 600, 360)
         a[i] = std::sin(t[i]) * std::exp(-t[i] / 8);
         b[i] = std::cos(t[i]) * std::exp(-t[i] / 8);
     }
-    auto sine = customPlot->add<QCPGraph>()
+    auto sine = customPlot->add<QCPMultiGraph>()
         .setData(t, a)
         .setName("sine")
         .setPen(QPen(QColor(77, 166, 255), 2));
-    auto cosine = customPlot->add<QCPGraph>()
+    auto cosine = customPlot->add<QCPMultiGraph>()
         .setData(t, b)
         .setName("cosine")
         .setPen(QPen(QColor(255, 159, 67), 2));
@@ -38,7 +38,7 @@ DOC_SNIPPET(styling_custom_theme, 600, 360)
         x[i] = i / 20.0;
         y[i] = std::sin(x[i]) + 0.5 * std::sin(3 * x[i]);
     }
-    auto graph = customPlot->add<QCPGraph>()
+    auto graph = customPlot->add<QCPMultiGraph>()
         .setData(x, y)
         .setName("signal")
         .setPen(QPen(QColor("#268bd2"), 2));
@@ -68,18 +68,18 @@ DOC_SNIPPET(styling_pens_brushes, 600, 360)
         upper[i] = mid[i] + 0.4;
         lower[i] = mid[i] - 0.4;
     }
-    auto low = customPlot->add<QCPGraph>()
+    auto low = customPlot->add<QCPMultiGraph>()
         .setData(x, lower)
         .setPen(Qt::NoPen);
-    auto high = customPlot->add<QCPGraph>()
+    auto high = customPlot->add<QCPMultiGraph>()
         .setData(x, upper)
         .setPen(Qt::NoPen)
         .setBrush(QColor(31, 119, 180, 60));
-    high->setChannelFillGraph(low.get()); // fill between high and low
-    auto centre = customPlot->add<QCPGraph>()
+    high->setComponentFillToGraph(0, low.get(), 0); // fill between high and low
+    auto centre = customPlot->add<QCPMultiGraph>()
         .setData(x, mid)
         .setPen(QPen(QColor(31, 119, 180), 2));
-    auto threshold = customPlot->add<QCPGraph>()
+    auto threshold = customPlot->add<QCPMultiGraph>()
         .setData(x, limit)
         .setPen(QPen(QColor(214, 39, 40), 1.5, Qt::DashLine));
     customPlot->rescaleAxes();
@@ -110,9 +110,9 @@ DOC_SNIPPET(styling_scatter_gallery, 600, 360)
     {
         const double x = i % 5 + 0.5;
         const double y = 2.6 - i / 5;
-        auto graph = customPlot->add<QCPGraph>()
-            .setData({ x }, { y })
-            .setLineStyle(QCPGraph::lsNone);
+        auto graph = customPlot->add<QCPMultiGraph>()
+            .setData(QVector<double> { x }, QVector<double> { y })
+            .setLineStyle(QCPMultiGraph::lsNone);
         graph->setScatterStyle(QCPScatterStyle(shapes[i], QPen(QColor(31, 119, 180), 1.5),
                                                QBrush(QColor(31, 119, 180, 70)), 18));
         auto label = customPlot->add<QCPItemText>();
@@ -168,7 +168,7 @@ DOC_SNIPPET(styling_legend, 600, 360)
             x[i] = i / 20.0;
             y[i] = std::sin(x[i] + k * 2.1);
         }
-        auto graph = customPlot->add<QCPGraph>()
+        auto graph = customPlot->add<QCPMultiGraph>()
             .setData(x, y)
             .setPen(QPen(colors[k], 2))
             .setName(QString("phase %1").arg(k));
@@ -198,7 +198,7 @@ DOC_SNIPPET(styling_legend_group, 600, 360)
             x[i] = i / 20.0;
             y[i] = std::sin(x[i]) + offset;
         }
-        auto graph = customPlot->add<QCPGraph>()
+        auto graph = customPlot->add<QCPMultiGraph>()
             .setData(x, y)
             .setPen(QPen(QColor(31, 119, 180), offset == 0 ? 2.5 : 1.5, style))
             .setName(name);
@@ -209,7 +209,7 @@ DOC_SNIPPET(styling_legend_group, 600, 360)
     model->addMember(curve(-0.3, Qt::DashLine, "min"));
     model->addMember(curve(0.3, Qt::DashLine, "max"));
 
-    auto zero = customPlot->add<QCPGraph>()
+    auto zero = customPlot->add<QCPMultiGraph>()
         .setData(QVector<double> { 0, 10 }, QVector<double> { 0, 0 })
         .setPen(QPen(QColor(150, 150, 150), 1, Qt::DotLine));
     zero->setWantsLegend(false); // context, not data: no row
@@ -233,7 +233,7 @@ DOC_SNIPPET(styling_background, 600, 360)
         x[i] = i / 20.0;
         y[i] = std::exp(-x[i] / 4) * std::cos(2 * x[i]);
     }
-    auto graph = customPlot->add<QCPGraph>()
+    auto graph = customPlot->add<QCPMultiGraph>()
         .setData(x, y)
         .setPen(QPen(QColor(20, 60, 110), 2));
     customPlot->rescaleAxes();

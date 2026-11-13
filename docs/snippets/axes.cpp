@@ -15,7 +15,7 @@ DOC_SNIPPET(axes_basics, 600, 360)
         depth[i] = 10.0 * i;                                            // 0 to 590 m
         temperature[i] = 4 + 18 / (1 + std::exp((depth[i] - 150) / 40));
     }
-    auto profile = customPlot->add<QCPGraph>()
+    auto profile = customPlot->add<QCPMultiGraph>()
         .setData(temperature, depth)
         .setPen(QPen(QColor(31, 119, 180), 2));
 
@@ -37,7 +37,7 @@ DOC_SNIPPET(axes_log, 600, 360)
         frequency[i] = std::pow(10.0, -1 + 4.0 * i / 199);              // 0.1 Hz to 1 kHz
         power[i] = 1e3 / (1 + std::pow(frequency[i] / 2, 5.0 / 3.0));
     }
-    auto spectrum = customPlot->add<QCPGraph>()
+    auto spectrum = customPlot->add<QCPMultiGraph>()
         .setData(frequency, power)
         .setPen(QPen(QColor(214, 39, 40), 2));
 
@@ -79,7 +79,7 @@ DOC_SNIPPET(axes_extra_axis, 600, 360)
     };
     for (const auto& [axis, values, color, label] : series)
     {
-        auto graph = customPlot->add<QCPGraph>().setAxes(customPlot->xAxis, axis)
+        auto graph = customPlot->add<QCPMultiGraph>().setAxes(customPlot->xAxis, axis)
             .setData(hour, values)
             .setPen(QPen(color, 2));
         axis->setLabel(label);

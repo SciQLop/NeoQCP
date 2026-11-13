@@ -252,10 +252,10 @@ void TestItemRecording::anAnchoredArrowFollowsThePan()
     // replay; the head must be remade too, or a pan leaves it behind.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.2, 0.3, 0.4, 0.5 });
     auto* tracer = new QCPItemTracer(&plot);
-    tracer->setGraph(graph);
+    tracer->setLineGraph(graph);
     tracer->setGraphKey(3.0);
     tracer->setStyle(QCPItemTracer::tsNone);
     auto* text = new QCPItemText(&plot);
@@ -330,10 +330,10 @@ void TestItemRecording::aFollowerFollowsItsAnchorItem()
     // the curve: its recording must depend on the item it hangs from, or it draws the old pixels.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.2, 0.2, 0.2, 0.2 });
     auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
-    tracer->setGraph(graph);
+    tracer->setLineGraph(graph);
     tracer->setGraphKey(2.0);
     tracer->setStyle(QCPItemTracer::tsNone);
     tracer->setLayer(plot.layer(QStringLiteral("main")));
@@ -362,15 +362,14 @@ void TestItemRecording::aTracerOnAnotherLayerFollowsItsGraph()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
-    auto low = QSharedPointer<QCPGraphDataContainer>::create();
-    auto high = QSharedPointer<QCPGraphDataContainer>::create();
-    low->set(QVector<QCPGraphData> { { 1, 0.2 }, { 2, 0.2 }, { 3, 0.2 }, { 4, 0.2 } });
-    high->set(QVector<QCPGraphData> { { 1, 0.8 }, { 2, 0.8 }, { 3, 0.8 }, { 4, 0.8 } });
-    graph->setData(low);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    const QVector<double> keys { 1, 2, 3, 4 };
+    const QVector<double> low { 0.2, 0.2, 0.2, 0.2 };
+    const QVector<double> high { 0.8, 0.8, 0.8, 0.8 };
+    graph->setData(keys, low);
     graph->setPen(QPen(Qt::black, 1));
     auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
-    tracer->setGraph(graph);
+    tracer->setLineGraph(graph);
     tracer->setGraphKey(3.0);
     tracer->setStyle(QCPItemTracer::tsCircle);
     tracer->setSize(9);
@@ -385,7 +384,7 @@ void TestItemRecording::aTracerOnAnotherLayerFollowsItsGraph()
     // drawings by itself.
     const int before = tracer->recordings();
 
-    graph->setData(high);
+    graph->setData(keys, high);
     plot.replot();
     QVERIFY2(tracer->recordings() > before,
              "a tracer on another layer than its graph kept the recording");
@@ -399,12 +398,11 @@ void TestItemRecording::anErrorBarOnAnotherLayerFollowsItsGraph()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
-    auto low = QSharedPointer<QCPGraphDataContainer>::create();
-    auto high = QSharedPointer<QCPGraphDataContainer>::create();
-    low->set(QVector<QCPGraphData> { { 1, 0.2 }, { 2, 0.2 }, { 3, 0.2 }, { 4, 0.2 } });
-    high->set(QVector<QCPGraphData> { { 1, 0.7 }, { 2, 0.7 }, { 3, 0.7 }, { 4, 0.7 } });
-    graph->setData(low);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    const QVector<double> keys { 1, 2, 3, 4 };
+    const QVector<double> low { 0.2, 0.2, 0.2, 0.2 };
+    const QVector<double> high { 0.7, 0.7, 0.7, 0.7 };
+    graph->setData(keys, low);
     graph->setPen(QPen(Qt::black, 1));
     auto* bars = new RecordingItem<QCPErrorBars>(plot.xAxis, plot.yAxis);
     bars->setDataPlottable(graph);
@@ -422,7 +420,7 @@ void TestItemRecording::anErrorBarOnAnotherLayerFollowsItsGraph()
     // drawings by itself.
     const int before = bars->recordings();
 
-    graph->setData(high);
+    graph->setData(keys, high);
     plot.replot();
     QVERIFY2(bars->recordings() > before,
              "error bars on another layer than their graph kept the recording");
@@ -685,7 +683,8 @@ void TestItemRecording::aTracerRecords()
         &commands,
         [](QCustomPlot& plot, RecordingItem<QCPItemTracer>* tracer)
         {
-            auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+            auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+            graph->setPen(QPen(Qt::blue, 0));
             QVector<double> keys, values;
             for (int i = 0; i <= 60; ++i)
             {
@@ -693,7 +692,7 @@ void TestItemRecording::aTracerRecords()
                 values << 0.5 + 0.35 * qSin(i * 0.1);
             }
             graph->setData(keys, values);
-            tracer->setGraph(graph);
+            tracer->setLineGraph(graph);
             tracer->setGraphKey(3.2);
             tracer->setStyle(QCPItemTracer::tsCircle);
             tracer->setSize(9);
@@ -708,10 +707,10 @@ void TestItemRecording::aTracerFollowsItsGraph()
     // The marker is where the graph's data says: new data moves it, without a call on the tracer.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.2, 0.2, 0.2, 0.2 });
     auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
-    tracer->setGraph(graph);
+    tracer->setLineGraph(graph);
     tracer->setGraphKey(3.0);
     tracer->setStyle(QCPItemTracer::tsCircle);
     tracer->setSize(9);
@@ -736,10 +735,10 @@ void TestItemRecording::aPannedTracerIsNotReRecorded()
     // A tracer on plot coordinates is data: a pan only shifts its marker.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4, 5 }, QVector<double> { 0.2, 0.3, 0.4, 0.5, 0.6 });
     auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
-    tracer->setGraph(graph);
+    tracer->setLineGraph(graph);
     tracer->setGraphKey(3.0);
     tracer->setStyle(QCPItemTracer::tsCircle);
     tracer->setSize(9);
@@ -756,10 +755,10 @@ void TestItemRecording::aTracerFollowsSetGraphKey()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4, 5 }, QVector<double> { 0.2, 0.3, 0.4, 0.5, 0.6 });
     auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
-    tracer->setGraph(graph);
+    tracer->setLineGraph(graph);
     tracer->setGraphKey(2.0);
     tracer->setStyle(QCPItemTracer::tsCircle);
     tracer->setSize(9);
@@ -785,10 +784,10 @@ void TestItemRecording::aTracerFollowsInterpolation()
     // Between two samples the tracer snaps to the nearer one, or interpolates when asked to.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 5 }, QVector<double> { 0.2, 0.6 });
     auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
-    tracer->setGraph(graph);
+    tracer->setLineGraph(graph);
     tracer->setGraphKey(2.0);
     tracer->setStyle(QCPItemTracer::tsCircle);
     tracer->setSize(9);
@@ -1047,21 +1046,18 @@ void TestItemRecording::selectionReRecords()
     QCOMPARE(rect->recordings(), before + 1);
 }
 
-// Double-buffered streaming: two containers refilled in lockstep carry the same revision, so a swap
-// is only visible through the container's identity.
+// Double-buffered streaming: replacing the data with other values of the same shape remakes the tracer.
 void TestItemRecording::aSwappedGraphContainerReRecords()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
-    auto first = QSharedPointer<QCPGraphDataContainer>::create();
-    auto second = QSharedPointer<QCPGraphDataContainer>::create();
-    first->set(QVector<QCPGraphData> { { 1, 0.2 }, { 2, 0.2 }, { 3, 0.2 }, { 4, 0.2 } });
-    second->set(QVector<QCPGraphData> { { 1, 0.8 }, { 2, 0.8 }, { 3, 0.8 }, { 4, 0.8 } });
-    QCOMPARE(first->revision(), second->revision());
-    graph->setData(first);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    const QVector<double> keys { 1, 2, 3, 4 };
+    const QVector<double> first { 0.2, 0.2, 0.2, 0.2 };
+    const QVector<double> second { 0.8, 0.8, 0.8, 0.8 };
+    graph->setData(keys, first);
     auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
-    tracer->setGraph(graph);
+    tracer->setLineGraph(graph);
     tracer->setGraphKey(3.0);
     tracer->setStyle(QCPItemTracer::tsCircle);
     tracer->setSize(9);
@@ -1076,7 +1072,7 @@ void TestItemRecording::aSwappedGraphContainerReRecords()
     QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
     QVERIFY2(redPixelsNear(image, low, 8) > 0, "the tracer did not draw its marker");
 
-    graph->setData(second);
+    graph->setData(keys, second);
     plot.replot();
     QVERIFY2(tracer->recordings() > before,
              "a swapped container with the same revision kept the recording");
