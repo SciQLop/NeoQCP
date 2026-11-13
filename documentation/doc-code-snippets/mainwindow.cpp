@@ -58,11 +58,9 @@ void MainWindow::snippetQCPColorScale()
   colorScale->axis()->ticker()->setTickCount(3);
   //! [qcpcolorscale-tickcount]
   
-  //! [qcpcolorscale-margingroup]
-  QCPMarginGroup *group = new QCPMarginGroup(customPlot);
-  colorScale->setMarginGroup(QCP::msTop|QCP::msBottom, group);
-  customPlot->axisRect()->setMarginGroup(QCP::msTop|QCP::msBottom, group);
-  //! [qcpcolorscale-margingroup]
+  //! [qcpcolorscale-alignmentgroup]
+  QCPAlignmentGroup::create({colorScale, customPlot->axisRect()}, QCP::msTop|QCP::msBottom);
+  //! [qcpcolorscale-alignmentgroup]
 }
 
 void MainWindow::snippetQCPColorMap()
@@ -122,21 +120,6 @@ void MainWindow::snippetQCPItemLine()
   //! [qcpitemline-creation-5]
   line->setClipToAxisRect(false);
   //! [qcpitemline-creation-5]
-}
-
-void MainWindow::snippetQCPMarginGroup()
-{
-  QCPAxisRect *ar = new QCPAxisRect(customPlot);
-  customPlot->plotLayout()->addElement(0, 1, ar);
-  
-  //! [qcpmargingroup-creation-1]
-  QCPMarginGroup *group = new QCPMarginGroup(customPlot);
-  //! [qcpmargingroup-creation-1]
-  
-  //! [qcpmargingroup-creation-2]
-  customPlot->axisRect(0)->setMarginGroup(QCP::msLeft|QCP::msRight, group);
-  customPlot->axisRect(1)->setMarginGroup(QCP::msLeft|QCP::msRight, group);
-  //! [qcpmargingroup-creation-2]
 }
 
 void MainWindow::snippetQCPTextElement()

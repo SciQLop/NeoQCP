@@ -30,155 +30,6 @@
 #include "misuse.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////// QCPMarginGroup
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/*! \class QCPMarginGroup
-  \brief A margin group allows synchronization of margin sides if working with multiple layout
-  elements.
-
-  \deprecated Use QCPAlignmentGroup: it aligns edges rather than margin sizes, also across plot
-  widgets. This class goes in 3.0 with the old API.
-
-  QCPMarginGroup allows you to tie a margin side of two or more layout elements together, such that
-  they will all have the same size, based on the largest required margin in the group.
-
-  \n
-  \image html QCPMarginGroup.png "Demonstration of QCPMarginGroup"
-  \n
-
-  In certain situations it is desirable that margins at specific sides are synchronized across
-  layout elements. For example, if one QCPAxisRect is below another one in a grid layout, it will
-  provide a cleaner look to the user if the left and right margins of the two axis rects are of the
-  same size. The left axis of the top axis rect will then be at the same horizontal position as the
-  left axis of the lower axis rect, making them appear aligned. The same applies for the right
-  axes. This is what QCPMarginGroup makes possible.
-
-  To add/remove a specific side of a layout element to/from a margin group, use the \ref
-  QCPLayoutElement::setMarginGroup method. To completely break apart the margin group, either call
-  \ref clear, or just delete the margin group.
-
-  \section QCPMarginGroup-example Example
-
-  First create a margin group:
-  \snippet documentation/doc-code-snippets/mainwindow.cpp qcpmargingroup-creation-1
-  Then set this group on the layout element sides:
-  \snippet documentation/doc-code-snippets/mainwindow.cpp qcpmargingroup-creation-2
-  Here, we've used the first two axis rects of the plot and synchronized their left margins with
-  each other and their right margins with each other.
-*/
-
-/* start documentation of inline functions */
-
-/*! \fn QList<QCPLayoutElement*> QCPMarginGroup::elements(QCP::MarginSide side) const
-
-  Returns a list of all layout elements that have their margin \a side associated with this margin
-  group.
-*/
-
-/* end documentation of inline functions */
-
-/*!
-  Creates a new QCPMarginGroup instance in \a parentPlot.
-*/
-QCPMarginGroup::QCPMarginGroup(QCustomPlot* parentPlot)
-        : QObject(parentPlot), mParentPlot(parentPlot)
-{
-    mChildren.insert(QCP::msLeft, QList<QCPLayoutElement*>());
-    mChildren.insert(QCP::msRight, QList<QCPLayoutElement*>());
-    mChildren.insert(QCP::msTop, QList<QCPLayoutElement*>());
-    mChildren.insert(QCP::msBottom, QList<QCPLayoutElement*>());
-}
-
-QCPMarginGroup::~QCPMarginGroup()
-{
-    clear();
-}
-
-/*!
-  Returns whether this margin group is empty. If this function returns true, no layout elements use
-  this margin group to synchronize margin sides.
-*/
-bool QCPMarginGroup::isEmpty() const
-{
-    for (const auto& elements : mChildren)
-        if (!elements.isEmpty())
-            return false;
-    return true;
-}
-
-/*!
-  Clears this margin group. The synchronization of the margin sides that use this margin group is
-  lifted and they will use their individual margin sizes again.
-*/
-void QCPMarginGroup::clear()
-{
-    // make all children remove themselves from this margin group:
-    for (auto it = mChildren.begin(); it != mChildren.end(); ++it)
-    {
-        const QList<QCPLayoutElement*> elements = it.value();
-        for (int i = elements.size() - 1; i >= 0; --i)
-            elements.at(i)->setMarginGroup(
-                it.key(), nullptr); // removes itself from mChildren via removeChild
-    }
-}
-
-/*! \internal
-
-  Returns the synchronized common margin for \a side. This is the margin value that will be used by
-  the layout element on the respective side, if it is part of this margin group.
-
-  The common margin is calculated by requesting the automatic margin (\ref
-  QCPLayoutElement::calculateAutoMargin) of each element associated with \a side in this margin
-  group, and choosing the largest returned value. (QCPLayoutElement::minimumMargins is taken into
-  account, too.)
-*/
-int QCPMarginGroup::commonMargin(QCP::MarginSide side) const
-{
-    // query all automatic margins of the layout elements in this margin group side and find
-    // maximum:
-    int result = 0;
-    for (QCPLayoutElement* el : mChildren.value(side))
-    {
-        if (!el->autoMargins().testFlag(side))
-            continue;
-        int m
-            = qMax(el->calculateAutoMargin(side), QCP::getMarginValue(el->minimumMargins(), side));
-        if (m > result)
-            result = m;
-    }
-    return result;
-}
-
-/*! \internal
-
-  Adds \a element to the internal list of child elements, for the margin \a side.
-
-  This function does not modify the margin group property of \a element.
-*/
-void QCPMarginGroup::addChild(QCP::MarginSide side, QCPLayoutElement* element)
-{
-    if (!mChildren[side].contains(element))
-        mChildren[side].append(element);
-    else
-        qDebug() << Q_FUNC_INFO << "element is already child of this margin group side"
-                 << reinterpret_cast<quintptr>(element);
-}
-
-/*! \internal
-
-  Removes \a element from the internal list of child elements, for the margin \a side.
-
-  This function does not modify the margin group property of \a element.
-*/
-void QCPMarginGroup::removeChild(QCP::MarginSide side, QCPLayoutElement* element)
-{
-    if (!mChildren[side].removeOne(element))
-        qDebug() << Q_FUNC_INFO << "element is not child of this margin group side"
-                 << reinterpret_cast<quintptr>(element);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPLayoutElement
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -267,7 +118,6 @@ QCPLayoutElement::~QCPLayoutElement()
     for (const QPointer<QCPAlignmentGroup>& group : mAlignmentGroups)
         if (group)
             group->remove(this);
-    setMarginGroup(QCP::msAll, nullptr); // unregister at margin groups, if there are any
     // unregister at layout:
     if (qobject_cast<QCPLayout*>(
             mParentLayout)) // the qobject_cast is just a safeguard in case the layout forgets to
@@ -342,8 +192,8 @@ void QCPLayoutElement::setMinimumMargins(const QMargins& margins)
   automatically, a minimum margin value may be provided with \ref setMinimumMargins. If a side is
   set to be controlled manually, the value may be specified with \ref setMargins.
 
-  Margin sides that are under automatic control may participate in a \ref QCPMarginGroup (see \ref
-  setMarginGroup), to synchronize (align) it with other layout elements in the plot.
+  Margin sides that are under automatic control may join a \ref QCPAlignmentGroup, to align their
+  edge with other layout elements, in this plot or another one.
 
   \see setMinimumMargins, setMargins, QCP::MarginSide
 */
@@ -453,53 +303,6 @@ void QCPLayoutElement::setSizeConstraintRect(SizeConstraintRect constraintRect)
     }
 }
 
-/*!
-  Sets the margin \a group of the specified margin \a sides.
-
-  Margin groups allow synchronizing specified margins across layout elements, see the documentation
-  of \ref QCPMarginGroup.
-
-  To unset the margin group of \a sides, set \a group to \c nullptr.
-
-  Note that margin groups only work for margin sides that are set to automatic (\ref
-  setAutoMargins).
-
-  \see QCP::MarginSide
-*/
-void QCPLayoutElement::setMarginGroup(QCP::MarginSides sides, QCPMarginGroup* group)
-{
-    static constexpr QCP::MarginSide kAllSides[] = {
-        QCP::msLeft, QCP::msRight, QCP::msTop, QCP::msBottom
-    };
-
-    bool changed = false;
-    for (auto side : kAllSides)
-    {
-        if (!sides.testFlag(side))
-            continue;
-        if (marginGroup(side) != group)
-        {
-            changed = true;
-            QCPMarginGroup* oldGroup = marginGroup(side);
-            if (oldGroup) // unregister at old group
-                oldGroup->removeChild(side, this);
-
-            if (!group) // if setting to 0, remove hash entry. Else set hash entry to new group and
-                        // register there
-            {
-                mMarginGroups.remove(side);
-            }
-            else // setting to a new group
-            {
-                mMarginGroups[side] = group;
-                group->addChild(side, this);
-            }
-        }
-    }
-    if (changed) // the margins it synchronises move this element
-        markLayoutAppearanceDirty();
-}
-
 QPointer<QCPAlignmentGroup> QCPLayoutElement::alignmentGroup(QCP::MarginSide side) const
 {
     const int slot = alignmentSlot(side);
@@ -558,7 +361,7 @@ void QCPLayoutElement::update(UpdatePhase phase)
         if (mAutoMargins != QCP::msNone)
         {
             // set the margins of this layout element according to automatic margin calculation,
-            // either directly or via a margin group:
+            // either directly or via an alignment group:
             QMargins newMargins = mMargins;
             static constexpr QCP::MarginSide allMarginSides[] = {
                 QCP::msLeft, QCP::msRight, QCP::msTop, QCP::msBottom
@@ -572,18 +375,9 @@ void QCPLayoutElement::update(UpdatePhase phase)
                         QCP::setMarginValue(newMargins, side,
                                             group->marginFor(
                                                 this, side)); // this side aligns with other
-                                                              // elements' edges, which win over a
-                                                              // margin group
-                    else if (mMarginGroups.contains(side))
-                        QCP::setMarginValue(newMargins, side,
-                                            mMarginGroups[side]->commonMargin(
-                                                side)); // this side is part of a margin group, so
-                                                        // get the margin value from that group
+                                                              // elements' edges
                     else
-                        QCP::setMarginValue(
-                            newMargins, side,
-                            calculateAutoMargin(side)); // this side is not part of a group, so
-                                                        // calculate the value directly
+                        QCP::setMarginValue(newMargins, side, calculateAutoMargin(side));
                     // apply minimum margin restrictions:
                     if (QCP::getMarginValue(newMargins, side)
                         < QCP::getMarginValue(mMinimumMargins, side))

@@ -81,8 +81,8 @@ QList<QPointer<QCPAbstractColorMapped>> liveUsers(const QList<QCPAbstractColorMa
   scale can be set with \ref setLabel.
 
   For optimum appearance (like in the image above), it may be desirable to line up the axis rect and
-  the borders of the color scale. Use a \ref QCPMarginGroup to achieve this:
-  \snippet documentation/doc-code-snippets/mainwindow.cpp qcpcolorscale-margingroup
+  the borders of the color scale. Use a \ref QCPAlignmentGroup to achieve this:
+  \snippet documentation/doc-code-snippets/mainwindow.cpp qcpcolorscale-alignmentgroup
 
   Color scales are initialized with a non-zero minimum top and bottom margin (\ref
   setMinimumMargins), because vertical color scales are most common and the minimum top/bottom
@@ -156,7 +156,7 @@ QCPColorScale::QCPColorScale(QCustomPlot* parentPlot)
     }
     setMinimumMargins(
         QMargins(0, 6, 0, 6)); // for default right color scale types, keep some room at bottom and
-                               // top (important if no margin group is used)
+                               // top (important if no alignment group is used)
     setType(QCPAxis::atRight);
     setDataRange(QCPRange(0, 6));
 }
@@ -566,7 +566,7 @@ void QCPColorScale::rescaleDataRange(bool onlyVisibleMaps)
 /* inherits documentation from base class */
 int QCPColorScale::calculateAutoMargin(QCP::MarginSide side)
 {
-    // The base returns max(current margin, minimum margin): in a margin group, the margin the
+    // The base returns max(current margin, minimum margin): in an alignment group, the margin the
     // group last set would come back as this element's own, so the group could never shrink.
     // The scale lays its bar and axis out inside its rect and needs no outer margin itself.
     return QCP::getMarginValue(mMinimumMargins, side);

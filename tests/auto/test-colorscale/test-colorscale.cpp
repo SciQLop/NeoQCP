@@ -204,10 +204,8 @@ void TestColorScale::groupedRectsLeaveRoomForTheScale()
 {
     auto* bottom = new QCPAxisRect(mPlot);
     mPlot->plotLayout()->addElement(1, 0, bottom);
-    auto* group = new QCPMarginGroup(mPlot);
     QCPAxisRect* top = mPlot->axisRect();
-    top->setMarginGroup(QCP::msRight, group);
-    bottom->setMarginGroup(QCP::msRight, group);
+    QVERIFY(QCPAlignmentGroup::create({ top, bottom }, QCP::msRight));
     mapWithRange(mPlot->xAxis, mPlot->yAxis, 0, 1);
     mPlot->replot();
     mPlot->replot();

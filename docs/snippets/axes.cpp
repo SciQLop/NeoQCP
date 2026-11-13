@@ -183,9 +183,7 @@ DOC_SNIPPET(axes_linked, 600, 400)
                      upperX, QOverload<const QCPRange&>::of(&QCPAxis::setRange));
 
     // Line the two axis rects up on the left and right.
-    auto* margins = new QCPMarginGroup(customPlot);
-    customPlot->axisRect(0)->setMarginGroup(QCP::msLeft | QCP::msRight, margins);
-    lowerRect->setMarginGroup(QCP::msLeft | QCP::msRight, margins);
+    QCPAlignmentGroup::create({ customPlot->axisRect(0), lowerRect }, QCP::msLeft | QCP::msRight);
 
     QVector<double> t(500), position(500), speed(500);
     for (int i = 0; i < 500; ++i)

@@ -93,9 +93,7 @@ DOC_SNIPPET(gallery_space_weather, 800, 560)
                      qOverload<const QCPRange&>(&QCPAxis::setRange));
     QObject::connect(spectraTime, &QCPAxis::rangeChanged, fieldTime,
                      qOverload<const QCPRange&>(&QCPAxis::setRange));
-    auto* margins = new QCPMarginGroup(customPlot);
-    customPlot->axisRect()->setMarginGroup(QCP::msLeft, margins);
-    spectraRect->setMarginGroup(QCP::msLeft, margins);
+    QCPAlignmentGroup::create({ customPlot->axisRect(), spectraRect }, QCP::msLeft);
 
     // The shock, marked on both panels.
     for (QCPAxisRect* rect : { customPlot->axisRect().get(), spectraRect })
@@ -172,9 +170,7 @@ DOC_SNIPPET(gallery_ten_million_points, 800, 520)
     note->setPositionAlignment(Qt::AlignLeft | Qt::AlignTop);
     note->setText("10 000 000 samples, plotted from the caller's vectors without a copy");
 
-    auto* margins = new QCPMarginGroup(customPlot);
-    customPlot->axisRect()->setMarginGroup(QCP::msLeft | QCP::msRight, margins);
-    detailRect->setMarginGroup(QCP::msLeft | QCP::msRight, margins);
+    QCPAlignmentGroup::create({ customPlot->axisRect(), detailRect }, QCP::msLeft | QCP::msRight);
     // [/gallery_ten_million_points]
 }
 
@@ -326,12 +322,8 @@ DOC_SNIPPET(gallery_joint_density, 640, 640)
     right->setAutoMargins(QCP::msTop | QCP::msBottom | QCP::msRight);
     right->setMargins(QMargins(6, 0, 0, 0));
 
-    auto* columns = new QCPMarginGroup(customPlot);
-    main->setMarginGroup(QCP::msLeft | QCP::msRight, columns);
-    top->setMarginGroup(QCP::msLeft | QCP::msRight, columns);
-    auto* rows = new QCPMarginGroup(customPlot);
-    main->setMarginGroup(QCP::msTop | QCP::msBottom, rows);
-    right->setMarginGroup(QCP::msTop | QCP::msBottom, rows);
+    QCPAlignmentGroup::create({ main, top }, QCP::msLeft | QCP::msRight);     // the column
+    QCPAlignmentGroup::create({ main, right }, QCP::msTop | QCP::msBottom);   // the row
 
     customPlot->xAxis->setLabel("x");
     customPlot->yAxis->setLabel("y");
@@ -367,9 +359,7 @@ DOC_SNIPPET(gallery_contours, 640, 500)
     map->setColorScale(scale);   // the map takes the scale's gradient: set it afterwards
     map->setGradient(QCPColorGradient::gpCoolwarm);
     map->setDataRange(QCPRange(-3, 3));   // symmetric, so zero is the neutral colour
-    auto* margins = new QCPMarginGroup(customPlot);
-    customPlot->axisRect()->setMarginGroup(QCP::msTop | QCP::msBottom, margins);
-    scale->setMarginGroup(QCP::msTop | QCP::msBottom, margins);
+    QCPAlignmentGroup::create({ customPlot->axisRect(), scale }, QCP::msTop | QCP::msBottom);
 
     customPlot->xAxis->setLabel("x");
     customPlot->yAxis->setLabel("y");
@@ -450,9 +440,7 @@ DOC_SNIPPET(gallery_stock_chart, 800, 520)
     customPlot->xAxis->setTickLabels(false);
     QObject::connect(customPlot->xAxis, &QCPAxis::rangeChanged, volumeTime,
                      qOverload<const QCPRange&>(&QCPAxis::setRange));
-    auto* margins = new QCPMarginGroup(customPlot);
-    customPlot->axisRect()->setMarginGroup(QCP::msLeft | QCP::msRight, margins);
-    volumeRect->setMarginGroup(QCP::msLeft | QCP::msRight, margins);
+    QCPAlignmentGroup::create({ customPlot->axisRect(), volumeRect }, QCP::msLeft | QCP::msRight);
 
     customPlot->yAxis->setLabel("price");
     customPlot->legend->setVisible(true);
@@ -579,9 +567,7 @@ DOC_SNIPPET(gallery_fit_residuals, 680, 560)
     residualT->setRange(0, 16);
     customPlot->yAxis->setRange(-4, 4.5);
     residualAxis->setRange(-3.2, 3.2);
-    auto* margins = new QCPMarginGroup(customPlot);
-    customPlot->axisRect()->setMarginGroup(QCP::msLeft | QCP::msRight, margins);
-    residualRect->setMarginGroup(QCP::msLeft | QCP::msRight, margins);
+    QCPAlignmentGroup::create({ customPlot->axisRect(), residualRect }, QCP::msLeft | QCP::msRight);
     customPlot->legend->setVisible(true);
     // [/gallery_fit_residuals]
 }

@@ -40,8 +40,7 @@
   this usually isn't the case. A \ref QCPAlignmentGroup fixes this: it aligns the edges of its
   members' inner rects, also across several plot widgets, colour bars included; an element joins
   one group per side. Make one with
-  \ref QCPAlignmentGroup::create. (\ref QCPMarginGroup, which makes margin sizes equal inside one
-  plot, is deprecated.)
+  \ref QCPAlignmentGroup::create.
   
   \subsection layoutsystem-layout Layouts
   

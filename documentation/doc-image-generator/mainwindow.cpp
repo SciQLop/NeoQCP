@@ -266,7 +266,7 @@ void MainWindow::genLineEnding()
   savePng("QCPLineEnding.png", 500, 100);
 }
 
-void MainWindow::genMarginGroup()
+void MainWindow::genAlignmentGroup()
 {
   resetPlot();
   
@@ -279,9 +279,7 @@ void MainWindow::genMarginGroup()
   foreach (QCPAxisRect *r, customPlot->axisRects())
     r->axis(QCPAxis::atBottom)->setTickLabels(false);
   
-  QCPMarginGroup *marginGroup = new QCPMarginGroup(customPlot);
-  customPlot->axisRect(0)->setMarginGroup(QCP::msLeft, marginGroup);
-  customPlot->axisRect(2)->setMarginGroup(QCP::msLeft, marginGroup);
+  QCPAlignmentGroup::create({customPlot->axisRect(0), customPlot->axisRect(2)}, QCP::msLeft);
   
   customPlot->axisRect(0)->axis(QCPAxis::atLeft)->setRange(0, 1300);
   customPlot->axisRect(1)->axis(QCPAxis::atLeft)->setRange(0, 1300);
@@ -298,14 +296,14 @@ void MainWindow::genMarginGroup()
   leftCaption->setClipToAxisRect(false);
   leftCaption->position->setCoords(0.25, 0);
   leftCaption->setPositionAlignment(Qt::AlignTop|Qt::AlignHCenter);
-  leftCaption->setText("left sides in margin group");
+  leftCaption->setText("left sides aligned");
   leftCaption->setFont(textFont);
   QCPItemText *rightCaption = new QCPItemText(customPlot);
   rightCaption->position->setType(QCPItemPosition::ptViewportRatio);
   rightCaption->position->setCoords(0.75, 0);
   rightCaption->setClipToAxisRect(false);
   rightCaption->setPositionAlignment(Qt::AlignTop|Qt::AlignHCenter);
-  rightCaption->setText("no margin group");
+  rightCaption->setText("no alignment group");
   rightCaption->setFont(textFont);
   
   QCPItemLine *splitter = new QCPItemLine(customPlot);
@@ -316,7 +314,7 @@ void MainWindow::genMarginGroup()
   splitter->setClipToAxisRect(false);
   splitter->setPen(QPen(Qt::gray, 0, Qt::DashLine));
   
-  savePng("QCPMarginGroup.png", 400, 400);
+  savePng("QCPAlignmentGroup.png", 400, 400);
 }
 
 void MainWindow::genAxisRectSpacingOverview()
@@ -924,13 +922,10 @@ void MainWindow::genQCPColorScale()
   customPlot->xAxis->setTickLabels(false);
   customPlot->yAxis->setTickLabels(false);
   
-  QCPMarginGroup *group = new QCPMarginGroup(customPlot);
-  customPlot->axisRect()->setMarginGroup(QCP::msAll, group);
-  
   QCPColorScale *colorScaleV = new QCPColorScale(customPlot);
   customPlot->plotLayout()->addElement(0, 1, colorScaleV);
   colorScaleV->setGradient(QCPColorGradient::gpThermal);
-  colorScaleV->setMarginGroup(QCP::msTop|QCP::msBottom, group);
+  QCPAlignmentGroup::create({customPlot->axisRect(), colorScaleV}, QCP::msTop|QCP::msBottom);
   colorScaleV->setDataScaleType(QCPAxis::stLogarithmic);
   colorScaleV->setDataRange(QCPRange(1, 1000));
   colorScaleV->axis()->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
@@ -942,7 +937,7 @@ void MainWindow::genQCPColorScale()
   QCPColorGradient gradient(QCPColorGradient::gpGrayscale);
   gradient.setLevelCount(20);
   colorScaleH->setGradient(gradient);
-  colorScaleH->setMarginGroup(QCP::msLeft|QCP::msRight, group);
+  QCPAlignmentGroup::create({customPlot->axisRect(), colorScaleH}, QCP::msLeft|QCP::msRight);
   colorScaleH->setType(QCPAxis::atBottom);
   colorScaleH->setMinimumMargins(QMargins());
   colorScaleH->setDataRange(QCPRange(-5, 5));
@@ -989,9 +984,7 @@ void MainWindow::genQCPColorGradient()
     QSharedPointer<QCPAxisTickerFixed> intTicker(new QCPAxisTickerFixed);
     intTicker->setTickStep(1.0);
     colorScale->axis()->setTicker(intTicker);
-    QCPMarginGroup *group = new QCPMarginGroup(customPlot);
-    colorScale->setMarginGroup(QCP::msTop|QCP::msBottom, group);
-    customPlot->axisRect()->setMarginGroup(QCP::msTop|QCP::msBottom, group);
+    QCPAlignmentGroup::create({colorScale, customPlot->axisRect()}, QCP::msTop|QCP::msBottom);
     QCPColorGradient gradient = colorMap->gradient();
     gradient.loadPreset(static_cast<QCPColorGradient::GradientPreset>(presetEnum.value(i)));
     gradient.setPeriodic(false);
@@ -1252,11 +1245,7 @@ void MainWindow::genQCPColorGradient_LevelCount()
   map2->setData(map1->data(), true);
   map1->setColorScale(scale1);
   map2->setColorScale(scale2);
-  QCPMarginGroup *group = new QCPMarginGroup(customPlot);
-  r1->setMarginGroup(QCP::msTop|QCP::msBottom, group);
-  r2->setMarginGroup(QCP::msTop|QCP::msBottom, group);
-  scale1->setMarginGroup(QCP::msTop|QCP::msBottom, group);
-  scale2->setMarginGroup(QCP::msTop|QCP::msBottom, group);
+  QCPAlignmentGroup::create({r1, r2, scale1, scale2}, QCP::msTop|QCP::msBottom);
   
   map1->rescaleDataRange();
   map2->rescaleDataRange();
@@ -1331,11 +1320,7 @@ void MainWindow::genQCPColorGradient_Periodic()
   map2->setData(map1->data(), true);
   map1->setColorScale(scale1);
   map2->setColorScale(scale2);
-  QCPMarginGroup *group = new QCPMarginGroup(customPlot);
-  r1->setMarginGroup(QCP::msTop|QCP::msBottom, group);
-  r2->setMarginGroup(QCP::msTop|QCP::msBottom, group);
-  scale1->setMarginGroup(QCP::msTop|QCP::msBottom, group);
-  scale2->setMarginGroup(QCP::msTop|QCP::msBottom, group);
+  QCPAlignmentGroup::create({r1, r2, scale1, scale2}, QCP::msTop|QCP::msBottom);
   scale1->axis()->ticker()->setTickCount(3);
   scale2->axis()->ticker()->setTickCount(3);
   map1->setDataRange(QCPRange(-0.2, 0.2));

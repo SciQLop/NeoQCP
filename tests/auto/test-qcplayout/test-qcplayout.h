@@ -11,8 +11,8 @@ private slots:
   void layoutGridElementManagement();
   void layoutGridInsertion();
   void layoutGridLayout();
-  void marginGroup();
-  void marginGroupShrinksWithAColorScale();
+  void alignmentGroupOnTheLeft();
+  void alignmentGroupShrinksWithAColorScale();
   void debugExpectationIgnoresSignatureSpelling();
   
   

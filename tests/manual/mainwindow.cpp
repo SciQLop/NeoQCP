@@ -34,7 +34,7 @@ MainWindow::MainWindow(QWidget *parent) :
   //setupLayoutTest(mCustomPlot);
   //setupMultiAxisTest(mCustomPlot);
   //setupLayoutElementBugTest(mCustomPlot);
-  //setupMarginGroupTest(mCustomPlot);
+  //setupAlignmentGroupTest(mCustomPlot);
   //setupInsetLayoutTest(mCustomPlot);
   //setupLegendTest(mCustomPlot);
   //setupMultiAxisRectInteractions(mCustomPlot);
@@ -300,9 +300,7 @@ void MainWindow::setupExportMapTest(QCustomPlot *customPlot)
   customPlot->plotLayout()->addElement(0, 1, s);
   s->setDataRange(QCPRange(0, 10));
   s->setGradient(QCPColorGradient::gpPolar);
-  QCPMarginGroup *group = new QCPMarginGroup(mCustomPlot);
-  s->setMarginGroup(QCP::msBottom|QCP::msTop, group);
-  mCustomPlot->axisRect()->setMarginGroup(QCP::msBottom|QCP::msTop, group);
+  QCPAlignmentGroup::create({s, mCustomPlot->axisRect()}, QCP::msBottom|QCP::msTop);
   
   QCPColorMap *m = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
   m->data()->setSize(3, 3);
@@ -666,7 +664,7 @@ void MainWindow::setupLayoutElementBugTest(QCustomPlot *customPlot)
   topLayout->addElement(0, 0, r);
 }
 
-void MainWindow::setupMarginGroupTest(QCustomPlot *customPlot)
+void MainWindow::setupAlignmentGroupTest(QCustomPlot *customPlot)
 {
   QCPLayoutGrid *topLayout =customPlot->plotLayout();
   
@@ -675,9 +673,8 @@ void MainWindow::setupMarginGroupTest(QCustomPlot *customPlot)
   r->addAxes(QCPAxis::atLeft|QCPAxis::atRight|QCPAxis::atBottom|QCPAxis::atTop);
   r->addAxes(QCPAxis::atLeft|QCPAxis::atRight|QCPAxis::atBottom|QCPAxis::atTop);
   
-  QCPMarginGroup *group = new QCPMarginGroup(customPlot);
-  topLayout->element(0, 0)->setMarginGroup(QCP::msAll, group);
-  topLayout->element(1, 0)->setMarginGroup(QCP::msAll, group);
+  // Stacked rows align their left and right edges; their top edges are a row apart.
+  QCPAlignmentGroup::create({topLayout->element(0, 0), topLayout->element(1, 0)}, QCP::msLeft|QCP::msRight);
 }
 
 void MainWindow::setupInsetLayoutTest(QCustomPlot *customPlot)
@@ -784,9 +781,7 @@ void MainWindow::setupColorMapTest(QCustomPlot *customPlot)
   colorMap->setColorScale(colorScale);
   colorScale->setLabel("test");
   
-  QCPMarginGroup *group = new QCPMarginGroup(customPlot);
-  colorScale->setMarginGroup(QCP::msTop|QCP::msBottom, group);
-  customPlot->axisRect()->setMarginGroup(QCP::msTop|QCP::msBottom, group);
+  QCPAlignmentGroup::create({colorScale, customPlot->axisRect()}, QCP::msTop|QCP::msBottom);
   
   QCPColorGradient gradient = colorMap->gradient();
   gradient.loadPreset(QCPColorGradient::gpJet);

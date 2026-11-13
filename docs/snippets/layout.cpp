@@ -130,9 +130,9 @@ DOC_CODE(layout_alignment_group)
     // [/layout_alignment_group]
 }
 
-DOC_SNIPPET(layout_margin_group, 600, 460)
+DOC_SNIPPET(layout_stacked_rects, 600, 460)
 {
-    // [layout_margin_group]
+    // [layout_stacked_rects]
     auto* lower = new QCPAxisRect(customPlot);
     customPlot->plotLayout()->addElement(1, 0, lower);
 
@@ -150,13 +150,11 @@ DOC_SNIPPET(layout_margin_group, 600, 460)
     lowerGraph->setPen(QPen(QColor(255, 127, 14)));
     customPlot->rescaleAxes();
 
-    auto* group = new QCPMarginGroup(customPlot);
-    customPlot->axisRect()->setMarginGroup(QCP::msLeft | QCP::msRight, group);
-    lower->setMarginGroup(QCP::msLeft | QCP::msRight, group);
+    QCPAlignmentGroup::create({ customPlot->axisRect(), lower }, QCP::msLeft | QCP::msRight);
 
     QObject::connect(customPlot->xAxis, &QCPAxis::rangeChanged,
                      lower->axis(QCPAxis::atBottom), qOverload<const QCPRange&>(&QCPAxis::setRange));
-    // [/layout_margin_group]
+    // [/layout_stacked_rects]
 }
 
 DOC_SNIPPET(layout_color_scale, 640, 440)
@@ -181,9 +179,7 @@ DOC_SNIPPET(layout_color_scale, 640, 440)
     colorMap->rescaleDataRange(true);
     customPlot->rescaleAxes();
 
-    auto* group = new QCPMarginGroup(customPlot);
-    customPlot->axisRect()->setMarginGroup(QCP::msTop | QCP::msBottom, group);
-    colorScale->setMarginGroup(QCP::msTop | QCP::msBottom, group);
+    QCPAlignmentGroup::create({ customPlot->axisRect(), colorScale }, QCP::msTop | QCP::msBottom);
     // [/layout_color_scale]
 }
 

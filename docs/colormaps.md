@@ -174,7 +174,7 @@ So attach the scale first, then set the gradient and the range. Or set them on t
 - `setBarWidth()` sets its thickness in pixels.
 - `setRangeDrag()` and `setRangeZoom()` let the user drag and zoom the data range with the mouse.
 
-The scale and the axis rect do not line up on their own. Put both in a <a href="api/classQCPMarginGroup.html">QCPMarginGroup</a>, as in the first example, to give them the same top and bottom margins.
+The scale and the axis rect do not line up on their own. Put both in a <a href="api/classQCPAlignmentGroup.html">QCPAlignmentGroup</a> on the top and bottom sides, as in the first example, to line their edges up.
 
 `QCPColorScale::rescaleDataRange()` fits the scale to every map attached to it, classic or not.
 For a `QCPHistogram2D`, call it once the counts exist (after `finished`, see above).

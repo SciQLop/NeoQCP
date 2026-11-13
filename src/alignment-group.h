@@ -12,8 +12,9 @@
 
   The members own the group: it deletes itself once the last of them leaves (with deleteLater). A
   member's margin on a side with an automatic margin puts its inner edge on the group's shared edge,
-  the innermost edge the members' own requirements ask for. The shared edge wins over a
-  QCPMarginGroup on the same side.
+  the innermost edge the members' own requirements ask for.
+
+  \image html QCPAlignmentGroup.png "The left column's left sides in one group"
 
   An element joins one group per side, so it can align its left and right edges with one column
   and its top and bottom edges with one row. Joining a group for some sides leaves, for those sides

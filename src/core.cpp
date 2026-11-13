@@ -4467,8 +4467,8 @@ void QCustomPlot::updateLayout()
 
   An aligned element computes its margin from the outer rect of the pass before. When the pass
   moved that rect (the first layout, a resize), the margin and layout phases run again, so one
-  replot or export already gives aligned edges, as a margin group did. The ticks are not prepared
-  again: the extra pass only places the edges.
+  replot or export already gives aligned edges. The ticks are not prepared again: the extra pass
+  only places the edges.
 */
 void QCustomPlot::settleAlignment(QCPLayoutGrid* layout)
 {

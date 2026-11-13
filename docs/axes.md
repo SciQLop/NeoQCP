@@ -218,7 +218,7 @@ Connect one to the other, and the second axis follows the first.
   has a single signature, `(newRange, oldRange)`, so `&QCPAxis::rangeChanged` connects directly.
 - Connecting both ways is safe. `setRange()` does nothing when the range does not change, so the signals stop after one round.
 - The user can pan and zoom either plot, the other one follows. {doc}`interactions` covers range dragging and zooming.
-- The margin group keeps the two axis rects aligned when their tick labels have different widths. {doc}`layout` explains margin groups.
+- The alignment group keeps the two axis rects aligned when their tick labels have different widths. {doc}`layout` explains alignment groups.
 
 `rangeChanged` passes the old range too, so a slot can take either `(newRange, oldRange)` or just
 `newRange`.

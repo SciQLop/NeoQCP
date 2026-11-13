@@ -66,7 +66,7 @@ The magnetic field jumps and turns turbulent, and the cold ion beam heats into a
 
 - The field is one `QCPGraph` with four columns: four components, one key array, one legend entry expanded to a row per component ({doc}`graphs`).
 - The ion spectrogram is a `QCPColorMap2` with a log energy axis and a log colour scale ({doc}`colormaps`).
-- The two panels share a date axis: linked ranges, a margin group, tick labels only below ({doc}`layout`).
+- The two panels share a date axis: linked ranges, an alignment group, tick labels only below ({doc}`layout`).
 - A vertical `QCPItemSpan` marks the shock on both panels ({doc}`items`), and the dark theme styles everything ({doc}`styling`).
 
 ![Magnetic field and ion spectrogram across a shock](images/gallery-space-weather.png)
@@ -149,7 +149,7 @@ Try it online
 
 - `QCPHistogram2D` bins the points on a worker thread ({doc}`colormaps`).
 - The marginals are `QCPBars`; the right one is horizontal because its key axis is the vertical one ({doc}`plottables`).
-- Two margin groups line the panels up: one for the column, one for the row ({doc}`layout`).
+- Two alignment groups line the panels up: one for the column, one for the row ({doc}`layout`).
 
 ![A 2D histogram with marginal histograms](images/gallery-joint-density.png)
 

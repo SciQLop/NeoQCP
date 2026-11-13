@@ -131,7 +131,7 @@ bool holds(const QPointer<QCPAlignmentGroup>& group, const QCPLayoutElement* ele
 
 enum class Grouping
 {
-    margin,
+    none,
     alignment
 };
 
@@ -141,24 +141,6 @@ void renderOnce(QCustomPlot& plot, QSize size)
     plot.resize(size);
     plot.setViewport(plot.rect());
     plot.replot();
-}
-
-QList<QRect> layoutRects(const QList<QCPLayoutElement*>& elements)
-{
-    QList<QRect> rects;
-    for (const QCPLayoutElement* element : elements)
-        rects << element->outerRect() << element->rect();
-    return rects;
-}
-
-//! The left and right edges of the outer and inner rects: what a left/right group decides.
-QList<int> horizontalEdges(const QList<QCPLayoutElement*>& elements)
-{
-    QList<int> edges;
-    for (const QCPLayoutElement* element : elements)
-        edges << element->outerRect().left() << element->outerRect().right()
-              << element->rect().left() << element->rect().right();
-    return edges;
 }
 
 // docs/snippets/gallery.cpp, gallery_joint_density: a main rect with marginals above and right,
@@ -187,16 +169,7 @@ QList<QCPLayoutElement*> jointDensity(QCustomPlot& plot, Grouping grouping)
     right->setMargins(QMargins(6, 0, 0, 0));
     plot.xAxis->setLabel("x");
     plot.yAxis->setLabel("y");
-    if (grouping == Grouping::margin)
-    {
-        auto* columns = new QCPMarginGroup(&plot);
-        main->setMarginGroup(QCP::msLeft | QCP::msRight, columns);
-        top->setMarginGroup(QCP::msLeft | QCP::msRight, columns);
-        auto* rows = new QCPMarginGroup(&plot);
-        main->setMarginGroup(QCP::msTop | QCP::msBottom, rows);
-        right->setMarginGroup(QCP::msTop | QCP::msBottom, rows);
-    }
-    else
+    if (grouping == Grouping::alignment)
     {
         QCPAlignmentGroup::create({ main, top }, QCP::msLeft | QCP::msRight);
         QCPAlignmentGroup::create({ main, right }, QCP::msTop | QCP::msBottom);
@@ -224,14 +197,7 @@ QList<QCPLayoutElement*> colourScaleLayout(QCustomPlot& plot, Grouping grouping)
     horizontal->setType(QCPAxis::atBottom);
     horizontal->setMinimumMargins(QMargins());
     horizontal->setDataRange(QCPRange(-5, 5));
-    if (grouping == Grouping::margin)
-    {
-        auto* group = new QCPMarginGroup(&plot);
-        rect->setMarginGroup(QCP::msAll, group);
-        vertical->setMarginGroup(QCP::msTop | QCP::msBottom, group);
-        horizontal->setMarginGroup(QCP::msLeft | QCP::msRight, group);
-    }
-    else
+    if (grouping == Grouping::alignment)
     {
         QCPAlignmentGroup::create({ rect, vertical }, QCP::msTop | QCP::msBottom);
         QCPAlignmentGroup::create({ rect, horizontal }, QCP::msLeft | QCP::msRight);
@@ -263,14 +229,7 @@ QList<QCPLayoutElement*> advancedAxes(QCustomPlot& plot, Grouping grouping)
     subRight->axis(QCPAxis::atRight)->ticker()->setTickCount(2);
     subRight->axis(QCPAxis::atBottom)->ticker()->setTickCount(2);
     wide->axis(QCPAxis::atLeft, 1)->setRange(0, 1e6); // the extra left axis: a wide left margin
-    if (grouping == Grouping::margin)
-    {
-        auto* group = new QCPMarginGroup(&plot);
-        subLeft->setMarginGroup(QCP::msLeft, group);
-        subRight->setMarginGroup(QCP::msRight, group);
-        wide->setMarginGroup(QCP::msLeft | QCP::msRight, group);
-    }
-    else
+    if (grouping == Grouping::alignment)
     {
         QCPAlignmentGroup::create({ subLeft, wide }, QCP::msLeft);
         QCPAlignmentGroup::create({ subRight, wide }, QCP::msRight);
@@ -278,7 +237,7 @@ QList<QCPLayoutElement*> advancedAxes(QCustomPlot& plot, Grouping grouping)
     return { wide, subLeft, subRight };
 }
 
-// tests/manual, setupMarginGroupTest: the default rect above one with two axes on every side.
+// tests/manual, setupAlignmentGroupTest: the default rect above one with two axes on every side.
 // Returns the two rects.
 QList<QCPLayoutElement*> stackedPair(QCustomPlot& plot, Grouping grouping)
 {
@@ -289,13 +248,7 @@ QList<QCPLayoutElement*> stackedPair(QCustomPlot& plot, Grouping grouping)
     lower->addAxes(everySide);
     lower->addAxes(everySide);
     QCPLayoutElement* upper = layout->element(0, 0);
-    if (grouping == Grouping::margin)
-    {
-        auto* group = new QCPMarginGroup(&plot);
-        upper->setMarginGroup(QCP::msAll, group);
-        lower->setMarginGroup(QCP::msAll, group);
-    }
-    else
+    if (grouping == Grouping::alignment)
         QCPAlignmentGroup::create({ upper, lower }, QCP::msLeft | QCP::msRight);
     return { upper, lower };
 }
@@ -343,6 +296,28 @@ int innerSide(const QCPLayoutElement* element, QCP::MarginSide side)
     default:
         return rect.bottom();
     }
+}
+
+/* Where a group puts its shared edge: the innermost edge the members ask for on their own. Laid
+   out without the group, each member's inner edge is exactly its own requirement (its outer edge
+   moved in by its automatic margin), as long as its outer rect does not move; so the aligned edge
+   is the largest of those left/top edges, or the smallest right/bottom one. */
+int innermostAlone(const QList<QCPLayoutElement*>& ungrouped, QCP::MarginSide side)
+{
+    const bool growsInward = side == QCP::msLeft || side == QCP::msTop;
+    int edge = innerSide(ungrouped.first(), side);
+    for (const QCPLayoutElement* element : ungrouped)
+        edge = growsInward ? qMax(edge, innerSide(element, side))
+                           : qMin(edge, innerSide(element, side));
+    return edge;
+}
+
+QList<QRect> outerRects(const QList<QCPLayoutElement*>& elements)
+{
+    QList<QRect> rects;
+    for (const QCPLayoutElement* element : elements)
+        rects << element->outerRect();
+    return rects;
 }
 } // namespace
 
@@ -693,36 +668,6 @@ void TestAlignmentGroup::sideBySideRectsAlignAndSettle()
     QCOMPARE(innerEdge(left, &plot, QCP::msBottom), innerEdge(right, &plot, QCP::msBottom));
 }
 
-void TestAlignmentGroup::alignmentWinsOverMarginGroup()
-{
-    auto* a = makePlot();
-    auto* b = makePlot(false);
-    auto* window = new QWidget;
-    auto* rows = new QVBoxLayout(window);
-    auto* firstRow = new QHBoxLayout;
-    firstRow->addWidget(a);
-    auto* secondRow = new QHBoxLayout;
-    secondRow->addSpacing(20); // B starts 20 px right of A: equal margins do not align the edges
-    secondRow->addWidget(b);
-    rows->addLayout(firstRow);
-    rows->addLayout(secondRow);
-    QScopedPointer<QWidget> windowGuard(window);
-    window->resize(420, 260);
-    window->show();
-    QVERIFY(QTest::qWaitForWindowExposed(window));
-    auto* marginGroup = new QCPMarginGroup(a);
-    a->axisRect()->setMarginGroup(QCP::msLeft, marginGroup);
-    b->axisRect()->setMarginGroup(QCP::msLeft, marginGroup);
-    QVERIFY(settle({ a, b }));
-    QVERIFY2(innerLeft(b) - innerLeft(a) == 20,
-             "the margin group alone already aligned the edges, so this test proves nothing");
-
-    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() }, QCP::msLeft);
-    QVERIFY(group);
-    QVERIFY(settle({ a, b }));
-    QCOMPARE(innerLeft(a), innerLeft(b));
-}
-
 void TestAlignmentGroup::anElementJoinsOneGroupPerSide()
 {
     QScopedPointer<QCustomPlot> a(makePlot());
@@ -835,79 +780,99 @@ void TestAlignmentGroup::aBadSideHasNoGroup()
     QCOMPARE(a->axisRect()->alignmentGroup(QCP::msLeft), group);
 }
 
-void TestAlignmentGroup::jointDensityAlignsAsItsMarginGroupsDid()
+/* The four tests below build a 2.x margin-group layout twice: without a group, and with the
+   alignment groups that replace the margin groups. They render the aligned build once, as the doc
+   pictures do. The outer rects must not move (the grid places them), so each shared edge lands on
+   the innermost edge the members took alone (innermostAlone). */
+void TestAlignmentGroup::jointDensityAlignsAfterOneRender()
 {
     const QSize size(640, 500);
-    QCustomPlot withMargins;
-    const auto marginElements = jointDensity(withMargins, Grouping::margin);
-    renderOnce(withMargins, size);
-    // The margin group needs a second render here: the top marginal reads main's right margin
-    // before main has sized its colour scale, so one render leaves top wider by the scale.
-    withMargins.replot();
+    QCustomPlot alonePlot;
+    const auto alone = jointDensity(alonePlot, Grouping::none);
+    renderOnce(alonePlot, size);
     QCustomPlot aligned;
     const auto elements = jointDensity(aligned, Grouping::alignment);
     renderOnce(aligned, size);
+    QCOMPARE(outerRects(elements), outerRects(alone));
 
     const QCPLayoutElement* main = elements[0];
     QCOMPARE(innerSide(elements[1], QCP::msLeft), innerSide(main, QCP::msLeft));
     QCOMPARE(innerSide(elements[1], QCP::msRight), innerSide(main, QCP::msRight));
     QCOMPARE(innerSide(elements[2], QCP::msTop), innerSide(main, QCP::msTop));
     QCOMPARE(innerSide(elements[2], QCP::msBottom), innerSide(main, QCP::msBottom));
-    QCOMPARE(layoutRects(elements), layoutRects(marginElements));
+    QCOMPARE(innerSide(main, QCP::msLeft), innermostAlone({ alone[0], alone[1] }, QCP::msLeft));
+    // main's colour scale binds here: the top marginal is as narrow as main's data area.
+    QCOMPARE(innerSide(main, QCP::msRight), innermostAlone({ alone[0], alone[1] }, QCP::msRight));
+    QCOMPARE(innerSide(main, QCP::msRight), innerSide(alone[0], QCP::msRight));
+    QCOMPARE(innerSide(main, QCP::msTop), innermostAlone({ alone[0], alone[2] }, QCP::msTop));
+    QCOMPARE(innerSide(main, QCP::msBottom), innermostAlone({ alone[0], alone[2] }, QCP::msBottom));
 }
 
-void TestAlignmentGroup::colourScaleLayoutAlignsAsItsMarginGroupDid()
+void TestAlignmentGroup::colourScaleLayoutAlignsAfterOneRender()
 {
     const QSize size(450, 200);
-    QCustomPlot withMargins;
-    const auto marginElements = colourScaleLayout(withMargins, Grouping::margin);
-    renderOnce(withMargins, size);
+    QCustomPlot alonePlot;
+    const auto alone = colourScaleLayout(alonePlot, Grouping::none);
+    renderOnce(alonePlot, size);
     QCustomPlot aligned;
     const auto elements = colourScaleLayout(aligned, Grouping::alignment);
     renderOnce(aligned, size);
+    QCOMPARE(outerRects(elements), outerRects(alone));
 
     const QCPLayoutElement* rect = elements[0];
     QCOMPARE(innerSide(elements[1], QCP::msTop), innerSide(rect, QCP::msTop));
     QCOMPARE(innerSide(elements[1], QCP::msBottom), innerSide(rect, QCP::msBottom));
     QCOMPARE(innerSide(elements[2], QCP::msLeft), innerSide(rect, QCP::msLeft));
     QCOMPARE(innerSide(elements[2], QCP::msRight), innerSide(rect, QCP::msRight));
-    QCOMPARE(layoutRects(elements), layoutRects(marginElements));
+    QCOMPARE(innerSide(rect, QCP::msTop), innermostAlone({ alone[0], alone[1] }, QCP::msTop));
+    QCOMPARE(innerSide(rect, QCP::msBottom), innermostAlone({ alone[0], alone[1] }, QCP::msBottom));
+    QCOMPARE(innerSide(rect, QCP::msLeft), innermostAlone({ alone[0], alone[2] }, QCP::msLeft));
+    QCOMPARE(innerSide(rect, QCP::msRight), innermostAlone({ alone[0], alone[2] }, QCP::msRight));
 }
 
-void TestAlignmentGroup::advancedAxesAlignAsTheirMarginGroupDid()
+void TestAlignmentGroup::advancedAxesAlignAfterOneRender()
 {
     const QSize size(700, 500);
-    QCustomPlot withMargins;
-    const auto marginElements = advancedAxes(withMargins, Grouping::margin);
-    renderOnce(withMargins, size);
+    QCustomPlot alonePlot;
+    const auto alone = advancedAxes(alonePlot, Grouping::none);
+    renderOnce(alonePlot, size);
     QCustomPlot aligned;
     const auto elements = advancedAxes(aligned, Grouping::alignment);
     renderOnce(aligned, size);
+    QCOMPARE(outerRects(elements), outerRects(alone));
 
     const QCPLayoutElement* wide = elements[0];
     QCOMPARE(innerSide(elements[1], QCP::msLeft), innerSide(wide, QCP::msLeft));
     QCOMPARE(innerSide(elements[2], QCP::msRight), innerSide(wide, QCP::msRight));
+    QCOMPARE(innerSide(wide, QCP::msLeft), innermostAlone({ alone[0], alone[1] }, QCP::msLeft));
+    // the wide rect's extra left axis binds: the left sub rect moves right to meet it.
+    QCOMPARE(innerSide(wide, QCP::msLeft), innerSide(alone[0], QCP::msLeft));
+    QCOMPARE(innerSide(wide, QCP::msRight), innermostAlone({ alone[0], alone[2] }, QCP::msRight));
+    QCOMPARE(innerSide(elements[1], QCP::msRight), innerSide(alone[1], QCP::msRight));
     QVERIFY2(innerSide(elements[1], QCP::msRight) < innerSide(elements[2], QCP::msLeft),
              "the left sub rect's right edge was pulled to the shared right edge");
-    QCOMPARE(layoutRects(elements), layoutRects(marginElements));
 }
 
 /* A margin group on msAll also made the two rows' top and bottom margins equal. That is not an
    edge alignment (the rows' top edges are a row apart) and has no alignment-group form: the port
-   aligns the left and right sides, and only those are compared. */
-void TestAlignmentGroup::stackedPairAlignsSidewaysAsItsMarginGroupDid()
+   aligns the left and right sides only. */
+void TestAlignmentGroup::stackedPairAlignsSidewaysAfterOneRender()
 {
     const QSize size(500, 400);
-    QCustomPlot withMargins;
-    const auto marginElements = stackedPair(withMargins, Grouping::margin);
-    renderOnce(withMargins, size);
+    QCustomPlot alonePlot;
+    const auto alone = stackedPair(alonePlot, Grouping::none);
+    renderOnce(alonePlot, size);
     QCustomPlot aligned;
     const auto elements = stackedPair(aligned, Grouping::alignment);
     renderOnce(aligned, size);
+    QCOMPARE(outerRects(elements), outerRects(alone));
 
     QCOMPARE(innerSide(elements[0], QCP::msLeft), innerSide(elements[1], QCP::msLeft));
     QCOMPARE(innerSide(elements[0], QCP::msRight), innerSide(elements[1], QCP::msRight));
-    QCOMPARE(horizontalEdges(elements), horizontalEdges(marginElements));
+    QCOMPARE(innerSide(elements[0], QCP::msLeft), innermostAlone(alone, QCP::msLeft));
+    QCOMPARE(innerSide(elements[0], QCP::msRight), innermostAlone(alone, QCP::msRight));
+    // the lower rect's two extra axes per side bind, so it keeps its own edges.
+    QCOMPARE(elements[1]->rect(), alone[1]->rect());
 }
 
 void TestAlignmentGroup::aHiddenMemberRepaintsNoVisiblePeer()

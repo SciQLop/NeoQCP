@@ -40,7 +40,7 @@ public:
   void setupLayoutTest(QCustomPlot* customPlot);
   void setupMultiAxisTest(QCustomPlot* customPlot);
   void setupLayoutElementBugTest(QCustomPlot *customPlot);
-  void setupMarginGroupTest(QCustomPlot* customPlot);
+  void setupAlignmentGroupTest(QCustomPlot* customPlot);
   void setupInsetLayoutTest(QCustomPlot* customPlot);
   void setupLegendTest(QCustomPlot *customPlot);
   void setupMultiAxisRectInteractions(QCustomPlot *customPlot);

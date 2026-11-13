@@ -148,25 +148,23 @@ A member can be an axis rect, a colour scale or any other layout element, in one
 - Inside one plot, the edges line up from the first replot, also in an export of a plot that was never shown.
 - Across plot widgets, members line up while both plots are shown.
 
-## Align axis rects with a margin group
+### Stacked axis rects
 
 Two axis rects stacked in a column rarely line up by themselves.
 Each one sizes its left margin to fit its own tick labels, and "80000" is wider than "1".
-A <a href="api/classQCPMarginGroup.html">QCPMarginGroup</a> gives every member the largest margin of the group, side by side.
+A left/right group puts both left edges on the innermost of the two, and both right edges too.
 
 ```{literalinclude} snippets/layout.cpp
-:start-after: // [layout_margin_group]
-:end-before: // [/layout_margin_group]
+:start-after: // [layout_stacked_rects]
+:end-before: // [/layout_stacked_rects]
 :language: cpp
 :dedent:
 ```
 
-![Two stacked axis rects whose left and right edges line up](images/layout-margin-group.png)
+![Two stacked axis rects whose left and right edges line up](images/layout-stacked-rects.png)
 
-- `setMarginGroup(sides, group)` adds the given sides of an element to the group.
 - Group the left and right sides for rects in a column. Group the top and bottom sides for rects in a row.
-- An element can be in different groups for different sides.
-- Deleting the group, or calling `clear()` on it, unties the margins.
+- A group aligns edges; it does not make margins equal. Stacked rows keep their own top and bottom margins.
 
 The `connect()` at the end makes the lower x axis follow the upper one.
 Panning or zooming the top rect then moves both.
@@ -187,7 +185,7 @@ It goes in a cell next to the axis rect, usually on the right.
 
 - The colour scale sets its own width from its bar width and axis labels. The axis rect takes the rest of the row.
 - `setType(QCPAxis::atBottom)` or `atTop` makes it horizontal; put it in a row above or below instead.
-- Without the margin group, the scale bar would not match the height of the data area.
+- Without the alignment group, the scale bar would not match the height of the data area.
 
 {doc}`colormaps` covers colormaps and gradients.
 
@@ -214,7 +212,7 @@ An axis rect computes each margin from the axes on that side: ticks, tick labels
 
 - `setMinimumMargins()` sets a floor for the automatic margins. An axis rect starts with 15 pixels on each side.
 - `setMargins()` sets the margins by hand, on the sides where automatic margins are off.
-- A margin group, seen above, replaces a side's margin with the largest one of the group.
+- An alignment group, seen above, sets a side's margin so that its inner edge meets the group's shared edge.
 
 To give a plot fixed margins, for example to line it up with something outside the widget:
 

@@ -544,9 +544,7 @@ void TestHandle::theLayoutHandsOutHandles()
     // K4: takeAt hands the ownership out.
     static_assert(std::is_same_v<decltype(std::declval<QCPLayout&>().takeAt(0)),
                                  QCPLayoutElement*>);
-    // K5: the margin group class goes in 5d; the alignment group already answers a QPointer.
-    static_assert(std::is_same_v<decltype(std::declval<Element&>().marginGroup(QCP::msLeft)),
-                                 QCPMarginGroup*>);
+    // K5: the alignment group answers a QPointer.
     static_assert(std::is_same_v<decltype(std::declval<Element&>().alignmentGroup(QCP::msLeft)),
                                  QPointer<QCPAlignmentGroup>>);
 

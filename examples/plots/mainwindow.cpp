@@ -1175,11 +1175,9 @@ void MainWindow::setupAdvancedAxesDemo(QCustomPlot *customPlot)
   subRectRight->axis(QCPAxis::atRight)->ticker()->setTickCount(2);
   subRectRight->axis(QCPAxis::atBottom)->ticker()->setTickCount(2);
   subRectLeft->axis(QCPAxis::atBottom)->grid()->setVisible(true);
-  // synchronize the left and right margins of the top and bottom axis rects:
-  QCPMarginGroup *marginGroup = new QCPMarginGroup(customPlot);
-  subRectLeft->setMarginGroup(QCP::msLeft, marginGroup);
-  subRectRight->setMarginGroup(QCP::msRight, marginGroup);
-  wideAxisRect->setMarginGroup(QCP::msLeft | QCP::msRight, marginGroup);
+  // align the left and right edges of the top and bottom axis rects:
+  QCPAlignmentGroup::create({subRectLeft, wideAxisRect}, QCP::msLeft);
+  QCPAlignmentGroup::create({subRectRight, wideAxisRect}, QCP::msRight);
   // move newly created axes on "axes" layer and grids on "grid" layer:
   foreach (QCPAxisRect *rect, customPlot->axisRects())
   {
@@ -1295,10 +1293,8 @@ void MainWindow::setupColorMapDemo(QCustomPlot *customPlot)
   // rescale the data dimension (color) such that all data points lie in the span visualized by the color gradient:
   colorMap->rescaleDataRange();
   
-  // make sure the axis rect and color scale synchronize their bottom and top margins (so they line up):
-  QCPMarginGroup *marginGroup = new QCPMarginGroup(customPlot);
-  customPlot->axisRect()->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
-  colorScale->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
+  // make sure the axis rect and color scale line up their bottom and top edges:
+  QCPAlignmentGroup::create({customPlot->axisRect(), colorScale}, QCP::msBottom|QCP::msTop);
   
   // rescale the key (x) and value (y) axes so the whole color map is visible:
   customPlot->rescaleAxes();
@@ -1391,9 +1387,7 @@ void MainWindow::setupFinancialDemo(QCustomPlot *customPlot)
   customPlot->yAxis->scaleRange(1.1, customPlot->yAxis->range().center());
   
   // make axis rects' left side line up:
-  QCPMarginGroup *group = new QCPMarginGroup(customPlot);
-  customPlot->axisRect()->setMarginGroup(QCP::msLeft|QCP::msRight, group);
-  volumeAxisRect->setMarginGroup(QCP::msLeft|QCP::msRight, group);
+  QCPAlignmentGroup::create({customPlot->axisRect(), volumeAxisRect}, QCP::msLeft|QCP::msRight);
 }
 
 void MainWindow::setupPolarPlotDemo(QCustomPlot *customPlot)

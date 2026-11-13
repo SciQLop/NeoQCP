@@ -311,7 +311,7 @@ void TestQCPLayout::layoutGridLayout()
   QCOMPARE(mainLayout->minimumOuterSizeHint(), QSize(10+100+10 +15+ 10+50+10 +15+ 10+50+10, 10+200+10 +10+ 10+50+10 +10+ 10+50+10));
 }
 
-void TestQCPLayout::marginGroup()
+void TestQCPLayout::alignmentGroupOnTheLeft()
 {
   mPlot->setGeometry(50, 50, 500, 500);
   
@@ -334,13 +334,10 @@ void TestQCPLayout::marginGroup()
   // test margin propagation when both margins are auto margin and no minimum margins are set:
   ar0->setMinimumMargins(QMargins(0, 0, 0, 0));
   ar2->setMinimumMargins(QMargins(0, 0, 0, 0));
-  QCPMarginGroup *leftGroup = new QCPMarginGroup(mPlot);
-  QVERIFY(leftGroup->isEmpty());
-  
-  ar0->setMarginGroup(QCP::msLeft, leftGroup);
-  ar2->setMarginGroup(QCP::msLeft, leftGroup);
-  QCOMPARE(leftGroup->elements(QCP::msLeft).at(0), ar0);
-  QCOMPARE(leftGroup->elements(QCP::msLeft).at(1), ar2);
+  const auto leftGroup = QCPAlignmentGroup::create({ar0, ar2}, QCP::msLeft);
+  QVERIFY(leftGroup);
+  QCOMPARE(ar0->alignmentGroup(QCP::msLeft), leftGroup);
+  QCOMPARE(ar2->alignmentGroup(QCP::msLeft), leftGroup);
   
   ar0->axis(QCPAxis::atLeft)->setPadding(10);
   ar2->axis(QCPAxis::atLeft)->setPadding(5);
@@ -400,15 +397,13 @@ void TestQCPLayout::debugExpectationIgnoresSignatureSpelling()
 }
 
 // A colour scale does not compute its top and bottom margins: it used to report the last
-// value a margin group gave it, so the group could grow but never shrink. A plot whose x
+// value a group gave it, so the group could grow but never shrink. A plot whose x
 // tick labels are hidden kept the margin of its first layout under the data area.
-void TestQCPLayout::marginGroupShrinksWithAColorScale()
+void TestQCPLayout::alignmentGroupShrinksWithAColorScale()
 {
   auto* scale = new QCPColorScale(mPlot);
   mPlot->plotLayout()->addElement(0, 1, scale);
-  auto* group = new QCPMarginGroup(mPlot);
-  mPlot->axisRect()->setMarginGroup(QCP::msTop | QCP::msBottom, group);
-  scale->setMarginGroup(QCP::msTop | QCP::msBottom, group);
+  QVERIFY(QCPAlignmentGroup::create({mPlot->axisRect(), scale}, QCP::msTop | QCP::msBottom));
   mPlot->xAxis->setLabel("time");
   mPlot->replot();
   const int withLabels = mPlot->axisRect()->margins().bottom();

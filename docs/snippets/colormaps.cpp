@@ -29,9 +29,7 @@ DOC_SNIPPET(colormaps_classic, 600, 360)
     map->rescaleDataRange();
 
     // Keep the colour bar exactly as tall as the axis rect.
-    auto* margins = new QCPMarginGroup(customPlot);
-    customPlot->axisRect()->setMarginGroup(QCP::msTop | QCP::msBottom, margins);
-    scale->setMarginGroup(QCP::msTop | QCP::msBottom, margins);
+    QCPAlignmentGroup::create({ customPlot->axisRect(), scale }, QCP::msTop | QCP::msBottom);
 
     customPlot->rescaleAxes();
     // [/colormaps_classic]

@@ -31,7 +31,7 @@ public slots:
   void genItemText();
   void genItemTracer();
   void genLineEnding();
-  void genMarginGroup();
+  void genAlignmentGroup();
   void genAxisRectSpacingOverview();
   void genAxisNamesOverview();
   void genAxisTickers();

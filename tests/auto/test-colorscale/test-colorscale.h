@@ -29,7 +29,7 @@ private slots:
     // The renderer of a map made later reads the values the scale already had.
     void aSecondMapTakesTheRectsGradient();
 
-    // A rect-owned scale is part of the plot like a layout one: margin groups and the mouse see it.
+    // A rect-owned scale is part of the plot like a layout one: alignment groups and the mouse see it.
     void groupedRectsLeaveRoomForTheScale();
     void theWheelZoomsTheRectsScale();
     // Opposite axes of the scale's inner rect are synchronized: one step must zoom once.

@@ -37,38 +37,6 @@ class QCustomPlot;
 
 class QCPAlignmentGroup;
 
-class QCP_LIB_DECL QCPMarginGroup : public QObject
-{
-    Q_OBJECT
-
-public:
-    explicit QCPMarginGroup(QCustomPlot* parentPlot);
-    virtual ~QCPMarginGroup();
-
-    // non-virtual methods:
-    QList<QCPLayoutElement*> elements(QCP::MarginSide side) const { return mChildren.value(side); }
-
-    bool isEmpty() const;
-    void clear();
-
-protected:
-    // non-property members:
-    QCustomPlot* mParentPlot;
-    QHash<QCP::MarginSide, QList<QCPLayoutElement*>> mChildren;
-
-    // introduced virtual methods:
-    virtual int commonMargin(QCP::MarginSide side) const;
-
-    // non-virtual methods:
-    void addChild(QCP::MarginSide side, QCPLayoutElement* element);
-    void removeChild(QCP::MarginSide side, QCPLayoutElement* element);
-
-private:
-    Q_DISABLE_COPY(QCPMarginGroup)
-
-    friend class QCPLayoutElement;
-};
-
 class QCP_LIB_DECL QCPLayoutElement : public QCPLayerable
 {
     Q_OBJECT
@@ -140,12 +108,6 @@ public:
 
     SizeConstraintRect sizeConstraintRect() const { return mSizeConstraintRect; }
 
-    QCPMarginGroup* marginGroup(QCP::MarginSide side) const
-    {
-        return mMarginGroups.value(side, nullptr);
-    }
-
-    QHash<QCP::MarginSide, QCPMarginGroup*> marginGroups() const { return mMarginGroups; }
     //! The group this element's \a side aligns with, if any: an element joins one group per side.
     QPointer<QCPAlignmentGroup> alignmentGroup(QCP::MarginSide side) const;
 
@@ -159,7 +121,6 @@ public:
     void setMaximumSize(const QSize& size);
     void setMaximumSize(int width, int height);
     void setSizeConstraintRect(SizeConstraintRect constraintRect);
-    void setMarginGroup(QCP::MarginSides sides, QCPMarginGroup* group);
 
     // introduced virtual methods:
     virtual void update(UpdatePhase phase);
@@ -182,7 +143,6 @@ protected:
     QRect mRect, mOuterRect;
     QMargins mMargins, mMinimumMargins;
     QCP::MarginSides mAutoMargins;
-    QHash<QCP::MarginSide, QCPMarginGroup*> mMarginGroups;
     // One alignment group per side, in the order of alignmentSlot(): left, right, top, bottom.
     std::array<QPointer<QCPAlignmentGroup>, 4> mAlignmentGroups;
 
@@ -210,7 +170,6 @@ private:
 
     friend class QCustomPlot;
     friend class QCPLayout;
-    friend class QCPMarginGroup;
     friend class QCPAlignmentGroup;
     friend class QCPAbstractPlottable; // walks the layout for the legend rows a name change touches
 };
