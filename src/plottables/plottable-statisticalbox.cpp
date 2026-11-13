@@ -604,15 +604,12 @@ void QCPStatisticalBox::draw(QCPDrawContext& context) const
 }
 
 /* inherits documentation from base class */
-void QCPStatisticalBox::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
+void QCPStatisticalBox::drawLegendIcon(QCPDrawContext& icon) const
 {
-    // draw filled rect:
-    applyDefaultAntialiasingHint(painter);
-    painter->setPen(mPen);
-    painter->setBrush(mBrush);
-    QRectF r = QRectF(0, 0, rect.width() * 0.67, rect.height() * 0.67);
-    r.moveCenter(rect.center());
-    painter->drawRect(r);
+    // The icon has no data of its own: an invisible unit rect gives the box the replay is fitted
+    // to, and the box covers the middle 67% of the icon, as it always did.
+    icon.rect(QCP::Data { 0.0, 0.0 }, QCP::Data { 1.0, 1.0 }, QPen(Qt::NoPen), QBrush(Qt::NoBrush));
+    icon.rect(QCP::Data { 0.165, 0.165 }, QCP::Data { 0.835, 0.835 }, mPen, mBrush);
 }
 
 /*! \internal

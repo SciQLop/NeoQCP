@@ -180,6 +180,7 @@ public:
   [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
   [[nodiscard]] int recordedCommands() const { return mCore.recordedCommandCount(); }
   [[nodiscard]] const QCPDrawList& recordedList() const { return mCore.recordedList(); }
+  [[nodiscard]] const QCPDrawList& iconList() const { return mCore.iconRecordedList(); }
 };
 
 struct Scene
@@ -365,4 +366,20 @@ void TestQCPFinancial::aLogKeyAxisCentresTheBodyInPixels()
                           .arg(low)
                           .arg(high)
                           .arg(centre)));
+}
+
+// The legend row paints the icon from a recording of its own, boxed by the unit square, and not
+// from the chart's data: the icon is drawn even with no data at all.
+void TestQCPFinancial::theLegendIconIsRecorded()
+{
+  QCustomPlot plot;
+  auto* financial = new RecordingFinancial(plot.xAxis, plot.yAxis);
+  plot.legend->setVisible(true);
+  [[maybe_unused]] const QPixmap painted = plot.toPixmap(300, 200);
+  const QCPDrawList& icon = financial->iconList();
+  QVERIFY2(icon.data.keyBounded && icon.data.valueBounded, "the legend icon was not recorded");
+  QCOMPARE(icon.data.bounds.keyLower, 0.0);
+  QCOMPARE(icon.data.bounds.keyUpper, 1.0);
+  QCOMPARE(icon.data.bounds.valueLower, 0.0);
+  QCOMPARE(icon.data.bounds.valueUpper, 1.0);
 }

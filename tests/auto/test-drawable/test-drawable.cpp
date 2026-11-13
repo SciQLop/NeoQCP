@@ -466,45 +466,6 @@ public:
     int recordings() const { return mCore.recordingCount(); }
 };
 
-//! A 2.x plottable: it paints through the painter and records nothing, so the 1D point click answers.
-class PainterOnlyDots : public QCPAbstractPlottable1D<QCPGraphData>
-{
-public:
-    PainterOnlyDots(QCPAxis* keyAxis, QCPAxis* valueAxis)
-            : QCPAbstractPlottable1D<QCPGraphData>(keyAxis, valueAxis)
-    {
-        QVector<QCPGraphData> data;
-        for (int i = 1; i <= 5; ++i)
-            data.append(QCPGraphData(i, i));
-        mDataContainer->set(data);
-    }
-
-    using QCPAbstractPlottable::draw;
-
-    void draw(QCPPainter* painter) override
-    {
-        painter->setPen(this->pen());
-        for (auto it = mDataContainer->constBegin(); it != mDataContainer->constEnd(); ++it)
-            painter->drawEllipse(this->coordsToPixels(it->mainKey(), it->mainValue()), 2, 2);
-    }
-
-    QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth) const override
-    {
-        Q_UNUSED(inSignDomain)
-        foundRange = true;
-        return QCPRange(1, 5);
-    }
-
-    QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
-                           const QCPRange& inKeyRange = QCPRange()) const override
-    {
-        Q_UNUSED(inSignDomain)
-        Q_UNUSED(inKeyRange)
-        foundRange = true;
-        return QCPRange(1, 5);
-    }
-};
-
 struct Fixture
 {
     Fixture()
@@ -2361,22 +2322,4 @@ void TestDrawable::aStyleSetterReRecords()
     bars->setPen(QPen(Qt::red));
     f.plot->replot();
     QCOMPARE(bars->recordings(), before + 1);
-}
-
-void TestDrawable::aPainterOnly1DPlottableKeepsThePointClick()
-{
-    // A 2.x class paints through draw(QCPPainter*) and never records: the 1D point click must still
-    // find the nearest point, not answer -1 from an empty recording.
-    Fixture f;
-    auto* dots = new PainterOnlyDots(f.plot->xAxis, f.plot->yAxis);
-    f.plot->replot();
-
-    const QPointF onTheThirdPoint(f.plot->xAxis->coordToPixel(3), f.plot->yAxis->coordToPixel(3));
-    QVariant details;
-    const double distance = dots->selectTest(onTheThirdPoint, false, &details);
-    QVERIFY2(distance >= 0 && distance < f.plot->selectionTolerance(),
-             qPrintable(QStringLiteral("the painter-only plottable missed its own point: %1")
-                            .arg(distance)));
-    QCOMPARE(details.value<QCPDataSelection>().dataRangeCount(), 1);
-    QCOMPARE(details.value<QCPDataSelection>().dataRange(0), QCPDataRange(2, 3));
 }

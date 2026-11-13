@@ -167,7 +167,7 @@ protected:
 
     // reimplemented virtual methods:
     void draw(QCPDrawContext& context) const override;
-    virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+    void drawLegendIcon(QCPDrawContext& icon) const override;
 
     // non-virtual methods:
     void recordSegment(QCPDrawContext& context, const QCPDataRange& segment, bool selected) const;

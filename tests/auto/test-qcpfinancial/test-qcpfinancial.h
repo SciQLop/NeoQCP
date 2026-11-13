@@ -16,6 +16,7 @@ private slots:
   void aPannedCandlestickIsNotReRecorded();
   void everyStyleSetterReRecords();
   void aLogKeyAxisCentresTheBodyInPixels();
+  void theLegendIconIsRecorded();
   
 private:
   QCustomPlot *mPlot;

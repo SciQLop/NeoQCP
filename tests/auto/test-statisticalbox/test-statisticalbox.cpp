@@ -1,4 +1,5 @@
 #include "test-statisticalbox.h"
+#include "painting/draw-commands.h"
 #include "reference-image.h"
 #include <QImage>
 #include <functional>
@@ -17,6 +18,8 @@ public:
     [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
 
     [[nodiscard]] int recordedCommands() const { return mCore.recordedCommandCount(); }
+
+    [[nodiscard]] const QCPDrawList& iconList() const { return mCore.iconRecordedList(); }
 };
 
 struct Scene
@@ -164,4 +167,20 @@ void TestStatisticalBox::anUnstyledOutlierMarkerTakesTheBoxPen()
     const QPointF outlier(plot.xAxis->coordToPixel(0.8), plot.yAxis->coordToPixel(9.2));
     QVERIFY2(redPixelsNear(imageOf(plot), outlier, 6) > 0,
              "the outlier marker is not drawn in the box's pen");
+}
+
+// The legend row paints the icon from a recording of its own, boxed by the unit square, and not
+// from the chart's data: the icon is drawn even with no data at all.
+void TestStatisticalBox::theLegendIconIsRecorded()
+{
+    QCustomPlot plot;
+    auto* box = new RecordingBox(plot.xAxis, plot.yAxis);
+    plot.legend->setVisible(true);
+    [[maybe_unused]] const QPixmap painted = plot.toPixmap(300, 200);
+    const QCPDrawList& icon = box->iconList();
+    QVERIFY2(icon.data.keyBounded && icon.data.valueBounded, "the legend icon was not recorded");
+    QCOMPARE(icon.data.bounds.keyLower, 0.0);
+    QCOMPARE(icon.data.bounds.keyUpper, 1.0);
+    QCOMPARE(icon.data.bounds.valueLower, 0.0);
+    QCOMPARE(icon.data.bounds.valueUpper, 1.0);
 }

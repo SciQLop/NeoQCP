@@ -9,4 +9,5 @@ private slots:
     void recordedBoxesMatchTheirReferences_data();
     void everyStyleSetterReRecords();
     void anUnstyledOutlierMarkerTakesTheBoxPen();
+    void theLegendIconIsRecorded();
 };

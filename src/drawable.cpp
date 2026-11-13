@@ -662,13 +662,6 @@ bool QCPDrawnCore::hasRecording() const
     return mState && mState->recorded;
 }
 
-bool QCPDrawnCore::recordsTheDrawing(const QCPDrawable& object, const QCPDrawnView& view)
-{
-    if (!ensureRecording(object, view))
-        return false;
-    return recordedCommandCount() > 0;
-}
-
 int QCPDrawnCore::recordedCommandCount() const
 {
     return mState && mState->recorded ? int(mState->recording.commands.size()) : 0;

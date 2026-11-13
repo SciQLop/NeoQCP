@@ -141,6 +141,7 @@ private slots:
     void nestedRepacksNotifyOnceAfterTheOuterCall();
     void reapplyingAnUnchangedLayoutSettingDoesNotNotify();
     void reapplyingTheCategoryOrderDoesNotRestack();
+    void theLegendIconIsRecorded();
 
 private:
     QCustomPlot* mPlot = nullptr;

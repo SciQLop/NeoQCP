@@ -26,4 +26,5 @@ private slots:
     void aBackboneShorterThanTheGapIsNotDrawn();
     void aGroupedBarsErrorBarSitsOnItsOwnBar();
     void aStackedBarsErrorBarSitsOnTheTopOfTheStack();
+    void theLegendIconIsRecorded();
 };

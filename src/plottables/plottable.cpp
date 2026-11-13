@@ -256,8 +256,8 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   If subclassing QCPAbstractPlottable directly, these are the pure virtual functions you must
   implement:
   \li \ref selectTest
-  \li \ref draw
-  \li \ref drawLegendIcon
+  \li \ref draw(QCPDrawContext&), which records what the plottable draws
+  \li \ref drawLegendIcon(QCPDrawContext&), optionally, to record an icon of its own
   \li \ref getKeyRange
   \li \ref getValueRange
 
@@ -363,8 +363,8 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   The passed \a painter has its cliprect set to \a rect, so painting outside of \a rect won't
   appear outside the legend icon border.
 
-  The default replays the icon recording, fitted to \a rect: a plottable that records its own
-  icon through \ref drawLegendIcon(QCPDrawContext&) gets that summary instead.
+  It replays the icon recording, fitted to \a rect: the plottable's drawing by default, or the
+  summary a class records through \ref drawLegendIcon(QCPDrawContext&).
 */
 
 /*! \fn QCPRange QCPAbstractPlottable::getKeyRange(bool &foundRange, QCP::SignDomain inSignDomain)
@@ -609,8 +609,7 @@ QCPAbstractPlottable::~QCPAbstractPlottable()
 }
 
 /*!
-  Replays the recording. A plottable that still paints through this virtual (the polar
-  plottables) overrides it and never records.
+  Replays the recording that \ref draw(QCPDrawContext&) made.
 */
 void QCPAbstractPlottable::draw(QCPPainter* painter)
 {
@@ -743,7 +742,7 @@ QCPRange QCPAbstractPlottable::getValueRange(bool& foundRange, QCP::SignDomain i
                          inSignDomain);
 }
 
-//! The old painter icon: replays the icon recording, fitted to \a rect.
+//! Replays the icon recording, fitted to \a rect.
 void QCPAbstractPlottable::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
 {
     mCore.paintIcon(*this, *painter, rect, view());

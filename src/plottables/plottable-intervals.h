@@ -154,7 +154,7 @@ Q_SIGNALS:
 
 protected:
     void draw(QCPDrawContext& context) const override;
-    void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+    void drawLegendIcon(QCPDrawContext& icon) const override;
 
     void regroupIfLanesWereAdded();
     void updateSubRows();

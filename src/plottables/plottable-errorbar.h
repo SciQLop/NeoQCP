@@ -173,9 +173,8 @@ protected:
 
     // reimplemented virtual methods:
     void draw(QCPDrawContext& context) const override;
-    // The icon's geometry is a few pixels of the icon rect, which a recording cannot know: it is
-    // fitted into a rect of the caller's choosing, so this one stays on the painter.
-    virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+    void drawLegendIcon(QCPDrawContext& icon) const override;
+    void paintLegendIcon(QCPPainter* painter, const QRectF& rect) const;
     virtual QCPRange getKeyRange(bool& foundRange,
                                  QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
     virtual QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,

@@ -629,8 +629,30 @@ void QCPFinancial::draw(QCPDrawContext& context) const
     }
 }
 
+namespace
+{
+//! The icon rect a unit-box recording is replayed into: the frame maps the box's corners onto it.
+QRectF unitBoxPixels(const QCPTransform& transform)
+{
+    const QCP::Pixels topLeft = transform.map(QCP::Data { 0.0, 1.0 });
+    const QCP::Pixels bottomRight = transform.map(QCP::Data { 1.0, 0.0 });
+    return QRectF(QPointF(topLeft.x, topLeft.y), QPointF(bottomRight.x, bottomRight.y));
+}
+} // namespace
+
 /* inherits documentation from base class */
-void QCPFinancial::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
+void QCPFinancial::drawLegendIcon(QCPDrawContext& icon) const
+{
+    // The icon clips to two diagonal halves and turns antialiasing off, which no native command
+    // expresses: the unit rect gives the replay its box, and the painter draws inside the rect the
+    // box was fitted to.
+    icon.rect(QCP::Data { 0.0, 0.0 }, QCP::Data { 1.0, 1.0 }, QPen(Qt::NoPen), QBrush(Qt::NoBrush));
+    icon.painter([this](QCPPainter& painter, const QCPTransform& transform)
+                 { paintLegendIcon(&painter, unitBoxPixels(transform)); });
+}
+
+//! The icon's painter code, in \a rect.
+void QCPFinancial::paintLegendIcon(QCPPainter* painter, const QRectF& rect) const
 {
     painter->setAntialiasing(
         false); // legend icon especially of csCandlestick looks better without antialiasing

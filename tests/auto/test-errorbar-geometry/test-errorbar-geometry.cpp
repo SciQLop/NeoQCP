@@ -1,4 +1,5 @@
 #include "test-errorbar-geometry.h"
+#include "painting/draw-commands.h"
 #include "plottables/graph-errorbars.h"
 #include "qcustomplot.h"
 #include "reference-image.h"
@@ -58,6 +59,7 @@ public:
 
     [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
     [[nodiscard]] int recordedCommands() const { return mCore.recordedCommandCount(); }
+    [[nodiscard]] const QCPDrawList& iconList() const { return mCore.iconRecordedList(); }
 };
 
 struct Scene
@@ -536,4 +538,20 @@ void TestErrorBarGeometry::aStackedBarsErrorBarSitsOnTheTopOfTheStack()
     QVERIFY2(redPixelsNear(imageOf(plot), onTheStack, 2) > 0,
              "the error bar is not on the top of the stack");
     QCOMPARE(redPixelsNear(imageOf(plot), onTheRawValue, 2), 0);
+}
+
+// The legend row paints the icon from a recording of its own, boxed by the unit square, and not
+// from the chart's data: the icon is drawn even with no data at all.
+void TestErrorBarGeometry::theLegendIconIsRecorded()
+{
+    QCustomPlot plot;
+    auto* bars = new RecordingErrorBars(plot.xAxis, plot.yAxis);
+    plot.legend->setVisible(true);
+    [[maybe_unused]] const QPixmap painted = plot.toPixmap(300, 200);
+    const QCPDrawList& icon = bars->iconList();
+    QVERIFY2(icon.data.keyBounded && icon.data.valueBounded, "the legend icon was not recorded");
+    QCOMPARE(icon.data.bounds.keyLower, 0.0);
+    QCOMPARE(icon.data.bounds.keyUpper, 1.0);
+    QCOMPARE(icon.data.bounds.valueLower, 0.0);
+    QCOMPARE(icon.data.bounds.valueUpper, 1.0);
 }

@@ -52,8 +52,6 @@ public:
     QCPRange getValueRange(bool& found, QCP::SignDomain = QCP::sdBoth,
                            const QCPRange& = QCPRange()) const override
     { found = false; return {}; }
-    void draw(QCPPainter*) override {}
-    void drawLegendIcon(QCPPainter*, const QRectF&) const override {}
 };
 } // namespace
 

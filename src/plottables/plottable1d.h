@@ -81,10 +81,6 @@ public:
     [[nodiscard]] virtual int findBegin(double sortKey, bool expandedRange = true) const override;
     [[nodiscard]] virtual int findEnd(double sortKey, bool expandedRange = true) const override;
 
-    // reimplemented virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override;
-
     //! The data container the recording was made from: a new pointer makes the recording stale.
     [[nodiscard]] const void* dataSourceIdentity() const override { return mDataContainer.get(); }
 
@@ -279,11 +275,10 @@ private:
   draw selected segments with a different pen/brush than unselected segments (also see \ref
   QCPSelectionDecorator).
 
-  This class implements basic functionality of \ref QCPAbstractPlottable::selectTest and \ref
-  QCPPlottableInterface1D::selectTestRect, assuming point-like data points, based on the 1D data
-  interface, and hands the base the data source and revision its recording is keyed on. In spite of
-  that, most plottable subclasses will want to reimplement those methods again, to provide a more
-  accurate hit test based on their specific data visualization geometry.
+  This class implements basic functionality of \ref QCPPlottableInterface1D::selectTestRect,
+  assuming point-like data points, based on the 1D data interface, and hands the base the data
+  source and revision its recording is keyed on. A point click is answered by the base, through the
+  recording.
 */
 
 /* start documentation of inline functions */
@@ -496,84 +491,6 @@ template <class DataType, class Base>
 int QCPAbstractPlottable1D<DataType, Base>::findEnd(double sortKey, bool expandedRange) const
 {
     return int(mDataContainer->findEnd(sortKey, expandedRange) - mDataContainer->constBegin());
-}
-
-/*!
-  Implements a point-selection algorithm assuming the data (accessed via the 1D data interface) is
-  point-like. Most subclasses will want to reimplement this method again, to provide a more
-  accurate hit test based on the true data visualization geometry.
-
-  If \a details is not 0, it will be set to a \ref QCPDataSelection, describing the closest data
-  point to \a pos.
-
-  A plottable that records is hit-tested through its recording, as the base does; this algorithm
-  serves the 2.x classes that paint through draw(QCPPainter*) and record nothing.
-
-  \seebaseclassmethod
-*/
-template <class DataType, class Base>
-double QCPAbstractPlottable1D<DataType, Base>::selectTest(const QPointF& pos, bool onlySelectable,
-                                                    QVariant* details) const
-{
-    if (this->mCore.recordsTheDrawing(*this, this->view()))
-        return QCPAbstractPlottable::selectTest(pos, onlySelectable, details);
-    if ((onlySelectable && this->mSelectable == QCP::stNone) || mDataContainer->isEmpty())
-        return -1;
-    if (!this->mKeyAxis || !this->mValueAxis)
-        return -1;
-
-    QCPDataSelection selectionResult;
-    double minDistSqr = (std::numeric_limits<double>::max)();
-    int minDistIndex = mDataContainer->size();
-
-    auto begin = mDataContainer->constBegin();
-    auto end = mDataContainer->constEnd();
-    if (DataType::sortKeyIsMainKey()) // we can assume that data is sorted by main key, so can
-                                      // reduce the searched key interval:
-    {
-        // determine which key range comes into question, taking selection tolerance around pos into
-        // account:
-        double posKeyMin, posKeyMax, dummy;
-        this->pixelsToCoords(
-            pos - QPointF(this->mParentPlot->selectionTolerance(), this->mParentPlot->selectionTolerance()),
-            posKeyMin, dummy);
-        this->pixelsToCoords(
-            pos + QPointF(this->mParentPlot->selectionTolerance(), this->mParentPlot->selectionTolerance()),
-            posKeyMax, dummy);
-        if (posKeyMin > posKeyMax)
-            qSwap(posKeyMin, posKeyMax);
-        begin = mDataContainer->findBegin(posKeyMin, true);
-        end = mDataContainer->findEnd(posKeyMax, true);
-    }
-    if (begin == end)
-        return -1;
-    QCPRange keyRange(this->mKeyAxis->range());
-    QCPRange valueRange(this->mValueAxis->range());
-    for (auto it = begin; it != end; ++it)
-    {
-        const double mainKey = it->mainKey();
-        const double mainValue = it->mainValue();
-        if (keyRange.contains(mainKey)
-            && valueRange.contains(
-                mainValue)) // make sure data point is inside visible range, for speedup in cases
-                            // where sort key isn't main key and we iterate over all points
-        {
-            const double currentDistSqr
-                = QCPVector2D(this->coordsToPixels(mainKey, mainValue) - pos).lengthSquared();
-            if (currentDistSqr < minDistSqr)
-            {
-                minDistSqr = currentDistSqr;
-                minDistIndex = int(it - mDataContainer->constBegin());
-            }
-        }
-    }
-    if (minDistIndex != mDataContainer->size())
-        selectionResult.addDataRange(QCPDataRange(minDistIndex, minDistIndex + 1), false);
-
-    selectionResult.simplify();
-    if (details)
-        details->setValue(selectionResult);
-    return qSqrt(minDistSqr);
 }
 
 /*!

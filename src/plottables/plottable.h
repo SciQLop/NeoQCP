@@ -365,9 +365,8 @@ protected:
 
     // reimplemented virtual methods:
     virtual QRect clipRect() const override;
-    //! Replays the recording: the default draw. A class that paints through the old virtual
-    //! (the polar plottables) overrides this and never records.
-    void draw(QCPPainter* painter) override;
+    //! Replays the recording. Final: a plottable draws through draw(QCPDrawContext&).
+    void draw(QCPPainter* painter) final;
     virtual QCP::Interaction selectionCategory() const override;
     void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
     // events:
@@ -376,8 +375,9 @@ protected:
     virtual void deselectEvent(bool* selectionStateChanged) override;
 
     // introduced virtual methods:
-    //! The old painter icon: replays the icon recording.
-    virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const;
+    //! Replays the icon recording. Final, so that a 2.x override fails to compile instead of being
+    //! hidden: a plottable draws its icon through drawLegendIcon(QCPDrawContext&).
+    virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const final;
 
     //! What the core reads from this plottable this frame.
     [[nodiscard]] QCPDrawnView view() const;

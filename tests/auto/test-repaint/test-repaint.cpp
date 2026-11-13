@@ -108,10 +108,6 @@ public:
         found = false;
         return { };
     }
-
-    void draw(QCPPainter*) override { }
-
-    void drawLegendIcon(QCPPainter*, const QRectF&) const override { }
 };
 
 // A plottable that joins any system: it needs no capability and draws nothing, so only the layer
@@ -138,10 +134,6 @@ public:
         found = false;
         return { };
     }
-
-    void draw(QCPPainter*) override { }
-
-    void drawLegendIcon(QCPPainter*, const QRectF&) const override { }
 };
 
 // Busy, like a pipeline that has not delivered yet: the plot keeps its layer's last frame.
@@ -164,9 +156,10 @@ public:
 
     QPointF stallPixelOffset() const override { return stall; }
 
-    void draw(QCPPainter* painter) override
+    void draw(QCPDrawContext& context) const override
     {
-        painter->fillRect(mKeyAxis->axisRect()->rect(), pen().color());
+        context.rect(QCP::AxisRatio { 0, 0 }, QCP::AxisRatio { 1, 1 }, QPen(Qt::NoPen),
+                     QBrush(pen().color()));
     }
 };
 

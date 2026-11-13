@@ -1,8 +1,8 @@
 #pragma once
 
 // The drawing contract (QCPDrawable) and the core that keeps one recording per object.
-// QCPAbstractPlottable and QCPAbstractItem derive from the contract and answer the old drawing
-// virtuals from the recording. Library-private.
+// QCPAbstractPlottable and QCPAbstractItem derive from the contract; their painter entries are final
+// and only replay the recording. Library-private.
 
 #include "axis/range.h"
 #include "coords.h"
@@ -183,10 +183,6 @@ public:
 
     //! Whether a recording exists: the object has drawn at least once.
     [[nodiscard]] bool hasRecording() const;
-
-    //! Whether \a object draws through the recording: it records on demand, and an empty recording
-    //! means the object paints through draw(QCPPainter*) instead.
-    bool recordsTheDrawing(const QCPDrawable& object, const QCPDrawnView& view);
 
     //! Test hook: how many commands the recording holds.
     [[nodiscard]] int recordedCommandCount() const;

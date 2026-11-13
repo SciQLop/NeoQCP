@@ -1,4 +1,5 @@
 #include "test-intervals.h"
+#include "painting/draw-commands.h"
 #include "qcustomplot.h"
 #include "reference-image.h"
 #include "plottables/lane-layout.h"
@@ -1792,4 +1793,22 @@ void TestIntervals::aTickLabelColourChangeReInksTheWaveBackdrop()
 
     QVERIFY2(redInk.red() > redInk.blue(), "the shading is not in the tick label colour");
     QVERIFY2(blueInk.blue() > blueInk.red(), "the shading kept the old tick label colour");
+}
+
+// A plain legend row paints the intervals' icon from a recording of its own, boxed by the unit
+// square, and not from the bars: the icon is drawn even with no data at all.
+void TestIntervals::theLegendIconIsRecorded()
+{
+    QCPLaneLayout layout;
+    auto* intervals = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    mPlot->legend->setVisible(true);
+    mPlot->legend->clearItems();
+    mPlot->legend->addItem(new QCPPlottableLegendItem(mPlot->legend, intervals));
+    [[maybe_unused]] const QPixmap painted = mPlot->toPixmap(300, 200);
+    const QCPDrawList& icon = intervals->mCore.iconRecordedList();
+    QVERIFY2(icon.data.keyBounded && icon.data.valueBounded, "the legend icon was not recorded");
+    QCOMPARE(icon.data.bounds.keyLower, 0.0);
+    QCOMPARE(icon.data.bounds.keyUpper, 1.0);
+    QCOMPARE(icon.data.bounds.valueLower, 0.0);
+    QCOMPARE(icon.data.bounds.valueUpper, 1.0);
 }
