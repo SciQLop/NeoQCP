@@ -14,6 +14,8 @@ private slots:
     void errorBarsLog();
     void errorBarsSelected();
     void errorBarsLegend();
+    void errorBarsKeyErrorLegend();
+    void errorBarsHorizontalValueLegend();
 
     void financialCandle();
     void financialOhlc();
@@ -21,6 +23,9 @@ private slots:
     void financialLog();
     void financialSelected();
     void financialLegend();
+    void financialOhlcLegend();
+    void financialSingleColourLegend();
+    void financialOhlcSingleColourLegend();
 
     void statisticalBoxPlain();
     void statisticalBoxVerticalKey();
@@ -32,6 +37,7 @@ private slots:
     void intervalsLanes();
     void intervalsSelected();
     void intervalsLegend();
+    void intervalsIconLegend();
 
     void itemLineArrows();
     void itemStraightLine();

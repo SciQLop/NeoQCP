@@ -48,7 +48,8 @@ QVector<double> sampleKeys()
     return QVector<double> { 0.5, 1.5, 2.5, 3.5, 4.5, 5.5 };
 }
 
-QImage errorBarsScene(bool verticalKey, bool logValue, bool selected, bool legend)
+QImage errorBarsScene(bool verticalKey, bool logValue, bool selected, bool legend,
+                      QCPErrorBars::ErrorType type = QCPErrorBars::etValueError)
 {
     return render(
         [=](QCustomPlot& plot)
@@ -66,7 +67,7 @@ QImage errorBarsScene(bool verticalKey, bool logValue, bool selected, bool legen
                                     : QVector<double> { 0.2, -0.4, 0.6, 0.1, -0.3, 0.5 });
             auto* bars = new QCPErrorBars(key, value);
             bars->setDataPlottable(graph);
-            bars->setErrorType(QCPErrorBars::etValueError);
+            bars->setErrorType(type);
             bars->setData(QVector<double> { 0.2, 0.4, 0.3, 0.5, 0.2, 0.4 });
             bars->setWhiskerWidth(6);
             bars->setPen(QPen(QColor(200, 30, 30)));
@@ -85,7 +86,8 @@ QImage errorBarsScene(bool verticalKey, bool logValue, bool selected, bool legen
         });
 }
 
-QImage financialScene(bool ohlc, bool verticalKey, bool logValue, bool selected, bool legend)
+QImage financialScene(bool ohlc, bool verticalKey, bool logValue, bool selected, bool legend,
+                      bool twoColored = true)
 {
     return render(
         [=](QCustomPlot& plot)
@@ -108,6 +110,12 @@ QImage financialScene(bool ohlc, bool verticalKey, bool logValue, bool selected,
             financial->setData(keys, open, high, low, close);
             financial->setChartStyle(ohlc ? QCPFinancial::csOhlc : QCPFinancial::csCandlestick);
             financial->setWidth(0.7);
+            if (!twoColored)
+            {
+                financial->setTwoColored(false);
+                financial->setPen(QPen(QColor(40, 60, 160)));
+                financial->setBrush(QColor(120, 160, 230));
+            }
             if (selected)
             {
                 financial->setSelectable(QCP::stDataRange);
@@ -188,6 +196,25 @@ QImage intervalsScene(bool lanes, bool selected, bool legend)
                 plot.legend->setVisible(true);
                 intervals->addToLegend();
             }
+        });
+}
+
+//! The intervals' own legend icon: a plain plottable row, not the category list it adds itself.
+QImage intervalsIconScene()
+{
+    QCPLaneLayout layout;
+    return render(
+        [&](QCustomPlot& plot)
+        {
+            plot.xAxis->setRange(0, 6);
+            plot.yAxis->setRange(-0.5, 2.5);
+            auto* intervals = new QCPIntervals(plot.xAxis, plot.yAxis, &layout);
+            intervals->setData(intervalColumns(layout));
+            intervals->setCategoryColors(QVector<QColor> { QColor(70, 130, 200) });
+            intervals->setName(QStringLiteral("intervals"));
+            plot.legend->setVisible(true);
+            plot.legend->clearItems();
+            plot.legend->addItem(new QCPPlottableLegendItem(plot.legend, intervals));
         });
 }
 
@@ -736,6 +763,17 @@ void TestReferenceM4e::errorBarsLegend()
     check(errorBarsScene(false, false, false, true), "errorbars-legend.png");
 }
 
+void TestReferenceM4e::errorBarsKeyErrorLegend()
+{
+    check(errorBarsScene(false, false, false, true, QCPErrorBars::etKeyError),
+          "errorbars-key-error-legend.png");
+}
+
+void TestReferenceM4e::errorBarsHorizontalValueLegend()
+{
+    check(errorBarsScene(true, false, false, true), "errorbars-horizontal-value-legend.png");
+}
+
 void TestReferenceM4e::financialCandle()
 {
     check(financialScene(false, false, false, false, false), "financial-candle.png");
@@ -764,6 +802,23 @@ void TestReferenceM4e::financialSelected()
 void TestReferenceM4e::financialLegend()
 {
     check(financialScene(false, false, false, false, true), "financial-legend.png");
+}
+
+void TestReferenceM4e::financialOhlcLegend()
+{
+    check(financialScene(true, false, false, false, true), "financial-ohlc-legend.png");
+}
+
+void TestReferenceM4e::financialSingleColourLegend()
+{
+    check(financialScene(false, false, false, false, true, false),
+          "financial-single-colour-legend.png");
+}
+
+void TestReferenceM4e::financialOhlcSingleColourLegend()
+{
+    check(financialScene(true, false, false, false, true, false),
+          "financial-ohlc-single-colour-legend.png");
 }
 
 void TestReferenceM4e::statisticalBoxPlain()
@@ -809,6 +864,11 @@ void TestReferenceM4e::intervalsSelected()
 void TestReferenceM4e::intervalsLegend()
 {
     check(intervalsScene(false, false, true), "intervals-legend.png");
+}
+
+void TestReferenceM4e::intervalsIconLegend()
+{
+    check(intervalsIconScene(), "intervals-icon-legend.png");
 }
 
 void TestReferenceM4e::itemLineArrows()
