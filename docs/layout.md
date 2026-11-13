@@ -128,6 +128,26 @@ Other grid tools:
 Deleting the first axis rect deletes the axes that `xAxis`, `yAxis`, `xAxis2` and `yAxis2` point to; they become `nullptr`.
 The default legend lives in that rect too, and goes with it.
 
+## Align edges with an alignment group
+
+A <a href="api/classQCPAlignmentGroup.html">QCPAlignmentGroup</a> lines up the inner edges of its members.
+A member can be an axis rect, a colour scale or any other layout element, in one plot or in several plot widgets.
+`QCPAlignmentGroup::create(members, sides)` makes one. The default sides are left and right.
+
+```{literalinclude} snippets/layout.cpp
+:start-after: // [layout_alignment_group]
+:end-before: // [/layout_alignment_group]
+:language: cpp
+:dedent:
+```
+
+- An element joins one alignment group per side. Above, `main` is in a left/right group with `top` and in a top/bottom group with `right`.
+- Joining a group for some sides leaves the element's previous groups on those sides only. Its other sides keep their groups.
+- `alignmentGroup(side)` returns the group of one side, or null.
+- `remove()` takes an element out of a group on every side. A group deletes itself when its last member leaves.
+- Inside one plot, the edges line up from the first replot, also in an export of a plot that was never shown.
+- Across plot widgets, members line up while both plots are shown.
+
 ## Align axis rects with a margin group
 
 Two axis rects stacked in a column rarely line up by themselves.

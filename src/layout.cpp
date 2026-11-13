@@ -263,8 +263,10 @@ QCPLayoutElement::QCPLayoutElement(QCustomPlot* parentPlot)
 
 QCPLayoutElement::~QCPLayoutElement()
 {
-    if (mAlignmentGroup)
-        mAlignmentGroup->remove(this);
+    // remove() clears every side the group holds, and may delete the group: read each slot afresh.
+    for (const QPointer<QCPAlignmentGroup>& group : mAlignmentGroups)
+        if (group)
+            group->remove(this);
     setMarginGroup(QCP::msAll, nullptr); // unregister at margin groups, if there are any
     // unregister at layout:
     if (qobject_cast<QCPLayout*>(
@@ -498,6 +500,39 @@ void QCPLayoutElement::setMarginGroup(QCP::MarginSides sides, QCPMarginGroup* gr
         markLayoutAppearanceDirty();
 }
 
+QPointer<QCPAlignmentGroup> QCPLayoutElement::alignmentGroup(QCP::MarginSide side) const
+{
+    const int slot = alignmentSlot(side);
+    QCP_CHECK_OR_RETURN(slot >= 0, "an alignment group is asked for one side", {});
+    return mAlignmentGroups[slot];
+}
+
+int QCPLayoutElement::alignmentSlot(QCP::MarginSide side)
+{
+    switch (side)
+    {
+    case QCP::msLeft:
+        return 0;
+    case QCP::msRight:
+        return 1;
+    case QCP::msTop:
+        return 2;
+    case QCP::msBottom:
+        return 3;
+    default:
+        return -1;
+    }
+}
+
+//! True when one of this element's groups computed its margin from an edge the layout has moved.
+bool QCPLayoutElement::alignedEdgeMoved() const
+{
+    for (const QPointer<QCPAlignmentGroup>& group : mAlignmentGroups)
+        if (group && group->edgeMoved(this))
+            return true;
+    return false;
+}
+
 /*!
   Updates the layout element and sub-elements. This function is automatically called before every
   replot by the parent layout element. It is called multiple times, once for every \ref
@@ -515,13 +550,9 @@ void QCPLayoutElement::update(UpdatePhase phase)
     // The margins were computed from the outer rect of the previous pass. A resize only tightens
     // the rect in upLayout, so a pass whose rect no longer matches what its margin assumed must
     // run once more: this is what makes an aligned peer follow a resized member.
-    if (phase == upLayout && mAlignmentGroup && mAlignmentGroup->edgeMoved(this))
-    {
-        markLayoutAppearanceDirty();
-        // markDirty is dropped while this very replot runs, so ask for the follow-up pass.
+    if (phase == upLayout && alignedEdgeMoved())
         if (QCustomPlot* plot = parentPlot())
-            plot->requestRepaint();
-    }
+            plot->mAlignmentUnsettled = true; // its layout pass runs again (settleAlignment)
     if (phase == upMargins)
     {
         if (mAutoMargins != QCP::msNone)
@@ -537,11 +568,12 @@ void QCPLayoutElement::update(UpdatePhase phase)
                 if (mAutoMargins.testFlag(
                         side)) // this side's margin shall be calculated automatically
                 {
-                    if (mAlignmentGroup && mAlignmentGroup->sides().testFlag(side))
+                    if (QCPAlignmentGroup* group = mAlignmentGroups[alignmentSlot(side)])
                         QCP::setMarginValue(newMargins, side,
-                                            mAlignmentGroup->marginFor(
-                                                this, side)); // this side aligns with other plots'
-                                                              // edges, which win over a margin group
+                                            group->marginFor(
+                                                this, side)); // this side aligns with other
+                                                              // elements' edges, which win over a
+                                                              // margin group
                     else if (mMarginGroups.contains(side))
                         QCP::setMarginValue(newMargins, side,
                                             mMarginGroups[side]->commonMargin(

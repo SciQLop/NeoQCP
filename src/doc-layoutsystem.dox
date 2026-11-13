@@ -38,7 +38,8 @@
   If multiple layout ements are arranged next to or beneath each other, it may be desirable to
   align their inner rects on certain sides. Since they all might have different automatic margins,
   this usually isn't the case. A \ref QCPAlignmentGroup fixes this: it aligns the edges of its
-  members' inner rects, also across several plot widgets, colour bars included. Make one with
+  members' inner rects, also across several plot widgets, colour bars included; an element joins
+  one group per side. Make one with
   \ref QCPAlignmentGroup::create. (\ref QCPMarginGroup, which makes margin sizes equal inside one
   plot, is deprecated.)
   

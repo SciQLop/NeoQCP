@@ -26,6 +26,8 @@
 #ifndef QCP_LAYOUT_H
 #define QCP_LAYOUT_H
 
+#include <array>
+
 #include "global.h"
 #include "layer.h"
 
@@ -144,8 +146,8 @@ public:
     }
 
     QHash<QCP::MarginSide, QCPMarginGroup*> marginGroups() const { return mMarginGroups; }
-    //! The group this element's edges align with, if any.
-    QPointer<QCPAlignmentGroup> alignmentGroup() const { return mAlignmentGroup; }
+    //! The group this element's \a side aligns with, if any: an element joins one group per side.
+    QPointer<QCPAlignmentGroup> alignmentGroup(QCP::MarginSide side) const;
 
     // setters:
     void setOuterRect(const QRect& rect);
@@ -181,7 +183,8 @@ protected:
     QMargins mMargins, mMinimumMargins;
     QCP::MarginSides mAutoMargins;
     QHash<QCP::MarginSide, QCPMarginGroup*> mMarginGroups;
-    QPointer<QCPAlignmentGroup> mAlignmentGroup;
+    // One alignment group per side, in the order of alignmentSlot(): left, right, top, bottom.
+    std::array<QPointer<QCPAlignmentGroup>, 4> mAlignmentGroups;
 
     // introduced virtual methods:
     virtual int calculateAutoMargin(QCP::MarginSide side);
@@ -200,6 +203,10 @@ protected:
 
 private:
     Q_DISABLE_COPY(QCPLayoutElement)
+
+    //! The index of \a side in mAlignmentGroups, or -1 for anything but one of the four sides.
+    static int alignmentSlot(QCP::MarginSide side);
+    bool alignedEdgeMoved() const;
 
     friend class QCustomPlot;
     friend class QCPLayout;

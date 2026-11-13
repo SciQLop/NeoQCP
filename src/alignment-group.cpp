@@ -31,6 +31,17 @@ bool inward(QCP::MarginSide side)
 {
     return side == QCP::msLeft || side == QCP::msTop;
 }
+
+constexpr QCP::MarginSide everySide[] = { QCP::msLeft, QCP::msRight, QCP::msTop, QCP::msBottom };
+
+bool laidOut(const QCPLayoutElement* element)
+{
+    return element && element->layout() && element->parentPlot()
+        && !element->outerRect().isEmpty();
+}
+
+// Recorded for a member that had no geometry yet: any edge it gets later counts as a move.
+constexpr int notLaidOut = INT_MIN;
 } // namespace
 
 QCPAlignmentGroup::QCPAlignmentGroup(QCP::MarginSides sides) : mSides(sides) { }
@@ -47,19 +58,39 @@ bool QCPAlignmentGroup::eligible(const QCPLayoutElement* element)
     return plot && plot->isVisible() && !element->outerRect().isEmpty();
 }
 
+bool QCPAlignmentGroup::comparable(const QCPLayoutElement* asker, const QCPLayoutElement* member)
+{
+    if (!laidOut(member))
+        return false;
+    // The plot being laid out has its geometry even before it is shown; another plot's edge means
+    // something only while both are on screen, in window coordinates.
+    const QCustomPlot* own = asker->parentPlot();
+    const QCustomPlot* plot = member->parentPlot();
+    return plot == own || (plot->isVisible() && own->isVisible());
+}
+
 QList<QCPLayoutElement*> QCPAlignmentGroup::liveMembers() const
 {
     QList<QCPLayoutElement*> live;
-    for (const auto& member : mMembers)
-        if (member)
-            live.append(member);
+    for (const Member& member : mMembers)
+        if (member.element)
+            live.append(member.element);
     return live;
+}
+
+QList<QCPAlignmentGroup::Member>::iterator
+QCPAlignmentGroup::findMember(const QCPLayoutElement* element)
+{
+    return std::find_if(mMembers.begin(), mMembers.end(),
+                        [element](const Member& member) { return member.element == element; });
 }
 
 QPointer<QCPAlignmentGroup> QCPAlignmentGroup::create(const QList<QCPLayoutElement*>& members,
                                                       QCP::MarginSides sides)
 {
     QCP_CHECK_OR_RETURN(!members.isEmpty(), "an alignment group needs at least one member", {});
+    QCP_CHECK_OR_RETURN(sides & (QCP::msLeft | QCP::msRight | QCP::msTop | QCP::msBottom),
+                        "an alignment group aligns at least one side", {});
     for (const QCPLayoutElement* member : members)
         QCP_CHECK_OR_RETURN(member && member->parentPlot(),
                             "an alignment group's members need a plot", {});
@@ -73,23 +104,49 @@ void QCPAlignmentGroup::add(QCPLayoutElement* element)
 {
     QCP_CHECK_OR_RETURN(element, "an alignment group cannot take a null element", );
     QCP_CHECK_OR_RETURN(element->parentPlot(), "an alignment group's members need a plot", );
-    if (mMembers.contains(element))
+    for (QCP::MarginSide side : everySide)
+    {
+        if (!mSides.testFlag(side))
+            continue;
+        QCPAlignmentGroup* previous
+            = element->mAlignmentGroups[QCPLayoutElement::alignmentSlot(side)];
+        if (previous && previous != this)
+            previous->leave(element, side);
+    }
+    auto member = findMember(element);
+    if (member == mMembers.end())
+        member = mMembers.insert(mMembers.end(), Member { element, QCP::msNone });
+    else if ((member->sides & mSides) == mSides)
         return;
-    if (QCPAlignmentGroup* previous = element->mAlignmentGroup)
-        previous->remove(element);
-    mMembers.append(element);
-    element->mAlignmentGroup = this;
+    member->sides = mSides;
+    for (QCP::MarginSide side : everySide)
+        if (mSides.testFlag(side))
+            element->mAlignmentGroups[QCPLayoutElement::alignmentSlot(side)] = this;
     invalidate();
     qcpEmit(this, nullptr, &QCPAlignmentGroup::membersChanged);
 }
 
 void QCPAlignmentGroup::remove(QCPLayoutElement* element)
 {
-    if (!element || !mMembers.removeOne(element))
+    leave(element, QCP::msAll);
+}
+
+void QCPAlignmentGroup::leave(QCPLayoutElement* element, QCP::MarginSides sides)
+{
+    const auto member = findMember(element);
+    if (!element || member == mMembers.end() || !(member->sides & sides))
         return;
+    const QCP::MarginSides leaving = member->sides & sides;
+    member->sides &= ~sides;
+    for (QCP::MarginSide side : everySide)
+        if (leaving.testFlag(side))
+            element->mAlignmentGroups[QCPLayoutElement::alignmentSlot(side)] = nullptr;
     QCustomPlot* plot = element->parentPlot();
-    element->mAlignmentGroup = nullptr;
-    mUsedEdges.remove(element);
+    if (member->sides == QCP::msNone)
+    {
+        mMembers.erase(member);
+        mUsedEdges.remove(element);
+    }
     invalidate();
     qcpEmit(this, nullptr, &QCPAlignmentGroup::membersChanged);
     if (mMembers.isEmpty())
@@ -120,16 +177,22 @@ int QCPAlignmentGroup::marginFor(QCPLayoutElement* element, QCP::MarginSide side
 {
     if (!element)
         return 0;
-    if (!mSides.testFlag(side) || !eligible(element)
+    const auto self = findMember(element);
+    if (self == mMembers.end() || !self->sides.testFlag(side)
         || !element->autoMargins().testFlag(side))
         return element->calculateAutoMargin(side);
+    if (!laidOut(element))
+    {
+        // The first pass has no edge to compare; the one that gives it an edge runs again.
+        mUsedEdges[element][side] = notLaidOut;
+        return element->calculateAutoMargin(side);
+    }
 
     QList<QCPLayoutElement*> peers;
-    for (QCPLayoutElement* member : liveMembers())
-        if (eligible(member) && member->autoMargins().testFlag(side))
-            peers.append(member);
-    if (peers.isEmpty())
-        return element->calculateAutoMargin(side);
+    for (const Member& member : mMembers)
+        if (member.sides.testFlag(side) && comparable(element, member.element)
+            && member.element->autoMargins().testFlag(side))
+            peers.append(member.element);
 
     const bool growsInward = inward(side);
     int shared = growsInward ? INT_MIN : INT_MAX;
@@ -144,7 +207,7 @@ int QCPAlignmentGroup::marginFor(QCPLayoutElement* element, QCP::MarginSide side
         if (member == element)
             own = edge;
     }
-    mUsedEdges[element][side] = windowEdge(element, side);
+    mUsedEdges[element][side] = own;
     if (mLastEdge.value(side, INT_MIN) != shared)
     {
         mLastEdge[side] = shared;
@@ -158,7 +221,7 @@ int QCPAlignmentGroup::marginFor(QCPLayoutElement* element, QCP::MarginSide side
 bool QCPAlignmentGroup::edgeMoved(const QCPLayoutElement* element) const
 {
     const auto used = mUsedEdges.constFind(element);
-    if (used == mUsedEdges.constEnd())
+    if (used == mUsedEdges.constEnd() || !laidOut(element))
         return false;
     for (auto it = used->constBegin(); it != used->constEnd(); ++it)
         if (windowEdge(element, it.key()) != it.value())

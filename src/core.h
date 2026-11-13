@@ -593,6 +593,8 @@ protected:
     quint64 mPaintGeneration = 0;
     // An explicit rpQueuedReplot during a replot: the end of that replot schedules it.
     bool mRepaintAskedDuringReplot = false;
+    // An aligned element's layout moved an edge its margin was computed from (settleAlignment).
+    bool mAlignmentUnsettled = false;
     quint64 mRepaintTicket = 0;
     void scheduleRepaint();
     void keepNotificationLayerOnTop();
@@ -673,6 +675,7 @@ protected:
     // introduced virtual methods:
     virtual void draw(QCPPainter* painter);
     virtual void updateLayout();
+    void settleAlignment(QCPLayoutGrid* layout);
     void notifyAlignmentGroups();
     void relayoutAlignmentGroups();
     void restoreViewportAfterExport(const QRect& screenViewport);
@@ -752,6 +755,7 @@ protected:
     friend class QCPGraph;
     friend class QCPAbstractItem;
     friend class QCPLayerable;
+    friend class QCPLayoutElement; // marks the alignment unsettled during the layout pass
     friend class QCPEmissionScope;
     template <typename Sender, typename... SignalArgs, typename... Args>
     friend void qcpEmit(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),

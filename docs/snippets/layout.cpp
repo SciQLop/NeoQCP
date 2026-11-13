@@ -114,6 +114,22 @@ DOC_SNIPPET(layout_axis_rects, 720, 520)
     // [/layout_axis_rects]
 }
 
+DOC_CODE(layout_alignment_group)
+{
+    // [layout_alignment_group]
+    QCPAxisRect* main = customPlot->axisRect();
+    customPlot->plotLayout()->insertRow(0);
+    auto* top = new QCPAxisRect(customPlot);
+    auto* right = new QCPAxisRect(customPlot);
+    customPlot->plotLayout()->addElement(0, 0, top);
+    customPlot->plotLayout()->addElement(1, 1, right);
+
+    // main lines up its left and right edges with top, its top and bottom edges with right.
+    QCPAlignmentGroup::create({ main, top }, QCP::msLeft | QCP::msRight);
+    QCPAlignmentGroup::create({ main, right }, QCP::msTop | QCP::msBottom);
+    // [/layout_alignment_group]
+}
+
 DOC_SNIPPET(layout_margin_group, 600, 460)
 {
     // [layout_margin_group]

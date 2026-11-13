@@ -547,7 +547,7 @@ void TestHandle::theLayoutHandsOutHandles()
     // K5: the margin group class goes in 5d; the alignment group already answers a QPointer.
     static_assert(std::is_same_v<decltype(std::declval<Element&>().marginGroup(QCP::msLeft)),
                                  QCPMarginGroup*>);
-    static_assert(std::is_same_v<decltype(std::declval<Element&>().alignmentGroup()),
+    static_assert(std::is_same_v<decltype(std::declval<Element&>().alignmentGroup(QCP::msLeft)),
                                  QPointer<QCPAlignmentGroup>>);
 
     using Area = QCPArea;

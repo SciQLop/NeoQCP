@@ -28,6 +28,7 @@
 #include "alignment-group.h"
 #include "core.h"
 #include <memory>
+#include <algorithm>
 #include <utility>
 #include "misuse.h"
 #include "plottables/plottable-bars.h"
@@ -3820,7 +3821,9 @@ void QCustomPlot::moveEvent(QMoveEvent* event)
 void QCustomPlot::notifyAlignmentGroups()
 {
     for (QCPLayoutElement* element : plotLayoutRaw()->elementsRaw(true))
-        if (element && element->alignmentGroup())
+        if (element && std::ranges::any_of(element->mAlignmentGroups, [](const auto& group) {
+                return !group.isNull();
+            }))
             element->markLayoutAppearanceDirty();
 }
 
@@ -3833,8 +3836,10 @@ void QCustomPlot::relayoutAlignmentGroups()
 {
     QSet<QCPAlignmentGroup*> groups;
     for (QCPLayoutElement* element : plotLayoutRaw()->elementsRaw(true))
-        if (element && element->alignmentGroup())
-            groups.insert(element->alignmentGroup().data());
+        if (element)
+            for (const QPointer<QCPAlignmentGroup>& group : element->mAlignmentGroups)
+                if (group)
+                    groups.insert(group.data());
     for (QCPAlignmentGroup* group : groups)
         group->relayoutMembers();
 }
@@ -4442,11 +4447,33 @@ void QCustomPlot::updateLayout()
     QCPLayoutGrid* layout = plotLayoutRaw();
     if (!layout)
         return;
+    mAlignmentUnsettled = false;
     layout->update(QCPLayoutElement::upPreparation);
     layout->update(QCPLayoutElement::upMargins);
     layout->update(QCPLayoutElement::upLayout);
+    settleAlignment(layout);
 
     emitReplotSignal(&QCustomPlot::afterLayout);
+}
+
+/*! \internal
+
+  An aligned element computes its margin from the outer rect of the pass before. When the pass
+  moved that rect (the first layout, a resize), the margin and layout phases run again, so one
+  replot or export already gives aligned edges, as a margin group did. The ticks are not prepared
+  again: the extra pass only places the edges.
+*/
+void QCustomPlot::settleAlignment(QCPLayoutGrid* layout)
+{
+    // Two passes settle every in-tree layout; a third covers a rect whose size follows its margin.
+    constexpr int maxExtraPasses = 3;
+    for (int pass = 0; pass < maxExtraPasses && std::exchange(mAlignmentUnsettled, false); ++pass)
+    {
+        layout->update(QCPLayoutElement::upMargins);
+        layout->update(QCPLayoutElement::upLayout);
+    }
+    if (std::exchange(mAlignmentUnsettled, false))
+        requestRepaint(); // still moving: the next replot carries on
 }
 
 /*! \internal

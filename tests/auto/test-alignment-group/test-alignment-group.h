@@ -27,6 +27,19 @@ private slots:
   void aMemberResizedRealigns();
     void alignmentWinsOverMarginGroup();
     void sideBySideRectsAlignAndSettle();
+
+    void anElementJoinsOneGroupPerSide();
+    void joiningForSomeSidesKeepsTheOthers();
+    void leavingOneGroupKeepsTheOther();
+    void aDeletedGroupLeavesTheOtherSides();
+    void aDeletedElementLeavesEveryGroup();
+    void aBadSideHasNoGroup();
+
+    // The mixed-side margin-group layouts of 2.x, rebuilt with alignment groups (m5d B2).
+    void jointDensityAlignsAsItsMarginGroupsDid();
+    void colourScaleLayoutAlignsAsItsMarginGroupDid();
+    void advancedAxesAlignAsTheirMarginGroupDid();
+    void stackedPairAlignsSidewaysAsItsMarginGroupDid();
 };
 
 #endif // TEST_ALIGNMENT_GROUP_H
