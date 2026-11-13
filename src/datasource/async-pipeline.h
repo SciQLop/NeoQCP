@@ -24,6 +24,7 @@ struct ViewportParams {
     bool keyLogScale = false;
     bool valueLogScale = false;
 
+    bool operator==(const ViewportParams&) const = default;
     static ViewportParams fromAxes(const QCPAxis* keyAxis, const QCPAxis* valueAxis);
 };
 
@@ -159,6 +160,14 @@ public:
             onDataChanged();
     }
 
+    //! The viewport \ref result was made for. The latest job asked for (\ref lastViewport) may
+    //! still be running: until it lands, the result is the one of an earlier viewport.
+    ViewportParams resultViewport() const
+    {
+        QMutexLocker lock(&mMutex);
+        return mResultViewport;
+    }
+
     // The pointer stays valid only until the next delivery: use it within the call, on the GUI thread.
     const Out* result() const
     {
@@ -199,6 +208,7 @@ public:
         if (!out) return false;
         lock.relock();
         mResult = std::move(out);
+        mResultViewport = vp;
         return true;
     }
 
@@ -233,27 +243,35 @@ protected:
             if (guard->destroyed) return;
 
             QMetaObject::invokeMethod(self, [self, result = std::move(result),
-                                              cache = std::move(cache), generation]() mutable {
+                                              cache = std::move(cache), generation, vp]() mutable {
                 self->deliverResult(generation, std::move(cache),
-                                    std::any(std::move(result)));
+                                    std::any(Delivery {std::move(result), vp}));
             }, Qt::QueuedConnection);
         };
     }
 
     void applyResult(uint64_t, std::any result) override
     {
-        if (auto* ptr = std::any_cast<std::shared_ptr<Out>>(&result))
-            if (*ptr)
+        if (auto* delivery = std::any_cast<Delivery>(&result))
+            if (delivery->result)
             {
                 QMutexLocker lock(&mMutex);
-                mResult = std::move(*ptr);
+                mResult = std::move(delivery->result);
+                mResultViewport = delivery->viewport;
             }
     }
 
 private:
+    struct Delivery
+    {
+        std::shared_ptr<Out> result;
+        ViewportParams viewport;
+    };
+
     std::shared_ptr<const In> mSource;
     TransformFn mTransform;
     std::shared_ptr<Out> mResult;
+    ViewportParams mResultViewport;
 };
 
 using QCPColormapPipeline = QCPAsyncPipeline<QCPAbstractDataSource2D, QCPColorMapData>;

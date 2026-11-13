@@ -127,7 +127,7 @@ protected:
     void systemChanged() override { followAxes(); }
 
 private:
-    [[nodiscard]] bool resampledForAnotherSize() const;
+    [[nodiscard]] bool needsAnImageOfTheNewSize() const;
     void installResampleTransform();
 
     std::shared_ptr<QCPAbstractDataSource2D> mDataSource;

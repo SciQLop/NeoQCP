@@ -977,6 +977,45 @@ void TestColorMap::colourMap2HonoursAVerticalKeyAxis()
   QVERIFY2(qGray(at(0.15, 0.4)) < 50, "the picture is rotated, not turned onto the vertical key axis");
 }
 
+// A map made before its plot is laid out is resampled for a 0x0 axis rect: a 4x4 image. The
+// job for the real size may still be running when the plot is exported; the export must not
+// take that job for done and draw the 4x4 image (seen on macOS CI, where the job was slower).
+void TestColorMap::colourMap2ExportWaitsForNoJobOfItsSize()
+{
+  QVERIFY(mPlot->removePlottable(mColorMap));
+  mPlot->resize(200, 200);
+  mPlot->axisRect()->setAutoMargins(QCP::msNone);
+  mPlot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
+  mPlot->xAxis->setRange(0, 7);
+  mPlot->yAxis->setRange(0, 1);
+
+  auto* map = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  map->pipeline().setScheduler(nullptr); // jobs run at once; only their delivery waits
+  std::vector<double> keys, values, z;
+  for (int k = 0; k < 8; ++k)
+    keys.push_back(k);
+  values = { 0.0, 1.0 };
+  for (int k = 0; k < 8; ++k)
+    for (int v = 0; v < 2; ++v)
+      z.push_back(k == 2 ? 1.0 : 0.0);
+  map->setData(std::move(keys), std::move(values), std::move(z));
+  map->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
+  map->setDataRange(QCPRange(0, 1));
+  QTRY_VERIFY(map->pipeline().result() && !map->pipeline().isBusy());
+  QVERIFY(map->pipeline().result()->keySize() < 8);
+
+  mPlot->replot(); // lays the plot out at its size
+  map->pipeline().onViewportChanged(ViewportParams::fromAxes(mPlot->xAxis, mPlot->yAxis));
+
+  const QImage exported = mPlot->toPixmap(200, 200).toImage().convertToFormat(QImage::Format_ARGB32);
+  const QRect area = mPlot->axisRect()->rect();
+  const auto grayAtKey = [&](double key) {
+    return qGray(exported.pixel(qRound(mPlot->xAxis->coordToPixel(key)), area.center().y()));
+  };
+  QVERIFY2(grayAtKey(2) > 200, "the hot column is not drawn at its key");
+  QVERIFY2(grayAtKey(0.8) < 50 && grayAtKey(3.2) < 50, "the export drew a coarser image");
+}
+
 // Same picture for a histogram, whose cells are not resampled: key column upper, value row
 // lower is the screen's top-left, one cell tall and two cells wide.
 void TestColorMap::histogram2dHonoursAVerticalKeyAxis()

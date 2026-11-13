@@ -37,7 +37,7 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
     if (QCustomPlot* plot = parentPlot())
         connect(plot, &QCustomPlot::afterLayout, this, [this]
         {
-            if (mPipeline.result() && resampledForAnotherSize())
+            if (needsAnImageOfTheNewSize())
                 queueViewportChange();
         });
 
@@ -212,11 +212,15 @@ void QCPColorMap2::colorMappingChanged()
     markDirty();
 }
 
-bool QCPColorMap2::resampledForAnotherSize() const
+// A job already running lands with finished(), which repaints and asks again if it was made for
+// another size; asking while it runs would only supersede it.
+bool QCPColorMap2::needsAnImageOfTheNewSize() const
 {
+    if (!mPipeline.result() || mPipeline.isBusy())
+        return false;
     const auto now = ViewportParams::fromAxes(keyAxisRaw(), valueAxisRaw());
-    const auto last = mPipeline.lastViewport();
-    return now.plotWidthPx != last.plotWidthPx || now.plotHeightPx != last.plotHeightPx;
+    const auto made = mPipeline.resultViewport();
+    return now.plotWidthPx != made.plotWidthPx || now.plotHeightPx != made.plotHeightPx;
 }
 
 void QCPColorMap2::onViewportChanged()
@@ -255,23 +259,22 @@ void QCPColorMap2::draw(QCPDrawContext& context) const
 
     auto* self = const_cast<QCPColorMap2*>(this);
     const QCPColorMapData* resampledData = mPipeline.result();
-    if (resampledData && self->resampledForAnotherSize())
+    const auto now = ViewportParams::fromAxes(keyAxisRaw(), valueAxisRaw());
+    // An export draws an image made for its own viewport: the job asked for it may still run.
+    if (resampledData && context.exporting() && mPipeline.resultViewport() != now)
     {
-        // A colormap made before its plot was laid out was resampled for a tiny axis rect, and
-        // a resize changes no axis range: nothing else would ask for a sharper image.
-        if (context.exporting())
+        if (self->mPipeline.runSynchronously(now))
         {
-            if (self->mPipeline.runSynchronously(ViewportParams::fromAxes(keyAxisRaw(), valueAxisRaw())))
-            {
-                // finished() only fires for async results
-                self->mRenderer.invalidateMapImage();
-                self->mContours.dataChanged();
-            }
+            // finished() only fires for async results
+            self->mRenderer.invalidateMapImage();
+            self->mContours.dataChanged();
         }
-        else
-            self->queueViewportChange();
         resampledData = self->mPipeline.result();
     }
+    // A colormap made before its plot was laid out was resampled for a tiny axis rect, and a
+    // resize changes no axis range: nothing else would ask for a sharper image.
+    else if (self->needsAnImageOfTheNewSize())
+        self->queueViewportChange();
     if (!resampledData)
     {
         if (!mDataSource) return;
