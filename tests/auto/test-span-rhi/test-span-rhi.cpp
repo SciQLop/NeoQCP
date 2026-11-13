@@ -99,8 +99,9 @@ void TestSpanRhi::dashedSpanBorderIsDashedOnScreen()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
     const QImage screen = mPlot->grabFramebuffer();
-    const QImage exported = mPlot->toPixmap(mPlot->width(), mPlot->height(),
-                                            screen.devicePixelRatio()).toImage();
+    QImage exported = mPlot->toPixmap(mPlot->width(), mPlot->height(),
+                                      screen.devicePixelRatio()).toImage();
+    exported.setDevicePixelRatio(screen.devicePixelRatio()); // the export is scaled, not tagged
     const double onScreen = darkFractionDown(screen, mPlot, 5);
     const double inExport = darkFractionDown(exported, mPlot, 5);
     QVERIFY2(onScreen < 0.95, qPrintable(QString("solid on screen: %1").arg(onScreen)));

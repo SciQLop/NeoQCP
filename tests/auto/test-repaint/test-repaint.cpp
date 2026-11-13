@@ -2555,9 +2555,11 @@ QCustomPlot* shownGpuPlot(QWidget& host)
 }
 
 // The columns where the middle row of the plot is inked.
+QColor pixelAt(QCustomPlot*, const QImage& image, int x, int y);
+
 QVector<int> inkedColumns(QCustomPlot* plot, const QImage& image)
 {
-    const double dpr = plot->bufferDevicePixelRatio();
+    const double dpr = image.devicePixelRatio(); // a framebuffer is in device pixels, an export not
     const int y = qBound(0, int(plot->yAxis->coordToPixel(0.5) * dpr), image.height() - 1);
     const QRect rect = plot->axisRect()->rect();
     const int first = qBound(0, int(rect.left() * dpr) + 2, image.width() - 1);
@@ -2979,7 +2981,7 @@ void TestRepaint::dashedUnderSolidStaysUnder()
     solid->setData(QVector<double> { 0.5, 0.5 }, QVector<double> { 0, 1 });
     waitUntilSettled(*plot);
     const QPoint centre(int(plot->xAxis->coordToPixel(0.5)), int(plot->yAxis->coordToPixel(0.5)));
-    const QColor crossing = screenOf(plot).pixelColor(centre);
+    const QColor crossing = pixelAt(plot, screenOf(plot), centre.x(), centre.y());
     QVERIFY2(crossing.blue() > 120 && crossing.red() < 90,
              "a solid line added after a dashed one must stay above it");
 
@@ -3003,7 +3005,7 @@ void TestRepaint::dashedUnderSolidStaysUnder()
     waitUntilSettled(*plot2);
     const QPoint centre2(int(plot2->xAxis->coordToPixel(0.5)),
                          int(plot2->yAxis->coordToPixel(0.5)));
-    const QColor crossing2 = screenOf(plot2).pixelColor(centre2);
+    const QColor crossing2 = pixelAt(plot2, screenOf(plot2), centre2.x(), centre2.y());
     QVERIFY2(crossing2.red() > 120 && crossing2.blue() < 90,
              "a dash that is on must stay above a solid line added before it");
 }
@@ -3113,15 +3115,16 @@ void usePixelRanges(QCustomPlot* plot)
 // The colour at data \a point in \a image.
 QColor sampleAt(QCustomPlot* plot, const QImage& image, double x, double y)
 {
-    const double dpr = plot->bufferDevicePixelRatio();
+    const double dpr = image.devicePixelRatio(); // a framebuffer is in device pixels, an export not
     return image.pixelColor(int(plot->xAxis->coordToPixel(x) * dpr),
                             int(plot->yAxis->coordToPixel(y) * dpr));
 }
 
 // The colour at widget pixel (\a x, \a y) in \a image, whatever the ranges are now.
-QColor pixelAt(QCustomPlot* plot, const QImage& image, int x, int y)
+//! The pixel at the logical point (\a x, \a y): a framebuffer is in device pixels, an export not.
+QColor pixelAt(QCustomPlot*, const QImage& image, int x, int y)
 {
-    const double dpr = plot->bufferDevicePixelRatio();
+    const double dpr = image.devicePixelRatio();
     return image.pixelColor(int(x * dpr), int(y * dpr));
 }
 
@@ -3495,6 +3498,7 @@ void TestRepaint::rasterFallbackIsCapped()
     // The painter pass draws every command of it, in the buffer the layer's GPU content draws over.
     QImage painted(viewport, QImage::Format_ARGB32_Premultiplied);
     painted.fill(Qt::white);
+    painted.setDevicePixelRatio(plot->bufferDevicePixelRatio()); // the layer's buffer: device size
     {
         QCPPainter painter(&painted);
         painter.setAntialiasing(true);
@@ -3791,6 +3795,7 @@ void TestRepaint::brokenImagePipelineFallsBackToThePainter()
 
     QImage painted(plot->rhiOutputSize(), QImage::Format_ARGB32_Premultiplied);
     painted.fill(Qt::white);
+    painted.setDevicePixelRatio(plot->bufferDevicePixelRatio()); // the layer's buffer: device size
     {
         QCPPainter painter(&painted);
         qcpReplayWithPainter(context.drawList(), painter, context.frame(),

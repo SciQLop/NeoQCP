@@ -2098,14 +2098,23 @@ static QImage renderOf(QCustomPlot* plot)
 
 static bool isRedish(QColor c) { return c.red() > 150 && c.green() < 120 && c.blue() < 120; }
 
+//! The pixel of \a img at the logical point \a p: a framebuffer is in device pixels.
+static QColor colourAt(const QImage& img, QPoint p)
+{
+    const double dpr = img.devicePixelRatio();
+    return img.pixelColor(qRound(p.x() * dpr), qRound(p.y() * dpr));
+}
+
 // A 1 px line lands on a fractional pixel that depends on the axis rect, so on the fonts: it is
 // antialiased over two columns, neither of them pure. Look for the dominant colour within 1 px.
 template <typename Dominates>
 static bool dominantNear(const QImage& img, QPoint p, Dominates dominates)
 {
+    const double dpr = img.devicePixelRatio();
+    const QPoint device(qRound(p.x() * dpr), qRound(p.y() * dpr));
     for (int dx = -1; dx <= 1; ++dx)
         for (int dy = -1; dy <= 1; ++dy)
-            if (dominates(img.pixelColor(p + QPoint(dx, dy))))
+            if (dominates(img.pixelColor(device + QPoint(dx, dy))))
                 return true;
     return false;
 }
@@ -2278,17 +2287,17 @@ void TestMultiGraph::fillsFollowTheViewOnTheGpu()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(mPlot->plottableRhiLayer(mg->layer())); // the GPU branch ran, not only the export one
     const QPoint inside(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(1.5)));
-    QVERIFY2(isRedish(mPlot->grabFramebuffer().pixelColor(inside)),
+    QVERIFY2(isRedish(colourAt(mPlot->grabFramebuffer(), inside)),
              "the fill is not drawn for the first view");
 
     mPlot->xAxis->setRange(1.5, 2.5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY2(isRedish(mPlot->grabFramebuffer().pixelColor(inside)),
+    QVERIFY2(isRedish(colourAt(mPlot->grabFramebuffer(), inside)),
              "the fill is not drawn for the zoomed view");
 
     mPlot->xAxis->setRange(1.55, 2.55);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY2(isRedish(mPlot->grabFramebuffer().pixelColor(inside)),
+    QVERIFY2(isRedish(colourAt(mPlot->grabFramebuffer(), inside)),
              "the fill is not drawn after a pan inside the window");
 }
 
@@ -2325,17 +2334,17 @@ void TestMultiGraph::defaultFillFollowsTheOwnerColourOnTheGpu()
     mPlot->yAxis->setRange(-1, 5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     const QPoint inside(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(1.5)));
-    const QColor red = mPlot->grabFramebuffer().pixelColor(inside);
+    const QColor red = colourAt(mPlot->grabFramebuffer(), inside);
     QVERIFY2(red.red() > red.blue(), qPrintable(red.name()));
 
     mg->setComponentColors({Qt::black, Qt::blue, Qt::blue});
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    const QColor blue = mPlot->grabFramebuffer().pixelColor(inside);
+    const QColor blue = colourAt(mPlot->grabFramebuffer(), inside);
     QVERIFY2(blue.blue() > blue.red(), qPrintable(blue.name()));
 
     mg->setComponentPens({QPen(Qt::black), QPen(Qt::red), QPen(Qt::red)});
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    const QColor redAgain = mPlot->grabFramebuffer().pixelColor(inside);
+    const QColor redAgain = colourAt(mPlot->grabFramebuffer(), inside);
     QVERIFY2(redAgain.red() > redAgain.blue(), qPrintable(redAgain.name()));
 }
 
@@ -2739,8 +2748,8 @@ void TestMultiGraph::errorBarsAreDrawnOnTheGpuPath()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     // A dense set fills the span instead: a translucent band between lower and upper.
     const QImage denseFrame = mPlot->grabFramebuffer();
-    const QColor inside = denseFrame.pixelColor(int(mPlot->xAxis->coordToPixel(9.5)),
-                                                int(mPlot->yAxis->coordToPixel(5.5)));
+    const QColor inside = colourAt(denseFrame, QPoint(int(mPlot->xAxis->coordToPixel(9.5)),
+                                                      int(mPlot->yAxis->coordToPixel(5.5))));
     QVERIFY2(inside.red() > 200 && inside.red() - inside.green() > 15, qPrintable(inside.name()));
 }
 
@@ -2946,10 +2955,10 @@ void TestMultiGraph::aRebuiltGpuFillIsNotDrawnTwice()
     mPlot->yAxis->setRange(-1, 5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     const QPoint inside(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(1.5)));
-    const QColor once = mPlot->grabFramebuffer().pixelColor(inside);
+    const QColor once = colourAt(mPlot->grabFramebuffer(), inside);
     mg->setComponentFillBrush(1, red); // same look, but the geometry is built again
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QCOMPARE(mPlot->grabFramebuffer().pixelColor(inside), once);
+    QCOMPARE(colourAt(mPlot->grabFramebuffer(), inside), once);
 }
 
 using StagedSource = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
@@ -4352,9 +4361,9 @@ void TestMultiGraph::fillsDrawUnderLinesOnTheGpu()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(mPlot->plottableRhiLayer(mg->layer()));
     const QImage frame = mPlot->grabFramebuffer();
-    QVERIFY2(isRedish(frame.pixelColor(pixelOf(mPlot, 2.5, 5.0))),
+    QVERIFY2(isRedish(colourAt(frame, pixelOf(mPlot, 2.5, 5.0))),
              "the line must draw over the fill on the GPU");
-    const QColor between = frame.pixelColor(pixelOf(mPlot, 2.5, 4.0));
+    const QColor between = colourAt(frame, pixelOf(mPlot, 2.5, 4.0));
     QVERIFY2(between.green() > between.red() + 60, "the fill must be visible between the bars");
 }
 
@@ -4374,7 +4383,7 @@ void TestMultiGraph::aCrossingFillIsTwoLobesOnTheGpu()
     const QImage frame = mPlot->grabFramebuffer();
     const auto green = [&](double key, double value)
     {
-        const QColor c = frame.pixelColor(pixelOf(mPlot, key, value));
+        const QColor c = colourAt(frame, pixelOf(mPlot, key, value));
         return c.green() > c.red() + 60;
     };
     QVERIFY2(green(0.25, -0.25) && green(0.75, 0.25), "a lobe is missing");

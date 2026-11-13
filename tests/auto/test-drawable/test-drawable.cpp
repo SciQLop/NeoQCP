@@ -496,7 +496,7 @@ QColor pixelAt(const QImage& frame, QCustomPlot* plot, double key, double value)
     return frame.pixelColor(qRound(p.x() * dpr), qRound(p.y() * dpr));
 }
 
-//! The box the inked pixels of \a frame occupy, in device pixels.
+//! The box the inked pixels of \a frame occupy, in logical pixels: the ones the axes map to.
 QRect inkedBounds(const QImage& frame)
 {
     QRect box;
@@ -504,7 +504,11 @@ QRect inkedBounds(const QImage& frame)
         for (int x = 0; x < frame.width(); ++x)
             if (frame.pixelColor(x, y) != QColor(Qt::white))
                 box = box.isNull() ? QRect(x, y, 1, 1) : box.united(QRect(x, y, 1, 1));
-    return box;
+    const double dpr = frame.devicePixelRatio();
+    const auto logical = [dpr](int device) { return qFloor(device / dpr); };
+    return box.isNull() ? box
+                        : QRect(QPoint(logical(box.left()), logical(box.top())),
+                                QPoint(logical(box.right()), logical(box.bottom())));
 }
 
 //! Hides everything but the drawn objects, so the ink measured is theirs.
