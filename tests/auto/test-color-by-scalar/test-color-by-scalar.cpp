@@ -1134,10 +1134,10 @@ void TestColorByScalar::coloredGraphDrawnFromL2KeepsIndicesConsistent()
                               qRound(mPlot->yAxis->coordToPixel(0.0)));
     };
 
+    // Replot first: the L1 without origin (built before the colours asked for one) may land
+    // before the one with it, and its L2 stays until a frame rebuilds it from the newer L1.
     auto checkColours = [&](double firstHalfKey, double secondHalfKey)
     {
-        QVERIFY(mg->mL2Result);
-        QVERIFY(mg->mL2HasOrigin);
         mPlot->replot();
         QVERIFY(mg->mL2Result);
         QVERIFY(mg->mL2HasOrigin);
