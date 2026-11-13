@@ -408,7 +408,7 @@ void QCPItemPosition::setSystem(QCPCoordinateSystem* system)
 {
     if (system)
     {
-        QCP_CHECK_OR_RETURN(!mParentPlot || system->area()->parentPlot() == mParentPlot,
+        QCP_CHECK_OR_RETURN(!mParentPlot || system->areaRaw()->parentPlot() == mParentPlot,
                             "the system of an item position must belong to its plot");
     }
     const QPointer<QCPArea> previousArea = mArea;
@@ -418,12 +418,12 @@ void QCPItemPosition::setSystem(QCPCoordinateSystem* system)
     // The 2.x projection exists only on a cartesian frame: a system of the user's own maps through
     // its transform, and 2.x pixel code gets no axis to compute a rectangle with.
     const bool projections = system && system->kind() == QCPTransform::Kind::Cartesian;
-    mKeyAxis = projections ? qobject_cast<QCPAxis*>(system->keyAxis()) : nullptr;
-    mValueAxis = projections ? qobject_cast<QCPAxis*>(system->valueAxis()) : nullptr;
+    mKeyAxis = projections ? qobject_cast<QCPAxis*>(system->keyAxisRaw()) : nullptr;
+    mValueAxis = projections ? qobject_cast<QCPAxis*>(system->valueAxisRaw()) : nullptr;
     // Binding a system always takes its area, even when the system is the same one: the area is a
     // fact of the frame, not a separate choice.
     if (system)
-        setArea(system->area());
+        setArea(system->areaRaw());
     if (mParentItem)
     {
         mParentItem->noteFramesChanged();
@@ -1919,8 +1919,8 @@ QCPAbstractItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>&
         // frame is always a candidate until the index learns system-side boxes (4j).
         if (system->kind() != QCPTransform::Kind::Cartesian)
             return std::nullopt;
-        keyAxis = qobject_cast<QCPAxis*>(system->keyAxis());
-        valueAxis = qobject_cast<QCPAxis*>(system->valueAxis());
+        keyAxis = qobject_cast<QCPAxis*>(system->keyAxisRaw());
+        valueAxis = qobject_cast<QCPAxis*>(system->valueAxisRaw());
     }
     else
     {

@@ -150,6 +150,9 @@ namespace qcp
 template <typename T>
 QList<T*> pointers(const QList<QCPHandle<T>>& handles)
 {
+    // An empty list stays unallocated: reserve(0) would allocate a header on every call.
+    if (handles.isEmpty())
+        return {};
     QList<T*> result;
     result.reserve(handles.size());
     for (const QCPHandle<T>& handle : handles)

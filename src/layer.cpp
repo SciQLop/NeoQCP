@@ -870,7 +870,7 @@ bool QCPLayerable::moveToLayer(QCPLayer* layer, bool prepend)
         qDebug() << Q_FUNC_INFO << "no parent QCustomPlot set";
         return false;
     }
-    if (layer && layer->parentPlot() != mParentPlot)
+    if (layer && layer->mParentPlot != mParentPlot)
     {
         qDebug() << Q_FUNC_INFO << "layer" << layer->name()
                  << "is not in same QCustomPlot as this layerable";

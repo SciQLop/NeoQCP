@@ -429,6 +429,8 @@ private:
 
     //! The rect this axis draws in raw, for the per-object and per-frame paths (K8). Defined in axis.cpp.
     [[nodiscard]] QCPAxisRect* axisRectRaw() const;
+    //! The grid raw, null until gridIfExists() would answer one: the range-change mark pass (K8).
+    [[nodiscard]] QCPGrid* gridRaw() const { return mGrid.data(); }
 
     friend class QCustomPlot;
     friend class QCPGrid;

@@ -583,11 +583,12 @@ void QCPAxisRect::markLayersUsingAxisDirty(const QCPAxis* axis)
     {
         // Through the system, in any kind: a plottable on a system of the user's own has no
         // projection to compare with (J-2), and its axis is the system's.
-        if (!(p->system() && p->system()->usesAxis(axis)))
+        QCPCoordinateSystem* system = p->systemRaw();
+        if (!(system && system->usesAxis(axis)))
             continue;
-        if (p->layer())
-            p->layer()->markDirty();
-        for (QCPLayer* dependent : p->dependentLayers())
+        if (QCPLayer* layer = p->layerRaw())
+            layer->markDirty();
+        for (QCPLayer* dependent : p->dependentLayersRaw())
             dependent->markDirty();
     }
     markItemsUsingAxisDirty(axis);
@@ -1726,7 +1727,7 @@ void QCPAxisRect::markAffectedLayersDirty(bool invalidate)
         {
             markOnce(ax->layerRaw());
             // A linked axis' grid is drawn by the CPU while the GPU grid has it skipped.
-            if (QCPGrid* grid = ax->gridIfExists(); grid && (!gpuGrid || ax->linkSource()))
+            if (QCPGrid* grid = ax->gridRaw(); grid && (!gpuGrid || ax->linkSource()))
                 markOnce(grid->layerRaw());
         }
     }

@@ -3033,12 +3033,13 @@ bool QCPAxis::scaleTypeWillChange([[maybe_unused]] ScaleType type)
 */
 void QCPAxis::markAppearanceDirty()
 {
-    if (!axisRect())
+    QCPAxisRect* rect = axisRectRaw();
+    if (!rect)
         return;
     // A margin change moves every axis, grid and plottable of the rect: invalidate their buffers
     // instead of dirtying them, so a pending pan translation cannot show the old frame.
-    axisRect()->markAffectedLayersDirty(true);
-    axisRect()->markItemsUsingAxisDirty(this);
+    rect->markAffectedLayersDirty(true);
+    rect->markItemsUsingAxisDirty(this);
 }
 
 /*! \internal
@@ -3066,10 +3067,10 @@ bool QCPAxis::checkLinkSource(const QCPAxisBase* source) const
 */
 void QCPAxis::rangeDidChange(const QCPRange& oldRange)
 {
-    if (axisRect())
+    if (QCPAxisRect* rect = axisRectRaw())
     {
-        axisRect()->markAffectedLayersDirty();
-        axisRect()->markItemsUsingAxisDirty(this);
+        rect->markAffectedLayersDirty();
+        rect->markItemsUsingAxisDirty(this);
     }
     QCPAxisBase::rangeDidChange(oldRange);
 }

@@ -126,6 +126,9 @@ protected:
 
     //! The frame's area raw, for the per-object view builders (K8).
     [[nodiscard]] QCPArea* areaRaw() const { return mArea; }
+    //! The two axes raw, for the item index's per-item box (K8).
+    [[nodiscard]] QCPAxisBase* keyAxisRaw() const { return mKeyAxis; }
+    [[nodiscard]] QCPAxisBase* valueAxisRaw() const { return mValueAxis; }
 
     QCPArea* mArea;
     QCPAxisBase* mKeyAxis;
@@ -141,6 +144,8 @@ private:
     friend class QCPArea;
     friend class QCPAxisRect; // its mark pass selects the systems by area raw
     friend class QCPPolarArea; // same, for the polar disc
+    friend class QCPAbstractItem; // its index box reads the axes raw, once per item and rebuild
+    friend class QCPItemPosition; // binding a system reads its frame raw, once per position
     friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip);
     Q_DISABLE_COPY(QCPCoordinateSystem)
 };
