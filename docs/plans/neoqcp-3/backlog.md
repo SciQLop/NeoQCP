@@ -235,4 +235,4 @@ public drawing API only, as a user would: every one is also a torture test of th
 | n7 | Hexbin | project: new plot types | gallery #18 |
 | n8 | Categorical axis (text keys) | project: new plot types | gallery #6 |
 | n9 | Contour labels and per-level styles | project: new plot types | gallery #13 |
-| n10 | Peak-fit editor: drag peaks, resize widths with handles, live fit and residual panel | benchmark idea | annotations + linked panels |
+| n10 | Peak-fit editor: drag peaks, resize widths with handles, live fit and residual panel | milestone 6 target 11 | annotations + linked panels |

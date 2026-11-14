@@ -33,7 +33,7 @@ code compiles, runs and draws the right picture. The target code is fixed before
 - **Simple names, little code per plot.**
 - **No `<>` at the call site unless nothing nicer exists** (`ax->line(x, y)` rather than `add<QCPGraph>()`). C++20
   and later: concepts, `auto`, designated initializers, as much as they help. Any range of numbers goes in.
-- **Two call styles he liked, to combine:** short calls with named options
+- **Two call styles the maintainer liked, to combine:** short calls with named options
   (`ax->line(x, y, {.pen = ..., .name = "..."})`), and handles that are kept and stay linked (a fill between two lines
   follows when one line's data changes).
 - **The drawing API is used from inside derived classes**: a new plot type, an extension of an existing one, or an
@@ -44,21 +44,23 @@ code compiles, runs and draws the right picture. The target code is fixed before
 
 ## Goals
 
-1. Ten target programs, written in the API above, read and approved by the maintainer before the library changes:
+1. Eleven target programs, written in the API above, read and approved by the maintainer before the library changes:
    - **Plot types and annotations** (the drawing API):
      1. lollipop chart: a new plot type; click selects one lollipop; selected look; legend icon;
      2. Asteroids: rotated polygons, many moving shapes, held keys (thrust while turning) without a click first,
         wrap-around at the edges, a score label on top, a game-over banner;
      3. brick breaker: many static shapes, a paddle dragged with the mouse, collisions in data space;
-     4. a callout annotation the user can drag and resize, pointer tip on a data point, text box in pixels.
+     4. a callout annotation the user can drag and resize, pointer tip on a data point, text box in pixels;
+     5. a peak-fit editor (added by the maintainer, 2026-11-14): drag peaks on a spectrum, resize their widths with
+        handles; the fitted curve and a residual panel below update live.
    - **Matplotlib hard cases** (gallery numbers from the survey):
-     5. shared-x panels (#4);
-     6. symlog axis (#3);
-     7. inset zoom with its indicator box and connectors (#9);
-     8. conditional fill between two curves, coloured by which is on top (#20);
-     9. spectrogram above a time series (#25);
-     10. annotations with connectors (#10).
-2. The library changed until all ten compile, run, and draw a picture that matches the target, each with tests.
+     6. shared-x panels (#4);
+     7. symlog axis (#3);
+     8. inset zoom with its indicator box and connectors (#9);
+     9. conditional fill between two curves, coloured by which is on top (#20);
+     10. spectrogram above a time series (#25);
+     11. annotations with connectors (#10).
+2. The library changed until all eleven compile, run, and draw a picture that matches the target, each with tests.
 3. A side-by-side page: each matplotlib case next to the NeoQCP picture and code, with line counts.
 4. For each target, a short Python sketch of the same program, on paper. Informative only: Python will come through
    PySide, so binding concerns do not shape the C++ API in this milestone (maintainer, 2026-11-14).
@@ -92,7 +94,7 @@ code compiles, runs and draws the right picture. The target code is fixed before
 
 ## Order of work
 
-1. Commit the two surveys. Write the ten targets as plain `.cpp` files that do not compile yet, plus the Python
+1. Commit the two surveys. Write the eleven targets as plain `.cpp` files that do not compile yet, plus the Python
    sketches. **Gate: the maintainer reads them.** Their feedback changes the targets, not the plan.
 2. Group the library changes the targets need by theme (the survey patterns are a starting split: multi-panel
    plumbing, scales, the drawing API in derived classes, annotations and their hooks, call-site friction). One
