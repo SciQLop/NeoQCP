@@ -47,6 +47,84 @@
   The text may be rotated around the \a position point with \ref setRotation.
 */
 
+/*! \fn void QCPItemText::colorChanged(const QColor& color)
+
+  This signal is emitted when \ref color changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemText::selectedColorChanged(const QColor& selectedColor)
+
+  This signal is emitted when \ref selectedColor changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemText::penChanged(const QPen& pen)
+
+  This signal is emitted when \ref pen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemText::selectedPenChanged(const QPen& selectedPen)
+
+  This signal is emitted when \ref selectedPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemText::brushChanged(const QBrush& brush)
+
+  This signal is emitted when \ref brush changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemText::selectedBrushChanged(const QBrush& selectedBrush)
+
+  This signal is emitted when \ref selectedBrush changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemText::fontChanged(const QFont& font)
+
+  This signal is emitted when \ref font changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemText::selectedFontChanged(const QFont& selectedFont)
+
+  This signal is emitted when \ref selectedFont changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemText::textChanged(const QString& text)
+
+  This signal is emitted when \ref text changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemText::positionAlignmentChanged(Qt::Alignment positionAlignment)
+
+  This signal is emitted when \ref positionAlignment changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemText::textAlignmentChanged(Qt::Alignment textAlignment)
+
+  This signal is emitted when \ref textAlignment changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemText::rotationChanged(double rotation)
+
+  This signal is emitted when \ref rotation changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemText::paddingChanged(const QMargins& padding)
+
+  This signal is emitted when \ref padding changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates a text item and sets default values.
 
@@ -90,6 +168,7 @@ void QCPItemText::setColor(const QColor& color)
         return;
     markDirty();
     mColor = color;
+    qcpEmit(this, mParentPlot, &QCPItemText::colorChanged, this->color());
 }
 
 /*!
@@ -101,6 +180,7 @@ void QCPItemText::setSelectedColor(const QColor& color)
         return;
     markDirty();
     mSelectedColor = color;
+    qcpEmit(this, mParentPlot, &QCPItemText::selectedColorChanged, selectedColor());
 }
 
 /*!
@@ -115,6 +195,7 @@ void QCPItemText::setPen(const QPen& pen)
         return;
     markDirty();
     mPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemText::penChanged, this->pen());
 }
 
 /*!
@@ -129,6 +210,7 @@ void QCPItemText::setSelectedPen(const QPen& pen)
         return;
     markDirty();
     mSelectedPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemText::selectedPenChanged, selectedPen());
 }
 
 /*!
@@ -143,6 +225,7 @@ void QCPItemText::setBrush(const QBrush& brush)
         return;
     markDirty();
     mBrush = brush;
+    qcpEmit(this, mParentPlot, &QCPItemText::brushChanged, this->brush());
 }
 
 /*!
@@ -157,6 +240,7 @@ void QCPItemText::setSelectedBrush(const QBrush& brush)
         return;
     markDirty();
     mSelectedBrush = brush;
+    qcpEmit(this, mParentPlot, &QCPItemText::selectedBrushChanged, selectedBrush());
 }
 
 /*!
@@ -170,6 +254,7 @@ void QCPItemText::setFont(const QFont& font)
         return;
     markDirty();
     mFont = font;
+    qcpEmit(this, mParentPlot, &QCPItemText::fontChanged, this->font());
 }
 
 /*!
@@ -183,6 +268,7 @@ void QCPItemText::setSelectedFont(const QFont& font)
         return;
     markDirty();
     mSelectedFont = font;
+    qcpEmit(this, mParentPlot, &QCPItemText::selectedFontChanged, selectedFont());
 }
 
 /*!
@@ -197,6 +283,7 @@ void QCPItemText::setText(const QString& text)
         return;
     markDirty();
     mText = text;
+    qcpEmit(this, mParentPlot, &QCPItemText::textChanged, this->text());
 }
 
 /*!
@@ -217,6 +304,7 @@ void QCPItemText::setPositionAlignment(Qt::Alignment alignment)
         return;
     markDirty();
     mPositionAlignment = alignment;
+    qcpEmit(this, mParentPlot, &QCPItemText::positionAlignmentChanged, positionAlignment());
 }
 
 /*!
@@ -229,6 +317,7 @@ void QCPItemText::setTextAlignment(Qt::Alignment alignment)
         return;
     markDirty();
     mTextAlignment = alignment;
+    qcpEmit(this, mParentPlot, &QCPItemText::textAlignmentChanged, textAlignment());
 }
 
 /*!
@@ -241,6 +330,7 @@ void QCPItemText::setRotation(double degrees)
         return;
     markDirty();
     mRotation = degrees;
+    qcpEmit(this, mParentPlot, &QCPItemText::rotationChanged, rotation());
 }
 
 /*!
@@ -253,6 +343,7 @@ void QCPItemText::setPadding(const QMargins& padding)
         return;
     markDirty();
     mPadding = padding;
+    qcpEmit(this, mParentPlot, &QCPItemText::paddingChanged, this->padding());
 }
 
 /* inherits documentation from base class */

@@ -53,6 +53,30 @@
   or QCPItemCurve) or a text label (QCPItemText), to the bracket.
 */
 
+/*! \fn void QCPItemBracket::penChanged(const QPen& pen)
+
+  This signal is emitted when \ref pen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemBracket::selectedPenChanged(const QPen& selectedPen)
+
+  This signal is emitted when \ref selectedPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemBracket::lengthChanged(double length)
+
+  This signal is emitted when \ref length changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemBracket::styleChanged(QCPItemBracket::BracketStyle style)
+
+  This signal is emitted when \ref style changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates a bracket item and sets default values.
 
@@ -91,6 +115,7 @@ void QCPItemBracket::setPen(const QPen& pen)
         return;
     markDirty();
     mPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemBracket::penChanged, this->pen());
 }
 
 /*!
@@ -104,6 +129,7 @@ void QCPItemBracket::setSelectedPen(const QPen& pen)
         return;
     markDirty();
     mSelectedPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemBracket::selectedPenChanged, selectedPen());
 }
 
 /*!
@@ -120,6 +146,7 @@ void QCPItemBracket::setLength(double length)
         return;
     markDirty();
     mLength = length;
+    qcpEmit(this, mParentPlot, &QCPItemBracket::lengthChanged, this->length());
 }
 
 /*!
@@ -133,6 +160,7 @@ void QCPItemBracket::setStyle(QCPItemBracket::BracketStyle style)
         return;
     markDirty();
     mStyle = style;
+    qcpEmit(this, mParentPlot, &QCPItemBracket::styleChanged, this->style());
 }
 
 /* inherits documentation from base class */

@@ -41,15 +41,17 @@ class QCP_LIB_DECL QCPItemTracer : public QCPAbstractItem
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QPen pen READ pen WRITE setPen)
-    Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen)
-    Q_PROPERTY(QBrush brush READ brush WRITE setBrush)
-    Q_PROPERTY(QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush)
-    Q_PROPERTY(double size READ size WRITE setSize)
-    Q_PROPERTY(TracerStyle style READ style WRITE setStyle)
-    Q_PROPERTY(QCPGraph* graph READ graph WRITE setGraph)
-    Q_PROPERTY(double graphKey READ graphKey WRITE setGraphKey)
-    Q_PROPERTY(bool interpolating READ interpolating WRITE setInterpolating)
+    Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
+    Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen NOTIFY selectedPenChanged)
+    Q_PROPERTY(QBrush brush READ brush WRITE setBrush NOTIFY brushChanged)
+    Q_PROPERTY(
+        QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush NOTIFY selectedBrushChanged)
+    Q_PROPERTY(double size READ size WRITE setSize NOTIFY sizeChanged)
+    Q_PROPERTY(TracerStyle style READ style WRITE setStyle NOTIFY styleChanged)
+    Q_PROPERTY(QCPGraph* graph READ graph WRITE setGraph NOTIFY graphChanged)
+    Q_PROPERTY(double graphKey READ graphKey WRITE setGraphKey NOTIFY graphKeyChanged)
+    Q_PROPERTY(
+        bool interpolating READ interpolating WRITE setInterpolating NOTIFY interpolatingChanged)
     /// \endcond
 
 public:
@@ -134,6 +136,17 @@ public:
     void updatePosition();
 
     QCPItemPosition* const position;
+
+signals:
+    void penChanged(const QPen& pen);
+    void selectedPenChanged(const QPen& selectedPen);
+    void brushChanged(const QBrush& brush);
+    void selectedBrushChanged(const QBrush& selectedBrush);
+    void sizeChanged(double size);
+    void styleChanged(QCPItemTracer::TracerStyle style);
+    void graphChanged(QCPGraph* graph);
+    void graphKeyChanged(double graphKey);
+    void interpolatingChanged(bool interpolating);
 
 protected:
     // property members:

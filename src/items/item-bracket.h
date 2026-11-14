@@ -39,10 +39,10 @@ class QCP_LIB_DECL QCPItemBracket : public QCPAbstractItem
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QPen pen READ pen WRITE setPen)
-    Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen)
-    Q_PROPERTY(double length READ length WRITE setLength)
-    Q_PROPERTY(BracketStyle style READ style WRITE setStyle)
+    Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
+    Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen NOTIFY selectedPenChanged)
+    Q_PROPERTY(double length READ length WRITE setLength NOTIFY lengthChanged)
+    Q_PROPERTY(BracketStyle style READ style WRITE setStyle NOTIFY styleChanged)
     /// \endcond
 
 public:
@@ -94,6 +94,12 @@ public:
     QCPItemPosition* const left;
     QCPItemPosition* const right;
     QCPItemAnchor* const center;
+
+signals:
+    void penChanged(const QPen& pen);
+    void selectedPenChanged(const QPen& selectedPen);
+    void lengthChanged(double length);
+    void styleChanged(QCPItemBracket::BracketStyle style);
 
 protected:
     // property members:

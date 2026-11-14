@@ -1420,6 +1420,18 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
   position when anything attached to the anchor needs to know the coordinates.
 */
 
+/*! \fn void QCPAbstractItem::clipToAxisRectChanged(bool clipToAxisRect)
+
+  This signal is emitted when \ref clipToAxisRect changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAbstractItem::clipAxisRectChanged(QCPAxisRect* clipAxisRect)
+
+  This signal is emitted when \ref clipAxisRect changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start of documentation of inline functions */
 
 /*! \fn QList<QCPItemPosition*> QCPAbstractItem::positions() const
@@ -1613,6 +1625,7 @@ void QCPAbstractItem::setClipToAxisRect(bool clip)
     mClipToAxisRect = clip;
     if (mClipToAxisRect)
         setParentLayerable(mClipArea.data());
+    qcpEmit(this, mParentPlot, &QCPAbstractItem::clipToAxisRectChanged, clipToAxisRect());
 }
 
 /*!
@@ -1623,18 +1636,22 @@ void QCPAbstractItem::setClipToAxisRect(bool clip)
 */
 void QCPAbstractItem::setClipAxisRect(QCPAxisRect* rect)
 {
-    setClipArea(rect);
+    setClipArea(rect); // emits clipAxisRectChanged when the rect moves
 }
 
 void QCPAbstractItem::setClipArea(QCPArea* area)
 {
     if (mClipArea == area)
         return;
+    const QCPAxisRect* rectBefore = clipAxisRectRaw();
     markDirty();
     mClipArea = area;
     if (mClipToAxisRect)
         setParentLayerable(mClipArea.data());
     noteFramesChanged();
+    // clipAxisRect is the clip area when that is an axis rect.
+    if (clipAxisRectRaw() != rectBefore)
+        qcpEmit(this, mParentPlot, &QCPAbstractItem::clipAxisRectChanged, clipAxisRectRaw());
 }
 
 /*!

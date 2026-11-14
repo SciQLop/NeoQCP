@@ -43,6 +43,18 @@
   It has two positions, \a point1 and \a point2, which define the straight line.
 */
 
+/*! \fn void QCPItemStraightLine::penChanged(const QPen& pen)
+
+  This signal is emitted when \ref pen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemStraightLine::selectedPenChanged(const QPen& selectedPen)
+
+  This signal is emitted when \ref selectedPen changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates a straight line item and sets default values.
 
@@ -74,6 +86,7 @@ void QCPItemStraightLine::setPen(const QPen& pen)
         return;
     markDirty();
     mPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemStraightLine::penChanged, this->pen());
 }
 
 /*!
@@ -87,6 +100,7 @@ void QCPItemStraightLine::setSelectedPen(const QPen& pen)
         return;
     markDirty();
     mSelectedPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemStraightLine::selectedPenChanged, selectedPen());
 }
 
 /* inherits documentation from base class */

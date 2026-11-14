@@ -41,19 +41,24 @@ class QCP_LIB_DECL QCPItemText : public QCPAbstractItem
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QColor color READ color WRITE setColor)
-    Q_PROPERTY(QColor selectedColor READ selectedColor WRITE setSelectedColor)
-    Q_PROPERTY(QPen pen READ pen WRITE setPen)
-    Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen)
-    Q_PROPERTY(QBrush brush READ brush WRITE setBrush)
-    Q_PROPERTY(QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush)
-    Q_PROPERTY(QFont font READ font WRITE setFont)
-    Q_PROPERTY(QFont selectedFont READ selectedFont WRITE setSelectedFont)
-    Q_PROPERTY(QString text READ text WRITE setText)
-    Q_PROPERTY(Qt::Alignment positionAlignment READ positionAlignment WRITE setPositionAlignment)
-    Q_PROPERTY(Qt::Alignment textAlignment READ textAlignment WRITE setTextAlignment)
-    Q_PROPERTY(double rotation READ rotation WRITE setRotation)
-    Q_PROPERTY(QMargins padding READ padding WRITE setPadding)
+    Q_PROPERTY(QColor color READ color WRITE setColor NOTIFY colorChanged)
+    Q_PROPERTY(
+        QColor selectedColor READ selectedColor WRITE setSelectedColor NOTIFY selectedColorChanged)
+    Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
+    Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen NOTIFY selectedPenChanged)
+    Q_PROPERTY(QBrush brush READ brush WRITE setBrush NOTIFY brushChanged)
+    Q_PROPERTY(
+        QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush NOTIFY selectedBrushChanged)
+    Q_PROPERTY(QFont font READ font WRITE setFont NOTIFY fontChanged)
+    Q_PROPERTY(
+        QFont selectedFont READ selectedFont WRITE setSelectedFont NOTIFY selectedFontChanged)
+    Q_PROPERTY(QString text READ text WRITE setText NOTIFY textChanged)
+    Q_PROPERTY(Qt::Alignment positionAlignment READ positionAlignment WRITE setPositionAlignment
+                   NOTIFY positionAlignmentChanged)
+    Q_PROPERTY(Qt::Alignment textAlignment READ textAlignment WRITE setTextAlignment NOTIFY
+                   textAlignmentChanged)
+    Q_PROPERTY(double rotation READ rotation WRITE setRotation NOTIFY rotationChanged)
+    Q_PROPERTY(QMargins padding READ padding WRITE setPadding NOTIFY paddingChanged)
     /// \endcond
 
 public:
@@ -117,6 +122,21 @@ public:
     QCPItemAnchor* const bottom;
     QCPItemAnchor* const bottomLeft;
     QCPItemAnchor* const left;
+
+signals:
+    void colorChanged(const QColor& color);
+    void selectedColorChanged(const QColor& selectedColor);
+    void penChanged(const QPen& pen);
+    void selectedPenChanged(const QPen& selectedPen);
+    void brushChanged(const QBrush& brush);
+    void selectedBrushChanged(const QBrush& selectedBrush);
+    void fontChanged(const QFont& font);
+    void selectedFontChanged(const QFont& selectedFont);
+    void textChanged(const QString& text);
+    void positionAlignmentChanged(Qt::Alignment positionAlignment);
+    void textAlignmentChanged(Qt::Alignment textAlignment);
+    void rotationChanged(double rotation);
+    void paddingChanged(const QMargins& padding);
 
 protected:
     enum AnchorIndex

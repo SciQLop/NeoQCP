@@ -41,6 +41,30 @@
   It has two positions, \a topLeft and \a bottomRight, which define the rectangle.
 */
 
+/*! \fn void QCPItemRect::penChanged(const QPen& pen)
+
+  This signal is emitted when \ref pen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemRect::selectedPenChanged(const QPen& selectedPen)
+
+  This signal is emitted when \ref selectedPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemRect::brushChanged(const QBrush& brush)
+
+  This signal is emitted when \ref brush changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemRect::selectedBrushChanged(const QBrush& selectedBrush)
+
+  This signal is emitted when \ref selectedBrush changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates a rectangle item and sets default values.
 
@@ -80,6 +104,7 @@ void QCPItemRect::setPen(const QPen& pen)
         return;
     markDirty();
     mPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemRect::penChanged, this->pen());
 }
 
 /*!
@@ -93,6 +118,7 @@ void QCPItemRect::setSelectedPen(const QPen& pen)
         return;
     markDirty();
     mSelectedPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemRect::selectedPenChanged, selectedPen());
 }
 
 /*!
@@ -107,6 +133,7 @@ void QCPItemRect::setBrush(const QBrush& brush)
         return;
     markDirty();
     mBrush = brush;
+    qcpEmit(this, mParentPlot, &QCPItemRect::brushChanged, this->brush());
 }
 
 /*!
@@ -121,6 +148,7 @@ void QCPItemRect::setSelectedBrush(const QBrush& brush)
         return;
     markDirty();
     mSelectedBrush = brush;
+    qcpEmit(this, mParentPlot, &QCPItemRect::selectedBrushChanged, selectedBrush());
 }
 
 

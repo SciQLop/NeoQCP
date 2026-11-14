@@ -62,6 +62,30 @@ QPointF pixelOf(const QCPDrawContext& context, const QCP::Position& at, QCPItemP
   arrow.
 */
 
+/*! \fn void QCPItemLine::penChanged(const QPen& pen)
+
+  This signal is emitted when \ref pen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemLine::selectedPenChanged(const QPen& selectedPen)
+
+  This signal is emitted when \ref selectedPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemLine::headChanged(const QCPLineEnding& head)
+
+  This signal is emitted when \ref head changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemLine::tailChanged(const QCPLineEnding& tail)
+
+  This signal is emitted when \ref tail changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates a line item and sets default values.
 
@@ -93,6 +117,7 @@ void QCPItemLine::setPen(const QPen& pen)
         return;
     markDirty();
     mPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemLine::penChanged, this->pen());
 }
 
 /*!
@@ -106,6 +131,7 @@ void QCPItemLine::setSelectedPen(const QPen& pen)
         return;
     markDirty();
     mSelectedPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemLine::selectedPenChanged, selectedPen());
 }
 
 /*!
@@ -122,6 +148,7 @@ void QCPItemLine::setHead(const QCPLineEnding& head)
         return;
     markDirty();
     mHead = head;
+    qcpEmit(this, mParentPlot, &QCPItemLine::headChanged, this->head());
 }
 
 /*!
@@ -138,6 +165,7 @@ void QCPItemLine::setTail(const QCPLineEnding& tail)
         return;
     markDirty();
     mTail = tail;
+    qcpEmit(this, mParentPlot, &QCPItemLine::tailChanged, this->tail());
 }
 
 /* inherits documentation from base class */

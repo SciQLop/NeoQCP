@@ -39,10 +39,11 @@ class QCP_LIB_DECL QCPItemRect : public QCPAbstractItem
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QPen pen READ pen WRITE setPen)
-    Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen)
-    Q_PROPERTY(QBrush brush READ brush WRITE setBrush)
-    Q_PROPERTY(QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush)
+    Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
+    Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen NOTIFY selectedPenChanged)
+    Q_PROPERTY(QBrush brush READ brush WRITE setBrush NOTIFY brushChanged)
+    Q_PROPERTY(
+        QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush NOTIFY selectedBrushChanged)
     /// \endcond
 
 public:
@@ -81,6 +82,12 @@ public:
     QCPItemAnchor* const bottom;
     QCPItemAnchor* const bottomLeft;
     QCPItemAnchor* const left;
+
+signals:
+    void penChanged(const QPen& pen);
+    void selectedPenChanged(const QPen& selectedPen);
+    void brushChanged(const QBrush& brush);
+    void selectedBrushChanged(const QBrush& selectedBrush);
 
 protected:
     enum AnchorIndex

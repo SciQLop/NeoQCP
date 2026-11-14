@@ -68,6 +68,60 @@
   updatePosition must be called manually, prior to reading the tracer coordinates.
 */
 
+/*! \fn void QCPItemTracer::penChanged(const QPen& pen)
+
+  This signal is emitted when \ref pen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemTracer::selectedPenChanged(const QPen& selectedPen)
+
+  This signal is emitted when \ref selectedPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemTracer::brushChanged(const QBrush& brush)
+
+  This signal is emitted when \ref brush changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemTracer::selectedBrushChanged(const QBrush& selectedBrush)
+
+  This signal is emitted when \ref selectedBrush changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemTracer::sizeChanged(double size)
+
+  This signal is emitted when \ref size changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemTracer::styleChanged(QCPItemTracer::TracerStyle style)
+
+  This signal is emitted when \ref style changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemTracer::graphChanged(QCPGraph* graph)
+
+  This signal is emitted when \ref graph changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemTracer::graphKeyChanged(double graphKey)
+
+  This signal is emitted when \ref graphKey changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemTracer::interpolatingChanged(bool interpolating)
+
+  This signal is emitted when \ref interpolating changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates a tracer item and sets default values.
 
@@ -103,6 +157,7 @@ void QCPItemTracer::setPen(const QPen& pen)
         return;
     markDirty();
     mPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemTracer::penChanged, this->pen());
 }
 
 /*!
@@ -116,6 +171,7 @@ void QCPItemTracer::setSelectedPen(const QPen& pen)
         return;
     markDirty();
     mSelectedPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemTracer::selectedPenChanged, selectedPen());
 }
 
 /*!
@@ -129,6 +185,7 @@ void QCPItemTracer::setBrush(const QBrush& brush)
         return;
     markDirty();
     mBrush = brush;
+    qcpEmit(this, mParentPlot, &QCPItemTracer::brushChanged, this->brush());
 }
 
 /*!
@@ -142,6 +199,7 @@ void QCPItemTracer::setSelectedBrush(const QBrush& brush)
         return;
     markDirty();
     mSelectedBrush = brush;
+    qcpEmit(this, mParentPlot, &QCPItemTracer::selectedBrushChanged, selectedBrush());
 }
 
 /*!
@@ -154,6 +212,7 @@ void QCPItemTracer::setSize(double size)
         return;
     markDirty();
     mSize = size;
+    qcpEmit(this, mParentPlot, &QCPItemTracer::sizeChanged, this->size());
 }
 
 /*!
@@ -168,6 +227,7 @@ void QCPItemTracer::setStyle(QCPItemTracer::TracerStyle style)
         return;
     markDirty();
     mStyle = style;
+    qcpEmit(this, mParentPlot, &QCPItemTracer::styleChanged, this->style());
 }
 
 /*!
@@ -191,6 +251,7 @@ void QCPItemTracer::setGraph(QCPGraph* graph, int component)
                             "the component is outside the graph's columns");
     if (!graph && !mGraph && !mFollowsGraph)
         return;
+    const QCPGraph* before = mGraph.data();
     if (mGraph)
         mGraph->removeDependent(this);
     markDirty();
@@ -205,12 +266,16 @@ void QCPItemTracer::setGraph(QCPGraph* graph, int component)
         // repaint it even when the graph's layer is the only one the change marks.
         graph->addDependent(this);
         updatePosition();
-        return;
     }
-    if (graph)
-        qDebug() << Q_FUNC_INFO << "graph isn't in same QCustomPlot instance as this item";
-    mGraph = nullptr;
-    mFollowsGraph = false;
+    else
+    {
+        if (graph)
+            qDebug() << Q_FUNC_INFO << "graph isn't in same QCustomPlot instance as this item";
+        mGraph = nullptr;
+        mFollowsGraph = false;
+    }
+    if (mGraph != before)
+        qcpEmit(this, mParentPlot, &QCPItemTracer::graphChanged, mGraph.data());
 }
 
 void QCPItemTracer::setComponent(int component)
@@ -241,6 +306,7 @@ void QCPItemTracer::setGraphKey(double key)
         return;
     markDirty();
     mGraphKey = key;
+    qcpEmit(this, mParentPlot, &QCPItemTracer::graphKeyChanged, graphKey());
 }
 
 /*!
@@ -260,6 +326,7 @@ void QCPItemTracer::setInterpolating(bool enabled)
         return;
     markDirty();
     mInterpolating = enabled;
+    qcpEmit(this, mParentPlot, &QCPItemTracer::interpolatingChanged, interpolating());
 }
 
 namespace

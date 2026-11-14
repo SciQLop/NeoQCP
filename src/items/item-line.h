@@ -39,10 +39,10 @@ class QCP_LIB_DECL QCPItemLine : public QCPAbstractItem
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QPen pen READ pen WRITE setPen)
-    Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen)
-    Q_PROPERTY(QCPLineEnding head READ head WRITE setHead)
-    Q_PROPERTY(QCPLineEnding tail READ tail WRITE setTail)
+    Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
+    Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen NOTIFY selectedPenChanged)
+    Q_PROPERTY(QCPLineEnding head READ head WRITE setHead NOTIFY headChanged)
+    Q_PROPERTY(QCPLineEnding tail READ tail WRITE setTail NOTIFY tailChanged)
     /// \endcond
 
 public:
@@ -75,6 +75,12 @@ public:
 
     QCPItemPosition* const start;
     QCPItemPosition* const end;
+
+signals:
+    void penChanged(const QPen& pen);
+    void selectedPenChanged(const QPen& selectedPen);
+    void headChanged(const QCPLineEnding& head);
+    void tailChanged(const QCPLineEnding& tail);
 
 protected:
     // property members:

@@ -42,6 +42,30 @@
   drawn in.
 */
 
+/*! \fn void QCPItemEllipse::penChanged(const QPen& pen)
+
+  This signal is emitted when \ref pen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemEllipse::selectedPenChanged(const QPen& selectedPen)
+
+  This signal is emitted when \ref selectedPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemEllipse::brushChanged(const QBrush& brush)
+
+  This signal is emitted when \ref brush changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemEllipse::selectedBrushChanged(const QBrush& selectedBrush)
+
+  This signal is emitted when \ref selectedBrush changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates an ellipse item and sets default values.
 
@@ -84,6 +108,7 @@ void QCPItemEllipse::setPen(const QPen& pen)
         return;
     markDirty();
     mPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemEllipse::penChanged, this->pen());
 }
 
 /*!
@@ -97,6 +122,7 @@ void QCPItemEllipse::setSelectedPen(const QPen& pen)
         return;
     markDirty();
     mSelectedPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemEllipse::selectedPenChanged, selectedPen());
 }
 
 /*!
@@ -111,6 +137,7 @@ void QCPItemEllipse::setBrush(const QBrush& brush)
         return;
     markDirty();
     mBrush = brush;
+    qcpEmit(this, mParentPlot, &QCPItemEllipse::brushChanged, this->brush());
 }
 
 /*!
@@ -125,6 +152,7 @@ void QCPItemEllipse::setSelectedBrush(const QBrush& brush)
         return;
     markDirty();
     mSelectedBrush = brush;
+    qcpEmit(this, mParentPlot, &QCPItemEllipse::selectedBrushChanged, selectedBrush());
 }
 
 /* inherits documentation from base class */

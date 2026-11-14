@@ -260,10 +260,12 @@ class QCP_LIB_DECL QCPAbstractItem : public QCPLayerable, public QCPDrawable
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(bool clipToAxisRect READ clipToAxisRect WRITE setClipToAxisRect)
-    Q_PROPERTY(QCPAxisRect* clipAxisRect READ clipAxisRect WRITE setClipAxisRect)
-    Q_PROPERTY(QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY
-                       selectableChanged)
+    Q_PROPERTY(bool clipToAxisRect READ clipToAxisRect WRITE setClipToAxisRect NOTIFY
+                   clipToAxisRectChanged)
+    Q_PROPERTY(QCPAxisRect* clipAxisRect READ clipAxisRect WRITE setClipAxisRect NOTIFY
+                   clipAxisRectChanged)
+    Q_PROPERTY(
+        QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY selectableChanged)
     Q_PROPERTY(bool selected READ selected WRITE setSelected NOTIFY selectionChanged)
     /// \endcond
 
@@ -363,6 +365,8 @@ signals:
     void selectionChanged();
     void selectableChanged();
     void deleteRequested();
+    void clipToAxisRectChanged(bool clipToAxisRect);
+    void clipAxisRectChanged(QCPAxisRect* clipAxisRect);
 
 protected:
     // property members:

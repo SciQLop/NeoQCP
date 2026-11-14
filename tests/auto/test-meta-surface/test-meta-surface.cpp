@@ -60,6 +60,19 @@ QCPColorScale* colorScaleOn(QCustomPlot& plot)
     return scale;
 }
 
+template <typename Item>
+QObject* itemOn(QCustomPlot& plot)
+{
+    return plot.add<Item>().get();
+}
+
+QCPAxisRect* axisRectOn(QCustomPlot& plot)
+{
+    auto* rect = new QCPAxisRect(&plot);
+    plot.plotLayout()->addElement(2, 0, rect);
+    return rect;
+}
+
 void removeAxis(QObject* object)
 {
     auto* axis = qobject_cast<QCPAxis*>(object);
@@ -491,6 +504,19 @@ const QVector<Fixture>& fixtures()
         { "QCPCurve", [](QCustomPlot& plot) -> QObject* { return curveOn(plot); } },
         { "QCPBars", [](QCustomPlot& plot) -> QObject* { return barsOn(plot); } },
         { "QCPBarsGroup", [](QCustomPlot& plot) -> QObject* { return new QCPBarsGroup(&plot); } },
+        { "QCPItemBracket", itemOn<QCPItemBracket> },
+        { "QCPItemCurve", itemOn<QCPItemCurve> },
+        { "QCPItemEllipse", itemOn<QCPItemEllipse> },
+        { "QCPItemLine", itemOn<QCPItemLine> },
+        { "QCPItemPixmap", itemOn<QCPItemPixmap> },
+        { "QCPItemRect", itemOn<QCPItemRect> },
+        { "QCPItemRichText", itemOn<QCPItemRichText> },
+        { "QCPItemRSpan", itemOn<QCPItemRSpan> },
+        { "QCPItemSpan",
+          [](QCustomPlot& plot) -> QObject* { return plot.add<QCPItemSpan>(Qt::Vertical).get(); } },
+        { "QCPItemStraightLine", itemOn<QCPItemStraightLine> },
+        { "QCPItemText", itemOn<QCPItemText> },
+        { "QCPItemTracer", itemOn<QCPItemTracer> },
         { "QCPColorMap",
           [](QCustomPlot& plot) -> QObject* { return new QCPColorMap(plot.xAxis, plot.yAxis); } },
         { "QCPErrorBars",
@@ -628,6 +654,10 @@ const QVector<std::pair<QMetaType, Different>>& differentValues()
         differentFor<QCPAbstractPlottable*>(
             [](QCPAbstractPlottable* const&, QObject* object) -> QCPAbstractPlottable*
             { return graphOn(*plotOf(object)); }),
+        differentFor<QCPGraph*>([](QCPGraph* const&, QObject* object) -> QCPGraph*
+                                { return graphOn(*plotOf(object)); }),
+        differentFor<QCPAxisRect*>([](QCPAxisRect* const&, QObject* object) -> QCPAxisRect*
+                                   { return axisRectOn(*plotOf(object)); }),
         differentFor<QCPBarsGroup*>([](QCPBarsGroup* const&, QObject* object) -> QCPBarsGroup*
                                     { return new QCPBarsGroup(plotOf(object)); }),
         differentFor<QCPColorScale*>([](QCPColorScale* const&, QObject* object) -> QCPColorScale*
@@ -660,6 +690,14 @@ QVariant differentEnum(const QMetaProperty& property, const QVariant& current)
     if (!value.convert(property.metaType()))
         return {};
     return value;
+}
+
+// QVariant's own ==, except for the types without an operator== (QPixmap: the same image).
+bool same(const QVariant& a, const QVariant& b)
+{
+    if (a.metaType() == QMetaType::fromType<QPixmap>() && b.metaType() == a.metaType())
+        return a.value<QPixmap>().cacheKey() == b.value<QPixmap>().cacheKey();
+    return a == b;
 }
 
 QVariant differentValue(const QMetaProperty& property, const QVariant& current, QObject* object)
@@ -951,6 +989,17 @@ const QVector<Writer>& writers()
           },
           { "barsGroup" },
           { } },
+        { "QCPAbstractItem::setClipArea",
+          [](QCustomPlot& plot) -> QObject* { return plot.add<QCPItemLine>().get(); },
+          [](QObject* o)
+          {
+              auto* item = qobject_cast<QCPAbstractItem*>(o);
+              QCustomPlot* plot = item->parentPlot();
+              if (item->clipAxisRect().get() == plot->axisRect().get())
+                  item->setClipArea(axisRectOn(*plot));
+          },
+          { "clipAxisRect" },
+          { "clipToAxisRect" } },
         { "QCPColorScale's axis label",
           [](QCustomPlot& plot) -> QObject* { return colorScaleOn(plot); },
           [](QObject* o)
@@ -1152,7 +1201,7 @@ void TestMetaSurface::everyNotifyPropertyNotifiesOncePerChange()
                                      : differentValue(meta, current, object);
     QVERIFY2(other.isValid(), qPrintable(QStringLiteral("no different value for type %1")
                                              .arg(QLatin1String(meta.typeName()))));
-    QVERIFY2(other != current, "the different value is equal to the current one");
+    QVERIFY2(!same(other, current), "the different value is equal to the current one");
 
     QSignalSpy spy(object, meta.notifySignal());
     QVERIFY(spy.isValid());
@@ -1168,9 +1217,9 @@ void TestMetaSurface::everyNotifyPropertyNotifiesOncePerChange()
         QCOMPARE(spy.count(), 0);
     }
     QCOMPARE(spy.count(), 1);
-    QCOMPARE(meta.read(object), other);
+    QVERIFY(same(meta.read(object), other));
     if (signalCarriesValue(meta))
-        QCOMPARE(spy.first().first(), other);
+        QVERIFY(same(spy.first().first(), other));
 
     if (!exception || exception->rule != Rule::TakesOwnership)
     {

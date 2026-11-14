@@ -49,6 +49,30 @@
   orientations.
 */
 
+/*! \fn void QCPItemPixmap::pixmapChanged(const QPixmap& pixmap)
+
+  This signal is emitted when \ref pixmap changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemPixmap::scaledChanged(bool scaled)
+
+  This signal is emitted when \ref scaled changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemPixmap::penChanged(const QPen& pen)
+
+  This signal is emitted when \ref pen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPItemPixmap::selectedPenChanged(const QPen& selectedPen)
+
+  This signal is emitted when \ref selectedPen changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates a rectangle item and sets default values.
 
@@ -92,11 +116,16 @@ void QCPItemPixmap::setPixmap(const QPixmap& pixmap)
     mImage = QImage(); // the converted picture is the old one
     if (mPixmap.isNull())
         qDebug() << Q_FUNC_INFO << "pixmap is null";
+    qcpEmit(this, mParentPlot, &QCPItemPixmap::pixmapChanged, this->pixmap());
 }
 
 /*!
   Sets whether the pixmap will be scaled to fit the rectangle defined by the \a topLeft and \a
   bottomRight positions.
+
+  The \ref scaled property writes through this function with the default modes: a binding or a
+  QMetaProperty write on \c scaled resets \a aspectRatioMode and \a transformationMode.
+  \ref scaledChanged fires only when \a scaled moves.
 */
 void QCPItemPixmap::setScaled(bool scaled, Qt::AspectRatioMode aspectRatioMode,
                               Qt::TransformationMode transformationMode)
@@ -105,10 +134,14 @@ void QCPItemPixmap::setScaled(bool scaled, Qt::AspectRatioMode aspectRatioMode,
         && transformationMode == mTransformationMode)
         return;
     markDirty();
+    const bool moved = scaled != mScaled;
     mScaled = scaled;
     mAspectRatioMode = aspectRatioMode;
     mTransformationMode = transformationMode;
     mScaledPixmapInvalidated = true;
+    // The two modes are off the surface (E-11): a change of them alone repaints with no signal.
+    if (moved)
+        qcpEmit(this, mParentPlot, &QCPItemPixmap::scaledChanged, mScaled);
 }
 
 /*!
@@ -122,6 +155,7 @@ void QCPItemPixmap::setPen(const QPen& pen)
         return;
     markDirty();
     mPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemPixmap::penChanged, this->pen());
 }
 
 /*!
@@ -135,6 +169,7 @@ void QCPItemPixmap::setSelectedPen(const QPen& pen)
         return;
     markDirty();
     mSelectedPen = pen;
+    qcpEmit(this, mParentPlot, &QCPItemPixmap::selectedPenChanged, selectedPen());
 }
 
 namespace

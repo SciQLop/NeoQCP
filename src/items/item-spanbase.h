@@ -31,7 +31,14 @@ public:
     void setBorderPen(const QPen& pen);
     void setSelectedBorderPen(const QPen& pen);
 
-    void setMovable(bool movable) { mMovable = movable; }
+    void setMovable(bool movable);
+
+signals:
+    void brushChanged(const QBrush& brush);
+    void selectedBrushChanged(const QBrush& selectedBrush);
+    void borderPenChanged(const QPen& borderPen);
+    void selectedBorderPenChanged(const QPen& selectedBorderPen);
+    void movableChanged(bool movable);
 
 protected:
     QBrush mBrush, mSelectedBrush;

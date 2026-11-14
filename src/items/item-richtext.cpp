@@ -12,6 +12,11 @@ QCPItemRichText::QCPItemRichText(QCustomPlot* parentPlot)
 
 QCPItemRichText::~QCPItemRichText() { }
 
+/*! \fn void QCPItemRichText::htmlChanged(const QString& html)
+
+  This signal is emitted when \ref html changes, after the plot delivers its deferred signals.
+*/
+
 void QCPItemRichText::setHtml(const QString& html)
 {
     if (html == mHtml)
@@ -22,6 +27,7 @@ void QCPItemRichText::setHtml(const QString& html)
     mDoc.setHtml(html);
     mBoundingRect = QRectF(QPointF(0, 0), mDoc.size());
     mUseHtml = true;
+    qcpEmit(this, mParentPlot, &QCPItemRichText::htmlChanged, this->html());
 }
 
 void QCPItemRichText::clearHtml()

@@ -318,6 +318,7 @@ it instead of `property("name")`.
 | `QCPAbstractLegendItem` | `parentLegend` | `parentLegend()` |
 | `QCPBars` | `barBelow`, `barAbove` | `barBelow()`, `barAbove()` |
 | `QCPErrorBars` | `data` | `data()` (a shared container, mutated in place with no signal) |
+| `QCPItemPixmap` | `aspectRatioMode`, `transformationMode` | `aspectRatioMode()`, `transformationMode()` |
 
 ### Signals
 
@@ -336,3 +337,8 @@ it instead of `property("name")`.
 - `QCPErrorBars::dataPlottableChanged(nullptr)` fires when a refused `setDataPlottable` detaches the old one.
 - `QCPScatterStyle` has an `operator==`. Equal writes of an outlier style, an error bars' data plottable, a
   selection decorator or an axis no longer repaint or re-register.
+- The span signals (`brushChanged`, `borderPenChanged`, `movableChanged` and the selected ones) are declared on
+  `QCPAbstractSpanItem`, where the setters are; `QCPAbstractSpanItem::setMovable` moved out of line.
+- `QCPAbstractItem::clipAxisRectChanged` also fires on `setClipArea` when the clip axis rect moves.
+- Writing `QCPItemPixmap::scaled` through the property (a binding, `setProperty`) resets the two modes to their
+  defaults, as it did before; `scaledChanged` fires only when `scaled` moves.
