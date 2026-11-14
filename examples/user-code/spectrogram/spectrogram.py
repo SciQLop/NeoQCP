@@ -21,8 +21,9 @@ s2[t <= 10] = s2[12 <= t] = 0
 x = s1 + s2 + 0.01 * np.random.random(size=len(t))
 power, frequency, time = mlab.specgram(x, NFFT=1024, Fs=1 / dt, noverlap=128)
 
-spectrum = plot.axisRect()
-signal = plot.addAxisRect(shareX=spectrum)
+plot.setAxisRectGrid(2, 1, shareX=True)
+spectrum = plot.axisRect(0, 0)
+signal = plot.axisRect(1, 0)
 
 spectrum.colorMap(time, frequency[1:], power[1:].T.ravel(),  # no 0 Hz row on a log axis
                   gradient=QCPColorGradient.gpViridis, dataScale=QCPScale.log())

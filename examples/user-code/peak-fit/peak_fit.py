@@ -66,8 +66,9 @@ rng = np.random.default_rng(7)
 energy = np.arange(401) * 0.25
 counts = 12 + rng.normal(0, 6, energy.size) + basis(energy, [(25, 2.5), (48, 4), (70, 3)])[:, 1:] @ [120, 80, 150]
 
-spectrum = plot.axisRect()
-residuals = plot.addAxisRect(shareX=spectrum, stretch=0.35)
+plot.setAxisRectGrid(2, 1, shareX=True, rowStretch=[1, 0.35])
+spectrum = plot.axisRect(0, 0)
+residuals = plot.axisRect(1, 0)
 spectrum.yAxis().setLabel("counts")
 residuals.yAxis().setLabel("residual")
 residuals.xAxis().setLabel("energy (keV)")

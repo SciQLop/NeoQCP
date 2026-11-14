@@ -13,9 +13,10 @@ plot.resize(640, 720)
 x = np.arange(-50.0, 50.0, 0.01)
 y = np.arange(0, 100.0, 0.01)
 
-ax0 = plot.axisRect()
-ax1 = plot.addAxisRect()
-ax2 = plot.addAxisRect()
+plot.setAxisRectGrid(3, 1)
+ax0 = plot.axisRect(0, 0)
+ax1 = plot.axisRect(1, 0)
+ax2 = plot.axisRect(2, 0)
 blue = QPen(QColor(31, 119, 180), 1.5)
 
 ax0.line(x, y, pen=blue)

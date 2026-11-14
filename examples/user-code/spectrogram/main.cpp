@@ -66,8 +66,9 @@ int main(int argc, char** argv)
     }
     const Spectrogram s = spectrogram(x, 1024, 1 / dt, 128);
 
-    auto spectrum = plot.axisRect();
-    auto signal = plot.addAxisRect({ .shareX = spectrum });
+    plot.setAxisRectGrid(2, 1, { .shareX = true });
+    auto spectrum = plot.axisRect(0, 0);
+    auto signal = plot.axisRect(1, 0);
 
     spectrum->colorMap(s.time, s.frequency, s.power,
                        { .gradient = QCPColorGradient::gpViridis, .dataScale = QCPScale::log() });

@@ -1,5 +1,5 @@
 // Target program (milestone 6): annotation connectors, one style per panel. Does not compile yet.
-// https://matplotlib.org/stable/gallery/userdemo/connectionstyle_demo.html
+// https://matplotlib.org/stable/gallery/userdemo/connectorstyle_demo.html
 
 #include <qcustomplot.h>
 
@@ -26,11 +26,11 @@ void showPanel(QCPAxisRect* ax)
     }
 }
 
-void demoConnection(QCPAxisRect* ax, const QCPConnection& connection, const QString& name)
+void demoConnector(QCPAxisRect* ax, const QCPConnector& connector, const QString& name)
 {
     showPanel(ax);
     ax->annotation(point, label, "",
-                   { .connection = connection, .pen = QPen(grey), .head = QCPLineEnding::esLineArrow,
+                   { .connector = connector, .pen = QPen(grey), .head = QCPLineEnding::esLineArrow,
                      .shrink = 5_px });
     ax->text(QCP::AxisRatio { 0.05, 0.05 }, name);
 }
@@ -45,32 +45,32 @@ int main(int argc, char** argv)
     const struct
     {
         int row, column;
-        QCPConnection connection;
+        QCPConnector connector;
         QString name;
     } demos[] = {
-        { 0, 0, QCPConnection::curve(90, 0), "curve(90, 0)" },
-        { 1, 0, QCPConnection::curve(0, 90), "curve(0, 90)" },
-        { 0, 1, QCPConnection::arc(0), "arc(0)" },
-        { 1, 1, QCPConnection::arc(0.3), "arc(0.3)" },
-        { 2, 1, QCPConnection::arc(-0.3), "arc(-0.3)" },
-        { 0, 2, QCPConnection::elbow(-90, 180), "elbow(-90, 180)" },
-        { 1, 2, QCPConnection::elbow(-90, 180, 5_px), "elbow(-90, 180,\n5 px)" },
-        { 2, 2, QCPConnection::elbow(-90, 10, 5_px), "elbow(-90, 10,\n5 px)" },
-        { 0, 3, QCPConnection::arms(-90, 30_px, 0, 30_px), "arms(-90, 30 px,\n0, 30 px)" },
-        { 1, 3, QCPConnection::arms(-90, 30_px, 0, 30_px, 5_px), "arms(-90, 30 px,\n0, 30 px, 5 px)" },
-        { 2, 3, QCPConnection::arms(-90, 0_px, 0, 40_px), "arms(-90, 0 px,\n0, 40 px)" },
-        { 0, 4, QCPConnection::bracket(0.3), "bracket(0.3)" },
-        { 1, 4, QCPConnection::bracket(-0.3), "bracket(-0.3)" },
-        { 2, 4, QCPConnection::bracket(-0.2, 180), "bracket(-0.2, 180)" },
+        { 0, 0, QCPConnector::curve(90, 0), "curve(90, 0)" },
+        { 1, 0, QCPConnector::curve(0, 90), "curve(0, 90)" },
+        { 0, 1, QCPConnector::arc(0), "arc(0)" },
+        { 1, 1, QCPConnector::arc(0.3), "arc(0.3)" },
+        { 2, 1, QCPConnector::arc(-0.3), "arc(-0.3)" },
+        { 0, 2, QCPConnector::elbow(-90, 180), "elbow(-90, 180)" },
+        { 1, 2, QCPConnector::elbow(-90, 180, 5_px), "elbow(-90, 180,\n5 px)" },
+        { 2, 2, QCPConnector::elbow(-90, 10, 5_px), "elbow(-90, 10,\n5 px)" },
+        { 0, 3, QCPConnector::arms(-90, 30_px, 0, 30_px), "arms(-90, 30 px,\n0, 30 px)" },
+        { 1, 3, QCPConnector::arms(-90, 30_px, 0, 30_px, 5_px), "arms(-90, 30 px,\n0, 30 px, 5 px)" },
+        { 2, 3, QCPConnector::arms(-90, 0_px, 0, 40_px), "arms(-90, 0 px,\n0, 40 px)" },
+        { 0, 4, QCPConnector::bracket(0.3), "bracket(0.3)" },
+        { 1, 4, QCPConnector::bracket(-0.3), "bracket(-0.3)" },
+        { 2, 4, QCPConnector::bracket(-0.2, 180), "bracket(-0.2, 180)" },
     };
     for (const auto& demo : demos)
-        demoConnection(plot.axisRect(demo.row, demo.column), demo.connection, demo.name);
+        demoConnector(plot.axisRect(demo.row, demo.column), demo.connector, demo.name);
 
     // matplotlib leaves this cell empty; it shows the text and its arrow as one annotation.
     auto spare = plot.axisRect(2, 0);
     showPanel(spare);
     spare->annotation(point, label, "text and\narrow",
-                      { .connection = QCPConnection::elbow(-90, 180, 5_px), .pen = QPen(grey),
+                      { .connector = QCPConnector::elbow(-90, 180, 5_px), .pen = QPen(grey),
                         .head = QCPLineEnding::esLineArrow, .shrink = 5_px,
                         .textStyle = { .pen = QPen(grey), .brush = Qt::white,
                                        .padding = QMarginsF(4, 2, 4, 2) } });

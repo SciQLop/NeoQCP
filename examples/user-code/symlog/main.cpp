@@ -22,9 +22,10 @@ int main(int argc, char** argv)
         wave.push_back(std::sin(x.back() / 3.0));
     }
 
-    auto ax0 = plot.axisRect();
-    auto ax1 = plot.addAxisRect();
-    auto ax2 = plot.addAxisRect();
+    plot.setAxisRectGrid(3, 1);
+    auto ax0 = plot.axisRect(0, 0);
+    auto ax1 = plot.axisRect(1, 0);
+    auto ax2 = plot.axisRect(2, 0);
     const QPen blue(QColor(31, 119, 180), 1.5);
 
     ax0->line(x, y, { .pen = blue });

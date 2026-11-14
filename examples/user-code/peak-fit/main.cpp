@@ -141,8 +141,9 @@ int main(int argc, char** argv)
         counts.push_back(c);
     }
 
-    auto spectrum = plot.axisRect();
-    auto residuals = plot.addAxisRect({ .shareX = spectrum, .stretch = 0.35 });
+    plot.setAxisRectGrid(2, 1, { .shareX = true, .rowStretch = { 1, 0.35 } });
+    auto spectrum = plot.axisRect(0, 0);
+    auto residuals = plot.axisRect(1, 0);
     spectrum->yAxis()->setLabel("counts");
     residuals->yAxis()->setLabel("residual");
     residuals->xAxis()->setLabel("energy (keV)");

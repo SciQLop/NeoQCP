@@ -25,8 +25,9 @@ int main(int argc, char** argv)
         y2.push_back(20 * std::pow(std::cos(2 * pi * t2.back()), 2) * std::exp(-0.3 * t2.back()));
     }
 
-    auto ax1 = plot.axisRect();
-    auto ax2 = plot.addAxisRect({ .shareX = ax1 });
+    plot.setAxisRectGrid(2, 1, { .shareX = true });
+    auto ax1 = plot.axisRect(0, 0);
+    auto ax2 = plot.axisRect(1, 0);
     const QPen blue(QColor(31, 119, 180), 1.5);
 
     ax1->line(t1, y1, { .pen = blue });

@@ -15,8 +15,9 @@ y1 = np.sin(2 * np.pi * t1)
 t2 = np.linspace(2, 10, 201)
 y2 = 20 * np.cos(2 * np.pi * t2) ** 2 * np.exp(-0.3 * t2)
 
-ax1 = plot.axisRect()
-ax2 = plot.addAxisRect(shareX=ax1)
+plot.setAxisRectGrid(2, 1, shareX=True)
+ax1 = plot.axisRect(0, 0)
+ax2 = plot.axisRect(1, 0)
 blue = QPen(QColor(31, 119, 180), 1.5)
 
 ax1.line(t1, y1, pen=blue)
