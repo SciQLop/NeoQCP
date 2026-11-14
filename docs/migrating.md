@@ -86,6 +86,7 @@ Most changes are confined to the new classes. A few touch existing code.
   - Deleting a selection rect no longer emits its `canceled` signal. If your code resets its own drag state on `canceled`, also watch the rect's `destroyed` signal.
   - `setSelectionRect()` with the rect already in use does nothing. It used to delete and reinstall it.
   - Deleting a `QCPColorScale` detaches the colour maps that use it, without a signal. Their `colorScale()` then returns `nullptr`.
+  - A signal argument that points to an object arrives as `nullptr` when that object was deleted before the signal was delivered.
 - **Span dragging.** Dragging a `QCPItemSpan` or `QCPItemRSpan` moves its edges by the mouse movement in pixels, whatever the type of their positions. An edge placed in pixels used to move by the wrong amount. If the axis moves during the drag, the edge now stays under the pointer.
 - **Native pinch.** A macOS pinch that the plot does not zoom on is left to the parent widget. It used to be swallowed.
 - **New axes are followed.** `QCPGraph`, `QCPColorMap2`, `QCPHistogram2D` and `QCPHistogram` follow the scale and range of an axis given later with `setKeyAxis()` or `setValueAxis()`, not only the axes they were built with.
@@ -189,6 +190,49 @@ Behaviour that changed:
 - **Removing points.** `removeData(from, to)` removes nothing when `from >= to`, as 2.x.
 - **Equal values.** `setPen()` with the pen the graph already has does not repaint.
 - **New virtual.** `QCPAbstractPlottable::assignSelection(const QCPDataSelection&)` is a new protected virtual, called when the selection is set. A plottable of your own that has a method of that name must rename it.
+
+## Properties, change signals and bindings
+
+Every property you can set has a change signal, `xChanged(T)`, carrying the new value.
+So every such property can be bound from C++, with Qt's property bindings.
+
+Bind with `QBindable<T>(object, "name")`.
+There are no `bindableX()` accessors.
+Inside a binding, read a property with `value()`: that is what makes it a dependency.
+
+```{literalinclude} snippets/migrating.cpp
+:start-after: // [migrating_bindings]
+:end-before: // [/migrating_bindings]
+:language: cpp
+:dedent:
+```
+
+A binding writes through the setter, like a call.
+A setter that refuses a value refuses it from a binding too.
+A plain write does not break a binding: `setLabel("x")` on a bound label sets it, and the next change of a
+dependency writes over it.
+
+Change signals are deferred, like every NeoQCP signal.
+They arrive once, after the operation that caused them, not in the middle of it.
+A write of an equal value sends nothing.
+
+A binding must not keep a `QBindable` of another object.
+That `QBindable` dies with its object.
+A binding that captured one crashes on its next evaluation once the object is deleted.
+Hold the source by `QPointer` instead, and build a fresh `QBindable` inside the binding:
+
+```{literalinclude} snippets/migrating.cpp
+:start-after: // [migrating_binding_guarded]
+:end-before: // [/migrating_binding_guarded]
+:language: cpp
+:dedent:
+```
+
+A few more things to know:
+
+- **A pointer that goes null on its own has no signal.** A plottable's axes, an error bar's data plottable and a tracer's graph are held weakly. When the target is deleted, the property reads null, but its change signal does not fire. The target's `destroyed()` is the notification.
+- **Don't delete the plot from a slot that runs during teardown, or from inside a destructor.** Signals sent while an object is being destroyed are delivered at once, and NeoQCP cannot protect a slot that deletes the plot there. Everywhere else a slot may delete its sender, or the plot.
+- **A late connect can miss one change.** NeoQCP queues a change signal only if something listens at that moment. A slot connected after the write, but before delivery, does not get that change. Read the property once when you connect.
 
 ## New classes
 
