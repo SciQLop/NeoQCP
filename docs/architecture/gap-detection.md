@@ -152,14 +152,14 @@ A few details differ from the colormap version:
 - Fewer than 3 points in range: no gap is detected.
 - The result is kept in a small cache on the data source, keyed by the range and the threshold, so a redraw of the same range does not scan again.
 
-Both pixel conversions honour the marks:
+`linesInData()` honours the marks. It works in data space and returns `(key, value)` points:
 
-- `linesInData()` below a few points per pixel emits a NaN point before each marked point.
-- `linesInData()` above it closes the current pixel interval at a marked point, emits a NaN point, and starts a new interval there.
+- When it keeps every point (fewer than about 2 rows per pixel), it emits a NaN point before each marked row.
+- When it thins to the min/max envelope, it closes the current bucket at a marked row, emits a NaN point, and starts a new bucket there.
 
-The NaN point breaks the polyline: the line extruder and `QPainter` both start a new segment after it.
+The NaN point breaks the line: the replay starts a new segment after it, on the GPU and with `QPainter` alike.
 
-NaN values in the data break the line too, when you could see the hole. `linesInData()` breaks at every NaN below 2 samples per pixel. Above that it breaks when a NaN run is wider than a pixel. A narrower run cannot be seen, so the line joins the samples on either side.
+NaN values in the data break the line too, when you could see the hole. While every point is kept, each NaN breaks the line. In the envelope, a NaN run breaks it only when it is wider than one bucket, that is one pixel. A narrower run cannot be seen, so the line joins the rows on either side.
 
 ### Resampled lines
 

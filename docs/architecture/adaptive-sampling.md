@@ -2,47 +2,48 @@
 
 When a <a href="../api/classQCPGraph.html">QCPGraph</a> has far more data points than pixels, NeoQCP consolidates the points of each pixel column into a min/max cluster. This preserves the visual envelope (peaks and valleys are never hidden) while drawing only 2 to 4 points per pixel.
 
-For large data this per-pixel step is preceded by two coarser resampling levels, described in [Two-Level Resampling](#two-level-resampling). The per-pixel step is `linesInData()`: below a few points per pixel it keeps every point, above it thins to the min/max envelope.
+For large data this per-pixel step is preceded by two coarser resampling levels, described in [Two-Level Resampling](#two-level-resampling). The per-pixel step is `linesInData()`, one function in data space: below 2 points per pixel it keeps every point, above it thins to the min/max envelope.
 
 ## When It Activates
 
-The algorithm compares the number of data points in the range being drawn to the key-axis pixel span:
+`linesInData()` works in data space. It takes the rows to draw and `pixelsPerKey`, the key axis' pixels per data unit, and returns `(key, value)` points. The draw records them as they are, and the replay maps them to pixels through the frame's transform.
 
 ```
-keyPixelSpan = |coordToPixel(firstKey) - coordToPixel(lastKey)|
-maxCount = 2 × keyPixelSpan + 2
+keySpan  = pixelsPerKey × |lastKey - firstKey|      // the rows' width in pixels
+maxCount = 2 × keySpan + 2
 ```
 
-- If `dataCount < maxCount` → **direct rendering** (every point is converted to a pixel coordinate)
-- If `dataCount >= maxCount` → **adaptive sampling** kicks in
+- If `dataCount < maxCount` → **every point** is kept.
+- If `dataCount >= maxCount` → the **min/max envelope** kicks in.
+
+On a logarithmic key axis the span is measured in decades, and `pixelsPerKey` counts pixels per decade.
+`pixelsPerKey = 0` keeps every point: `setAdaptiveSampling(false)` does that, and so does a graph on a system that is not cartesian.
 
 Typical trigger: a 1000-pixel-wide plot showing 100K+ data points.
 
-`setAdaptiveSampling(false)` on the graph skips it and always renders directly. A graph coloured by a scalar (`setColorValues()`) also renders directly.
-
 ## Algorithm
 
-The algorithm walks through the data linearly, grouping points into pixel-width intervals.
+The keys are cut into buckets one pixel wide, starting at the first key: `1 / pixelsPerKey` data units each (one pixel of `log10(key)` on a log axis). The algorithm walks the rows once and keeps the extremes of each bucket.
 
 ```mermaid
 flowchart TD
-    A["Start at first visible non-NaN point"] --> B{"Next point in<br/>same pixel interval?"}
-    B -->|Yes| C["Track min and max<br/>values in this interval"]
+    A["Start at first non-NaN row"] --> B{"Next row in<br/>the same bucket?"}
+    B -->|Yes| C["Track min and max<br/>values in this bucket"]
     C --> B
-    B -->|No| D{"How many points<br/>in this interval?"}
+    B -->|No| D{"How many rows<br/>in this bucket?"}
     D -->|"≥ 2"| E["Emit 2-4 points:<br/>(first), min/max in time order, (last)"]
-    D -->|"1"| F["Emit single point"]
-    E --> G["Start new interval<br/>at current point"]
+    D -->|"1"| F["Emit the row itself"]
+    E --> G["Start a new bucket<br/>at the current row"]
     F --> G
     G --> B
 ```
 
-NaN values are skipped. A detected gap (see [Gap Detection](gap-detection.md)) closes the current interval and emits a NaN point, which breaks the polyline there.
+A detected gap (see [Gap Detection](gap-detection.md)) or a NaN run wider than a pixel closes the current bucket and emits a NaN point, which breaks the line there.
 
-### Per-Interval Output
+### Per-Bucket Output
 
-For each pixel interval containing 2+ data points, 2 to 4 points are emitted.
-For single-point intervals, the point is emitted at its actual coordinates.
+For each bucket holding 2+ rows, 2 to 4 points are emitted.
+A bucket with one row emits that row as it is.
 
 **Raw data** — thousands of points crammed into a few pixels:
 
@@ -74,26 +75,16 @@ For single-point intervals, the point is emitted at its actual coordinates.
    │◄── pixel 1 ──►◄── pixel 2 ──►◄── pixel 3 ──►◄── pixel 4 ──►
 ```
 
-Within each pixel, the minimum and the maximum are emitted in the order they occur in the data. On a falling line the maximum comes first; emitting min-then-max there would draw a zigzag inside every pixel and make the line look thicker. Across pixels, the last point of one interval connects to the first of the next, forming a continuous polyline that follows the shape of the data with only a handful of points.
+Within each pixel, the minimum and the maximum are emitted in the order they occur in the data. On a falling line the maximum comes first; emitting min-then-max there would draw a zigzag inside every pixel and make the line look thicker. Across pixels, the last point of one bucket connects to the first of the next, forming a continuous polyline that follows the shape of the data with only a handful of points.
 
 | Point | X position | When |
 |---|---|---|
-| **First** | 20% of interval | Only when the previous data point is more than one pixel before this interval (an empty pixel in between): the line then enters at a real data value |
-| **Min / max, whichever comes first** | 25% of interval | Always |
-| **Max / min, the other one** | 75% of interval | Always |
-| **Last** | 80% of interval | Only when the next data point skips at least one empty pixel interval (ensures a clean handoff) |
+| **First** | 20% of the bucket | Only when the previous data point is more than one bucket before this one (an empty bucket in between): the line then enters at a real data value |
+| **Min / max, whichever comes first** | 25% of the bucket | Always |
+| **Max / min, the other one** | 75% of the bucket | Always |
+| **Last** | 80% of the bucket | Only when the next data point skips at least one empty bucket (ensures a clean handoff) |
 
-### Pixel Interval Calculation
-
-The interval width equals one pixel in data coordinates:
-
-```
-keyEpsilon = |pixelToCoord(coordToPixel(x)) - pixelToCoord(coordToPixel(x) + 1)|
-```
-
-For **logarithmic** key axes, `keyEpsilon` is recalculated at each interval start because the data-space width of one pixel varies across the axis.
-
-For **linear** axes, `keyEpsilon` is constant, and the coordinate conversion uses a precomputed affine transform instead of calling the axis for every point.
+The points sit at fixed fractions of the bucket's key span, so the line keeps its shape whatever the data density. The bucket's width is a key span here, not a pixel count: the transform turns it into one pixel.
 
 ## Two-Level Resampling
 
@@ -105,7 +96,7 @@ flowchart LR
     B -->|"GUI thread,<br/>per view"| C["Level 2<br/>4 bins per pixel column"]
     A -.->|"few rows in view"| D["linesInData()"]
     C --> D
-    D --> E["Pixel polyline"]
+    D --> E["(key, value) polyline"]
 ```
 
 1. **Level 1** bins the full key range into equal-width bins and keeps each bin's minimum and maximum, ordered by trend. It runs on the plot's [async pipeline](async-pipeline.md), and the binning itself is split across a shared pool of `binWorker` threads. It is rebuilt only when the data changes. Until the first level 1 arrives, a large graph draws nothing and the layer keeps its previous content.
@@ -115,40 +106,24 @@ flowchart LR
    - Else (zoomed in deep), level 2 is binned from the raw rows in view.
 3. The per-pixel pass above then runs on level 2, or on the raw rows.
 
-During a pan, the graph does not rebuild anything: the cached pixel polyline covers one view width on each side of the visible range, and it is translated on the GPU. 150 ms after the last pure pan, level 2 and the lines are rebuilt; a pan further than one view width rebuilds them at once, and so does a zoom.
+During a pan, the graph does not record again: the recorded line covers one view width on each side of the visible range, and a pan only moves the transform it is replayed through. 150 ms after the last pure pan, level 2 and the lines are rebuilt; a pan further than one view width rebuilds them at once, and so does a zoom.
 
 For exports, a missing level 1 is built synchronously, so the picture is complete.
-
-## Pixel-to-Data Mapping
-
-The draw converts data coordinates to pixel coordinates. It handles both horizontal and vertical key-axis orientations:
-
-```
-Horizontal key axis:     pt.x = keyAxis→coordToPixel(key)
-                         pt.y = valueAxis→coordToPixel(value)
-
-Vertical key axis:       pt.x = valueAxis→coordToPixel(value)
-                         pt.y = keyAxis→coordToPixel(key)
-```
-
-The conversion uses the axis's scale type (linear or logarithmic) internally. Data is stored in native types (float, int, etc.) and cast to `double` only at the coordinate conversion step — no intermediate copies.
 
 ## Data Flow
 
 ```mermaid
 flowchart LR
-    A["QCPAbstractDataSource<br/>(raw SoA, or level 2)"] --> B["findBegin / findEnd<br/>(binary search for<br/>the line cache range)"]
-    B --> C{"dataCount vs<br/>pixel span?"}
-    C -->|"Few points"| D["linesInData()<br/>(every point)"]
-    C -->|"Many points"| E["linesInData()<br/>(adaptive min/max)"]
-    D --> F["QVector&lt;QPointF&gt;<br/>(cached for pans)"]
-    E --> F
-    F --> G{"Solid pen,<br/>on screen?"}
-    G -->|Yes| H["QCPLineExtruder<br/>(GPU triangles,<br/>cached)"]
-    G -->|"No (dashed,<br/>export)"| I["QPainter::drawPolyline<br/>(CPU path)"]
+    A["Data source<br/>(raw rows, or level 2)"] --> B["findBegin / findEnd<br/>(binary search for<br/>the key window)"]
+    B --> C["linesInData()<br/>(every point, or the<br/>min/max envelope)"]
+    C --> D["(key, value) points<br/>recorded as a polyline"]
+    D --> E["Replay maps them<br/>through the transform"]
+    E --> F{"Solid pen,<br/>GPU on screen?"}
+    F -->|Yes| G["QCPLineExtruder<br/>(GPU triangles)"]
+    F -->|"No (dashed,<br/>export)"| H["QPainter polyline"]
 ```
 
-With several columns, `QCPGraph` runs the same steps for all of them in one pass over the keys, sharing the pixel-boundary decisions.
+With several columns, `QCPGraph` calls `linesInData()` once per column over the same rows. The gap marks are cached on the data source, so the later columns reuse them.
 
 ## Limitations
 
@@ -160,8 +135,8 @@ With several columns, `QCPGraph` runs the same steps for all of them in one pass
 
 | File | Role |
 |---|---|
-| `src/datasource/algorithms.h` | `qcp::algo::linesInData()` — the per-pixel algorithm, in data space; gap detection |
+| `src/datasource/algorithms.h` | `qcp::algo::linesInData()` — the per-pixel algorithm, in data space (`envelopeInto()`, `KeyBucketGrid`, `LogKeyBucketGrid`); gap detection |
 | `src/datasource/graph-resampler.h` | `buildL1Cache()`, `resampleL2()` and their multi-column versions — the two resampling levels |
 | `src/plottables/plottable-graph.h/.cpp` | QCPGraph — drives the levels and the line cache in `draw()` |
-| `src/datasource/abstract-datasource.h` | QCPAbstractDataSource — data source interface |
-| `src/datasource/soa-datasource.h` | QCPSoADataSource — SoA container for keys + values |
+| `src/datasource/abstract-multi-datasource.h` | QCPAbstractMultiDataSource — the graph's data source interface, `linesInData(column, ...)` |
+| `src/datasource/soa-multi-datasource.h` | QCPSoAMultiDataSource — keys plus one value array per column |
