@@ -10,7 +10,7 @@ They are grouped by the guide page they belong to.
 See {doc}`graphs`.
 
 - **Error-bar caps are slightly lopsided on a log key axis.**
-  The cap width is set in data units, the same on both sides.
+  You set the cap width in pixels. The draw turns it into one half-width in data units, used on both sides.
   On a log axis, the left and right halves then differ on screen.
 - **Selected error bars all use the selected pen.**
   With part of a graph selected, every error bar of that component looks selected.
@@ -26,9 +26,11 @@ See {doc}`plottables`.
 - **Overlapping OHLC bars of two colours do not interleave.**
   The bars of one colour are drawn together, then those of the other.
   Where they overlap, the same colour always ends on top.
-- **A zero-height histogram bin draws no hairline at the base.**
-  An empty bin leaves a gap in the baseline on a linear axis.
-- **A step histogram's legend icon is a filled box**, not a line sample.
+- **A zero-height bar draws no hairline at the base.**
+  In the bar style, an empty bin leaves a gap in the baseline on a linear axis.
+  A step outline walks along the base through it.
+- **A step histogram's legend icon is a box**, not a line sample.
+  With one column the box is empty and outlined; with several it is lightly filled.
 - **`QCPIntervals::pixelOf()` returns -1 as y before the first layout, and 0 as x without a key axis.**
   Neither is reported. Replot once before asking for pixels.
 - **Removing data at a NaN key does nothing on the classic containers.**
@@ -148,6 +150,7 @@ See {doc}`migrating`.
 
 - **A 2.x program now shows a colour bar it never asked for.**
   Each axis rect shows its own scale once a colour map or a coloured line uses it.
-  To hide it, call `setColorScale(nullptr)` on the plottable. A program that made its own scale is unchanged.
+  To hide it, call `setColorScale(nullptr)` on the plottable, before or after its colour values.
+  The choice sticks. A program that made its own scale is unchanged.
 - **A debug build aborts at the next draw when a plottable's axis is deleted.**
   The default misuse handler stops debug builds. Install your own with `qcp::setMisuseHandler()` to log instead.

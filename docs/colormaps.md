@@ -158,7 +158,8 @@ With column normalization, a column without points shows as zero. It does not co
 ## Colour scales
 
 Every axis rect owns one <a href="api/classQCPColorScale.html">QCPColorScale</a>, reached with `axisRect()->colorScale()`.
-It is shown while something uses it, in the rect's right margin by default.
+It is shown while something colours through it, in the rect's right margin by default.
+A line whose colour values no longer match its data colours nothing, so it shows no bar.
 A colour map, a 2D histogram or a line with colour values joins its rect's scale on its own.
 So all of them on one rect share one gradient and one data range.
 Change the gradient of one and every other follows.
@@ -166,10 +167,12 @@ Change the gradient of one and every other follows.
 To give a plottable its own colours, call `setColorScale(nullptr)` on it.
 It then keeps its own gradient and range, and shows no colour bar.
 The rect hides its bar once nobody uses it.
+The choice sticks, before or after colour values.
+New colour values, new data, a move to another axis rect or to another plot never join the rect's scale again.
 The gradient example below does this for each stripe.
 
 You can also make a scale yourself, put it in the plot layout and attach it with `setColorScale()`, as in the first example.
-It replaces the rect's scale for that plottable. {doc}`layout` explains layouts.
+It replaces the rect's scale for that plottable, and stays through the same changes. {doc}`layout` explains layouts.
 
 Once attached, the map and the scale share three properties: the gradient, the data range and the data scale type.
 Change one on either side and the other follows.
@@ -184,7 +187,7 @@ So attach the scale first, then set the gradient and the range. Or set them on t
 - `setBarWidth()` sets its thickness in pixels.
 - `setRangeDrag()` and `setRangeZoom()` let the user drag and zoom the data range with the mouse.
 
-The scale and the axis rect do not line up on their own. Put both in a <a href="api/classQCPAlignmentGroup.html">QCPAlignmentGroup</a> on the top and bottom sides, as in the first example, to line their edges up.
+A scale you put in the layout does not line up with the axis rect on its own; the rect's own scale does. Put both in a <a href="api/classQCPAlignmentGroup.html">QCPAlignmentGroup</a> on the top and bottom sides, as in the first example, to line their edges up.
 
 `QCPColorScale::rescaleDataRange()` fits the scale to every map attached to it, classic or not.
 For a `QCPHistogram2D`, call it once the counts exist (after `finished`, see above).

@@ -884,7 +884,11 @@ QList<QCPHandle<QCPAbstractItem>> QCPAxisRect::items() const
 
   The scale sits in the margin of the side its \ref QCPColorScale::type names, outside that side's
   axes, and this rect's auto margin on that side grows to hold it. It is visible exactly while a
-  plottable uses it: a scale nobody uses takes no room and is never laid out.
+  plottable colours through it: a scale nobody colours through takes no room and is never laid out.
+
+  A colour map, a 2D histogram or a line with colour values on this rect joins the scale on its
+  own, unless \ref QCPAbstractColorMapped::setColorScale picked another scale or none for it. That
+  choice sticks: new colour values, new data and moves never join this scale again.
 
   The rect deletes the scale with itself. Removing the scale leaves this rect working; the next
   call makes a new scale.
@@ -913,8 +917,9 @@ QCPColorScaleOps<QCPColorScale> QCPAxisRect::colorScale()
 
 /*! \internal
 
-  Returns the rect's own scale while at least one plottable uses it, otherwise null. A scale with
-  no user is hidden and costs nothing per replot.
+  Returns the rect's own scale while at least one of its users colours through it, otherwise null.
+  A curve whose colour values no longer match its data is a user that colours nothing. A hidden
+  scale costs nothing per replot.
 */
 QCPColorScale* QCPAxisRect::usedColorScale() const
 {

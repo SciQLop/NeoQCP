@@ -141,7 +141,8 @@ public:
     QList<QCPHandle<QCPGraph>> graphs() const;
     QList<QCPHandle<QCPAbstractItem>> items() const;
     //! The colour scale this rect owns and places in its margin, made on first call. It is visible
-    //! exactly while a plottable uses it.
+    //! exactly while a plottable colours through it. A plottable given its own scale, or none,
+    //! with setColorScale() never joins it.
     QCPColorScaleOps<QCPColorScale> colorScale();
 
     // read-only interface imitating a QRect:
@@ -225,7 +226,7 @@ protected:
 private:
     Q_DISABLE_COPY_MOVE(QCPAxisRect)
 
-    // The rect's own scale while it has at least one user, otherwise null.
+    // The rect's own scale while at least one user colours through it, otherwise null.
     QCPColorScale* usedColorScale() const;
     // The width a vertical scale takes in the margin, or the height of a horizontal one.
     int colorScaleExtent() const;
