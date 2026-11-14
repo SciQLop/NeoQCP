@@ -46,6 +46,20 @@ QCPBars* barsOn(QCustomPlot& plot)
     return bars;
 }
 
+QCPTextElement* textOn(QCustomPlot& plot)
+{
+    auto* text = new QCPTextElement(&plot, QStringLiteral("title"));
+    plot.plotLayout()->addElement(1, 0, text);
+    return text;
+}
+
+QCPColorScale* colorScaleOn(QCustomPlot& plot)
+{
+    auto* scale = new QCPColorScale(&plot);
+    plot.plotLayout()->addElement(0, 1, scale);
+    return scale;
+}
+
 void removeAxis(QObject* object)
 {
     auto* axis = qobject_cast<QCPAxis*>(object);
@@ -456,6 +470,22 @@ const QVector<Fixture>& fixtures()
     static const QVector<Fixture> list {
         { "QCPAxis", [](QCustomPlot& plot) -> QObject* { return plot.xAxis; } },
         { "QCPGrid", [](QCustomPlot& plot) -> QObject* { return plot.xAxis->grid().get(); } },
+        { "QCPLayoutGrid", [](QCustomPlot& plot) -> QObject* { return plot.plotLayout().get(); } },
+        { "QCPAxisRect", [](QCustomPlot& plot) -> QObject* { return plot.axisRect().get(); } },
+        // With a row: an empty legend has no stretch factor to change.
+        { "QCPLegend",
+          [](QCustomPlot& plot) -> QObject* {
+              graphOn(plot);
+              return plot.legend.get();
+          } },
+        { "QCPPlottableLegendItem",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              graphOn(plot);
+              return plot.legend->item(0).get();
+          } },
+        { "QCPTextElement", [](QCustomPlot& plot) -> QObject* { return textOn(plot); } },
+        { "QCPColorScale", [](QCustomPlot& plot) -> QObject* { return colorScaleOn(plot); } },
         { "QCPGraph", [](QCustomPlot& plot) -> QObject* { return graphOn(plot); } },
         { "QCPCurve", [](QCustomPlot& plot) -> QObject* { return curveOn(plot); } },
         { "QCPBars", [](QCustomPlot& plot) -> QObject* { return barsOn(plot); } },
@@ -496,72 +526,96 @@ const QVector<std::pair<QMetaType, Different>>& differentValues()
         differentFor<int>([](const int& v, QObject*) { return v + 1; }),
         differentFor<double>([](const double& v, QObject*) { return v + 0.5; }),
         differentFor<QColor>([](const QColor& v, QObject*) { return otherColor(v); }),
-        differentFor<QPen>([](const QPen& v, QObject*) {
-            QPen pen = v;
-            pen.setColor(otherColor(v.color()));
-            pen.setWidthF(v.widthF() + 1);
-            return pen;
-        }),
-        differentFor<QBrush>([](const QBrush& v, QObject*) {
-            return QBrush(otherColor(v.color()), Qt::SolidPattern);
-        }),
-        differentFor<QFont>([](const QFont& v, QObject*) {
-            QFont font = v;
-            font.setPointSizeF(v.pointSizeF() + 1);
-            return font;
-        }),
+        differentFor<QPen>(
+            [](const QPen& v, QObject*)
+            {
+                QPen pen = v;
+                pen.setColor(otherColor(v.color()));
+                pen.setWidthF(v.widthF() + 1);
+                return pen;
+            }),
+        differentFor<QBrush>([](const QBrush& v, QObject*)
+                             { return QBrush(otherColor(v.color()), Qt::SolidPattern); }),
+        differentFor<QFont>(
+            [](const QFont& v, QObject*)
+            {
+                QFont font = v;
+                font.setPointSizeF(v.pointSizeF() + 1);
+                return font;
+            }),
         differentFor<QMargins>([](const QMargins& v, QObject*) { return v + 1; }),
         differentFor<QRect>([](const QRect& v, QObject*) { return v.adjusted(1, 1, 2, 2); }),
         differentFor<QSize>([](const QSize& v, QObject*) { return v + QSize(1, 1); }),
         differentFor<QPointF>([](const QPointF& v, QObject*) { return v + QPointF(1, 1); }),
-        differentFor<QPixmap>([](const QPixmap& v, QObject*) {
-            QPixmap pixmap(2, 2);
-            pixmap.fill(v.isNull() ? Qt::red : Qt::green);
-            return pixmap;
-        }),
-        differentFor<QCPRange>(
-            [](const QCPRange& v, QObject*) { return QCPRange(v.lower + 1, v.upper + 2); }),
-        differentFor<QCPLineEnding>([](const QCPLineEnding& v, QObject*) {
-            return QCPLineEnding(v.style() == QCPLineEnding::esSpikeArrow
-                                     ? QCPLineEnding::esDisc
-                                     : QCPLineEnding::esSpikeArrow);
-        }),
-        differentFor<QCPScatterStyle>([](const QCPScatterStyle& v, QObject*) {
-            return QCPScatterStyle(v.shape() == QCPScatterStyle::ssCircle
-                                       ? QCPScatterStyle::ssDisc
-                                       : QCPScatterStyle::ssCircle);
-        }),
-        differentFor<QCPColorGradient>([](const QCPColorGradient& v, QObject*) {
-            const QCPColorGradient hot(QCPColorGradient::gpHot);
-            return v == hot ? QCPColorGradient(QCPColorGradient::gpJet) : hot;
-        }),
-        differentFor<QCPDataSelection>([](const QCPDataSelection& v, QObject*) {
-            const QCPDataSelection first(QCPDataRange(0, 1));
-            return v == first ? QCPDataSelection(QCPDataRange(1, 2)) : first;
-        }),
-        differentFor<QSharedPointer<QCPAxisTicker>>(
-            [](const QSharedPointer<QCPAxisTicker>&, QObject*) {
-                return QSharedPointer<QCPAxisTicker>(new QCPAxisTickerFixed);
+        differentFor<QPixmap>(
+            [](const QPixmap& v, QObject*)
+            {
+                QPixmap pixmap(2, 2);
+                pixmap.fill(v.isNull() ? Qt::red : Qt::green);
+                return pixmap;
             }),
-        differentFor<QList<double>>([](const QList<double>& v, QObject*) {
-            QList<double> list = v;
-            list.append(1);
-            return list;
-        }),
-        differentFor<QList<QColor>>([](const QList<QColor>& v, QObject*) {
-            QList<QColor> list = v;
-            list.append(Qt::red);
-            return list;
-        }),
-        differentFor<QCPLayer*>([](QCPLayer* const& v, QObject* object) -> QCPLayer* {
-            QCustomPlot* plot = plotOf(object);
-            QCPLayer* grid = plot->layer(QStringLiteral("grid"));
-            return v == grid ? plot->layer(QStringLiteral("overlay")).get() : grid;
-        }),
-        differentFor<QCPAxis*>([](QCPAxis* const& v, QObject* object) -> QCPAxis* {
-            QCustomPlot* plot = plotOf(object);
-            return v == plot->xAxis2.get() ? plot->yAxis2.get() : plot->xAxis2.get();
-        }),
+        differentFor<QCPRange>([](const QCPRange& v, QObject*)
+                               { return QCPRange(v.lower + 1, v.upper + 2); }),
+        differentFor<QCPLineEnding>(
+            [](const QCPLineEnding& v, QObject*)
+            {
+                return QCPLineEnding(v.style() == QCPLineEnding::esSpikeArrow
+                                         ? QCPLineEnding::esDisc
+                                         : QCPLineEnding::esSpikeArrow);
+            }),
+        differentFor<QCPScatterStyle>(
+            [](const QCPScatterStyle& v, QObject*)
+            {
+                return QCPScatterStyle(v.shape() == QCPScatterStyle::ssCircle
+                                           ? QCPScatterStyle::ssDisc
+                                           : QCPScatterStyle::ssCircle);
+            }),
+        differentFor<QCPColorGradient>(
+            [](const QCPColorGradient& v, QObject*)
+            {
+                const QCPColorGradient hot(QCPColorGradient::gpHot);
+                return v == hot ? QCPColorGradient(QCPColorGradient::gpJet) : hot;
+            }),
+        differentFor<QCPDataSelection>(
+            [](const QCPDataSelection& v, QObject*)
+            {
+                const QCPDataSelection first(QCPDataRange(0, 1));
+                return v == first ? QCPDataSelection(QCPDataRange(1, 2)) : first;
+            }),
+        differentFor<QSharedPointer<QCPAxisTicker>>(
+            [](const QSharedPointer<QCPAxisTicker>&, QObject*)
+            { return QSharedPointer<QCPAxisTicker>(new QCPAxisTickerFixed); }),
+        // A list of stretch factors keeps its length (one per row or column): a value moves.
+        differentFor<QList<double>>(
+            [](const QList<double>& v, QObject*)
+            {
+                QList<double> list = v;
+                if (list.isEmpty())
+                    list.append(1);
+                else
+                    list.last() += 1;
+                return list;
+            }),
+        differentFor<QList<QColor>>(
+            [](const QList<QColor>& v, QObject*)
+            {
+                QList<QColor> list = v;
+                list.append(Qt::red);
+                return list;
+            }),
+        differentFor<QCPLayer*>(
+            [](QCPLayer* const& v, QObject* object) -> QCPLayer*
+            {
+                QCustomPlot* plot = plotOf(object);
+                QCPLayer* grid = plot->layer(QStringLiteral("grid"));
+                return v == grid ? plot->layer(QStringLiteral("overlay")).get() : grid;
+            }),
+        differentFor<QCPAxis*>(
+            [](QCPAxis* const& v, QObject* object) -> QCPAxis*
+            {
+                QCustomPlot* plot = plotOf(object);
+                return v == plot->xAxis2.get() ? plot->yAxis2.get() : plot->xAxis2.get();
+            }),
     };
     return table;
 }
@@ -673,6 +727,7 @@ const QSet<QByteArray>& pendingClasses()
 {
     static const QSet<QByteArray> list { "QCPAbstractPlottable",
                                          "QCPAbstractColorMapped",
+                                         "QCPArea",
                                          "QCPAbstractLine",
                                          "QCPGraph",
                                          "QCPCurve",
@@ -771,6 +826,7 @@ struct Writer
     std::function<void(QObject*)> write;
     QVector<const char*> moved; // each signals once
     QVector<const char*> still; // each signals nothing
+    bool idempotent = true; // a second call moves nothing
 };
 
 const QVector<Writer>& writers()
@@ -800,6 +856,53 @@ const QVector<Writer>& writers()
           [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
           [](QObject* o) { qobject_cast<QCPAxis*>(o)->setRangeUpper(30); },
           { "range" },
+          { } },
+        { "QCPLayoutGrid::insertRow",
+          [](QCustomPlot& plot) -> QObject* { return plot.plotLayout().get(); },
+          [](QObject* o) { qobject_cast<QCPLayoutGrid*>(o)->insertRow(0); },
+          { "rowStretchFactors" },
+          { "columnStretchFactors" },
+          false },
+        { "QCPLayoutGrid::insertColumn",
+          [](QCustomPlot& plot) -> QObject* { return plot.plotLayout().get(); },
+          [](QObject* o) { qobject_cast<QCPLayoutGrid*>(o)->insertColumn(0); },
+          { "columnStretchFactors" },
+          { "rowStretchFactors" },
+          false },
+        { "QCPLayoutGrid::addElement",
+          [](QCustomPlot& plot) -> QObject* { return plot.plotLayout().get(); },
+          [](QObject* o)
+          {
+              auto* grid = qobject_cast<QCPLayoutGrid*>(o);
+              if (!grid->hasElement(1, 1))
+                  grid->addElement(1, 1, new QCPTextElement(grid->parentPlot()));
+          },
+          { "columnStretchFactors", "rowStretchFactors" },
+          { } },
+        { "QCPLayoutGrid::simplify",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              plot.plotLayout()->insertRow(1);
+              return plot.plotLayout().get();
+          },
+          [](QObject* o) { qobject_cast<QCPLayoutGrid*>(o)->simplify(); },
+          { "rowStretchFactors" },
+          { "columnStretchFactors" } },
+        { "QCPColorScale::setType",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              QCPColorScale* scale = colorScaleOn(plot);
+              scale->setLabel(QStringLiteral("z"));
+              return scale;
+          },
+          [](QObject* o) { qobject_cast<QCPColorScale*>(o)->setType(QCPAxis::atBottom); },
+          { "type" },
+          { "label", "rangeDrag", "rangeZoom" } },
+        { "QCPColorScale's axis label",
+          [](QCustomPlot& plot) -> QObject* { return colorScaleOn(plot); },
+          [](QObject* o)
+          { qobject_cast<QCPColorScale*>(o)->axis()->setLabel(QStringLiteral("z")); },
+          { "label" },
           { } },
         { "a link's source reverses",
           [](QCustomPlot& plot) -> QObject*
@@ -846,9 +949,103 @@ void TestMetaSurface::everyWriterBesidesTheSetterNotifies()
         QVERIFY2(moved[i]->count() == 1, w.moved[i]);
     for (int i = 0; i < still.size(); ++i)
         QVERIFY2(still[i]->count() == 0, w.still[i]);
+    if (!w.idempotent)
+        return;
     w.write(object);
     for (int i = 0; i < moved.size(); ++i)
         QVERIFY2(moved[i]->count() == 1, w.moved[i]);
+}
+
+namespace
+{
+// A writer that moves several properties, or calls other setters, delivers no signal before it is
+// done: a slot of the first signal sees every value the call writes (and may delete the object).
+struct Nested
+{
+    const char* name;
+    // Builds, connects a probe to the first signal and calls the writer, outside any scope.
+    // Returns whether the probe ran and saw the call finished.
+    std::function<bool(QCustomPlot&)> run;
+};
+
+template <typename Sender, typename Signal>
+bool probeOnce(Sender* sender, Signal signal, std::function<void()> write,
+               std::function<bool()> finished)
+{
+    bool ran = false, sawFinished = false;
+    QObject::connect(sender, signal, sender,
+                     [&]
+                     {
+                         if (!ran)
+                             sawFinished = finished();
+                         ran = true;
+                     });
+    write();
+    return ran && sawFinished;
+}
+
+const QVector<Nested>& nestedWriters()
+{
+    static const QVector<Nested> list {
+        { "QCPLegend::setFont",
+          [](QCustomPlot& plot)
+          {
+              graphOn(plot);
+              graphOn(plot);
+              const QFont font(QStringLiteral("Serif"), 17);
+              QCPLegend* legend = plot.legend.get();
+              return probeOnce(
+                  legend->item(0).get(), &QCPAbstractLegendItem::fontChanged,
+                  [&] { legend->setFont(font); },
+                  [&] { return legend->item(1)->font() == font && legend->font() == font; });
+          } },
+        { "QCPAxis::setColor",
+          [](QCustomPlot& plot)
+          {
+              QCPAxis* axis = plot.xAxis.get();
+              return probeOnce(
+                  axis, &QCPAxis::labelColorChanged, [&] { axis->setColor(Qt::red); },
+                  [&] { return axis->subTickPen().color() == QColor(Qt::red); });
+          } },
+        { "QCPAxis::setTickLength",
+          [](QCustomPlot& plot)
+          {
+              QCPAxis* axis = plot.xAxis.get();
+              return probeOnce(
+                  axis, &QCPAxis::tickLengthInChanged, [&] { axis->setTickLength(9, 8); },
+                  [&] { return axis->tickLengthOut() == 8; });
+          } },
+        { "QCPColorScale::setType",
+          [](QCustomPlot& plot)
+          {
+              QCPColorScale* scale = colorScaleOn(plot);
+              scale->setLabel(QStringLiteral("z"));
+              return probeOnce(
+                  scale->axis().get(), &QCPAxis::ticksChanged,
+                  [&] { scale->setType(QCPAxis::atBottom); },
+                  [&]
+                  {
+                      return scale->axis()->label() == QStringLiteral("z")
+                          && scale->type() == QCPAxis::atBottom;
+                  });
+          } },
+    };
+    return list;
+}
+} // namespace
+
+void TestMetaSurface::nestedWriterSignalsWaitForTheWriter_data()
+{
+    QTest::addColumn<int>("writer");
+    for (int i = 0; i < nestedWriters().size(); ++i)
+        QTest::newRow(nestedWriters()[i].name) << i;
+}
+
+void TestMetaSurface::nestedWriterSignalsWaitForTheWriter()
+{
+    QFETCH(int, writer);
+    auto plot = newPlot();
+    QVERIFY(nestedWriters()[writer].run(*plot));
 }
 
 void TestMetaSurface::exceptionsNameRealProperties()

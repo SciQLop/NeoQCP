@@ -313,6 +313,9 @@ it instead of `property("name")`.
 | `QCPAxisBase` | `tickVector`, `tickVectorLabels` | `tickVector()`, `tickVectorLabels()` |
 | `QCPAxis` | `grid` | `grid()` |
 | `QCPLayerable` | `parentPlot`, `parentLayerable` | `parentPlot()`, `parentLayerable()` |
+| `QCPLayoutElement` | `layout`, `rect` | `layout()`, `rect()` |
+| `QCPLayoutGrid` | `rowCount`, `columnCount` | `rowCount()`, `columnCount()` |
+| `QCPAbstractLegendItem` | `parentLegend` | `parentLegend()` |
 
 ### Signals
 
@@ -322,3 +325,6 @@ it instead of `property("name")`.
 - `QCPLayerable::setMouseTransparent` moved out of line.
 - `QCPAxis::setTickLabelRotation` compares the clamped angle: a write past ±90° when the axis is already at the
   bound changes nothing and repaints nothing.
+- A grid's stretch factor signals also fire when rows or columns are added, inserted or collapsed
+  (`expandTo`, `insertRow`, `insertColumn`, `simplify`, `addElement`).
+- `QCPColorScale::labelChanged` is the colour axis's: `axis()->setLabel(...)` fires it too.

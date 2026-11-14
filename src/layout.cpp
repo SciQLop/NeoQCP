@@ -60,6 +60,43 @@
   elements in the grid layout.
 */
 
+/*! \fn void QCPLayoutElement::outerRectChanged(const QRect& outerRect)
+
+  This signal is emitted when \ref outerRect changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLayoutElement::marginsChanged(const QMargins& margins)
+
+  This signal is emitted when \ref margins changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLayoutElement::minimumMarginsChanged(const QMargins& minimumMargins)
+
+  This signal is emitted when \ref minimumMargins changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLayoutElement::minimumSizeChanged(const QSize& minimumSize)
+
+  This signal is emitted when \ref minimumSize changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLayoutElement::maximumSizeChanged(const QSize& maximumSize)
+
+  This signal is emitted when \ref maximumSize changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLayoutElement::sizeConstraintRectChanged(QCPLayoutElement::SizeConstraintRect
+  sizeConstraintRect)
+
+  This signal is emitted when \ref sizeConstraintRect changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start documentation of inline functions */
 
 QCPHandle<QCPLayout> QCPLayoutElement::layout() const
@@ -144,6 +181,7 @@ void QCPLayoutElement::setOuterRect(const QRect& rect)
         mOuterRect = rect;
         mRect = mOuterRect.adjusted(mMargins.left(), mMargins.top(), -mMargins.right(),
                                     -mMargins.bottom());
+        qcpEmit(this, mParentPlot, &QCPLayoutElement::outerRectChanged, outerRect());
     }
 }
 
@@ -166,6 +204,7 @@ void QCPLayoutElement::setMargins(const QMargins& margins)
         mMargins = margins;
         mRect = mOuterRect.adjusted(mMargins.left(), mMargins.top(), -mMargins.right(),
                                     -mMargins.bottom());
+        qcpEmit(this, mParentPlot, &QCPLayoutElement::marginsChanged, this->margins());
     }
 }
 
@@ -184,6 +223,7 @@ void QCPLayoutElement::setMinimumMargins(const QMargins& margins)
     {
         markLayoutAppearanceDirty();
         mMinimumMargins = margins;
+        qcpEmit(this, mParentPlot, &QCPLayoutElement::minimumMarginsChanged, minimumMargins());
     }
 }
 
@@ -225,6 +265,7 @@ void QCPLayoutElement::setMinimumSize(const QSize& size)
         mMinimumSize = size;
         if (mParentLayout)
             mParentLayout->sizeConstraintsChanged();
+        qcpEmit(this, mParentPlot, &QCPLayoutElement::minimumSizeChanged, minimumSize());
     }
 }
 
@@ -255,6 +296,7 @@ void QCPLayoutElement::setMaximumSize(const QSize& size)
         mMaximumSize = size;
         if (mParentLayout)
             mParentLayout->sizeConstraintsChanged();
+        qcpEmit(this, mParentPlot, &QCPLayoutElement::maximumSizeChanged, maximumSize());
     }
 }
 
@@ -300,6 +342,8 @@ void QCPLayoutElement::setSizeConstraintRect(SizeConstraintRect constraintRect)
         mSizeConstraintRect = constraintRect;
         if (mParentLayout)
             mParentLayout->sizeConstraintsChanged();
+        qcpEmit(this, mParentPlot, &QCPLayoutElement::sizeConstraintRectChanged,
+                sizeConstraintRect());
     }
 }
 
@@ -1079,6 +1123,42 @@ QSize QCPLayout::getFinalMaximumOuterSize(const QCPLayoutElement* el)
   Row and column insertion can be performed with \ref insertRow and \ref insertColumn.
 */
 
+/*! \fn void QCPLayoutGrid::columnStretchFactorsChanged(const QList<double>& columnStretchFactors)
+
+  This signal is emitted when \ref columnStretchFactors changes, after the plot delivers its
+  deferred signals.
+*/
+
+/*! \fn void QCPLayoutGrid::rowStretchFactorsChanged(const QList<double>& rowStretchFactors)
+
+  This signal is emitted when \ref rowStretchFactors changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLayoutGrid::columnSpacingChanged(int columnSpacing)
+
+  This signal is emitted when \ref columnSpacing changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLayoutGrid::rowSpacingChanged(int rowSpacing)
+
+  This signal is emitted when \ref rowSpacing changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLayoutGrid::fillOrderChanged(QCPLayoutGrid::FillOrder fillOrder)
+
+  This signal is emitted when \ref fillOrder changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLayoutGrid::wrapChanged(int wrap)
+
+  This signal is emitted when \ref wrap changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start documentation of inline functions */
 
 /*! \fn int QCPLayoutGrid::rowCount() const
@@ -1163,6 +1243,8 @@ bool QCPLayoutGrid::addElement(int row, int column, QCPLayoutElement* element)
                         false);
     if (!hasElement(row, column))
     {
+        // Growing the grid signals its stretch factors: the slots run once the element is in.
+        const QCPEmissionScope scope(mParentPlot);
         if (element && element->layout()) // remove from old layout first
             element->layout()->take(element);
         expandTo(row + 1, column + 1);
@@ -1254,6 +1336,8 @@ void QCPLayoutGrid::setColumnStretchFactor(int column, double factor)
                 return;
             markLayoutAppearanceDirty();
             mColumnStretchFactors[column] = factor;
+            qcpEmit(this, mParentPlot, &QCPLayoutGrid::columnStretchFactorsChanged,
+                    mColumnStretchFactors);
         }
         else
             qDebug() << Q_FUNC_INFO << "Invalid stretch factor, must be positive:" << factor;
@@ -1276,25 +1360,24 @@ void QCPLayoutGrid::setColumnStretchFactor(int column, double factor)
 */
 void QCPLayoutGrid::setColumnStretchFactors(const QList<double>& factors)
 {
-    if (factors.size() == mColumnStretchFactors.size())
+    if (factors.size() != mColumnStretchFactors.size())
     {
-        if (factors == mColumnStretchFactors)
-            return;
-        markLayoutAppearanceDirty();
-        mColumnStretchFactors = factors;
-        for (int i = 0; i < mColumnStretchFactors.size(); ++i)
-        {
-            if (mColumnStretchFactors.at(i) <= 0)
-            {
-                qDebug() << Q_FUNC_INFO << "Invalid stretch factor, must be positive:"
-                         << mColumnStretchFactors.at(i);
-                mColumnStretchFactors[i] = 1;
-            }
-        }
-    }
-    else
         qDebug() << Q_FUNC_INFO
                  << "Column count not equal to passed stretch factor count:" << factors;
+        return;
+    }
+    QList<double> sane = factors;
+    for (double& factor : sane)
+        if (factor <= 0)
+        {
+            qDebug() << Q_FUNC_INFO << "Invalid stretch factor, must be positive:" << factor;
+            factor = 1;
+        }
+    if (sane == mColumnStretchFactors)
+        return;
+    markLayoutAppearanceDirty();
+    mColumnStretchFactors = sane;
+    qcpEmit(this, mParentPlot, &QCPLayoutGrid::columnStretchFactorsChanged, mColumnStretchFactors);
 }
 
 /*!
@@ -1319,6 +1402,8 @@ void QCPLayoutGrid::setRowStretchFactor(int row, double factor)
                 return;
             markLayoutAppearanceDirty();
             mRowStretchFactors[row] = factor;
+            qcpEmit(this, mParentPlot, &QCPLayoutGrid::rowStretchFactorsChanged,
+                    mRowStretchFactors);
         }
         else
             qDebug() << Q_FUNC_INFO << "Invalid stretch factor, must be positive:" << factor;
@@ -1341,24 +1426,23 @@ void QCPLayoutGrid::setRowStretchFactor(int row, double factor)
 */
 void QCPLayoutGrid::setRowStretchFactors(const QList<double>& factors)
 {
-    if (factors.size() == mRowStretchFactors.size())
+    if (factors.size() != mRowStretchFactors.size())
     {
-        if (factors == mRowStretchFactors)
-            return;
-        markLayoutAppearanceDirty();
-        mRowStretchFactors = factors;
-        for (int i = 0; i < mRowStretchFactors.size(); ++i)
-        {
-            if (mRowStretchFactors.at(i) <= 0)
-            {
-                qDebug() << Q_FUNC_INFO
-                         << "Invalid stretch factor, must be positive:" << mRowStretchFactors.at(i);
-                mRowStretchFactors[i] = 1;
-            }
-        }
-    }
-    else
         qDebug() << Q_FUNC_INFO << "Row count not equal to passed stretch factor count:" << factors;
+        return;
+    }
+    QList<double> sane = factors;
+    for (double& factor : sane)
+        if (factor <= 0)
+        {
+            qDebug() << Q_FUNC_INFO << "Invalid stretch factor, must be positive:" << factor;
+            factor = 1;
+        }
+    if (sane == mRowStretchFactors)
+        return;
+    markLayoutAppearanceDirty();
+    mRowStretchFactors = sane;
+    qcpEmit(this, mParentPlot, &QCPLayoutGrid::rowStretchFactorsChanged, mRowStretchFactors);
 }
 
 /*!
@@ -1372,6 +1456,7 @@ void QCPLayoutGrid::setColumnSpacing(int pixels)
         return;
     markLayoutAppearanceDirty();
     mColumnSpacing = pixels;
+    qcpEmit(this, mParentPlot, &QCPLayoutGrid::columnSpacingChanged, columnSpacing());
 }
 
 /*!
@@ -1385,6 +1470,7 @@ void QCPLayoutGrid::setRowSpacing(int pixels)
         return;
     markLayoutAppearanceDirty();
     mRowSpacing = pixels;
+    qcpEmit(this, mParentPlot, &QCPLayoutGrid::rowSpacingChanged, rowSpacing());
 }
 
 /*!
@@ -1410,6 +1496,7 @@ void QCPLayoutGrid::setWrap(int count)
         return;
     markLayoutAppearanceDirty();
     mWrap = qMax(0, count);
+    qcpEmit(this, mParentPlot, &QCPLayoutGrid::wrapChanged, wrap());
 }
 
 /*!
@@ -1441,6 +1528,9 @@ void QCPLayoutGrid::setFillOrder(FillOrder order, bool rearrange)
 {
     if (order == mFillOrder && !rearrange)
         return;
+    // Rearranging moves elements and may reshape the grid: every signal waits for the scope.
+    const QCPEmissionScope scope(mParentPlot);
+    const bool moved = order != mFillOrder;
     markLayoutAppearanceDirty();
     // if rearranging, take all elements via linear index of old fill order:
     const int elCount = elementCount();
@@ -1463,6 +1553,8 @@ void QCPLayoutGrid::setFillOrder(FillOrder order, bool rearrange)
         for (QCPLayoutElement* tempElement : tempElements)
             addElement(tempElement);
     }
+    if (moved)
+        qcpEmit(this, mParentPlot, &QCPLayoutGrid::fillOrderChanged, mFillOrder);
 }
 
 /*!
@@ -1481,6 +1573,7 @@ void QCPLayoutGrid::setFillOrder(FillOrder order, bool rearrange)
 */
 void QCPLayoutGrid::expandTo(int newRowCount, int newColumnCount)
 {
+    const QList<double> columns = mColumnStretchFactors, rows = mRowStretchFactors;
     // add rows as necessary:
     while (rowCount() < newRowCount)
     {
@@ -1496,6 +1589,7 @@ void QCPLayoutGrid::expandTo(int newRowCount, int newColumnCount)
     }
     while (mColumnStretchFactors.size() < newColCount)
         mColumnStretchFactors.append(1);
+    stretchFactorsMoved(columns, rows);
 }
 
 /*!
@@ -1523,6 +1617,7 @@ void QCPLayoutGrid::insertRow(int newIndex)
     for (int col = 0; col < columnCount(); ++col)
         newRow.append(nullptr);
     mElements.insert(newIndex, newRow);
+    qcpEmit(this, mParentPlot, &QCPLayoutGrid::rowStretchFactorsChanged, mRowStretchFactors);
 }
 
 /*!
@@ -1549,6 +1644,7 @@ void QCPLayoutGrid::insertColumn(int newIndex)
     mColumnStretchFactors.insert(newIndex, 1);
     for (int row = 0; row < rowCount(); ++row)
         mElements[row].insert(newIndex, nullptr);
+    qcpEmit(this, mParentPlot, &QCPLayoutGrid::columnStretchFactorsChanged, mColumnStretchFactors);
 }
 
 /*!
@@ -1743,6 +1839,7 @@ bool QCPLayoutGrid::take(QCPLayoutElement* element)
 */
 void QCPLayoutGrid::simplify()
 {
+    const QList<double> columns = mColumnStretchFactors, rows = mRowStretchFactors;
     // remove rows with only empty cells:
     for (int row = rowCount() - 1; row >= 0; --row)
     {
@@ -1784,6 +1881,27 @@ void QCPLayoutGrid::simplify()
                 mElements[row].removeAt(col);
         }
     }
+    stretchFactorsMoved(columns, rows);
+}
+
+/*! \internal
+
+  Emits the stretch factor signals whose list moved since \a columns and \a rows: adding,
+  inserting and collapsing rows and columns move them as the setters do. Both wait for one scope,
+  as a slot of the first may delete the grid.
+*/
+void QCPLayoutGrid::stretchFactorsMoved(const QList<double>& columns, const QList<double>& rows)
+{
+    const bool columnsMoved = columns != mColumnStretchFactors;
+    const bool rowsMoved = rows != mRowStretchFactors;
+    if (!columnsMoved && !rowsMoved)
+        return;
+    const QCPEmissionScope scope(mParentPlot);
+    if (columnsMoved)
+        qcpEmit(this, mParentPlot, &QCPLayoutGrid::columnStretchFactorsChanged,
+                mColumnStretchFactors);
+    if (rowsMoved)
+        qcpEmit(this, mParentPlot, &QCPLayoutGrid::rowStretchFactorsChanged, mRowStretchFactors);
 }
 
 /* inherits documentation from base class */

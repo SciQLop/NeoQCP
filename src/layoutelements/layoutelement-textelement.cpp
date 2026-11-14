@@ -45,6 +45,36 @@
   \snippet documentation/doc-code-snippets/mainwindow.cpp qcptextelement-creation
 */
 
+/*! \fn void QCPTextElement::textChanged(const QString& text)
+
+  This signal is emitted when \ref text changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPTextElement::fontChanged(const QFont& font)
+
+  This signal is emitted when \ref font changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPTextElement::textColorChanged(const QColor& textColor)
+
+  This signal is emitted when \ref textColor changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPTextElement::selectedFontChanged(const QFont& selectedFont)
+
+  This signal is emitted when \ref selectedFont changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPTextElement::selectedTextColorChanged(const QColor& selectedTextColor)
+
+  This signal is emitted when \ref selectedTextColor changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start documentation of signals */
 
 /*! \fn void QCPTextElement::selectionChanged()
@@ -216,6 +246,7 @@ void QCPTextElement::setText(const QString& text)
         return;
     markDirty();
     mText = text;
+    qcpEmit(this, mParentPlot, &QCPTextElement::textChanged, this->text());
 }
 
 /*!
@@ -257,6 +288,7 @@ void QCPTextElement::setFont(const QFont& font)
         return;
     markDirty();
     mFont = font;
+    qcpEmit(this, mParentPlot, &QCPTextElement::fontChanged, this->font());
 }
 
 /*!
@@ -270,6 +302,7 @@ void QCPTextElement::setTextColor(const QColor& color)
         return;
     markDirty();
     mTextColor = color;
+    qcpEmit(this, mParentPlot, &QCPTextElement::textColorChanged, textColor());
 }
 
 /*!
@@ -283,6 +316,7 @@ void QCPTextElement::setSelectedFont(const QFont& font)
         return;
     markDirty();
     mSelectedFont = font;
+    qcpEmit(this, mParentPlot, &QCPTextElement::selectedFontChanged, selectedFont());
 }
 
 /*!
@@ -297,6 +331,7 @@ void QCPTextElement::setSelectedTextColor(const QColor& color)
         return;
     markDirty();
     mSelectedTextColor = color;
+    qcpEmit(this, mParentPlot, &QCPTextElement::selectedTextColorChanged, selectedTextColor());
 }
 
 /*!

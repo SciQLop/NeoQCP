@@ -40,13 +40,14 @@ class QCP_LIB_DECL QCPAbstractLegendItem : public QCPLayoutElement
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QCPLegend* parentLegend READ parentLegend)
-    Q_PROPERTY(QFont font READ font WRITE setFont)
-    Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor)
-    Q_PROPERTY(QFont selectedFont READ selectedFont WRITE setSelectedFont)
-    Q_PROPERTY(QColor selectedTextColor READ selectedTextColor WRITE setSelectedTextColor)
-    Q_PROPERTY(QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY
-                       selectableChanged)
+    Q_PROPERTY(QFont font READ font WRITE setFont NOTIFY fontChanged)
+    Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor NOTIFY textColorChanged)
+    Q_PROPERTY(
+        QFont selectedFont READ selectedFont WRITE setSelectedFont NOTIFY selectedFontChanged)
+    Q_PROPERTY(QColor selectedTextColor READ selectedTextColor WRITE setSelectedTextColor NOTIFY
+                   selectedTextColorChanged)
+    Q_PROPERTY(
+        QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY selectableChanged)
     Q_PROPERTY(bool selected READ selected WRITE setSelected NOTIFY selectionChanged)
     /// \endcond
 
@@ -83,6 +84,10 @@ public:
 signals:
     void selectionChanged();
     void selectableChanged();
+    void fontChanged(const QFont& font);
+    void textColorChanged(const QColor& textColor);
+    void selectedFontChanged(const QFont& selectedFont);
+    void selectedTextColorChanged(const QColor& selectedTextColor);
 
 protected:
     // property members:
@@ -155,22 +160,29 @@ class QCP_LIB_DECL QCPLegend : public QCPLayoutGrid
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QPen borderPen READ borderPen WRITE setBorderPen)
-    Q_PROPERTY(QBrush brush READ brush WRITE setBrush)
-    Q_PROPERTY(QFont font READ font WRITE setFont)
-    Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor)
-    Q_PROPERTY(QSize iconSize READ iconSize WRITE setIconSize)
-    Q_PROPERTY(int iconTextPadding READ iconTextPadding WRITE setIconTextPadding)
-    Q_PROPERTY(QPen iconBorderPen READ iconBorderPen WRITE setIconBorderPen)
+    Q_PROPERTY(QPen borderPen READ borderPen WRITE setBorderPen NOTIFY borderPenChanged)
+    Q_PROPERTY(QBrush brush READ brush WRITE setBrush NOTIFY brushChanged)
+    Q_PROPERTY(QFont font READ font WRITE setFont NOTIFY fontChanged)
+    Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor NOTIFY textColorChanged)
+    Q_PROPERTY(QSize iconSize READ iconSize WRITE setIconSize NOTIFY iconSizeChanged)
+    Q_PROPERTY(int iconTextPadding READ iconTextPadding WRITE setIconTextPadding NOTIFY
+                   iconTextPaddingChanged)
+    Q_PROPERTY(
+        QPen iconBorderPen READ iconBorderPen WRITE setIconBorderPen NOTIFY iconBorderPenChanged)
     Q_PROPERTY(SelectableParts selectableParts READ selectableParts WRITE setSelectableParts NOTIFY
                    selectableChanged)
     Q_PROPERTY(SelectableParts selectedParts READ selectedParts WRITE setSelectedParts NOTIFY
                    selectionChanged)
-    Q_PROPERTY(QPen selectedBorderPen READ selectedBorderPen WRITE setSelectedBorderPen)
-    Q_PROPERTY(QPen selectedIconBorderPen READ selectedIconBorderPen WRITE setSelectedIconBorderPen)
-    Q_PROPERTY(QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush)
-    Q_PROPERTY(QFont selectedFont READ selectedFont WRITE setSelectedFont)
-    Q_PROPERTY(QColor selectedTextColor READ selectedTextColor WRITE setSelectedTextColor)
+    Q_PROPERTY(QPen selectedBorderPen READ selectedBorderPen WRITE setSelectedBorderPen NOTIFY
+                   selectedBorderPenChanged)
+    Q_PROPERTY(QPen selectedIconBorderPen READ selectedIconBorderPen WRITE setSelectedIconBorderPen
+                   NOTIFY selectedIconBorderPenChanged)
+    Q_PROPERTY(
+        QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush NOTIFY selectedBrushChanged)
+    Q_PROPERTY(
+        QFont selectedFont READ selectedFont WRITE setSelectedFont NOTIFY selectedFontChanged)
+    Q_PROPERTY(QColor selectedTextColor READ selectedTextColor WRITE setSelectedTextColor NOTIFY
+                   selectedTextColorChanged)
     /// \endcond
 
 public:
@@ -269,6 +281,18 @@ public:
 signals:
     void selectionChanged();
     void selectableChanged();
+    void borderPenChanged(const QPen& borderPen);
+    void brushChanged(const QBrush& brush);
+    void fontChanged(const QFont& font);
+    void textColorChanged(const QColor& textColor);
+    void iconSizeChanged(const QSize& iconSize);
+    void iconTextPaddingChanged(int iconTextPadding);
+    void iconBorderPenChanged(const QPen& iconBorderPen);
+    void selectedBorderPenChanged(const QPen& selectedBorderPen);
+    void selectedIconBorderPenChanged(const QPen& selectedIconBorderPen);
+    void selectedBrushChanged(const QBrush& selectedBrush);
+    void selectedFontChanged(const QFont& selectedFont);
+    void selectedTextColorChanged(const QColor& selectedTextColor);
 
 protected:
     // property members:

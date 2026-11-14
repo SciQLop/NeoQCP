@@ -75,6 +75,30 @@
   \ref selectable.
 */
 
+/*! \fn void QCPAbstractLegendItem::fontChanged(const QFont& font)
+
+  This signal is emitted when \ref font changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAbstractLegendItem::textColorChanged(const QColor& textColor)
+
+  This signal is emitted when \ref textColor changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAbstractLegendItem::selectedFontChanged(const QFont& selectedFont)
+
+  This signal is emitted when \ref selectedFont changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAbstractLegendItem::selectedTextColorChanged(const QColor& selectedTextColor)
+
+  This signal is emitted when \ref selectedTextColor changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* end of documentation of signals */
 
 /*!
@@ -107,6 +131,7 @@ void QCPAbstractLegendItem::setFont(const QFont& font)
     if (mLayer)
         mLayer->invalidatePaintBuffer(); // a font change invalidates the old glyphs
     mFont = font;
+    qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::fontChanged, this->font());
 }
 
 /*!
@@ -121,6 +146,7 @@ void QCPAbstractLegendItem::setTextColor(const QColor& color)
     if (mLayer)
         mLayer->invalidatePaintBuffer(); // a font change invalidates the old glyphs
     mTextColor = color;
+    qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::textColorChanged, textColor());
 }
 
 /*!
@@ -136,6 +162,7 @@ void QCPAbstractLegendItem::setSelectedFont(const QFont& font)
     if (mLayer)
         mLayer->invalidatePaintBuffer(); // a font change invalidates the old glyphs
     mSelectedFont = font;
+    qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectedFontChanged, selectedFont());
 }
 
 /*!
@@ -151,6 +178,8 @@ void QCPAbstractLegendItem::setSelectedTextColor(const QColor& color)
     if (mLayer)
         mLayer->invalidatePaintBuffer(); // a font change invalidates the old glyphs
     mSelectedTextColor = color;
+    qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectedTextColorChanged,
+            selectedTextColor());
 }
 
 /*!
@@ -489,6 +518,78 @@ QSize QCPPlottableLegendItem::minimumOuterSizeHint() const
   \see setSelectableParts
 */
 
+/*! \fn void QCPLegend::borderPenChanged(const QPen& borderPen)
+
+  This signal is emitted when \ref borderPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLegend::brushChanged(const QBrush& brush)
+
+  This signal is emitted when \ref brush changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLegend::fontChanged(const QFont& font)
+
+  This signal is emitted when \ref font changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLegend::textColorChanged(const QColor& textColor)
+
+  This signal is emitted when \ref textColor changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLegend::iconSizeChanged(const QSize& iconSize)
+
+  This signal is emitted when \ref iconSize changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLegend::iconTextPaddingChanged(int iconTextPadding)
+
+  This signal is emitted when \ref iconTextPadding changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLegend::iconBorderPenChanged(const QPen& iconBorderPen)
+
+  This signal is emitted when \ref iconBorderPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLegend::selectedBorderPenChanged(const QPen& selectedBorderPen)
+
+  This signal is emitted when \ref selectedBorderPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLegend::selectedIconBorderPenChanged(const QPen& selectedIconBorderPen)
+
+  This signal is emitted when \ref selectedIconBorderPen changes, after the plot delivers its
+  deferred signals.
+*/
+
+/*! \fn void QCPLegend::selectedBrushChanged(const QBrush& selectedBrush)
+
+  This signal is emitted when \ref selectedBrush changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLegend::selectedFontChanged(const QFont& selectedFont)
+
+  This signal is emitted when \ref selectedFont changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLegend::selectedTextColorChanged(const QColor& selectedTextColor)
+
+  This signal is emitted when \ref selectedTextColor changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* end of documentation of signals */
 
 /*!
@@ -561,6 +662,7 @@ void QCPLegend::setBorderPen(const QPen& pen)
         return;
     markDirty();
     mBorderPen = pen;
+    qcpEmit(this, mParentPlot, &QCPLegend::borderPenChanged, borderPen());
 }
 
 /*!
@@ -572,6 +674,7 @@ void QCPLegend::setBrush(const QBrush& brush)
         return;
     markDirty();
     mBrush = brush;
+    qcpEmit(this, mParentPlot, &QCPLegend::brushChanged, this->brush());
 }
 
 /*!
@@ -587,6 +690,8 @@ void QCPLegend::setFont(const QFont& font)
 {
     if (font == mFont)
         return;
+    // The items' signals and ours wait for the scope: a slot may delete the legend mid-loop.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mFont = font;
     for (int i = 0; i < itemCount(); ++i)
@@ -594,6 +699,7 @@ void QCPLegend::setFont(const QFont& font)
         if (itemRaw(i))
             itemRaw(i)->setFont(mFont);
     }
+    qcpEmit(this, mParentPlot, &QCPLegend::fontChanged, this->font());
 }
 
 /*!
@@ -609,6 +715,8 @@ void QCPLegend::setTextColor(const QColor& color)
 {
     if (color == mTextColor)
         return;
+    // The items' signals and ours wait for the scope: a slot may delete the legend mid-loop.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mTextColor = color;
     for (int i = 0; i < itemCount(); ++i)
@@ -616,6 +724,7 @@ void QCPLegend::setTextColor(const QColor& color)
         if (itemRaw(i))
             itemRaw(i)->setTextColor(color);
     }
+    qcpEmit(this, mParentPlot, &QCPLegend::textColorChanged, textColor());
 }
 
 /*!
@@ -628,6 +737,7 @@ void QCPLegend::setIconSize(const QSize& size)
         return;
     markDirty();
     mIconSize = size;
+    qcpEmit(this, mParentPlot, &QCPLegend::iconSizeChanged, iconSize());
 }
 
 /*! \overload
@@ -652,6 +762,7 @@ void QCPLegend::setIconTextPadding(int padding)
         return;
     markDirty();
     mIconTextPadding = padding;
+    qcpEmit(this, mParentPlot, &QCPLegend::iconTextPaddingChanged, iconTextPadding());
 }
 
 /*!
@@ -666,6 +777,7 @@ void QCPLegend::setIconBorderPen(const QPen& pen)
         return;
     markDirty();
     mIconBorderPen = pen;
+    qcpEmit(this, mParentPlot, &QCPLegend::iconBorderPenChanged, iconBorderPen());
 }
 
 /*!
@@ -763,6 +875,7 @@ void QCPLegend::setSelectedBorderPen(const QPen& pen)
         return;
     markDirty();
     mSelectedBorderPen = pen;
+    qcpEmit(this, mParentPlot, &QCPLegend::selectedBorderPenChanged, selectedBorderPen());
 }
 
 /*!
@@ -776,6 +889,7 @@ void QCPLegend::setSelectedIconBorderPen(const QPen& pen)
         return;
     markDirty();
     mSelectedIconBorderPen = pen;
+    qcpEmit(this, mParentPlot, &QCPLegend::selectedIconBorderPenChanged, selectedIconBorderPen());
 }
 
 /*!
@@ -790,6 +904,7 @@ void QCPLegend::setSelectedBrush(const QBrush& brush)
         return;
     markDirty();
     mSelectedBrush = brush;
+    qcpEmit(this, mParentPlot, &QCPLegend::selectedBrushChanged, selectedBrush());
 }
 
 /*!
@@ -803,6 +918,8 @@ void QCPLegend::setSelectedFont(const QFont& font)
 {
     if (font == mSelectedFont)
         return;
+    // The items' signals and ours wait for the scope: a slot may delete the legend mid-loop.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mSelectedFont = font;
     for (int i = 0; i < itemCount(); ++i)
@@ -810,6 +927,7 @@ void QCPLegend::setSelectedFont(const QFont& font)
         if (itemRaw(i))
             itemRaw(i)->setSelectedFont(font);
     }
+    qcpEmit(this, mParentPlot, &QCPLegend::selectedFontChanged, selectedFont());
 }
 
 /*!
@@ -823,6 +941,8 @@ void QCPLegend::setSelectedTextColor(const QColor& color)
 {
     if (color == mSelectedTextColor)
         return;
+    // The items' signals and ours wait for the scope: a slot may delete the legend mid-loop.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mSelectedTextColor = color;
     for (int i = 0; i < itemCount(); ++i)
@@ -830,6 +950,7 @@ void QCPLegend::setSelectedTextColor(const QColor& color)
         if (itemRaw(i))
             itemRaw(i)->setSelectedTextColor(color);
     }
+    qcpEmit(this, mParentPlot, &QCPLegend::selectedTextColorChanged, selectedTextColor());
 }
 
 /*!

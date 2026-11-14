@@ -72,15 +72,15 @@ class QCP_LIB_DECL QCPColorScale : public QCPLayoutElement
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QCPAxis::AxisType type READ type WRITE setType)
+    Q_PROPERTY(QCPAxis::AxisType type READ type WRITE setType NOTIFY typeChanged)
     Q_PROPERTY(QCPRange dataRange READ dataRange WRITE setDataRange NOTIFY dataRangeChanged)
     Q_PROPERTY(QCPAxis::ScaleType dataScaleType READ dataScaleType WRITE setDataScaleType NOTIFY
                    dataScaleTypeChanged)
     Q_PROPERTY(QCPColorGradient gradient READ gradient WRITE setGradient NOTIFY gradientChanged)
-    Q_PROPERTY(QString label READ label WRITE setLabel)
-    Q_PROPERTY(int barWidth READ barWidth WRITE setBarWidth)
-    Q_PROPERTY(bool rangeDrag READ rangeDrag WRITE setRangeDrag)
-    Q_PROPERTY(bool rangeZoom READ rangeZoom WRITE setRangeZoom)
+    Q_PROPERTY(QString label READ label WRITE setLabel NOTIFY labelChanged)
+    Q_PROPERTY(int barWidth READ barWidth WRITE setBarWidth NOTIFY barWidthChanged)
+    Q_PROPERTY(bool rangeDrag READ rangeDrag WRITE setRangeDrag NOTIFY rangeDragChanged)
+    Q_PROPERTY(bool rangeZoom READ rangeZoom WRITE setRangeZoom NOTIFY rangeZoomChanged)
     /// \endcond
 
 public:
@@ -133,6 +133,11 @@ signals:
     void dataRangeChanged(const QCPRange& newRange);
     void dataScaleTypeChanged(QCPAxis::ScaleType scaleType);
     void gradientChanged(const QCPColorGradient& newGradient);
+    void typeChanged(QCPAxis::AxisType type);
+    void labelChanged(const QString& label);
+    void barWidthChanged(int barWidth);
+    void rangeDragChanged(bool rangeDrag);
+    void rangeZoomChanged(bool rangeZoom);
 
 protected:
     // property members:

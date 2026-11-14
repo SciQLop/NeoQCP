@@ -36,6 +36,8 @@ private slots:
     void everyPropertyIsConstantOrNotifies();
     void everyWriterBesidesTheSetterNotifies_data();
     void everyWriterBesidesTheSetterNotifies();
+    void nestedWriterSignalsWaitForTheWriter_data();
+    void nestedWriterSignalsWaitForTheWriter();
     void exceptionsNameRealProperties();
     void everyNotifyPropertyNotifiesOncePerChange_data();
     void everyNotifyPropertyNotifiesOncePerChange();

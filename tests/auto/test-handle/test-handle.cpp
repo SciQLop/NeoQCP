@@ -956,12 +956,10 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
 
     QCOMPARE(plot.property("plotLayout").value<QCPLayoutGrid*>(), plot.plotLayout().get());
     QCOMPARE(axis->property("axisRect").value<QCPAxisRect*>(), axis->axisRect().get());
-    QCOMPARE(rect->property("layout").value<QCPLayout*>(), rect->layout().get());
     QCOMPARE(layer->property("parentPlot").value<QCustomPlot*>(), layer->parentPlot().get());
     QCOMPARE(layer->property("children").value<QList<QCPLayerable*>>(),
              qcp::pointers(layer->children()));
     QCOMPARE(graph->property("layer").value<QCPLayer*>(), graph->layer().get());
-    QCOMPARE(row->property("parentLegend").value<QCPLegend*>(), row->parentLegend().get());
     QCOMPARE(tracer->property("graph").value<QCPGraph*>(), tracer->graph().get());
     QCOMPARE(item->property("clipAxisRect").value<QCPAxisRect*>(), item->clipAxisRect().get());
     QCOMPARE(map->property("colorScale").value<QCPColorScale*>(), map->colorScale().get());
@@ -1019,9 +1017,8 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
     // Off the surface (milestone 5e, E-11): read-only, they move with no signal. The accessors
     // stay.
     const std::pair<QObject*, const char*> dropped[] = {
-        { axis, "grid" },
-        { graph, "parentPlot" },
-        { graph, "parentLayerable" },
+        { axis, "grid" },   { graph, "parentPlot" }, { graph, "parentLayerable" },
+        { rect, "layout" }, { row, "parentLegend" },
     };
     for (const auto& [object, name] : dropped)
         QVERIFY2(object->metaObject()->indexOfProperty(name) < 0, name);

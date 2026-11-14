@@ -40,13 +40,15 @@ class QCP_LIB_DECL QCPTextElement : public QCPLayoutElement
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QString text READ text WRITE setText)
-    Q_PROPERTY(QFont font READ font WRITE setFont)
-    Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor)
-    Q_PROPERTY(QFont selectedFont READ selectedFont WRITE setSelectedFont)
-    Q_PROPERTY(QColor selectedTextColor READ selectedTextColor WRITE setSelectedTextColor)
-    Q_PROPERTY(QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY
-                       selectableChanged)
+    Q_PROPERTY(QString text READ text WRITE setText NOTIFY textChanged)
+    Q_PROPERTY(QFont font READ font WRITE setFont NOTIFY fontChanged)
+    Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor NOTIFY textColorChanged)
+    Q_PROPERTY(
+        QFont selectedFont READ selectedFont WRITE setSelectedFont NOTIFY selectedFontChanged)
+    Q_PROPERTY(QColor selectedTextColor READ selectedTextColor WRITE setSelectedTextColor NOTIFY
+                   selectedTextColorChanged)
+    Q_PROPERTY(
+        QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY selectableChanged)
     Q_PROPERTY(bool selected READ selected WRITE setSelected NOTIFY selectionChanged)
     /// \endcond
 
@@ -100,6 +102,11 @@ signals:
     void selectableChanged();
     void clicked(QMouseEvent* event);
     void doubleClicked(QMouseEvent* event);
+    void textChanged(const QString& text);
+    void fontChanged(const QFont& font);
+    void textColorChanged(const QColor& textColor);
+    void selectedFontChanged(const QFont& selectedFont);
+    void selectedTextColorChanged(const QColor& selectedTextColor);
 
 protected:
     // property members:

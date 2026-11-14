@@ -60,8 +60,8 @@ class QCP_LIB_DECL QCPAxisRect : public QCPArea
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(Qt::Orientations rangeDrag READ rangeDrag WRITE setRangeDrag)
-    Q_PROPERTY(Qt::Orientations rangeZoom READ rangeZoom WRITE setRangeZoom)
+    Q_PROPERTY(Qt::Orientations rangeDrag READ rangeDrag WRITE setRangeDrag NOTIFY rangeDragChanged)
+    Q_PROPERTY(Qt::Orientations rangeZoom READ rangeZoom WRITE setRangeZoom NOTIFY rangeZoomChanged)
     /// \endcond
 
 public:
@@ -172,6 +172,10 @@ public:
     // reimplemented virtual methods:
     virtual void update(UpdatePhase phase) override;
     virtual int calculateAutoMargin(QCP::MarginSide side) override;
+
+signals:
+    void rangeDragChanged(Qt::Orientations rangeDrag);
+    void rangeZoomChanged(Qt::Orientations rangeZoom);
 
 protected:
     // The pair the rect maps, refused as misuse when both axes grow the same way.

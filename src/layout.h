@@ -41,15 +41,14 @@ class QCP_LIB_DECL QCPLayoutElement : public QCPLayerable
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QCPLayout* layout READ layout)
-    Q_PROPERTY(QRect rect READ rect)
-    Q_PROPERTY(QRect outerRect READ outerRect WRITE setOuterRect)
-    Q_PROPERTY(QMargins margins READ margins WRITE setMargins)
-    Q_PROPERTY(QMargins minimumMargins READ minimumMargins WRITE setMinimumMargins)
-    Q_PROPERTY(QSize minimumSize READ minimumSize WRITE setMinimumSize)
-    Q_PROPERTY(QSize maximumSize READ maximumSize WRITE setMaximumSize)
-    Q_PROPERTY(
-        SizeConstraintRect sizeConstraintRect READ sizeConstraintRect WRITE setSizeConstraintRect)
+    Q_PROPERTY(QRect outerRect READ outerRect WRITE setOuterRect NOTIFY outerRectChanged)
+    Q_PROPERTY(QMargins margins READ margins WRITE setMargins NOTIFY marginsChanged)
+    Q_PROPERTY(QMargins minimumMargins READ minimumMargins WRITE setMinimumMargins NOTIFY
+                   minimumMarginsChanged)
+    Q_PROPERTY(QSize minimumSize READ minimumSize WRITE setMinimumSize NOTIFY minimumSizeChanged)
+    Q_PROPERTY(QSize maximumSize READ maximumSize WRITE setMaximumSize NOTIFY maximumSizeChanged)
+    Q_PROPERTY(SizeConstraintRect sizeConstraintRect READ sizeConstraintRect WRITE
+                   setSizeConstraintRect NOTIFY sizeConstraintRectChanged)
     /// \endcond
 
 public:
@@ -134,6 +133,14 @@ public:
     // reimplemented virtual methods:
     virtual double selectTest(const QPointF& pos, bool onlySelectable,
                               QVariant* details = nullptr) const override;
+
+signals:
+    void outerRectChanged(const QRect& outerRect);
+    void marginsChanged(const QMargins& margins);
+    void minimumMarginsChanged(const QMargins& minimumMargins);
+    void minimumSizeChanged(const QSize& minimumSize);
+    void maximumSizeChanged(const QSize& maximumSize);
+    void sizeConstraintRectChanged(QCPLayoutElement::SizeConstraintRect sizeConstraintRect);
 
 protected:
     // property members:
@@ -230,15 +237,15 @@ class QCP_LIB_DECL QCPLayoutGrid : public QCPLayout
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(int rowCount READ rowCount)
-    Q_PROPERTY(int columnCount READ columnCount)
+    Q_PROPERTY(QList<double> columnStretchFactors READ columnStretchFactors WRITE
+                   setColumnStretchFactors NOTIFY columnStretchFactorsChanged)
+    Q_PROPERTY(QList<double> rowStretchFactors READ rowStretchFactors WRITE setRowStretchFactors
+                   NOTIFY rowStretchFactorsChanged)
     Q_PROPERTY(
-        QList<double> columnStretchFactors READ columnStretchFactors WRITE setColumnStretchFactors)
-    Q_PROPERTY(QList<double> rowStretchFactors READ rowStretchFactors WRITE setRowStretchFactors)
-    Q_PROPERTY(int columnSpacing READ columnSpacing WRITE setColumnSpacing)
-    Q_PROPERTY(int rowSpacing READ rowSpacing WRITE setRowSpacing)
-    Q_PROPERTY(FillOrder fillOrder READ fillOrder WRITE setFillOrder)
-    Q_PROPERTY(int wrap READ wrap WRITE setWrap)
+        int columnSpacing READ columnSpacing WRITE setColumnSpacing NOTIFY columnSpacingChanged)
+    Q_PROPERTY(int rowSpacing READ rowSpacing WRITE setRowSpacing NOTIFY rowSpacingChanged)
+    Q_PROPERTY(FillOrder fillOrder READ fillOrder WRITE setFillOrder NOTIFY fillOrderChanged)
+    Q_PROPERTY(int wrap READ wrap WRITE setWrap NOTIFY wrapChanged)
     /// \endcond
 
 public:
@@ -312,6 +319,14 @@ public:
     int rowColToIndex(int row, int column) const;
     void indexToRowCol(int index, int& row, int& column) const;
 
+signals:
+    void columnStretchFactorsChanged(const QList<double>& columnStretchFactors);
+    void rowStretchFactorsChanged(const QList<double>& rowStretchFactors);
+    void columnSpacingChanged(int columnSpacing);
+    void rowSpacingChanged(int rowSpacing);
+    void fillOrderChanged(QCPLayoutGrid::FillOrder fillOrder);
+    void wrapChanged(int wrap);
+
 protected:
     virtual QCPLayoutElement* elementAtRaw(int index) const override;
 
@@ -328,6 +343,8 @@ protected:
     void getMaximumRowColSizes(QVector<int>* maxColWidths, QVector<int>* maxRowHeights) const;
 
 private:
+    void stretchFactorsMoved(const QList<double>& columns, const QList<double>& rows);
+
     Q_DISABLE_COPY(QCPLayoutGrid)
 };
 Q_DECLARE_METATYPE(QCPLayoutGrid::FillOrder)

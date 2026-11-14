@@ -92,6 +92,36 @@ QList<QPointer<QCPAbstractColorMapped>> liveUsers(const QList<QCPAbstractColorMa
   <tt>setMinimumMargins(QMargins(6, 0, 6, 0))</tt>.
 */
 
+/*! \fn void QCPColorScale::typeChanged(QCPAxis::AxisType type)
+
+  This signal is emitted when \ref type changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPColorScale::labelChanged(const QString& label)
+
+  This signal is emitted when \ref label changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPColorScale::barWidthChanged(int barWidth)
+
+  This signal is emitted when \ref barWidth changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPColorScale::rangeDragChanged(bool rangeDrag)
+
+  This signal is emitted when \ref rangeDrag changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPColorScale::rangeZoomChanged(bool rangeZoom)
+
+  This signal is emitted when \ref rangeZoom changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start documentation of inline functions */
 
 /*! \fn QCPHandle<QCPAxis> QCPColorScale::axis() const
@@ -241,6 +271,10 @@ void QCPColorScale::setType(QCPAxis::AxisType type)
     }
     if (mType != type)
     {
+        // The type moves rangeDrag, rangeZoom and the axis the label lives on: every signal waits
+        // for the scope, so a slot that deletes the scale runs after the last is queued.
+        QCPEmissionScope scope(mParentPlot);
+        const bool drag = mColorAxis && rangeDrag(), zoom = mColorAxis && rangeZoom();
         markDirty();
         mType = type;
         QCPRange rangeTransfer(0, 6);
@@ -253,6 +287,8 @@ void QCPColorScale::setType(QCPAxis::AxisType type)
             rangeTransfer = mColorAxis.data()->range();
             labelTransfer = mColorAxis.data()->label();
             tickerTransfer = mColorAxis.data()->ticker();
+            disconnect(mColorAxis.data(), &QCPAxis::labelChanged, this,
+                       &QCPColorScale::labelChanged);
             mColorAxis.data()->setLabel(QString());
             disconnect(mColorAxis.data(), &QCPAxis::rangeChanged, this, &QCPColorScale::setDataRange);
             disconnect(mColorAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPColorScale::setDataScaleType);
@@ -278,10 +314,18 @@ void QCPColorScale::setType(QCPAxis::AxisType type)
         }
         connect(mColorAxis.data(), &QCPAxis::rangeChanged, this, &QCPColorScale::setDataRange);
         connect(mColorAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPColorScale::setDataScaleType);
+        // The label lives on the colour axis, which a caller can reach (axis()): its signal is
+        // ours.
+        connect(mColorAxis.data(), &QCPAxis::labelChanged, this, &QCPColorScale::labelChanged);
         mAxisRect.data()->setRangeDragAxes(QList<QCPAxis*>() << mColorAxis.data());
         // Its opposite axes are synchronized by signals: zooming them both would zoom twice.
         mAxisRect.data()->setRangeZoomAxes(QList<QCPAxis*>() << mColorAxis.data());
         usersChanged(); // the scale now needs a different side's width or height
+        qcpEmit(this, mParentPlot, &QCPColorScale::typeChanged, mType);
+        if (drag != rangeDrag())
+            qcpEmit(this, mParentPlot, &QCPColorScale::rangeDragChanged, !drag);
+        if (zoom != rangeZoom())
+            qcpEmit(this, mParentPlot, &QCPColorScale::rangeZoomChanged, !zoom);
     }
 }
 
@@ -406,7 +450,7 @@ void QCPColorScale::setLabel(const QString& str)
     if (mColorAxis.data()->label() == str)
         return;
     markDirty();
-    mColorAxis.data()->setLabel(str);
+    mColorAxis.data()->setLabel(str); // its labelChanged is ours (setType)
 }
 
 /*!
@@ -422,6 +466,7 @@ void QCPColorScale::setBarWidth(int width)
         mColorAxis.data()->markDirty(); // the bar width moves the axis beside it
     mBarWidth = width;
     usersChanged();
+    qcpEmit(this, mParentPlot, &QCPColorScale::barWidthChanged, barWidth());
 }
 
 /*!
@@ -437,6 +482,10 @@ void QCPColorScale::setRangeDrag(bool enabled)
         qDebug() << Q_FUNC_INFO << "internal axis rect was deleted";
         return;
     }
+    if (enabled == rangeDrag())
+        return;
+    // The inner rect's signal and ours wait for the scope: a slot may delete the scale.
+    const QCPEmissionScope scope(mParentPlot);
 
     if (enabled)
     {
@@ -446,6 +495,7 @@ void QCPColorScale::setRangeDrag(bool enabled)
     {
         mAxisRect.data()->setRangeDrag({});
     }
+    qcpEmit(this, mParentPlot, &QCPColorScale::rangeDragChanged, rangeDrag());
 }
 
 /*!
@@ -461,6 +511,10 @@ void QCPColorScale::setRangeZoom(bool enabled)
         qDebug() << Q_FUNC_INFO << "internal axis rect was deleted";
         return;
     }
+    if (enabled == rangeZoom())
+        return;
+    // The inner rect's signal and ours wait for the scope: a slot may delete the scale.
+    const QCPEmissionScope scope(mParentPlot);
 
     if (enabled)
     {
@@ -470,6 +524,7 @@ void QCPColorScale::setRangeZoom(bool enabled)
     {
         mAxisRect.data()->setRangeZoom({});
     }
+    qcpEmit(this, mParentPlot, &QCPColorScale::rangeZoomChanged, rangeZoom());
 }
 
 /*!

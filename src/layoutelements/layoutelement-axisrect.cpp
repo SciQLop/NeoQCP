@@ -80,6 +80,18 @@
   line on the far left indicates the viewport/widget border.</center>
 */
 
+/*! \fn void QCPAxisRect::rangeDragChanged(Qt::Orientations rangeDrag)
+
+  This signal is emitted when \ref rangeDrag changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxisRect::rangeZoomChanged(Qt::Orientations rangeZoom)
+
+  This signal is emitted when \ref rangeZoom changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start documentation of inline functions */
 
 /*! \fn QCPHandle<QCPLayoutInset> QCPAxisRect::insetLayout() const
@@ -1135,7 +1147,10 @@ double QCPAxisRect::rangeZoomFactor(Qt::Orientation orientation)
 */
 void QCPAxisRect::setRangeDrag(Qt::Orientations orientations)
 {
+    if (mRangeDrag == orientations)
+        return;
     mRangeDrag = orientations;
+    qcpEmit(this, mParentPlot, &QCPAxisRect::rangeDragChanged, rangeDrag());
 }
 
 /*!
@@ -1156,7 +1171,10 @@ void QCPAxisRect::setRangeDrag(Qt::Orientations orientations)
 */
 void QCPAxisRect::setRangeZoom(Qt::Orientations orientations)
 {
+    if (mRangeZoom == orientations)
+        return;
     mRangeZoom = orientations;
+    qcpEmit(this, mParentPlot, &QCPAxisRect::rangeZoomChanged, rangeZoom());
 }
 
 /*! \overload
