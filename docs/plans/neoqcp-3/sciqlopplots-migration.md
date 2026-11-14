@@ -297,3 +297,28 @@ read; SciQLopPlots at 8b456e70, line numbers of 2026-11-13). Three compile break
 - An alignment group settles in the replot that needs it (up to three extra layout passes), so a
   freshly shown or exported panel is aligned at once. A layout that never settles stops after one
   follow-up replot and reports a misuse (fatal in debug).
+
+## From milestone 5e (the meta-object surface)
+
+SciQLopPlots reads no QCP property by name today, so nothing here stops compiling. The rows matter only to code
+that goes through `QObject::property`, `QMetaProperty` or a `QBindable(obj, "name")`.
+
+### Properties off the surface
+
+A read-only property that moves with no change signal is no longer a `Q_PROPERTY` (E-11). Its accessor stays: call
+it instead of `property("name")`.
+
+| class | property | read instead |
+|---|---|---|
+| `QCPAxisBase` | `tickVector`, `tickVectorLabels` | `tickVector()`, `tickVectorLabels()` |
+| `QCPAxis` | `grid` | `grid()` |
+| `QCPLayerable` | `parentPlot`, `parentLayerable` | `parentPlot()`, `parentLayerable()` |
+
+### Signals
+
+- Every writable property has a change signal now, `xChanged(T)` carrying the new value, delivered after the
+  plot's deferred signals like the others (4a). The existing signals keep their signatures.
+- `QCPAxis::axisType` and `axisRect` are `CONSTANT`.
+- `QCPLayerable::setMouseTransparent` moved out of line.
+- `QCPAxis::setTickLabelRotation` compares the clamped angle: a write past ±90° when the axis is already at the
+  bound changes nothing and repaints nothing.

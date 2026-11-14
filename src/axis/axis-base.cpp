@@ -14,6 +14,18 @@
 #include <cmath>
 #include <utility>
 
+/*! \fn void QCPAxisBase::rangeReversedChanged(bool rangeReversed)
+
+  This signal is emitted when \ref rangeReversed changes, by \ref setRangeReversed or by the
+  source of a link, after the plot delivers its deferred signals.
+*/
+
+/*! \fn void QCPAxisBase::tickerChanged(const QSharedPointer<QCPAxisTicker>& ticker)
+
+  This signal is emitted when \ref setTicker installs another ticker, after the plot delivers its
+  deferred signals.
+*/
+
 QCPAxisBase::QCPAxisBase(QCPArea* area, Qt::Orientation orientation)
         : QCPLayerable(area ? area->parentPlot() : nullptr, QString(), area)
         , mArea(area)
@@ -237,6 +249,7 @@ void QCPAxisBase::setRangeReversed(bool reversed)
     markAppearanceDirty();
     // No signal carries a reversal, so the linked axes are told here.
     refreshLinkedAxes();
+    qcpEmit(this, mParentPlot, &QCPAxisBase::rangeReversedChanged, rangeReversed());
 }
 
 /*!
@@ -270,6 +283,7 @@ void QCPAxisBase::setTicker(QSharedPointer<QCPAxisTicker> ticker)
     mTicker = ticker;
     // No need to invalidate a margin cache here: the tick labels are compared per replot.
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxisBase::tickerChanged, mTicker);
 }
 
 /*!
@@ -537,10 +551,16 @@ void QCPAxisBase::refreshFromLink()
     mRange
         = mScaleType == stLogarithmic ? fresh.sanitizedForLogScale() : fresh.sanitizedForLinScale();
     const bool reversalChanged = reversed != mRangeReversed;
+    // Both signals wait for the scope: a rangeChanged slot may delete this axis.
+    std::optional<QCPEmissionScope> scope;
+    if (reversalChanged)
+        scope.emplace(mParentPlot);
     mRangeReversed = reversed;
     if (reversalChanged)
         markAppearanceDirty();
     rangeDidChange(oldRange);
+    if (reversalChanged)
+        qcpEmit(this, mParentPlot, &QCPAxisBase::rangeReversedChanged, mRangeReversed);
 }
 
 /*! \internal

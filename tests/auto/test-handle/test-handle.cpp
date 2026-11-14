@@ -956,14 +956,10 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
 
     QCOMPARE(plot.property("plotLayout").value<QCPLayoutGrid*>(), plot.plotLayout().get());
     QCOMPARE(axis->property("axisRect").value<QCPAxisRect*>(), axis->axisRect().get());
-    QCOMPARE(axis->property("grid").value<QCPGrid*>(), axis->grid().get());
     QCOMPARE(rect->property("layout").value<QCPLayout*>(), rect->layout().get());
     QCOMPARE(layer->property("parentPlot").value<QCustomPlot*>(), layer->parentPlot().get());
     QCOMPARE(layer->property("children").value<QList<QCPLayerable*>>(),
              qcp::pointers(layer->children()));
-    QCOMPARE(graph->property("parentPlot").value<QCustomPlot*>(), graph->parentPlot().get());
-    QCOMPARE(graph->property("parentLayerable").value<QCPLayerable*>(),
-             graph->parentLayerable().get());
     QCOMPARE(graph->property("layer").value<QCPLayer*>(), graph->layer().get());
     QCOMPARE(row->property("parentLegend").value<QCPLegend*>(), row->parentLegend().get());
     QCOMPARE(tracer->property("graph").value<QCPGraph*>(), tracer->graph().get());
@@ -1019,6 +1015,16 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
 
     writeObject(graph, "selectionDecorator", QVariant::fromValue(new QCPSelectionDecorator));
     QVERIFY(graph->selectionDecorator());
+
+    // Off the surface (milestone 5e, E-11): read-only, they move with no signal. The accessors
+    // stay.
+    const std::pair<QObject*, const char*> dropped[] = {
+        { axis, "grid" },
+        { graph, "parentPlot" },
+        { graph, "parentLayerable" },
+    };
+    for (const auto& [object, name] : dropped)
+        QVERIFY2(object->metaObject()->indexOfProperty(name) < 0, name);
 
     // The axes stay where they are: a pair of another area would be refused (and reported), and
     // these two properties are the same write path as the others.

@@ -545,6 +545,18 @@ QCPHandle<QCPLayerable> QCPLayerable::parentLayerable() const
   For details about the layering mechanism, see the QCPLayer documentation.
 */
 
+/*! \fn void QCPLayerable::antialiasedChanged(bool antialiased)
+
+  This signal is emitted when \ref antialiased changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLayerable::mouseTransparentChanged(bool mouseTransparent)
+
+  This signal is emitted when \ref mouseTransparent changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start documentation of inline functions */
 
 /*! \fn QCPHandle<QCPLayerable> QCPLayerable::parentLayerable() const
@@ -736,6 +748,18 @@ void QCPLayerable::setAntialiased(bool enabled)
         return;
     markDirty();
     mAntialiased = enabled;
+    qcpEmit(this, mParentPlot, &QCPLayerable::antialiasedChanged, antialiased());
+}
+
+/*!
+  Sets whether hit-testing skips this layerable, so it never captures clicks or hover.
+*/
+void QCPLayerable::setMouseTransparent(bool transparent)
+{
+    if (mMouseTransparent == transparent)
+        return;
+    mMouseTransparent = transparent;
+    qcpEmit(this, mParentPlot, &QCPLayerable::mouseTransparentChanged, mMouseTransparent);
 }
 
 /*!

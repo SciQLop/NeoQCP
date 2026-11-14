@@ -245,12 +245,11 @@ class QCP_LIB_DECL QCPLayerable : public QObject
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(bool visible READ visible WRITE setVisible)
-    Q_PROPERTY(QCustomPlot* parentPlot READ parentPlot)
-    Q_PROPERTY(QCPLayerable* parentLayerable READ parentLayerable)
+    Q_PROPERTY(bool visible READ visible WRITE setVisible NOTIFY visibleChanged)
     Q_PROPERTY(QCPLayer* layer READ layer WRITE setLayer NOTIFY layerChanged)
-    Q_PROPERTY(bool antialiased READ antialiased WRITE setAntialiased)
-    Q_PROPERTY(bool mouseTransparent READ mouseTransparent WRITE setMouseTransparent)
+    Q_PROPERTY(bool antialiased READ antialiased WRITE setAntialiased NOTIFY antialiasedChanged)
+    Q_PROPERTY(bool mouseTransparent READ mouseTransparent WRITE setMouseTransparent NOTIFY
+                   mouseTransparentChanged)
     /// \endcond
 
 public:
@@ -285,7 +284,7 @@ public:
     bool setLayer(const QString& layerName);
     void setAntialiased(bool enabled);
 
-    void setMouseTransparent(bool transparent) { mMouseTransparent = transparent; }
+    void setMouseTransparent(bool transparent);
 
     // introduced virtual methods:
     virtual double selectTest(const QPointF& pos, bool onlySelectable,
@@ -306,6 +305,8 @@ public:
 signals:
     void layerChanged(QCPLayer* newLayer);
     void visibleChanged(bool visible);
+    void antialiasedChanged(bool antialiased);
+    void mouseTransparentChanged(bool mouseTransparent);
 
 protected:
     // property members:

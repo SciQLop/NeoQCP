@@ -56,6 +56,42 @@
   described situation is the default setup, see the QCPLayer documentation.
 */
 
+/*! \fn void QCPGrid::subGridVisibleChanged(bool subGridVisible)
+
+  This signal is emitted when \ref subGridVisible changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPGrid::antialiasedSubGridChanged(bool antialiasedSubGrid)
+
+  This signal is emitted when \ref antialiasedSubGrid changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPGrid::antialiasedZeroLineChanged(bool antialiasedZeroLine)
+
+  This signal is emitted when \ref antialiasedZeroLine changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPGrid::penChanged(const QPen& pen)
+
+  This signal is emitted when \ref pen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPGrid::subGridPenChanged(const QPen& subGridPen)
+
+  This signal is emitted when \ref subGridPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPGrid::zeroLinePenChanged(const QPen& zeroLinePen)
+
+  This signal is emitted when \ref zeroLinePen changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates a QCPGrid instance and sets default values.
 
@@ -94,6 +130,7 @@ void QCPGrid::setSubGridVisible(bool visible)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
     markDirty();
+    qcpEmit(this, mParentPlot, &QCPGrid::subGridVisibleChanged, subGridVisible());
 }
 
 /*!
@@ -105,6 +142,7 @@ void QCPGrid::setAntialiasedSubGrid(bool enabled)
         return;
     mAntialiasedSubGrid = enabled;
     markDirty();
+    qcpEmit(this, mParentPlot, &QCPGrid::antialiasedSubGridChanged, antialiasedSubGrid());
 }
 
 /*!
@@ -116,6 +154,7 @@ void QCPGrid::setAntialiasedZeroLine(bool enabled)
         return;
     mAntialiasedZeroLine = enabled;
     markDirty();
+    qcpEmit(this, mParentPlot, &QCPGrid::antialiasedZeroLineChanged, antialiasedZeroLine());
 }
 
 /*!
@@ -130,6 +169,7 @@ void QCPGrid::setPen(const QPen& pen)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
     markDirty();
+    qcpEmit(this, mParentPlot, &QCPGrid::penChanged, mPen);
 }
 
 /*!
@@ -144,6 +184,7 @@ void QCPGrid::setSubGridPen(const QPen& pen)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
     markDirty();
+    qcpEmit(this, mParentPlot, &QCPGrid::subGridPenChanged, subGridPen());
 }
 
 /*!
@@ -161,6 +202,7 @@ void QCPGrid::setZeroLinePen(const QPen& pen)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
     markDirty();
+    qcpEmit(this, mParentPlot, &QCPGrid::zeroLinePenChanged, zeroLinePen());
 }
 
 /*! \internal
@@ -414,6 +456,192 @@ void QCPGrid::drawSubGridLines(QCPPainter* painter) const
 
   This signal is emitted when the selectability changes, by calls to \ref setSelectableParts. The
   slot reads \ref selectableParts.
+*/
+
+/*! \fn void QCPAxis::ticksChanged(bool ticks)
+
+  This signal is emitted when \ref ticks changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::tickLabelsChanged(bool tickLabels)
+
+  This signal is emitted when \ref tickLabels changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::tickLabelPaddingChanged(int tickLabelPadding)
+
+  This signal is emitted when \ref tickLabelPadding changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::tickLabelFontChanged(const QFont& tickLabelFont)
+
+  This signal is emitted when \ref tickLabelFont changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::tickLabelColorChanged(const QColor& tickLabelColor)
+
+  This signal is emitted when \ref tickLabelColor changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::tickLabelRotationChanged(double tickLabelRotation)
+
+  This signal is emitted when \ref tickLabelRotation changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::tickLabelSideChanged(QCPAxis::LabelSide tickLabelSide)
+
+  This signal is emitted when \ref tickLabelSide changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::numberFormatChanged(const QString& numberFormat)
+
+  This signal is emitted when \ref numberFormat changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::numberPrecisionChanged(int numberPrecision)
+
+  This signal is emitted when \ref numberPrecision changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::tickLengthInChanged(int tickLengthIn)
+
+  This signal is emitted when \ref tickLengthIn changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::tickLengthOutChanged(int tickLengthOut)
+
+  This signal is emitted when \ref tickLengthOut changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::subTicksChanged(bool subTicks)
+
+  This signal is emitted when \ref subTicks changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::subTickLengthInChanged(int subTickLengthIn)
+
+  This signal is emitted when \ref subTickLengthIn changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::subTickLengthOutChanged(int subTickLengthOut)
+
+  This signal is emitted when \ref subTickLengthOut changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::basePenChanged(const QPen& basePen)
+
+  This signal is emitted when \ref basePen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::tickPenChanged(const QPen& tickPen)
+
+  This signal is emitted when \ref tickPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::subTickPenChanged(const QPen& subTickPen)
+
+  This signal is emitted when \ref subTickPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::labelFontChanged(const QFont& labelFont)
+
+  This signal is emitted when \ref labelFont changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::labelColorChanged(const QColor& labelColor)
+
+  This signal is emitted when \ref labelColor changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::labelPaddingChanged(int labelPadding)
+
+  This signal is emitted when \ref labelPadding changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::paddingChanged(int padding)
+
+  This signal is emitted when \ref padding changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::offsetChanged(int offset)
+
+  This signal is emitted when \ref offset changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::selectedTickLabelFontChanged(const QFont& selectedTickLabelFont)
+
+  This signal is emitted when \ref selectedTickLabelFont changes, after the plot delivers its
+  deferred signals.
+*/
+
+/*! \fn void QCPAxis::selectedLabelFontChanged(const QFont& selectedLabelFont)
+
+  This signal is emitted when \ref selectedLabelFont changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::selectedTickLabelColorChanged(const QColor& selectedTickLabelColor)
+
+  This signal is emitted when \ref selectedTickLabelColor changes, after the plot delivers its
+  deferred signals.
+*/
+
+/*! \fn void QCPAxis::selectedLabelColorChanged(const QColor& selectedLabelColor)
+
+  This signal is emitted when \ref selectedLabelColor changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::selectedBasePenChanged(const QPen& selectedBasePen)
+
+  This signal is emitted when \ref selectedBasePen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::selectedTickPenChanged(const QPen& selectedTickPen)
+
+  This signal is emitted when \ref selectedTickPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::selectedSubTickPenChanged(const QPen& selectedSubTickPen)
+
+  This signal is emitted when \ref selectedSubTickPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::lowerEndingChanged(const QCPLineEnding& lowerEnding)
+
+  This signal is emitted when \ref lowerEnding changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxis::upperEndingChanged(const QCPLineEnding& upperEnding)
+
+  This signal is emitted when \ref upperEnding changes, after the plot delivers its deferred
+  signals.
 */
 
 /* end of documentation of signals */
@@ -712,6 +940,7 @@ void QCPAxis::setTicks(bool show)
         mTicks = show;
         mCachedMarginValid = false;
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::ticksChanged, ticks());
     }
 }
 
@@ -727,6 +956,7 @@ void QCPAxis::setTickLabels(bool show)
         if (!mTickLabels)
             mTickVectorLabels.clear();
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::tickLabelsChanged, tickLabels());
     }
 }
 
@@ -741,6 +971,7 @@ void QCPAxis::setTickLabelPadding(int padding)
         mAxisPainter->tickLabelPadding = padding;
         mCachedMarginValid = false;
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::tickLabelPaddingChanged, tickLabelPadding());
     }
 }
 
@@ -756,6 +987,7 @@ void QCPAxis::setTickLabelFont(const QFont& font)
         mTickLabelFont = font;
         mCachedMarginValid = false;
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::tickLabelFontChanged, tickLabelFont());
     }
 }
 
@@ -770,6 +1002,7 @@ void QCPAxis::setTickLabelColor(const QColor& color)
         return;
     mTickLabelColor = color;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::tickLabelColorChanged, tickLabelColor());
 }
 
 /*!
@@ -783,11 +1016,13 @@ void QCPAxis::setTickLabelColor(const QColor& color)
 */
 void QCPAxis::setTickLabelRotation(double degrees)
 {
-    if (!qFuzzyIsNull(degrees - mAxisPainter->tickLabelRotation))
+    const double clamped = qBound(-90.0, degrees, 90.0);
+    if (!qFuzzyIsNull(clamped - mAxisPainter->tickLabelRotation))
     {
-        mAxisPainter->tickLabelRotation = qBound(-90.0, degrees, 90.0);
+        mAxisPainter->tickLabelRotation = clamped;
         mCachedMarginValid = false;
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::tickLabelRotationChanged, tickLabelRotation());
     }
 }
 
@@ -805,6 +1040,7 @@ void QCPAxis::setTickLabelSide(LabelSide side)
     mAxisPainter->tickLabelSide = side;
     mCachedMarginValid = false;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::tickLabelSideChanged, tickLabelSide());
 }
 
 /*!
@@ -899,6 +1135,7 @@ void QCPAxis::setNumberFormat(const QString& formatCode)
     mNumberBeautifulPowers = beautifulPowers;
     mAxisPainter->numberMultiplyCross = multiplyCross;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::numberFormatChanged, numberFormat());
 }
 
 /*!
@@ -913,6 +1150,7 @@ void QCPAxis::setNumberPrecision(int precision)
         mNumberPrecision = precision;
         mCachedMarginValid = false;
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::numberPrecisionChanged, numberPrecision());
     }
 }
 
@@ -926,6 +1164,8 @@ void QCPAxis::setNumberPrecision(int precision)
 */
 void QCPAxis::setTickLength(int inside, int outside)
 {
+    // Both signals wait for the scope: a slot of the first may delete the axis.
+    QCPEmissionScope scope(mParentPlot);
     setTickLengthIn(inside);
     setTickLengthOut(outside);
 }
@@ -942,6 +1182,7 @@ void QCPAxis::setTickLengthIn(int inside)
     {
         mAxisPainter->tickLengthIn = inside;
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::tickLengthInChanged, tickLengthIn());
     }
 }
 
@@ -959,6 +1200,7 @@ void QCPAxis::setTickLengthOut(int outside)
         mAxisPainter->tickLengthOut = outside;
         mCachedMarginValid = false; // only outside tick length can change margin
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::tickLengthOutChanged, tickLengthOut());
     }
 }
 
@@ -976,6 +1218,7 @@ void QCPAxis::setSubTicks(bool show)
         mSubTicks = show;
         mCachedMarginValid = false;
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::subTicksChanged, subTicks());
     }
 }
 
@@ -989,6 +1232,8 @@ void QCPAxis::setSubTicks(bool show)
 */
 void QCPAxis::setSubTickLength(int inside, int outside)
 {
+    // Both signals wait for the scope: a slot of the first may delete the axis.
+    QCPEmissionScope scope(mParentPlot);
     setSubTickLengthIn(inside);
     setSubTickLengthOut(outside);
 }
@@ -1005,6 +1250,7 @@ void QCPAxis::setSubTickLengthIn(int inside)
     {
         mAxisPainter->subTickLengthIn = inside;
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::subTickLengthInChanged, subTickLengthIn());
     }
 }
 
@@ -1022,6 +1268,7 @@ void QCPAxis::setSubTickLengthOut(int outside)
         mAxisPainter->subTickLengthOut = outside;
         mCachedMarginValid = false; // only outside tick length can change margin
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::subTickLengthOutChanged, subTickLengthOut());
     }
 }
 
@@ -1036,6 +1283,7 @@ void QCPAxis::setBasePen(const QPen& pen)
         return;
     mBasePen = pen;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::basePenChanged, basePen());
 }
 
 /*!
@@ -1049,6 +1297,7 @@ void QCPAxis::setTickPen(const QPen& pen)
         return;
     mTickPen = pen;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::tickPenChanged, tickPen());
 }
 
 /*!
@@ -1062,6 +1311,7 @@ void QCPAxis::setSubTickPen(const QPen& pen)
         return;
     mSubTickPen = pen;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::subTickPenChanged, subTickPen());
 }
 
 /*!
@@ -1076,6 +1326,7 @@ void QCPAxis::setLabelFont(const QFont& font)
         mLabelFont = font;
         mCachedMarginValid = false;
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::labelFontChanged, labelFont());
     }
 }
 
@@ -1090,6 +1341,7 @@ void QCPAxis::setLabelColor(const QColor& color)
         return;
     mLabelColor = color;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::labelColorChanged, labelColor());
 }
 
 /*!
@@ -1103,11 +1355,28 @@ void QCPAxis::setColor(const QColor& color)
     if (color == mLabelColor && color == mTickLabelColor && color == mBasePen.color()
         && color == mTickPen.color() && color == mSubTickPen.color())
         return;
+    // Five properties move at once: their signals wait for the scope, so a slot that deletes the
+    // axis runs after the last of them is queued.
+    QCPEmissionScope scope(mParentPlot);
+    const auto moved = [&color](const QColor& old) { return old != color; };
+    const bool label = moved(mLabelColor), tickLabel = moved(mTickLabelColor),
+               base = moved(mBasePen.color()), tick = moved(mTickPen.color()),
+               subTick = moved(mSubTickPen.color());
     mLabelColor = color;
     mTickLabelColor = color;
     for (QPen* pen : {&mBasePen, &mTickPen, &mSubTickPen})
         pen->setColor(color);
     markAppearanceDirty();
+    if (label)
+        qcpEmit(this, mParentPlot, &QCPAxis::labelColorChanged, mLabelColor);
+    if (tickLabel)
+        qcpEmit(this, mParentPlot, &QCPAxis::tickLabelColorChanged, mTickLabelColor);
+    if (base)
+        qcpEmit(this, mParentPlot, &QCPAxis::basePenChanged, mBasePen);
+    if (tick)
+        qcpEmit(this, mParentPlot, &QCPAxis::tickPenChanged, mTickPen);
+    if (subTick)
+        qcpEmit(this, mParentPlot, &QCPAxis::subTickPenChanged, mSubTickPen);
 }
 
 /*!
@@ -1147,6 +1416,7 @@ void QCPAxis::setLabelPadding(int padding)
         mAxisPainter->labelPadding = padding;
         mCachedMarginValid = false;
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::labelPaddingChanged, labelPadding());
     }
 }
 
@@ -1167,6 +1437,7 @@ void QCPAxis::setPadding(int padding)
         mPadding = padding;
         mCachedMarginValid = false;
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::paddingChanged, mPadding);
     }
 }
 
@@ -1184,6 +1455,7 @@ void QCPAxis::setOffset(int offset)
         return;
     mAxisPainter->offset = offset;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::offsetChanged, mAxisPainter->offset);
 }
 
 /*!
@@ -1199,6 +1471,7 @@ void QCPAxis::setSelectedTickLabelFont(const QFont& font)
         // don't set mCachedMarginValid to false here because margin calculation is always done with
         // non-selected fonts
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::selectedTickLabelFontChanged, selectedTickLabelFont());
     }
 }
 
@@ -1215,6 +1488,7 @@ void QCPAxis::setSelectedLabelFont(const QFont& font)
     // don't set mCachedMarginValid to false here because margin calculation is always done with
     // non-selected fonts
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::selectedLabelFontChanged, selectedLabelFont());
 }
 
 /*!
@@ -1228,6 +1502,8 @@ void QCPAxis::setSelectedTickLabelColor(const QColor& color)
     {
         mSelectedTickLabelColor = color;
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::selectedTickLabelColorChanged,
+                selectedTickLabelColor());
     }
 }
 
@@ -1242,6 +1518,7 @@ void QCPAxis::setSelectedLabelColor(const QColor& color)
         return;
     mSelectedLabelColor = color;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::selectedLabelColorChanged, selectedLabelColor());
 }
 
 /*!
@@ -1255,6 +1532,7 @@ void QCPAxis::setSelectedBasePen(const QPen& pen)
         return;
     mSelectedBasePen = pen;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::selectedBasePenChanged, selectedBasePen());
 }
 
 /*!
@@ -1268,6 +1546,7 @@ void QCPAxis::setSelectedTickPen(const QPen& pen)
         return;
     mSelectedTickPen = pen;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::selectedTickPenChanged, selectedTickPen());
 }
 
 /*!
@@ -1281,6 +1560,7 @@ void QCPAxis::setSelectedSubTickPen(const QPen& pen)
         return;
     mSelectedSubTickPen = pen;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::selectedSubTickPenChanged, selectedSubTickPen());
 }
 
 /*!
@@ -1301,6 +1581,7 @@ void QCPAxis::setLowerEnding(const QCPLineEnding& ending)
         return;
     mAxisPainter->lowerEnding = ending;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::lowerEndingChanged, lowerEnding());
 }
 
 /*!
@@ -1321,6 +1602,7 @@ void QCPAxis::setUpperEnding(const QCPLineEnding& ending)
         return;
     mAxisPainter->upperEnding = ending;
     markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::upperEndingChanged, upperEnding());
 }
 
 /*!

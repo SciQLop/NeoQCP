@@ -61,10 +61,10 @@ class QCP_LIB_DECL QCPAxisBase : public QCPLayerable
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(ScaleType scaleType READ scaleType WRITE setScaleType NOTIFY scaleTypeChanged)
     Q_PROPERTY(QCPRange range READ range WRITE setRange NOTIFY rangeChanged)
-    Q_PROPERTY(bool rangeReversed READ rangeReversed WRITE setRangeReversed)
-    Q_PROPERTY(QSharedPointer<QCPAxisTicker> ticker READ ticker WRITE setTicker)
-    Q_PROPERTY(QVector<double> tickVector READ tickVector)
-    Q_PROPERTY(QVector<QString> tickVectorLabels READ tickVectorLabels)
+    Q_PROPERTY(
+        bool rangeReversed READ rangeReversed WRITE setRangeReversed NOTIFY rangeReversedChanged)
+    Q_PROPERTY(
+        QSharedPointer<QCPAxisTicker> ticker READ ticker WRITE setTicker NOTIFY tickerChanged)
     Q_PROPERTY(SelectableParts selectedParts READ selectedParts WRITE setSelectedParts NOTIFY
                    selectionChanged)
     Q_PROPERTY(SelectableParts selectableParts READ selectableParts WRITE setSelectableParts NOTIFY
@@ -191,6 +191,8 @@ signals:
     void scaleTypeChanged(QCPAxisBase::ScaleType scaleType);
     void selectionChanged();
     void selectableChanged();
+    void rangeReversedChanged(bool rangeReversed);
+    void tickerChanged(const QSharedPointer<QCPAxisTicker>& ticker);
 
 protected:
     // The hot members sit together, first among this class's: a coordToPixel call reads where the

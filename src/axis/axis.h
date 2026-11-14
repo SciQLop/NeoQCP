@@ -64,12 +64,15 @@ class QCP_LIB_DECL QCPGrid : public QCPLayerable
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(bool subGridVisible READ subGridVisible WRITE setSubGridVisible)
-    Q_PROPERTY(bool antialiasedSubGrid READ antialiasedSubGrid WRITE setAntialiasedSubGrid)
-    Q_PROPERTY(bool antialiasedZeroLine READ antialiasedZeroLine WRITE setAntialiasedZeroLine)
-    Q_PROPERTY(QPen pen READ pen WRITE setPen)
-    Q_PROPERTY(QPen subGridPen READ subGridPen WRITE setSubGridPen)
-    Q_PROPERTY(QPen zeroLinePen READ zeroLinePen WRITE setZeroLinePen)
+    Q_PROPERTY(bool subGridVisible READ subGridVisible WRITE setSubGridVisible NOTIFY
+                   subGridVisibleChanged)
+    Q_PROPERTY(bool antialiasedSubGrid READ antialiasedSubGrid WRITE setAntialiasedSubGrid NOTIFY
+                   antialiasedSubGridChanged)
+    Q_PROPERTY(bool antialiasedZeroLine READ antialiasedZeroLine WRITE setAntialiasedZeroLine NOTIFY
+                   antialiasedZeroLineChanged)
+    Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
+    Q_PROPERTY(QPen subGridPen READ subGridPen WRITE setSubGridPen NOTIFY subGridPenChanged)
+    Q_PROPERTY(QPen zeroLinePen READ zeroLinePen WRITE setZeroLinePen NOTIFY zeroLinePenChanged)
     /// \endcond
 
 public:
@@ -96,6 +99,14 @@ public:
     void setSubGridPen(const QPen& pen);
     void setZeroLinePen(const QPen& pen);
 
+signals:
+    void subGridVisibleChanged(bool subGridVisible);
+    void antialiasedSubGridChanged(bool antialiasedSubGrid);
+    void antialiasedZeroLineChanged(bool antialiasedZeroLine);
+    void penChanged(const QPen& pen);
+    void subGridPenChanged(const QPen& subGridPen);
+    void zeroLinePenChanged(const QPen& zeroLinePen);
+
 protected:
     // property members:
     bool mSubGridVisible;
@@ -120,43 +131,59 @@ class QCP_LIB_DECL QCPAxis : public QCPAxisBase
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(AxisType axisType READ axisType)
-    Q_PROPERTY(QCPAxisRect* axisRect READ axisRect)
-    Q_PROPERTY(bool ticks READ ticks WRITE setTicks)
-    Q_PROPERTY(bool tickLabels READ tickLabels WRITE setTickLabels)
-    Q_PROPERTY(int tickLabelPadding READ tickLabelPadding WRITE setTickLabelPadding)
-    Q_PROPERTY(QFont tickLabelFont READ tickLabelFont WRITE setTickLabelFont)
-    Q_PROPERTY(QColor tickLabelColor READ tickLabelColor WRITE setTickLabelColor)
-    Q_PROPERTY(double tickLabelRotation READ tickLabelRotation WRITE setTickLabelRotation)
-    Q_PROPERTY(LabelSide tickLabelSide READ tickLabelSide WRITE setTickLabelSide)
-    Q_PROPERTY(QString numberFormat READ numberFormat WRITE setNumberFormat)
-    Q_PROPERTY(int numberPrecision READ numberPrecision WRITE setNumberPrecision)
-    Q_PROPERTY(int tickLengthIn READ tickLengthIn WRITE setTickLengthIn)
-    Q_PROPERTY(int tickLengthOut READ tickLengthOut WRITE setTickLengthOut)
-    Q_PROPERTY(bool subTicks READ subTicks WRITE setSubTicks)
-    Q_PROPERTY(int subTickLengthIn READ subTickLengthIn WRITE setSubTickLengthIn)
-    Q_PROPERTY(int subTickLengthOut READ subTickLengthOut WRITE setSubTickLengthOut)
-    Q_PROPERTY(QPen basePen READ basePen WRITE setBasePen)
-    Q_PROPERTY(QPen tickPen READ tickPen WRITE setTickPen)
-    Q_PROPERTY(QPen subTickPen READ subTickPen WRITE setSubTickPen)
-    Q_PROPERTY(QFont labelFont READ labelFont WRITE setLabelFont)
-    Q_PROPERTY(QColor labelColor READ labelColor WRITE setLabelColor)
+    Q_PROPERTY(AxisType axisType READ axisType CONSTANT)
+    Q_PROPERTY(QCPAxisRect* axisRect READ axisRect CONSTANT)
+    Q_PROPERTY(bool ticks READ ticks WRITE setTicks NOTIFY ticksChanged)
+    Q_PROPERTY(bool tickLabels READ tickLabels WRITE setTickLabels NOTIFY tickLabelsChanged)
+    Q_PROPERTY(int tickLabelPadding READ tickLabelPadding WRITE setTickLabelPadding NOTIFY
+                   tickLabelPaddingChanged)
+    Q_PROPERTY(
+        QFont tickLabelFont READ tickLabelFont WRITE setTickLabelFont NOTIFY tickLabelFontChanged)
+    Q_PROPERTY(QColor tickLabelColor READ tickLabelColor WRITE setTickLabelColor NOTIFY
+                   tickLabelColorChanged)
+    Q_PROPERTY(double tickLabelRotation READ tickLabelRotation WRITE setTickLabelRotation NOTIFY
+                   tickLabelRotationChanged)
+    Q_PROPERTY(LabelSide tickLabelSide READ tickLabelSide WRITE setTickLabelSide NOTIFY
+                   tickLabelSideChanged)
+    Q_PROPERTY(
+        QString numberFormat READ numberFormat WRITE setNumberFormat NOTIFY numberFormatChanged)
+    Q_PROPERTY(int numberPrecision READ numberPrecision WRITE setNumberPrecision NOTIFY
+                   numberPrecisionChanged)
+    Q_PROPERTY(int tickLengthIn READ tickLengthIn WRITE setTickLengthIn NOTIFY tickLengthInChanged)
+    Q_PROPERTY(
+        int tickLengthOut READ tickLengthOut WRITE setTickLengthOut NOTIFY tickLengthOutChanged)
+    Q_PROPERTY(bool subTicks READ subTicks WRITE setSubTicks NOTIFY subTicksChanged)
+    Q_PROPERTY(int subTickLengthIn READ subTickLengthIn WRITE setSubTickLengthIn NOTIFY
+                   subTickLengthInChanged)
+    Q_PROPERTY(int subTickLengthOut READ subTickLengthOut WRITE setSubTickLengthOut NOTIFY
+                   subTickLengthOutChanged)
+    Q_PROPERTY(QPen basePen READ basePen WRITE setBasePen NOTIFY basePenChanged)
+    Q_PROPERTY(QPen tickPen READ tickPen WRITE setTickPen NOTIFY tickPenChanged)
+    Q_PROPERTY(QPen subTickPen READ subTickPen WRITE setSubTickPen NOTIFY subTickPenChanged)
+    Q_PROPERTY(QFont labelFont READ labelFont WRITE setLabelFont NOTIFY labelFontChanged)
+    Q_PROPERTY(QColor labelColor READ labelColor WRITE setLabelColor NOTIFY labelColorChanged)
     Q_PROPERTY(QString label READ label WRITE setLabel NOTIFY labelChanged)
-    Q_PROPERTY(int labelPadding READ labelPadding WRITE setLabelPadding)
-    Q_PROPERTY(int padding READ padding WRITE setPadding)
-    Q_PROPERTY(int offset READ offset WRITE setOffset)
+    Q_PROPERTY(int labelPadding READ labelPadding WRITE setLabelPadding NOTIFY labelPaddingChanged)
+    Q_PROPERTY(int padding READ padding WRITE setPadding NOTIFY paddingChanged)
+    Q_PROPERTY(int offset READ offset WRITE setOffset NOTIFY offsetChanged)
+    Q_PROPERTY(QFont selectedTickLabelFont READ selectedTickLabelFont WRITE setSelectedTickLabelFont
+                   NOTIFY selectedTickLabelFontChanged)
+    Q_PROPERTY(QFont selectedLabelFont READ selectedLabelFont WRITE setSelectedLabelFont NOTIFY
+                   selectedLabelFontChanged)
+    Q_PROPERTY(QColor selectedTickLabelColor READ selectedTickLabelColor WRITE
+                   setSelectedTickLabelColor NOTIFY selectedTickLabelColorChanged)
+    Q_PROPERTY(QColor selectedLabelColor READ selectedLabelColor WRITE setSelectedLabelColor NOTIFY
+                   selectedLabelColorChanged)
+    Q_PROPERTY(QPen selectedBasePen READ selectedBasePen WRITE setSelectedBasePen NOTIFY
+                   selectedBasePenChanged)
+    Q_PROPERTY(QPen selectedTickPen READ selectedTickPen WRITE setSelectedTickPen NOTIFY
+                   selectedTickPenChanged)
+    Q_PROPERTY(QPen selectedSubTickPen READ selectedSubTickPen WRITE setSelectedSubTickPen NOTIFY
+                   selectedSubTickPenChanged)
     Q_PROPERTY(
-        QFont selectedTickLabelFont READ selectedTickLabelFont WRITE setSelectedTickLabelFont)
-    Q_PROPERTY(QFont selectedLabelFont READ selectedLabelFont WRITE setSelectedLabelFont)
+        QCPLineEnding lowerEnding READ lowerEnding WRITE setLowerEnding NOTIFY lowerEndingChanged)
     Q_PROPERTY(
-        QColor selectedTickLabelColor READ selectedTickLabelColor WRITE setSelectedTickLabelColor)
-    Q_PROPERTY(QColor selectedLabelColor READ selectedLabelColor WRITE setSelectedLabelColor)
-    Q_PROPERTY(QPen selectedBasePen READ selectedBasePen WRITE setSelectedBasePen)
-    Q_PROPERTY(QPen selectedTickPen READ selectedTickPen WRITE setSelectedTickPen)
-    Q_PROPERTY(QPen selectedSubTickPen READ selectedSubTickPen WRITE setSelectedSubTickPen)
-    Q_PROPERTY(QCPLineEnding lowerEnding READ lowerEnding WRITE setLowerEnding)
-    Q_PROPERTY(QCPLineEnding upperEnding READ upperEnding WRITE setUpperEnding)
-    Q_PROPERTY(QCPGrid* grid READ grid)
+        QCPLineEnding upperEnding READ upperEnding WRITE setUpperEnding NOTIFY upperEndingChanged)
     /// \endcond
 
 public:
@@ -352,6 +379,37 @@ public:
 
 signals:
     void labelChanged(const QString& label);
+    void ticksChanged(bool ticks);
+    void tickLabelsChanged(bool tickLabels);
+    void tickLabelPaddingChanged(int tickLabelPadding);
+    void tickLabelFontChanged(const QFont& tickLabelFont);
+    void tickLabelColorChanged(const QColor& tickLabelColor);
+    void tickLabelRotationChanged(double tickLabelRotation);
+    void tickLabelSideChanged(QCPAxis::LabelSide tickLabelSide);
+    void numberFormatChanged(const QString& numberFormat);
+    void numberPrecisionChanged(int numberPrecision);
+    void tickLengthInChanged(int tickLengthIn);
+    void tickLengthOutChanged(int tickLengthOut);
+    void subTicksChanged(bool subTicks);
+    void subTickLengthInChanged(int subTickLengthIn);
+    void subTickLengthOutChanged(int subTickLengthOut);
+    void basePenChanged(const QPen& basePen);
+    void tickPenChanged(const QPen& tickPen);
+    void subTickPenChanged(const QPen& subTickPen);
+    void labelFontChanged(const QFont& labelFont);
+    void labelColorChanged(const QColor& labelColor);
+    void labelPaddingChanged(int labelPadding);
+    void paddingChanged(int padding);
+    void offsetChanged(int offset);
+    void selectedTickLabelFontChanged(const QFont& selectedTickLabelFont);
+    void selectedLabelFontChanged(const QFont& selectedLabelFont);
+    void selectedTickLabelColorChanged(const QColor& selectedTickLabelColor);
+    void selectedLabelColorChanged(const QColor& selectedLabelColor);
+    void selectedBasePenChanged(const QPen& selectedBasePen);
+    void selectedTickPenChanged(const QPen& selectedTickPen);
+    void selectedSubTickPenChanged(const QPen& selectedSubTickPen);
+    void lowerEndingChanged(const QCPLineEnding& lowerEnding);
+    void upperEndingChanged(const QCPLineEnding& upperEnding);
 
 protected:
     // property members:

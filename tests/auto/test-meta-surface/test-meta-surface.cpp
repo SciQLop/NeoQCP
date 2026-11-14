@@ -455,6 +455,7 @@ const QVector<Fixture>& fixtures()
 {
     static const QVector<Fixture> list {
         { "QCPAxis", [](QCustomPlot& plot) -> QObject* { return plot.xAxis; } },
+        { "QCPGrid", [](QCustomPlot& plot) -> QObject* { return plot.xAxis->grid().get(); } },
         { "QCPGraph", [](QCustomPlot& plot) -> QObject* { return graphOn(plot); } },
         { "QCPCurve", [](QCustomPlot& plot) -> QObject* { return curveOn(plot); } },
         { "QCPBars", [](QCustomPlot& plot) -> QObject* { return barsOn(plot); } },
@@ -599,20 +600,24 @@ QVariant differentValue(const QMetaProperty& property, const QVariant& current, 
 // and a rule of its own, run by exceptionRulesHold once the property has its NOTIFY.
 enum class Rule
 {
-    Refuses,             // an invalid value leaves the property, with no signal
-    Clamps,              // a value out of range is stored clamped; the clamp is the change
+    Refuses, // an invalid value (the probe) leaves the property, with no signal
+    Clamps, // a value out of range (the probe) is stored clamped, one signal
     TrimmedBySelectable, // the selection is cut to what the selectable type allows
-    TakesOwnership,      // the object is adopted; writing the same pointer again is refused
-    ComponentPen,        // a line's setPen repaints components, pen() may not move
-    RefusesScaleType,    // a polar angular axis refuses a logarithmic scale
+    TakesOwnership, // the object is adopted; writing the same pointer again is refused
+    ComponentPen, // a line's setPen repaints components, pen() may not move
 };
+
+using MakeValue = std::function<QVariant(QObject*)>;
 
 struct Exception
 {
     const QMetaObject* meta;
     const char* property;
     Rule rule;
-    std::function<QVariant(QObject*)> accepted; // a value the setter stores as given
+    // A value the setter stores as given. None: the setter accepts only the current value, so the
+    // generic check has no row and the rule covers the property.
+    MakeValue accepted;
+    MakeValue probe; // the value the rule writes, when it needs one
     const char* why;
 };
 
@@ -623,24 +628,27 @@ const QVector<Exception>& exceptions()
     static const QVector<Exception> list {
         { &QCPAxis::staticMetaObject, "numberFormat", Rule::Refuses,
           [](QObject*) { return QVariant(QStringLiteral("eb")); },
+          [](QObject*) { return QVariant(QStringLiteral("xb")); },
           "parses the format code and refuses an invalid one" },
         { &QCPAxis::staticMetaObject, "tickLabelRotation", Rule::Clamps,
-          [](QObject*) { return QVariant(45.0); }, "clamps to [-90, 90]" },
+          [](QObject*) { return QVariant(45.0); }, [](QObject*) { return QVariant(120.0); },
+          "clamps to [-90, 90]" },
         { &QCPAbstractPlottable::staticMetaObject, "selection", Rule::TrimmedBySelectable,
-          [](QObject* object) {
+          [](QObject* object)
+          {
               auto* plottable = qobject_cast<QCPAbstractPlottable*>(object);
               plottable->setSelectable(QCP::stDataRange);
               return QVariant::fromValue(QCPDataSelection(QCPDataRange(0, 1)));
           },
-          "enforceType trims it by selectable (plottable.cpp)" },
+          nullptr, "enforceType trims it by selectable (plottable.cpp)" },
         { &QCPAbstractPlottable::staticMetaObject, "selectionDecorator", Rule::TakesOwnership,
-          [](QObject*) { return QVariant::fromValue(freshDecorator()); },
+          [](QObject*) { return QVariant::fromValue(freshDecorator()); }, nullptr,
           "adopts the decorator and refuses the same one again (plottable.cpp:966-976)" },
         { &QCPAbstractLine::staticMetaObject, "pen", Rule::ComponentPen,
-          [](QObject*) { return QVariant(QPen(Qt::blue, 3)); },
+          [](QObject*) { return QVariant(QPen(Qt::blue, 3)); }, nullptr,
           "repaints when only a component differs (plottable-line.cpp:84)" },
-        { &QCPPolarAxisAngular::staticMetaObject, "scaleType", Rule::RefusesScaleType,
-          [](QObject*) { return QVariant::fromValue(QCPAxisBase::stLinear); },
+        { &QCPPolarAxisAngular::staticMetaObject, "scaleType", Rule::Refuses, nullptr,
+          [](QObject*) { return QVariant::fromValue(QCPAxisBase::stLogarithmic); },
           "the ring has no logarithmic scale (angularaxis.cpp:938)" },
     };
     return list;
@@ -659,6 +667,61 @@ bool isNotifyProperty(const QMetaProperty& property)
     return property.hasNotifySignal() && property.isWritable();
 }
 
+// The classes whose existing properties do not have their NOTIFY yet; each area of Task 2 empties
+// its part of the list.
+const QSet<QByteArray>& pendingClasses()
+{
+    static const QSet<QByteArray> list { "QCPAbstractPlottable",
+                                         "QCPAbstractColorMapped",
+                                         "QCPAbstractLine",
+                                         "QCPGraph",
+                                         "QCPCurve",
+                                         "QCPBars" };
+    return list;
+}
+
+// The class whose Q_PROPERTY declares property \a index of \a meta.
+const QMetaObject* declaringClass(const QMetaObject* meta, int index)
+{
+    while (index < meta->propertyOffset())
+        meta = meta->superClass();
+    return meta;
+}
+
+// One row per fixture and per class it inherits: a class shows its properties through every
+// fixture, so the first fixture of each class is enough.
+struct Declared
+{
+    int fixture;
+    const QMetaObject* meta;
+};
+
+QVector<Declared> declaredClasses()
+{
+    QVector<Declared> out;
+    QSet<const QMetaObject*> seen;
+    for (int f = 0; f < fixtures().size(); ++f)
+    {
+        auto plot = newPlot();
+        for (const QMetaObject* meta = fixtures()[f].make(*plot)->metaObject();
+             meta != &QObject::staticMetaObject; meta = meta->superClass())
+            if (!seen.contains(meta))
+            {
+                seen.insert(meta);
+                out.append({ f, meta });
+            }
+    }
+    return out;
+}
+
+bool hasGenericRow(const QMetaObject* meta, const QMetaProperty& property)
+{
+    for (const Exception& e : exceptions())
+        if (meta->inherits(e.meta) && qstrcmp(e.property, property.name()) == 0)
+            return bool(e.accepted);
+    return true;
+}
+
 // True when the notify signal's first argument carries the property's value.
 bool signalCarriesValue(const QMetaProperty& property)
 {
@@ -666,6 +729,127 @@ bool signalCarriesValue(const QMetaProperty& property)
     return notify.parameterCount() > 0 && notify.parameterMetaType(0) == property.metaType();
 }
 } // namespace
+
+void TestMetaSurface::everyPropertyIsConstantOrNotifies_data()
+{
+    QTest::addColumn<int>("fixture");
+    QTest::addColumn<QByteArray>("className");
+    for (const Declared& d : declaredClasses())
+        if (!pendingClasses().contains(d.meta->className()))
+            QTest::newRow(d.meta->className()) << d.fixture << QByteArray(d.meta->className());
+}
+
+// E-11: a property is constant, or it has a change signal; a read-only one without a signal is
+// off the surface.
+void TestMetaSurface::everyPropertyIsConstantOrNotifies()
+{
+    QFETCH(int, fixture);
+    QFETCH(QByteArray, className);
+    auto plot = newPlot();
+    const QMetaObject* meta = fixtures()[fixture].make(*plot)->metaObject();
+    for (int i = QObject::staticMetaObject.propertyCount(); i < meta->propertyCount(); ++i)
+    {
+        const QMetaProperty property = meta->property(i);
+        if (declaringClass(meta, i)->className() != className)
+            continue;
+        QVERIFY2(property.isConstant() || property.hasNotifySignal(),
+                 qPrintable(QStringLiteral("%1::%2 neither constant nor notifying")
+                                .arg(QLatin1String(className), QLatin1String(property.name()))));
+        QVERIFY2(!property.isConstant() || !property.isWritable(),
+                 qPrintable(QStringLiteral("%1::%2 is constant and writable")
+                                .arg(QLatin1String(className), QLatin1String(property.name()))));
+    }
+}
+
+namespace
+{
+// E-4b: a function other than the setter that moves properties emits the signal of each.
+struct Writer
+{
+    const char* name;
+    std::function<QObject*(QCustomPlot&)> make;
+    std::function<void(QObject*)> write;
+    QVector<const char*> moved; // each signals once
+    QVector<const char*> still; // each signals nothing
+};
+
+const QVector<Writer>& writers()
+{
+    static const QVector<Writer> list {
+        { "QCPAxis::setColor",
+          [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
+          [](QObject* o) { qobject_cast<QCPAxis*>(o)->setColor(Qt::red); },
+          { "labelColor", "tickLabelColor", "basePen", "tickPen", "subTickPen" },
+          { "selectedLabelColor" } },
+        { "QCPAxis::setTickLength",
+          [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
+          [](QObject* o) { qobject_cast<QCPAxis*>(o)->setTickLength(9, 8); },
+          { "tickLengthIn", "tickLengthOut" },
+          { "subTickLengthIn" } },
+        { "QCPAxis::setSubTickLength",
+          [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
+          [](QObject* o) { qobject_cast<QCPAxis*>(o)->setSubTickLength(9, 8); },
+          { "subTickLengthIn", "subTickLengthOut" },
+          { "tickLengthIn" } },
+        { "QCPAxisBase::setRangeLower",
+          [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
+          [](QObject* o) { qobject_cast<QCPAxis*>(o)->setRangeLower(-3); },
+          { "range" },
+          { } },
+        { "QCPAxisBase::setRangeUpper",
+          [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
+          [](QObject* o) { qobject_cast<QCPAxis*>(o)->setRangeUpper(30); },
+          { "range" },
+          { } },
+        { "a link's source reverses",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              plot.xAxis2->linkTo(plot.xAxis);
+              return plot.xAxis2;
+          },
+          [](QObject* o)
+          { qobject_cast<QCPAxis*>(o)->parentPlot()->xAxis->setRangeReversed(true); },
+          { "rangeReversed" },
+          { } },
+    };
+    return list;
+}
+} // namespace
+
+void TestMetaSurface::everyWriterBesidesTheSetterNotifies_data()
+{
+    QTest::addColumn<int>("writer");
+    for (int i = 0; i < writers().size(); ++i)
+        QTest::newRow(writers()[i].name) << i;
+}
+
+void TestMetaSurface::everyWriterBesidesTheSetterNotifies()
+{
+    QFETCH(int, writer);
+    const Writer& w = writers()[writer];
+    auto plot = newPlot();
+    QObject* object = w.make(*plot);
+    std::vector<std::unique_ptr<QSignalSpy>> moved, still;
+    for (const char* name : w.moved)
+        moved.push_back(
+            std::make_unique<QSignalSpy>(object, metaProperty(object, name).notifySignal()));
+    for (const char* name : w.still)
+        still.push_back(
+            std::make_unique<QSignalSpy>(object, metaProperty(object, name).notifySignal()));
+    {
+        QCPEmissionScope scope(plot.get());
+        w.write(object);
+        for (const auto& spy : moved)
+            QCOMPARE(spy->count(), 0);
+    }
+    for (int i = 0; i < moved.size(); ++i)
+        QVERIFY2(moved[i]->count() == 1, w.moved[i]);
+    for (int i = 0; i < still.size(); ++i)
+        QVERIFY2(still[i]->count() == 0, w.still[i]);
+    w.write(object);
+    for (int i = 0; i < moved.size(); ++i)
+        QVERIFY2(moved[i]->count() == 1, w.moved[i]);
+}
 
 void TestMetaSurface::exceptionsNameRealProperties()
 {
@@ -686,7 +870,7 @@ void TestMetaSurface::everyNotifyPropertyNotifiesOncePerChange_data()
         const QMetaObject* meta = fixtures()[f].make(*plot)->metaObject();
         // QObject's own objectName is Qt's, with its own BINDABLE storage: not ours to check.
         for (int i = QObject::staticMetaObject.propertyCount(); i < meta->propertyCount(); ++i)
-            if (isNotifyProperty(meta->property(i)))
+            if (isNotifyProperty(meta->property(i)) && hasGenericRow(meta, meta->property(i)))
                 QTest::addRow("%s::%s", fixtures()[f].name, meta->property(i).name())
                     << f << QByteArray(meta->property(i).name());
     }
@@ -784,10 +968,32 @@ void TestMetaSurface::exceptionRulesHold()
             break;
         }
         case Rule::Refuses:
+        {
+            const QVariant before = meta.read(object);
+            {
+                QCPEmissionScope scope(plot.get());
+                meta.write(object, ex.probe(object));
+            }
+            QCOMPARE(meta.read(object), before);
+            QCOMPARE(spy.count(), 0);
+            break;
+        }
         case Rule::Clamps:
+        {
+            const QVariant probe = ex.probe(object);
+            {
+                QCPEmissionScope scope(plot.get());
+                QVERIFY(meta.write(object, probe));
+            }
+            const QVariant clamped = meta.read(object);
+            QVERIFY(clamped != probe);
+            QCOMPARE(spy.count(), 1);
+            QVERIFY(meta.write(object, probe));
+            QCOMPARE(meta.read(object), clamped);
+            QCOMPARE(spy.count(), 1);
+            break;
+        }
         case Rule::TakesOwnership:
-        case Rule::RefusesScaleType:
-            // No row reaches these yet: their properties get a NOTIFY in Task 2, with the rule.
             QFAIL("the rule of this exception is not written");
     }
 }

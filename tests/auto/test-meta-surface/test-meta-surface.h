@@ -32,6 +32,10 @@ private slots:
     void curvePenNotifiesOnce();
     void componentRepenRepaintsWithoutPenChanged();
 
+    void everyPropertyIsConstantOrNotifies_data();
+    void everyPropertyIsConstantOrNotifies();
+    void everyWriterBesidesTheSetterNotifies_data();
+    void everyWriterBesidesTheSetterNotifies();
     void exceptionsNameRealProperties();
     void everyNotifyPropertyNotifiesOncePerChange_data();
     void everyNotifyPropertyNotifiesOncePerChange();
