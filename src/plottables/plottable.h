@@ -112,7 +112,7 @@ class QCP_LIB_DECL QCPAbstractPlottable : public QCPLayerable, public QCPDrawabl
     Q_PROPERTY(QString name READ name WRITE setName)
     Q_PROPERTY(bool antialiasedFill READ antialiasedFill WRITE setAntialiasedFill)
     Q_PROPERTY(bool antialiasedScatters READ antialiasedScatters WRITE setAntialiasedScatters)
-    Q_PROPERTY(QPen pen READ pen WRITE setPen)
+    Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
     Q_PROPERTY(QBrush brush READ brush WRITE setBrush)
     Q_PROPERTY(QCPAxis* keyAxis READ keyAxis WRITE setKeyAxis)
     Q_PROPERTY(QCPAxis* valueAxis READ valueAxis WRITE setValueAxis)
@@ -313,6 +313,7 @@ public:
     int effectiveBusyHideDelayMs() const;
 
 signals:
+    void penChanged(const QPen& pen);
     void selectionChanged();
     void selectableChanged();
     void busyChanged(bool busy);

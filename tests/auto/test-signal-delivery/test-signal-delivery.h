@@ -41,6 +41,7 @@ private slots:
     void qcpEmitHoldsUntilTheScopeCloses();
     void noPlotEmitsAtOnce();
     void deadSenderIsNotDelivered();
+    void noReceiverEmitQueuesNothing();
 
     void rangeSlotSeesTheNewScaleType();
     void slotReenteringTheSetterDeliversInOrder();

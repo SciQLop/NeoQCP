@@ -1,4 +1,5 @@
 #include "test-signal-delivery.h"
+#include <QBindable>
 #include <QTemporaryDir>
 #include <QtTest/qtestspontaneevent.h>
 #include <memory>
@@ -596,6 +597,40 @@ void TestSignalDelivery::deadSenderIsNotDelivered()
         delete sender;
     }
     QCOMPARE(received, 0);
+}
+
+// E-4c: layout passes set properties inside replot's scope, so an emission nobody receives must not
+// be queued. A slot, a spy and a QBindable adaptor are receivers.
+void TestSignalDelivery::noReceiverEmitQueuesNothing()
+{
+    QCustomPlot plot;
+    QCPAxis* axis = plot.xAxis;
+    const QCPEmissionScope scope(&plot);
+
+    std::size_t before = plot.mEmissions.size();
+    axis->setLabel(QStringLiteral("nobody listens"));
+    qcpEmit(axis, &plot, &QCPAxis::labelChanged, QStringLiteral("nobody"));
+    QCOMPARE(plot.mEmissions.size(), before);
+
+    QSignalSpy spy(axis, &QCPAxis::labelChanged);
+    axis->setLabel(QStringLiteral("a spy listens"));
+    QCOMPARE(plot.mEmissions.size(), before + 1);
+    QCOMPARE(spy.count(), 0);
+
+    QCPAxis* other = plot.yAxis;
+    QBindable<QString> label(other, "label");
+    int notified = 0;
+    const QPropertyNotifier notifier = label.addNotifier([&notified] { ++notified; });
+    before = plot.mEmissions.size();
+    other->setLabel(QStringLiteral("a binding listens"));
+    QCOMPARE(plot.mEmissions.size(), before + 1);
+    QCOMPARE(notified, 0);
+
+    // A sender counting its own receivers skips the probe: the emission is queued as it asks.
+    before = plot.mEmissions.size();
+    auto* nobodyHears = new QCPTheme(&plot);
+    qcpEmitHeard(nobodyHears, &plot, &QCPTheme::changed);
+    QCOMPARE(plot.mEmissions.size(), before + 1);
 }
 
 void TestSignalDelivery::rangeSlotSeesTheNewScaleType()

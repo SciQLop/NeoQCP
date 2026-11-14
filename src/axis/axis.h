@@ -141,7 +141,7 @@ class QCP_LIB_DECL QCPAxis : public QCPAxisBase
     Q_PROPERTY(QPen subTickPen READ subTickPen WRITE setSubTickPen)
     Q_PROPERTY(QFont labelFont READ labelFont WRITE setLabelFont)
     Q_PROPERTY(QColor labelColor READ labelColor WRITE setLabelColor)
-    Q_PROPERTY(QString label READ label WRITE setLabel)
+    Q_PROPERTY(QString label READ label WRITE setLabel NOTIFY labelChanged)
     Q_PROPERTY(int labelPadding READ labelPadding WRITE setLabelPadding)
     Q_PROPERTY(int padding READ padding WRITE setPadding)
     Q_PROPERTY(int offset READ offset WRITE setOffset)
@@ -349,6 +349,9 @@ public:
 
     // The part of this axis at pos, spNone where there is none. Public as in 2.x.
     SelectablePart getPartAt(const QPointF& pos) const override;
+
+signals:
+    void labelChanged(const QString& label);
 
 protected:
     // property members:

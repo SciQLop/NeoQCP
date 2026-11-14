@@ -1,0 +1,793 @@
+#include "test-meta-surface.h"
+#include "../misuse-recorder.h"
+#include <QBindable>
+#include <QProperty>
+#include <memory>
+
+// The spike (milestone 5e, Task 1): three plain properties, an axis label, a plottable pen and an
+// axis scale type. Each is a Q_PROPERTY with a NOTIFY emitted through qcpEmit; bindings go through
+// QBindable(obj, "name"), whose adaptor hangs off that signal.
+
+namespace
+{
+std::unique_ptr<QCustomPlot> newPlot()
+{
+    auto plot = std::make_unique<QCustomPlot>();
+    plot->resize(400, 300);
+    plot->xAxis->setRange(0, 10);
+    plot->yAxis->setRange(0, 10);
+    return plot;
+}
+
+void settle(QCustomPlot& plot)
+{
+    plot.replot();
+    QTRY_VERIFY(!plot.isRepaintQueued());
+}
+
+QCPGraph* graphOn(QCustomPlot& plot)
+{
+    QCPGraph* graph = plot.addGraph();
+    graph->setData(QVector<double> { 0, 5, 10 }, QVector<double> { 1, 6, 2 });
+    return graph;
+}
+
+QCPCurve* curveOn(QCustomPlot& plot)
+{
+    auto* curve = new QCPCurve(plot.xAxis, plot.yAxis);
+    curve->setData(QVector<double> { 0, 5, 10 }, QVector<double> { 1, 6, 2 });
+    return curve;
+}
+
+QCPBars* barsOn(QCustomPlot& plot)
+{
+    auto* bars = new QCPBars(plot.xAxis, plot.yAxis);
+    bars->setData(QVector<double> { 1, 5, 9 }, QVector<double> { 3, 6, 2 });
+    return bars;
+}
+
+void removeAxis(QObject* object)
+{
+    auto* axis = qobject_cast<QCPAxis*>(object);
+    QVERIFY(axis->axisRect()->removeAxis(axis));
+}
+
+void removePlottable(QObject* object)
+{
+    auto* plottable = qobject_cast<QCPAbstractPlottable*>(object);
+    QVERIFY(plottable->parentPlot()->removePlottable(plottable));
+}
+
+template <typename T>
+QUntypedBindable bindableOf(QObject* object, const char* property)
+{
+    return QBindable<T>(object, property);
+}
+
+// The safe form of a binding that reads another object (review I10): the source is held by a
+// QPointer and read through a fresh QBindable each time, so a dead source is never touched.
+template <typename T>
+void bindGuarded(QObject* target, QObject* source, const char* property, QProperty<int>& tick)
+{
+    const T fallback = QBindable<T>(target, property).value();
+    const QPointer<QObject> alive(source);
+    QBindable<T>(target, property).setBinding([alive, property, &tick, fallback] {
+        tick.value();
+        return alive ? QBindable<T>(alive.data(), property).value() : fallback;
+    });
+}
+
+struct SpikeCase
+{
+    const char* name;
+    const char* property;
+    // The object under test and a second one of its kind.
+    std::function<std::pair<QObject*, QObject*>(QCustomPlot&)> make;
+    std::function<void(QObject*)> remove;
+    QVariant other; // accepted by the setter, different from the default
+    QUntypedBindable (*bindable)(QObject*, const char*);
+    void (*bindToSource)(QObject*, QObject*, const char*, QProperty<int>&);
+};
+
+const QVector<SpikeCase>& spikeCases()
+{
+    static const QVector<SpikeCase> cases {
+        { "axis label", "label",
+          [](QCustomPlot& plot) { return std::pair<QObject*, QObject*>(plot.xAxis, plot.yAxis); },
+          removeAxis, QVariant(QStringLiteral("time (s)")), bindableOf<QString>,
+          bindGuarded<QString> },
+        { "graph pen", "pen",
+          [](QCustomPlot& plot) {
+              return std::pair<QObject*, QObject*>(graphOn(plot), graphOn(plot));
+          },
+          removePlottable, QVariant(QPen(Qt::blue, 3)), bindableOf<QPen>, bindGuarded<QPen> },
+        { "curve pen", "pen",
+          [](QCustomPlot& plot) {
+              return std::pair<QObject*, QObject*>(curveOn(plot), curveOn(plot));
+          },
+          removePlottable, QVariant(QPen(Qt::blue, 3)), bindableOf<QPen>, bindGuarded<QPen> },
+        { "bars pen", "pen",
+          [](QCustomPlot& plot) {
+              return std::pair<QObject*, QObject*>(barsOn(plot), barsOn(plot));
+          },
+          removePlottable, QVariant(QPen(Qt::blue, 3)), bindableOf<QPen>, bindGuarded<QPen> },
+        { "axis scale type", "scaleType",
+          [](QCustomPlot& plot) { return std::pair<QObject*, QObject*>(plot.xAxis, plot.yAxis); },
+          removeAxis, QVariant::fromValue(QCPAxisBase::stLogarithmic),
+          bindableOf<QCPAxisBase::ScaleType>, bindGuarded<QCPAxisBase::ScaleType> },
+    };
+    return cases;
+}
+
+void addSpikeRows()
+{
+    QTest::addColumn<int>("index");
+    for (int i = 0; i < spikeCases().size(); ++i)
+        QTest::newRow(spikeCases()[i].name) << i;
+}
+
+void addSpikeRowsWithTiming()
+{
+    QTest::addColumn<int>("index");
+    QTest::addColumn<bool>("deferred");
+    for (int i = 0; i < spikeCases().size(); ++i)
+        for (bool deferred : { false, true })
+            QTest::addRow("%s, %s", spikeCases()[i].name, deferred ? "deferred" : "at once")
+                << i << deferred;
+}
+
+QMetaProperty metaProperty(const QObject* object, const char* name)
+{
+    return object->metaObject()->property(object->metaObject()->indexOfProperty(name));
+}
+
+// Writes \a value as a binding, a slot or the user's code would: through the WRITE setter.
+void write(QObject* object, const char* name, const QVariant& value)
+{
+    QVERIFY2(metaProperty(object, name).write(object, value), name);
+}
+
+// The write, inside an open delivery scope of the plot when \a deferred.
+void writeMaybeDeferred(QCustomPlot* plot, QObject* object, const char* name,
+                        const QVariant& value, bool deferred)
+{
+    if (!deferred)
+        return write(object, name, value);
+    QCPEmissionScope scope(plot);
+    write(object, name, value);
+}
+
+void connectTrigger(QObject* sender, const char* property, MetaTrigger* trigger)
+{
+    const QMetaMethod notify = metaProperty(sender, property).notifySignal();
+    const QMetaMethod fire =
+        trigger->metaObject()->method(trigger->metaObject()->indexOfSlot("fire()"));
+    QVERIFY(QObject::connect(sender, notify, trigger, fire));
+}
+} // namespace
+
+void TestMetaSurface::init()
+{
+    qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+}
+
+void TestMetaSurface::cleanup()
+{
+    for (const test_misuse::Call& call : test_misuse::calls)
+        qWarning("unexpected misuse: %s: %s", call.where.c_str(), call.what.c_str());
+    QVERIFY(test_misuse::calls.empty());
+    qcp::setMisuseHandler(nullptr);
+}
+
+void TestMetaSurface::spikeSignalIsDeferredAndFiresOnce_data() { addSpikeRows(); }
+
+void TestMetaSurface::spikeSignalIsDeferredAndFiresOnce()
+{
+    QFETCH(int, index);
+    const SpikeCase& c = spikeCases()[index];
+    auto plot = newPlot();
+    QObject* target = c.make(*plot).first;
+    QSignalSpy spy(target, metaProperty(target, c.property).notifySignal());
+    QVERIFY(spy.isValid());
+    {
+        QCPEmissionScope scope(plot.get());
+        write(target, c.property, c.other);
+        QCOMPARE(spy.count(), 0);
+    }
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(spy.first().first(), c.other);
+    QCOMPARE(target->property(c.property), c.other);
+
+    write(target, c.property, c.other);
+    QCOMPARE(spy.count(), 1);
+}
+
+void TestMetaSurface::spikeSubscriberSeesTheChangeAfterDelivery_data() { addSpikeRows(); }
+
+void TestMetaSurface::spikeSubscriberSeesTheChangeAfterDelivery()
+{
+    QFETCH(int, index);
+    const SpikeCase& c = spikeCases()[index];
+    auto plot = newPlot();
+    QObject* target = c.make(*plot).first;
+    QUntypedBindable bindable = c.bindable(target, c.property);
+    QVERIFY(bindable.isValid());
+    int notified = 0;
+    QVariant seen;
+    const QPropertyNotifier notifier = bindable.addNotifier([&] {
+        ++notified;
+        seen = target->property(c.property);
+    });
+    {
+        QCPEmissionScope scope(plot.get());
+        write(target, c.property, c.other);
+        QCOMPARE(notified, 0);
+    }
+    QCOMPARE(notified, 1);
+    QCOMPARE(seen, c.other);
+
+    write(target, c.property, c.other);
+    QCOMPARE(notified, 1);
+}
+
+void TestMetaSurface::spikeBindingDrivesTheSetterAndRepaints_data() { addSpikeRows(); }
+
+// A binding writes through the setter, so the result is the plot a direct call draws.
+void TestMetaSurface::spikeBindingDrivesTheSetterAndRepaints()
+{
+    QFETCH(int, index);
+    const SpikeCase& c = spikeCases()[index];
+    auto bound = newPlot();
+    auto [target, source] = c.make(*bound);
+    QVERIFY(c.bindable(target, c.property).setBinding(c.bindable(source, c.property).makeBinding()));
+    settle(*bound);
+    QSignalSpy spy(target, metaProperty(target, c.property).notifySignal());
+
+    write(source, c.property, c.other);
+    QCOMPARE(target->property(c.property), c.other);
+    QCOMPARE(spy.count(), 1);
+    QVERIFY2(bound->isRepaintQueued(), "the binding changed the value and scheduled no repaint");
+    QVERIFY(c.bindable(target, c.property).hasBinding());
+
+    auto called = newPlot();
+    auto [calledTarget, calledSource] = c.make(*called);
+    write(calledSource, c.property, c.other);
+    write(calledTarget, c.property, c.other);
+    QCOMPARE(bound->toPixmap(400, 300).toImage(), called->toPixmap(400, 300).toImage());
+}
+
+void TestMetaSurface::spikeSlotDeletingTheObject_data() { addSpikeRowsWithTiming(); }
+
+void TestMetaSurface::spikeSlotDeletingTheObject()
+{
+    QFETCH(int, index);
+    QFETCH(bool, deferred);
+    const SpikeCase& c = spikeCases()[index];
+    auto plot = newPlot();
+    QObject* target = c.make(*plot).first;
+    const QPointer<QObject> alive(target);
+    MetaTrigger deleter, later;
+    int laterRuns = 0;
+    deleter.action = [&] { c.remove(target); };
+    later.action = [&] { ++laterRuns; };
+    connectTrigger(target, c.property, &deleter);
+    connectTrigger(target, c.property, &later);
+
+    writeMaybeDeferred(plot.get(), target, c.property, c.other, deferred);
+
+    QVERIFY(!alive);
+    QCOMPARE(laterRuns, 0); // no further signal from a deleted sender
+    settle(*plot);
+}
+
+void TestMetaSurface::spikeObserverDeletingTheObject_data() { addSpikeRowsWithTiming(); }
+
+void TestMetaSurface::spikeObserverDeletingTheObject()
+{
+    QFETCH(int, index);
+    QFETCH(bool, deferred);
+    const SpikeCase& c = spikeCases()[index];
+    auto plot = newPlot();
+    QObject* target = c.make(*plot).first;
+    const QPointer<QObject> alive(target);
+    QUntypedBindable bindable = c.bindable(target, c.property);
+    const QPropertyNotifier notifier = bindable.addNotifier([&] { c.remove(target); });
+
+    writeMaybeDeferred(plot.get(), target, c.property, c.other, deferred);
+
+    QVERIFY(!alive);
+    settle(*plot);
+}
+
+void TestMetaSurface::spikeSlotDeletingThePlot_data() { addSpikeRowsWithTiming(); }
+
+void TestMetaSurface::spikeSlotDeletingThePlot()
+{
+    QFETCH(int, index);
+    QFETCH(bool, deferred);
+    const SpikeCase& c = spikeCases()[index];
+    QCustomPlot* plot = newPlot().release();
+    const QPointer<QCustomPlot> alive(plot);
+    QObject* target = c.make(*plot).first;
+    MetaTrigger deleter;
+    deleter.action = [plot] { delete plot; };
+    connectTrigger(target, c.property, &deleter);
+
+    writeMaybeDeferred(plot, target, c.property, c.other, deferred);
+
+    QVERIFY(!alive);
+}
+
+void TestMetaSurface::spikeObserverDeletingThePlot_data() { addSpikeRowsWithTiming(); }
+
+void TestMetaSurface::spikeObserverDeletingThePlot()
+{
+    QFETCH(int, index);
+    QFETCH(bool, deferred);
+    const SpikeCase& c = spikeCases()[index];
+    QCustomPlot* plot = newPlot().release();
+    const QPointer<QCustomPlot> alive(plot);
+    QObject* target = c.make(*plot).first;
+    QUntypedBindable bindable = c.bindable(target, c.property);
+    const QPropertyNotifier notifier = bindable.addNotifier([plot] { delete plot; });
+
+    writeMaybeDeferred(plot, target, c.property, c.other, deferred);
+
+    QVERIFY(!alive);
+}
+
+void TestMetaSurface::spikeBindingWhoseSourceDiesFirst_data() { addSpikeRows(); }
+
+// Review I10: a binding that captured QBindable(source, "x") by value would read freed memory on
+// its next evaluation once the source is gone. The guarded form (QPointer, a fresh QBindable per
+// evaluation) falls back instead; docs/migrating.md states the rule.
+void TestMetaSurface::spikeBindingWhoseSourceDiesFirst()
+{
+    QFETCH(int, index);
+    const SpikeCase& c = spikeCases()[index];
+    auto plot = newPlot();
+    auto [target, source] = c.make(*plot);
+    const QVariant before = target->property(c.property);
+    QProperty<int> tick(0);
+    c.bindToSource(target, source, c.property, tick);
+
+    write(source, c.property, c.other);
+    QCOMPARE(target->property(c.property), c.other);
+
+    c.remove(source);
+    tick = 1; // another dependency changes: the binding evaluates with its source gone
+    QCOMPARE(target->property(c.property), before);
+    QVERIFY(c.bindable(target, c.property).hasBinding());
+    settle(*plot);
+}
+
+// Review M6: the polar angular axis refuses a logarithmic scale. A binding that asks for one
+// leaves the value, sends no signal, and stays installed.
+void TestMetaSurface::bindingToARefusedScaleTypeKeepsTheValue()
+{
+    auto plot = newPlot();
+    auto* area = new QCPPolarArea(plot.get());
+    plot->plotLayout()->addElement(0, 1, area);
+    QCPPolarAxisAngular* angular = area->angularAxis();
+    QBindable<QCPAxisBase::ScaleType> scaleType(angular, "scaleType");
+    QProperty<QCPAxisBase::ScaleType> wanted(QCPAxisBase::stLinear);
+    scaleType.setBinding([&wanted] { return wanted.value(); });
+    QSignalSpy spy(angular, &QCPAxisBase::scaleTypeChanged);
+
+    wanted = QCPAxisBase::stLogarithmic;
+
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear(); // the refusal is the point of this test
+    QCOMPARE(angular->scaleType(), QCPAxisBase::stLinear);
+    QCOMPARE(scaleType.value(), QCPAxisBase::stLinear);
+    QCOMPARE(spy.count(), 0);
+    QVERIFY(scaleType.hasBinding());
+
+    wanted = QCPAxisBase::stLinear;
+    QCOMPARE(spy.count(), 0);
+    QVERIFY(test_misuse::calls.empty());
+}
+
+// Review M7: Qt's adaptor keeps its binding through a direct setter call; the next change of
+// the source overwrites the direct value. (A storage property would drop the binding instead.)
+void TestMetaSurface::plainWriteDoesNotBreakTheBinding()
+{
+    auto plot = newPlot();
+    QBindable<QString> label(plot->xAxis, "label");
+    QProperty<QString> wanted(QStringLiteral("bound"));
+    label.setBinding([&wanted] { return wanted.value(); });
+    QCOMPARE(plot->xAxis->label(), QStringLiteral("bound"));
+
+    plot->xAxis->setLabel(QStringLiteral("direct"));
+    QCOMPARE(plot->xAxis->label(), QStringLiteral("direct"));
+    QVERIFY(label.hasBinding());
+
+    wanted = QStringLiteral("bound again");
+    QCOMPARE(plot->xAxis->label(), QStringLiteral("bound again"));
+}
+
+// Review M5: the curve's setPen forwards to the line family's: one penChanged, not two.
+void TestMetaSurface::curvePenNotifiesOnce()
+{
+    auto plot = newPlot();
+    QCPCurve* curve = curveOn(*plot);
+    QSignalSpy spy(curve, &QCPAbstractPlottable::penChanged);
+    curve->setPen(QPen(Qt::green, 2));
+    QCOMPARE(spy.count(), 1);
+    curve->setPen(QPen(Qt::green, 2));
+    QCOMPARE(spy.count(), 1);
+}
+
+// QCPAbstractLine::setPen repaints when only a component's pen differs (plottable-line.cpp), but
+// pen() does not move: no penChanged.
+void TestMetaSurface::componentRepenRepaintsWithoutPenChanged()
+{
+    auto plot = newPlot();
+    QCPGraph* graph = graphOn(*plot);
+    graph->setPen(QPen(Qt::red));
+    graph->setComponentPens({ QPen(Qt::green) });
+    settle(*plot);
+    QSignalSpy spy(graph, &QCPAbstractPlottable::penChanged);
+
+    graph->setPen(QPen(Qt::red));
+
+    QCOMPARE(spy.count(), 0);
+    QVERIFY(plot->isRepaintQueued());
+    QCOMPARE(graph->component(0).pen, QPen(Qt::red));
+}
+
+// ---------------------------------------------------------------------------------------------
+// The generic test (E-16). Three tables, all data: the fixtures (a class and its factory on a
+// real plot), the "different value" per property type, and the setters that refuse, clamp, trim
+// or take ownership, each checked by its own rule. Every NOTIFY property of every fixture gets
+// one row; Tasks 2 and 3 extend the fixtures, the tables grow with the types they bring.
+// ---------------------------------------------------------------------------------------------
+namespace
+{
+struct Fixture
+{
+    const char* name;
+    std::function<QObject*(QCustomPlot&)> make;
+};
+
+const QVector<Fixture>& fixtures()
+{
+    static const QVector<Fixture> list {
+        { "QCPAxis", [](QCustomPlot& plot) -> QObject* { return plot.xAxis; } },
+        { "QCPGraph", [](QCustomPlot& plot) -> QObject* { return graphOn(plot); } },
+        { "QCPCurve", [](QCustomPlot& plot) -> QObject* { return curveOn(plot); } },
+        { "QCPBars", [](QCustomPlot& plot) -> QObject* { return barsOn(plot); } },
+    };
+    return list;
+}
+
+// A value other than \a current, for a property of that type. Object pointers name a sibling on
+// the same plot.
+using Different = std::function<QVariant(const QVariant& current, QObject* object)>;
+
+template <typename T>
+std::pair<QMetaType, Different> differentFor(std::function<T(const T&, QObject*)> make)
+{
+    return { QMetaType::fromType<T>(),
+             [make](const QVariant& current, QObject* object) {
+                 return QVariant::fromValue(make(current.value<T>(), object));
+             } };
+}
+
+QCustomPlot* plotOf(QObject* object)
+{
+    if (auto* layerable = qobject_cast<QCPLayerable*>(object))
+        return layerable->parentPlot();
+    return nullptr;
+}
+
+QColor otherColor(const QColor& color)
+{
+    return color == QColor(Qt::magenta) ? QColor(Qt::cyan) : QColor(Qt::magenta);
+}
+
+const QVector<std::pair<QMetaType, Different>>& differentValues()
+{
+    static const QVector<std::pair<QMetaType, Different>> table {
+        differentFor<QString>([](const QString& v, QObject*) { return v + QStringLiteral("x"); }),
+        differentFor<bool>([](const bool& v, QObject*) { return !v; }),
+        differentFor<int>([](const int& v, QObject*) { return v + 1; }),
+        differentFor<double>([](const double& v, QObject*) { return v + 0.5; }),
+        differentFor<QColor>([](const QColor& v, QObject*) { return otherColor(v); }),
+        differentFor<QPen>([](const QPen& v, QObject*) {
+            QPen pen = v;
+            pen.setColor(otherColor(v.color()));
+            pen.setWidthF(v.widthF() + 1);
+            return pen;
+        }),
+        differentFor<QBrush>([](const QBrush& v, QObject*) {
+            return QBrush(otherColor(v.color()), Qt::SolidPattern);
+        }),
+        differentFor<QFont>([](const QFont& v, QObject*) {
+            QFont font = v;
+            font.setPointSizeF(v.pointSizeF() + 1);
+            return font;
+        }),
+        differentFor<QMargins>([](const QMargins& v, QObject*) { return v + 1; }),
+        differentFor<QRect>([](const QRect& v, QObject*) { return v.adjusted(1, 1, 2, 2); }),
+        differentFor<QSize>([](const QSize& v, QObject*) { return v + QSize(1, 1); }),
+        differentFor<QPointF>([](const QPointF& v, QObject*) { return v + QPointF(1, 1); }),
+        differentFor<QPixmap>([](const QPixmap& v, QObject*) {
+            QPixmap pixmap(2, 2);
+            pixmap.fill(v.isNull() ? Qt::red : Qt::green);
+            return pixmap;
+        }),
+        differentFor<QCPRange>(
+            [](const QCPRange& v, QObject*) { return QCPRange(v.lower + 1, v.upper + 2); }),
+        differentFor<QCPLineEnding>([](const QCPLineEnding& v, QObject*) {
+            return QCPLineEnding(v.style() == QCPLineEnding::esSpikeArrow
+                                     ? QCPLineEnding::esDisc
+                                     : QCPLineEnding::esSpikeArrow);
+        }),
+        differentFor<QCPScatterStyle>([](const QCPScatterStyle& v, QObject*) {
+            return QCPScatterStyle(v.shape() == QCPScatterStyle::ssCircle
+                                       ? QCPScatterStyle::ssDisc
+                                       : QCPScatterStyle::ssCircle);
+        }),
+        differentFor<QCPColorGradient>([](const QCPColorGradient& v, QObject*) {
+            const QCPColorGradient hot(QCPColorGradient::gpHot);
+            return v == hot ? QCPColorGradient(QCPColorGradient::gpJet) : hot;
+        }),
+        differentFor<QCPDataSelection>([](const QCPDataSelection& v, QObject*) {
+            const QCPDataSelection first(QCPDataRange(0, 1));
+            return v == first ? QCPDataSelection(QCPDataRange(1, 2)) : first;
+        }),
+        differentFor<QSharedPointer<QCPAxisTicker>>(
+            [](const QSharedPointer<QCPAxisTicker>&, QObject*) {
+                return QSharedPointer<QCPAxisTicker>(new QCPAxisTickerFixed);
+            }),
+        differentFor<QList<double>>([](const QList<double>& v, QObject*) {
+            QList<double> list = v;
+            list.append(1);
+            return list;
+        }),
+        differentFor<QList<QColor>>([](const QList<QColor>& v, QObject*) {
+            QList<QColor> list = v;
+            list.append(Qt::red);
+            return list;
+        }),
+        differentFor<QCPLayer*>([](QCPLayer* const& v, QObject* object) -> QCPLayer* {
+            QCustomPlot* plot = plotOf(object);
+            QCPLayer* grid = plot->layer(QStringLiteral("grid"));
+            return v == grid ? plot->layer(QStringLiteral("overlay")).get() : grid;
+        }),
+        differentFor<QCPAxis*>([](QCPAxis* const& v, QObject* object) -> QCPAxis* {
+            QCustomPlot* plot = plotOf(object);
+            return v == plot->xAxis2.get() ? plot->yAxis2.get() : plot->xAxis2.get();
+        }),
+    };
+    return table;
+}
+
+// Enums and flags are read from the meta-enum: the first other key, or one bit toggled.
+QVariant differentEnum(const QMetaProperty& property, const QVariant& current)
+{
+    const QMetaEnum e = property.enumerator();
+    const int now = current.toInt();
+    int next = now;
+    for (int i = 0; i < e.keyCount() && next == now; ++i)
+    {
+        const int key = e.value(i);
+        if (!e.isFlag())
+            next = key;
+        else if (key != 0 && (key & (key - 1)) == 0)
+            next = now ^ key;
+    }
+    QVariant value(next);
+    if (!value.convert(property.metaType()))
+        return {};
+    return value;
+}
+
+QVariant differentValue(const QMetaProperty& property, const QVariant& current, QObject* object)
+{
+    if (property.isEnumType() || property.isFlagType())
+        return differentEnum(property, current);
+    for (const auto& [type, make] : differentValues())
+        if (type == property.metaType())
+            return make(current, object);
+    return {};
+}
+
+// The setters that do not simply store what they get. Each has a value the generic check uses,
+// and a rule of its own, run by exceptionRulesHold once the property has its NOTIFY.
+enum class Rule
+{
+    Refuses,             // an invalid value leaves the property, with no signal
+    Clamps,              // a value out of range is stored clamped; the clamp is the change
+    TrimmedBySelectable, // the selection is cut to what the selectable type allows
+    TakesOwnership,      // the object is adopted; writing the same pointer again is refused
+    ComponentPen,        // a line's setPen repaints components, pen() may not move
+    RefusesScaleType,    // a polar angular axis refuses a logarithmic scale
+};
+
+struct Exception
+{
+    const QMetaObject* meta;
+    const char* property;
+    Rule rule;
+    std::function<QVariant(QObject*)> accepted; // a value the setter stores as given
+    const char* why;
+};
+
+QCPSelectionDecorator* freshDecorator() { return new QCPSelectionDecorator; }
+
+const QVector<Exception>& exceptions()
+{
+    static const QVector<Exception> list {
+        { &QCPAxis::staticMetaObject, "numberFormat", Rule::Refuses,
+          [](QObject*) { return QVariant(QStringLiteral("eb")); },
+          "parses the format code and refuses an invalid one" },
+        { &QCPAxis::staticMetaObject, "tickLabelRotation", Rule::Clamps,
+          [](QObject*) { return QVariant(45.0); }, "clamps to [-90, 90]" },
+        { &QCPAbstractPlottable::staticMetaObject, "selection", Rule::TrimmedBySelectable,
+          [](QObject* object) {
+              auto* plottable = qobject_cast<QCPAbstractPlottable*>(object);
+              plottable->setSelectable(QCP::stDataRange);
+              return QVariant::fromValue(QCPDataSelection(QCPDataRange(0, 1)));
+          },
+          "enforceType trims it by selectable (plottable.cpp)" },
+        { &QCPAbstractPlottable::staticMetaObject, "selectionDecorator", Rule::TakesOwnership,
+          [](QObject*) { return QVariant::fromValue(freshDecorator()); },
+          "adopts the decorator and refuses the same one again (plottable.cpp:966-976)" },
+        { &QCPAbstractLine::staticMetaObject, "pen", Rule::ComponentPen,
+          [](QObject*) { return QVariant(QPen(Qt::blue, 3)); },
+          "repaints when only a component differs (plottable-line.cpp:84)" },
+        { &QCPPolarAxisAngular::staticMetaObject, "scaleType", Rule::RefusesScaleType,
+          [](QObject*) { return QVariant::fromValue(QCPAxisBase::stLinear); },
+          "the ring has no logarithmic scale (angularaxis.cpp:938)" },
+    };
+    return list;
+}
+
+const Exception* exceptionFor(const QObject* object, const char* property)
+{
+    for (const Exception& e : exceptions())
+        if (object->metaObject()->inherits(e.meta) && qstrcmp(e.property, property) == 0)
+            return &e;
+    return nullptr;
+}
+
+bool isNotifyProperty(const QMetaProperty& property)
+{
+    return property.hasNotifySignal() && property.isWritable();
+}
+
+// True when the notify signal's first argument carries the property's value.
+bool signalCarriesValue(const QMetaProperty& property)
+{
+    const QMetaMethod notify = property.notifySignal();
+    return notify.parameterCount() > 0 && notify.parameterMetaType(0) == property.metaType();
+}
+} // namespace
+
+void TestMetaSurface::exceptionsNameRealProperties()
+{
+    for (const Exception& e : exceptions())
+        QVERIFY2(e.meta->indexOfProperty(e.property) >= 0,
+                 qPrintable(QStringLiteral("%1::%2 is no property")
+                                .arg(QLatin1String(e.meta->className()),
+                                     QLatin1String(e.property))));
+}
+
+void TestMetaSurface::everyNotifyPropertyNotifiesOncePerChange_data()
+{
+    QTest::addColumn<int>("fixture");
+    QTest::addColumn<QByteArray>("property");
+    for (int f = 0; f < fixtures().size(); ++f)
+    {
+        auto plot = newPlot();
+        const QMetaObject* meta = fixtures()[f].make(*plot)->metaObject();
+        // QObject's own objectName is Qt's, with its own BINDABLE storage: not ours to check.
+        for (int i = QObject::staticMetaObject.propertyCount(); i < meta->propertyCount(); ++i)
+            if (isNotifyProperty(meta->property(i)))
+                QTest::addRow("%s::%s", fixtures()[f].name, meta->property(i).name())
+                    << f << QByteArray(meta->property(i).name());
+    }
+}
+
+void TestMetaSurface::everyNotifyPropertyNotifiesOncePerChange()
+{
+    QFETCH(int, fixture);
+    QFETCH(QByteArray, property);
+    auto plot = newPlot();
+    QObject* object = fixtures()[fixture].make(*plot);
+    const QMetaProperty meta = metaProperty(object, property.constData());
+    const Exception* exception = exceptionFor(object, property.constData());
+
+    const QVariant current = meta.read(object);
+    const QVariant other = exception ? exception->accepted(object)
+                                     : differentValue(meta, current, object);
+    QVERIFY2(other.isValid(), qPrintable(QStringLiteral("no different value for type %1")
+                                             .arg(QLatin1String(meta.typeName()))));
+    QVERIFY2(other != current, "the different value is equal to the current one");
+
+    QSignalSpy spy(object, meta.notifySignal());
+    QVERIFY(spy.isValid());
+    if (!exception || exception->rule != Rule::TakesOwnership)
+    {
+        QVERIFY(meta.write(object, meta.read(object)));
+        QCOMPARE(spy.count(), 0);
+    }
+
+    {
+        QCPEmissionScope scope(plot.get());
+        QVERIFY(meta.write(object, other));
+        QCOMPARE(spy.count(), 0);
+    }
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(meta.read(object), other);
+    if (signalCarriesValue(meta))
+        QCOMPARE(spy.first().first(), other);
+
+    if (!exception || exception->rule != Rule::TakesOwnership)
+    {
+        QVERIFY(meta.write(object, other));
+        QCOMPARE(spy.count(), 1);
+    }
+}
+
+void TestMetaSurface::exceptionRulesHold_data()
+{
+    QTest::addColumn<int>("fixture");
+    QTest::addColumn<int>("exception");
+    for (int f = 0; f < fixtures().size(); ++f)
+    {
+        auto plot = newPlot();
+        QObject* object = fixtures()[f].make(*plot);
+        for (int e = 0; e < exceptions().size(); ++e)
+        {
+            const Exception& ex = exceptions()[e];
+            if (!object->metaObject()->inherits(ex.meta))
+                continue;
+            if (isNotifyProperty(metaProperty(object, ex.property)))
+                QTest::addRow("%s::%s", fixtures()[f].name, ex.property) << f << e;
+        }
+    }
+}
+
+void TestMetaSurface::exceptionRulesHold()
+{
+    QFETCH(int, fixture);
+    QFETCH(int, exception);
+    const Exception& ex = exceptions()[exception];
+    auto plot = newPlot();
+    QObject* object = fixtures()[fixture].make(*plot);
+    const QMetaProperty meta = metaProperty(object, ex.property);
+    QSignalSpy spy(object, meta.notifySignal());
+    switch (ex.rule)
+    {
+        case Rule::TrimmedBySelectable:
+        {
+            auto* plottable = qobject_cast<QCPAbstractPlottable*>(object);
+            plottable->setSelectable(QCP::stNone);
+            QVERIFY(meta.write(object, QVariant::fromValue(QCPDataSelection(QCPDataRange(0, 1)))));
+            QVERIFY(plottable->selection().isEmpty());
+            QCOMPARE(spy.count(), 0);
+            break;
+        }
+        case Rule::ComponentPen:
+        {
+            auto* line = qobject_cast<QCPAbstractLine*>(object);
+            line->setComponentPens({ QPen(Qt::green) });
+            settle(*plot);
+            spy.clear();
+            QVERIFY(meta.write(object, QVariant(line->pen())));
+            QCOMPARE(spy.count(), 0);
+            QVERIFY(plot->isRepaintQueued());
+            break;
+        }
+        case Rule::Refuses:
+        case Rule::Clamps:
+        case Rule::TakesOwnership:
+        case Rule::RefusesScaleType:
+            // No row reaches these yet: their properties get a NOTIFY in Task 2, with the rule.
+            QFAIL("the rule of this exception is not written");
+    }
+}

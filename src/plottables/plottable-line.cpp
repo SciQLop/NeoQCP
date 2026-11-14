@@ -89,6 +89,8 @@ void QCPAbstractLine::setPen(const QPen& pen)
         && std::all_of(mComponents.cbegin(), mComponents.cend(), [&](const QCPGraphComponent& c)
                        { return c.pen == pen && c.selectedPen == selected; }))
         return;
+    // pen() is mPen: a call that only re-pens the components repaints without a penChanged.
+    const bool penMoved = mPen != pen;
     mPen = pen;
     mExplicitPen = pen;
     for (auto& c : mComponents) {
@@ -96,6 +98,9 @@ void QCPAbstractLine::setPen(const QPen& pen)
         c.selectedPen = defaultSelectedPen(pen);
     }
     lineChanged();
+    if (penMoved)
+        qcpEmit(static_cast<QCPAbstractPlottable*>(this), mParentPlot,
+                &QCPAbstractPlottable::penChanged, mPen);
 }
 
 // Same for the brush: setComponentFill()/clearComponentFill() can have replaced a component's

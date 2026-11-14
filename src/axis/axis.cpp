@@ -404,6 +404,12 @@ void QCPGrid::drawSubGridLines(QCPPainter* painter) const
   interaction or by a direct call to \ref setSelectedParts. The slot reads \ref selectedParts.
 */
 
+/*! \fn void QCPAxis::labelChanged(const QString& label)
+
+  This signal is emitted when \ref setLabel changes the label, after the plot delivers its
+  deferred signals.
+*/
+
 /*! \fn void QCPAxis::selectableChanged()
 
   This signal is emitted when the selectability changes, by calls to \ref setSelectableParts. The
@@ -1115,6 +1121,7 @@ void QCPAxis::setLabel(const QString& str)
         mLabel = str;
         mCachedMarginValid = false;
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::labelChanged, mLabel);
     }
 }
 

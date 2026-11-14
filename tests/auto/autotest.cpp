@@ -34,6 +34,7 @@
 #include "test-layer-removal/test-layer-removal.h"
 #include "test-line-extruder/test-line-extruder.h"
 #include "test-linked-axes/test-linked-axes.h"
+#include "test-meta-surface/test-meta-surface.h"
 #include "test-misuse/test-misuse.h"
 #include "test-multi-datasource/test-multi-datasource.h"
 #include "test-multigraph/test-multigraph.h"
@@ -225,6 +226,7 @@ int main(int argc, char** argv)
     QCPTEST(TestPolar);
     QCPTEST(TestAxisBase);
     QCPTEST(TestUserSystem);
+    QCPTEST(TestMetaSurface);
 
     return failures == 0 ? 0 : 1;
 }

@@ -3,6 +3,7 @@
 
 #include "global.h"
 #include <QList>
+#include <QMetaMethod>
 #include <QObject>
 #include <QPointer>
 #include <functional>
@@ -19,6 +20,27 @@ template <typename T>
 QList<QPointer<T>> guarded(const QList<T*>& objects)
 {
     return QList<QPointer<T>>(objects.cbegin(), objects.cend());
+}
+
+namespace detail
+{
+// QObject::isSignalConnected is protected; a member pointer formed through a derived class is the
+// standard way to call it on any object.
+struct SignalProbe : QObject
+{
+    static bool connected(const QObject* sender, const QMetaMethod& signal)
+    {
+        return (sender->*&SignalProbe::isSignalConnected)(signal);
+    }
+};
+} // namespace detail
+
+// Whether anything receives \a signal of \a sender. A QBindable(obj, "x") adaptor and a QSignalSpy
+// count: both are connections.
+template <typename Sender, typename... SignalArgs>
+bool hasReceivers(const Sender* sender, void (Sender::*signal)(SignalArgs...))
+{
+    return detail::SignalProbe::connected(sender, QMetaMethod::fromSignal(signal));
 }
 } // namespace qcp
 

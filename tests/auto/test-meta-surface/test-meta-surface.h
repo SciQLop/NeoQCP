@@ -1,0 +1,54 @@
+#include "qcustomplot.h"
+#include <QtTest/QtTest>
+#include <functional>
+
+// The meta-object surface of milestone 5e: every property with a NOTIFY fires it once per change,
+// after the plot's delivery, and binds through QBindable(obj, "name") without a storage member.
+class TestMetaSurface : public QObject
+{
+    Q_OBJECT
+private slots:
+    void init();
+    void cleanup();
+
+    void spikeSignalIsDeferredAndFiresOnce_data();
+    void spikeSignalIsDeferredAndFiresOnce();
+    void spikeSubscriberSeesTheChangeAfterDelivery_data();
+    void spikeSubscriberSeesTheChangeAfterDelivery();
+    void spikeBindingDrivesTheSetterAndRepaints_data();
+    void spikeBindingDrivesTheSetterAndRepaints();
+    void spikeSlotDeletingTheObject_data();
+    void spikeSlotDeletingTheObject();
+    void spikeObserverDeletingTheObject_data();
+    void spikeObserverDeletingTheObject();
+    void spikeSlotDeletingThePlot_data();
+    void spikeSlotDeletingThePlot();
+    void spikeObserverDeletingThePlot_data();
+    void spikeObserverDeletingThePlot();
+    void spikeBindingWhoseSourceDiesFirst_data();
+    void spikeBindingWhoseSourceDiesFirst();
+    void bindingToARefusedScaleTypeKeepsTheValue();
+    void plainWriteDoesNotBreakTheBinding();
+    void curvePenNotifiesOnce();
+    void componentRepenRepaintsWithoutPenChanged();
+
+    void exceptionsNameRealProperties();
+    void everyNotifyPropertyNotifiesOncePerChange_data();
+    void everyNotifyPropertyNotifiesOncePerChange();
+    void exceptionRulesHold_data();
+    void exceptionRulesHold();
+};
+
+// Runs its action when a signal it is connected to through QMetaMethod fires.
+class MetaTrigger : public QObject
+{
+    Q_OBJECT
+public:
+    std::function<void()> action;
+public slots:
+    void fire()
+    {
+        if (action)
+            action();
+    }
+};

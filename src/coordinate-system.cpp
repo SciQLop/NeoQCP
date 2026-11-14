@@ -149,7 +149,7 @@ void QCPCoordinateSystem::bumpRevision()
     mRevision = qcp::nextSystemRevision();
     if (!listens())
         return;
-    qcpEmit(this, mArea ? mArea->parentPlot() : nullptr, &QCPCoordinateSystem::changed);
+    qcpEmitHeard(this, mArea ? mArea->parentPlot() : nullptr, &QCPCoordinateSystem::changed);
 }
 
 /*! \internal

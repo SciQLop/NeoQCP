@@ -393,6 +393,12 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 /* end of documentation of the drawing virtuals */
 /* start of documentation of signals */
 
+/*! \fn void QCPAbstractPlottable::penChanged(const QPen& pen)
+
+  This signal is emitted when \ref setPen changes \ref pen, after the plot delivers its deferred
+  signals. A call that only re-pens the components of a line repaints and emits nothing.
+*/
+
 /*! \fn void QCPAbstractPlottable::selectionChanged()
 
   This signal is emitted when the selection state of this plottable has changed, either by user
@@ -805,6 +811,7 @@ void QCPAbstractPlottable::setPen(const QPen& pen)
         return;
     markDirty();
     mPen = pen;
+    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::penChanged, mPen);
 }
 
 /*!

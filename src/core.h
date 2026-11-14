@@ -769,6 +769,9 @@ protected:
     template <typename Sender, typename... SignalArgs, typename... Args>
     friend void qcpEmit(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
                         Args&&... args);
+    template <typename Sender, typename... SignalArgs, typename... Args>
+    friend void qcpEmitHeard(Sender* sender, QCustomPlot* plot,
+                             void (Sender::*signal)(SignalArgs...), Args&&... args);
     template <typename Sender, typename... SignalArgs, typename StillValid, typename... Args>
     friend void qcpEmitIf(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
                           StillValid stillValid, Args&&... args);
@@ -784,14 +787,13 @@ Q_DECLARE_METATYPE(QCustomPlot::LayerInsertMode)
 Q_DECLARE_METATYPE(QCustomPlot::RefreshPriority)
 
 /*!
-  Emits \a signal of \a sender, through \a plot's delivery when there is one, so its slots run
-  when the plot's emission scope closes rather than inside the setter. The arguments are copied,
-  so a deferred slot sees the values the setter emitted. Without a plot, the signal is emitted at
-  once.
+  qcpEmit for a sender that counts the receivers of \a signal itself (connectNotify) and calls
+  only when there is one: the probe would repeat what it knows, at the cost of a mutex
+  (QObject::isSignalConnected), on every range set of a pan.
 */
 template <typename Sender, typename... SignalArgs, typename... Args>
-void qcpEmit(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
-             Args&&... args)
+void qcpEmitHeard(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
+                  Args&&... args)
 {
     // Nothing is deferred, so the tuple and the std::function (a heap allocation per emit) would be
     // pure overhead. Every range setter of a drag or a pan lands here.
@@ -804,6 +806,25 @@ void qcpEmit(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArg
     plot->deliver(sender, [sender, signal, copied = std::move(copied)]() mutable {
         std::apply([&](auto&... values) { (sender->*signal)(values...); }, copied);
     });
+}
+
+/*!
+  Emits \a signal of \a sender, through \a plot's delivery when there is one, so its slots run
+  when the plot's emission scope closes rather than inside the setter. The arguments are copied,
+  so a deferred slot sees the values the setter emitted. Without a plot, the signal is emitted at
+  once. A deferred emission nobody receives is not queued.
+*/
+template <typename Sender, typename... SignalArgs, typename... Args>
+void qcpEmit(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
+             Args&&... args)
+{
+    // Layout passes set properties of every element inside replot's scope: an emission nobody
+    // receives must not cost a queue entry and a heap allocation each. The probe takes Qt's
+    // connection mutex, about what the entry costs, so only the property signals pay it: the range
+    // and state signals (qcpEmitIf, qcpEmitCurrent) do not fire per layout pass.
+    if (plot && plot->mEmissions.isOpen() && !qcp::hasReceivers(sender, signal))
+        return;
+    qcpEmitHeard(sender, plot, signal, std::forward<Args>(args)...);
 }
 
 /*!
