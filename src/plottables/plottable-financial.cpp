@@ -682,17 +682,6 @@ void QCPFinancial::draw(QCPDrawContext& context) const
     }
 }
 
-namespace
-{
-//! The icon rect a unit-box recording is replayed into: the frame maps the box's corners onto it.
-QRectF unitBoxPixels(const QCPTransform& transform)
-{
-    const QCP::Pixels topLeft = transform.map(QCP::Data { 0.0, 1.0 });
-    const QCP::Pixels bottomRight = transform.map(QCP::Data { 1.0, 0.0 });
-    return QRectF(QPointF(topLeft.x, topLeft.y), QPointF(bottomRight.x, bottomRight.y));
-}
-} // namespace
-
 /* inherits documentation from base class */
 void QCPFinancial::drawLegendIcon(QCPDrawContext& icon) const
 {

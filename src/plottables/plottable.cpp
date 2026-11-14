@@ -779,6 +779,13 @@ QCPRange QCPAbstractPlottable::getValueRange(bool& foundRange, QCP::SignDomain i
 
 //! Replays the icon recording, fitted to \a rect, with this plottable's antialiasing: the replay
 //! keeps the painter's, which is the legend row's.
+QRectF QCPAbstractPlottable::unitBoxPixels(const QCPTransform& transform)
+{
+    const QCP::Pixels topLeft = transform.map(QCP::Data { 0.0, 1.0 });
+    const QCP::Pixels bottomRight = transform.map(QCP::Data { 1.0, 0.0 });
+    return QRectF(QPointF(topLeft.x, topLeft.y), QPointF(bottomRight.x, bottomRight.y));
+}
+
 void QCPAbstractPlottable::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
 {
     applyDefaultAntialiasingHint(painter);
