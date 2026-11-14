@@ -281,6 +281,7 @@ DOC_SNIPPET(gallery_joint_density, 640, 640)
     const auto [yRange, yCentres, yCounts] = marginal(y);
 
     auto density = customPlot->add<QCPHistogram2D>();
+    density->setColorScale(nullptr);   // no colour bar: the marginals sit flush with the map
     density->setBins(bins, bins);
     density->setGradient(QCPColorGradient::gpInferno);
     density->setData(std::move(x), std::move(y));
