@@ -43,6 +43,9 @@ public:
     //! Joins \a colorScale, or detaches with null. Virtual: a subclass with its own rule (a frame
     //! that has no rect scale to fall back to) refuses through a base pointer and the property.
     virtual void setColorScale(QCPColorScale* colorScale);
+    //! A move to another rect's axes takes that rect's scale when this one followed its old rect's;
+    //! a scale the user picked, or none, stays.
+    void setSystem(QCPCoordinateSystem* system) override;
 
     // non-property methods:
     //! Fits the data range to colorDataBounds(). A class whose bounds can be cached or partial
@@ -73,6 +76,8 @@ protected:
     //! True while followKeyAxisRectScale() is handing its rect's scale to setColorScale(): a
     //! subclass uses it to tell an automatic join from a user's explicit scale.
     bool mJoiningKeyAxisRectScale = false;
+    //! The scale held is its rect's, joined automatically: a move to another rect follows it.
+    bool mFollowsRectScale = false;
 
     // property members:
     QCPRange mDataRange;

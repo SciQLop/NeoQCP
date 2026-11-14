@@ -274,3 +274,49 @@ void TestColorScale::theScaleIsNotOnTheDataLayer()
     QVERIFY2(scale->layer() != map->layer(), "a visible bar on the map's layer stops pans translating");
     QCOMPARE(scale->layer(), mPlot->layer("axes"));
 }
+
+void TestColorScale::aMovedMapFollowsItsNewRectsScale()
+{
+    auto* bottom = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(1, 0, bottom);
+    QCPAxisRect* top = mPlot->axisRect();
+    auto* moved = mapWithRange(top->axis(QCPAxis::atBottom), top->axis(QCPAxis::atLeft), 0, 1);
+    QCOMPARE(moved->colorScale(), top->colorScale().get());
+
+    moved->setKeyAxis(bottom->axis(QCPAxis::atBottom));
+    moved->setValueAxis(bottom->axis(QCPAxis::atLeft));
+    QCOMPARE(moved->colorScale(), bottom->colorScale().get());
+
+    // A scale the user picked, or none at all, is the user's: the move keeps it.
+    auto* chosen = mapWithRange(top->axis(QCPAxis::atBottom), top->axis(QCPAxis::atLeft), 0, 1);
+    auto* own = new QCPColorScale(mPlot);
+    mPlot->plotLayout()->addElement(0, 1, own);
+    chosen->setColorScale(own);
+    auto* none = mapWithRange(top->axis(QCPAxis::atBottom), top->axis(QCPAxis::atLeft), 0, 1);
+    none->setColorScale(nullptr);
+    chosen->setKeyAxis(bottom->axis(QCPAxis::atBottom));
+    chosen->setValueAxis(bottom->axis(QCPAxis::atLeft));
+    none->setKeyAxis(bottom->axis(QCPAxis::atBottom));
+    none->setValueAxis(bottom->axis(QCPAxis::atLeft));
+    QCOMPARE(chosen->colorScale(), own);
+    QVERIFY(!none->colorScale());
+}
+
+void TestColorScale::aScaleSlotDeletingTheMovedMapIsSafe()
+{
+    auto* bottom = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(1, 0, bottom);
+    QCPAxisRect* top = mPlot->axisRect();
+    QPointer<QCPColorMap> moved
+        = mapWithRange(top->axis(QCPAxis::atBottom), top->axis(QCPAxis::atLeft), 0, 1);
+    bool ran = false;
+    connect(moved, &QCPAbstractColorMapped::colorScaleChanged, mPlot, [&] {
+        ran = true;
+        delete moved.data();
+    }, Qt::SingleShotConnection);
+    moved->setKeyAxis(bottom->axis(QCPAxis::atBottom));
+    moved->setValueAxis(bottom->axis(QCPAxis::atLeft));
+    QVERIFY(ran);
+    QVERIFY(!moved);
+    mPlot->replot();
+}

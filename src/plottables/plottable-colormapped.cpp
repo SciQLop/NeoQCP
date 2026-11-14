@@ -67,6 +67,7 @@ void QCPAbstractColorMapped::setGradient(const QCPColorGradient& gradient)
 
 void QCPAbstractColorMapped::setColorScale(QCPColorScale* colorScale)
 {
+    mFollowsRectScale = mJoiningKeyAxisRectScale && colorScale;
     if (mColorScale == colorScale)
         return;
     markDirty();
@@ -142,10 +143,21 @@ void QCPAbstractColorMapped::applyGradient(const QCPColorGradient& gradient)
     qcpEmit(this, mParentPlot, &QCPAbstractColorMapped::gradientChanged, mGradient);
 }
 
+void QCPAbstractColorMapped::setSystem(QCPCoordinateSystem* system)
+{
+    // The system's signals wait for the join below: a slot may delete this plottable.
+    const QCPEmissionScope scope(mParentPlot);
+    const bool follows = mFollowsRectScale;
+    QCPAbstractPlottable::setSystem(system);
+    if (follows && system && mSystem == system)
+        followKeyAxisRectScale();
+}
+
 void QCPAbstractColorMapped::detachColorScale()
 {
     if (!mColorScale)
         return;
+    mFollowsRectScale = false;
     mColorScale = nullptr;
     qcpEmit(this, mParentPlot, &QCPAbstractColorMapped::colorScaleChanged);
 }
