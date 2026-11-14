@@ -27,7 +27,7 @@ QCPHandle<QCPIntervals> QCPIntervalsLegendItem::intervals() const
 QFont QCPIntervalsLegendItem::effectiveFont() const
 {
     const QFont font = mSelected ? mSelectedFont : mFont;
-    return font.pointSize() > 0 || !mParentLegend ? font : mParentLegend->font();
+    return font.pointSize() > 0 || !legend() ? font : legend()->font();
 }
 
 QSize QCPIntervalsLegendItem::minimumOuterSizeHint() const

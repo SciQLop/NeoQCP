@@ -91,7 +91,6 @@ signals:
 
 protected:
     // property members:
-    QPointer<QCPLegend> mParentLegend; // follows the item into the legend it is added to
     QFont mFont;
     QColor mTextColor;
     QFont mSelectedFont;
@@ -106,13 +105,21 @@ protected:
     //! A row about \a subject has nothing left to show once it is gone: it leaves its legend.
     void leaveLegendWhenDestroyed(QObject* subject);
 
+    //! The legend this row sits in, read from its layout: null in another layout, or in none.
+    [[nodiscard]] QCPLegend* legend() const;
+    //! Outside a legend a row has no icon: it draws and measures as text only.
+    [[nodiscard]] QSize legendIconSize() const;
+    [[nodiscard]] int legendIconTextPadding() const;
+    //! The icon border for the selection state; no pen outside a legend.
+    [[nodiscard]] QPen legendIconBorderPen() const;
+    //! Selectable as a row: the row allows it and its legend selects items. Never outside a legend.
+    [[nodiscard]] bool selectableAsItem() const;
+
     // reimplemented virtual methods:
     virtual QCP::Interaction selectionCategory() const override;
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
     virtual QRect clipRect() const override;
     virtual void draw(QCPPainter* painter) override = 0;
-    //! A row belongs to the legend it sits in, however it got there (addItem or addElement).
-    virtual void layoutChanged() override;
     // events:
     virtual void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
                              bool* selectionStateChanged) override;

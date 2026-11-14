@@ -295,7 +295,7 @@ void QCPPlottableGroupLegendItem::draw(QCPPainter* painter)
 
     painter->setFont(mSelected ? mSelectedFont : mFont);
     painter->setPen(QPen(effectiveTextColor()));
-    const QSize iconSize = mParentLegend->iconSize();
+    const QSize iconSize = legendIconSize();
 
     auto* renderer = QCPLabelRenderer::defaultRenderer();
     const QSize textSize = QCPLabelRenderer::measureWith(renderer, painter->font(), text);
@@ -303,10 +303,12 @@ void QCPPlottableGroupLegendItem::draw(QCPPainter* painter)
     const int textHeight = qMax(textSize.height(), iconSize.height());
     QCPLabelRenderer::drawWith(
         renderer, painter,
-        QRect(mRect.x() + iconSize.width() + mParentLegend->iconTextPadding(), mRect.y(),
+        QRect(mRect.x() + iconSize.width() + legendIconTextPadding(), mRect.y(),
               textSize.width(), textHeight),
         painter->font(), painter->pen().color(), text,
         Qt::TextDontClip | Qt::AlignLeft | Qt::AlignVCenter);
+    if (iconSize.isEmpty())
+        return;
 
     painter->save();
     painter->setClipRect(iconRect, Qt::IntersectClip);
@@ -317,8 +319,7 @@ void QCPPlottableGroupLegendItem::draw(QCPPainter* painter)
     icon->drawLegendIcon(painter, iconRect);
     painter->restore();
 
-    const QPen border = mSelected ? mParentLegend->selectedIconBorderPen()
-                                  : mParentLegend->iconBorderPen();
+    const QPen border = legendIconBorderPen();
     if (border.style() != Qt::NoPen)
     {
         painter->setPen(border);
@@ -333,10 +334,10 @@ QSize QCPPlottableGroupLegendItem::minimumOuterSizeHint() const
 {
     if (!iconMember())
         return {};
-    const QSize iconSize = mParentLegend->iconSize();
+    const QSize iconSize = legendIconSize();
     const QSize textSize = QCPLabelRenderer::measureWith(
         QCPLabelRenderer::defaultRenderer(), mSelected ? mSelectedFont : mFont, rowText());
-    return { iconSize.width() + mParentLegend->iconTextPadding() + textSize.width()
+    return { iconSize.width() + legendIconTextPadding() + textSize.width()
                  + mMargins.left() + mMargins.right(),
              qMax(textSize.height(), iconSize.height()) + mMargins.top() + mMargins.bottom() };
 }

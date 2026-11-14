@@ -81,7 +81,7 @@ bool QCPGroupLegendItem::shownExpanded() const
 
 QFont QCPGroupLegendItem::rowFont() const
 {
-    return mFont.pointSize() > 0 ? mFont : (mParentLegend ? mParentLegend->font() : QFont());
+    return mFont.pointSize() > 0 ? mFont : (legend() ? legend()->font() : QFont());
 }
 
 // Rows share one height so selectTest can find a row by division; the tallest typeset name sets it.
@@ -142,9 +142,11 @@ QString QCPGroupLegendItem::headerRowText(bool includeBusySymbol) const
 
 double QCPGroupLegendItem::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {
-    if (!mParentPlot || !mSelectable || !mParentLegend->selectableParts().testFlag(QCPLegend::spItems))
+    // As the base row: selectability gates a selecting click only, and a row outside a legend is
+    // never selectable.
+    if (!mParentPlot)
         return -1;
-    if (onlySelectable && !mSelectable)
+    if (onlySelectable && !selectableAsItem())
         return -1;
     if (!mRect.contains(pos.toPoint()))
         return -1;
@@ -171,7 +173,7 @@ void QCPGroupLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event,
                                      bool* selectionStateChanged)
 {
 
-    if (!mSelectable || !mParentLegend->selectableParts().testFlag(QCPLegend::spItems))
+    if (!selectableAsItem())
         return;
 
     int componentIndex = -1;
@@ -208,8 +210,8 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
         && !painter->modes().testFlag(QCPPainter::pmVectorized);
 
     QFont font = mSelected ? mSelectedFont : mFont;
-    if (font.pointSize() <= 0 && mParentLegend)
-        font = mParentLegend->font();
+    if (font.pointSize() <= 0 && legend())
+        font = legend()->font();
     QColor textColor = mSelected ? mSelectedTextColor : mTextColor;
     painter->setFont(font);
 
@@ -258,8 +260,8 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
             const auto& comp = graphRaw()->component(i);
             double rowY = inRect.top() + (k + 1) * rh;
 
-            if (mSelected && mSelectedComponent == i && mParentLegend) {
-                painter->setPen(mParentLegend->selectedIconBorderPen());
+            if (mSelected && mSelectedComponent == i && legend()) {
+                painter->setPen(legend()->selectedIconBorderPen());
                 painter->setBrush(Qt::NoBrush);
                 painter->drawRect(QRectF(inRect.left(), rowY, inRect.width(), rh));
             }
@@ -282,8 +284,8 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
         }
     }
 
-    if (mSelected && (mSelectedComponent < 0 || !shownExpanded()) && mParentLegend) {
-        painter->setPen(mParentLegend->selectedIconBorderPen());
+    if (mSelected && (mSelectedComponent < 0 || !shownExpanded()) && legend()) {
+        painter->setPen(legend()->selectedIconBorderPen());
         painter->setBrush(Qt::NoBrush);
         painter->drawRect(mRect);
     }

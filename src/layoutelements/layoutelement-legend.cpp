@@ -53,8 +53,8 @@
   You inherit the following members you may use:
   <table>
     <tr>
-      <td>QCPLegend *\b mParentLegend</td>
-      <td>A pointer to the parent QCPLegend.</td>
+      <td>QCPLegend *\b legend()</td>
+      <td>The QCPLegend the item sits in, or null outside a legend.</td>
     </tr><tr>
       <td>QFont \b mFont</td>
       <td>The generic font of the item. You should use this font for all or at least the most
@@ -109,7 +109,6 @@
 */
 QCPAbstractLegendItem::QCPAbstractLegendItem(QCPLegend* parent)
         : QCPLayoutElement(parent->parentPlot())
-        , mParentLegend(parent)
         , mFont(parent->font())
         , mTextColor(parent->textColor())
         , mSelectedFont(parent->selectedFont())
@@ -222,8 +221,8 @@ void QCPAbstractLegendItem::setSelected(bool selected)
     markDirty();
     mSelected = selected;
     qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectionChanged);
-    if (mParentLegend)
-        mParentLegend->noteItemSelection();
+    if (QCPLegend* owner = legend())
+        owner->noteItemSelection();
 }
 
 /* inherits documentation from base class */
@@ -232,8 +231,7 @@ double QCPAbstractLegendItem::selectTest(const QPointF& pos, bool onlySelectable
 {
     if (!mParentPlot)
         return -1;
-    if (onlySelectable
-        && (!mSelectable || !mParentLegend->selectableParts().testFlag(QCPLegend::spItems)))
+    if (onlySelectable && !selectableAsItem())
         return -1;
 
     if (mRect.contains(pos.toPoint()))
@@ -259,7 +257,7 @@ void QCPAbstractLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event, boo
                                         [[maybe_unused]] const QVariant& details,
                                         bool* selectionStateChanged)
 {
-    if (mSelectable && mParentLegend->selectableParts().testFlag(QCPLegend::spItems))
+    if (selectableAsItem())
     {
         bool selBefore = mSelected;
         const QPointer<QCPAbstractLegendItem> alive(this);
@@ -272,7 +270,7 @@ void QCPAbstractLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event, boo
 /* inherits documentation from base class */
 void QCPAbstractLegendItem::deselectEvent(bool* selectionStateChanged)
 {
-    if (mSelectable && mParentLegend->selectableParts().testFlag(QCPLegend::spItems))
+    if (selectableAsItem())
     {
         bool selBefore = mSelected;
         const QPointer<QCPAbstractLegendItem> alive(this);
@@ -327,13 +325,38 @@ QCPPlottableLegendItem::QCPPlottableLegendItem(QCPLegend* parent, QCPAbstractPlo
 
 QCPHandle<QCPLegend> QCPAbstractLegendItem::parentLegend() const
 {
-    return QCPHandle<QCPLegend>(mParentLegend);
+    return QCPHandle<QCPLegend>(legend());
 }
 
-void QCPAbstractLegendItem::layoutChanged()
+QCPLegend* QCPAbstractLegendItem::legend() const
 {
-    if (auto* legend = qobject_cast<QCPLegend*>(mParentLayout))
-        mParentLegend = legend;
+    return qobject_cast<QCPLegend*>(mParentLayout);
+}
+
+QSize QCPAbstractLegendItem::legendIconSize() const
+{
+    const QCPLegend* owner = legend();
+    return owner ? owner->iconSize() : QSize(0, 0);
+}
+
+int QCPAbstractLegendItem::legendIconTextPadding() const
+{
+    const QCPLegend* owner = legend();
+    return owner ? owner->iconTextPadding() : 0;
+}
+
+QPen QCPAbstractLegendItem::legendIconBorderPen() const
+{
+    const QCPLegend* owner = legend();
+    if (!owner)
+        return QPen(Qt::NoPen);
+    return mSelected ? owner->selectedIconBorderPen() : owner->iconBorderPen();
+}
+
+bool QCPAbstractLegendItem::selectableAsItem() const
+{
+    const QCPLegend* owner = legend();
+    return mSelectable && owner && owner->selectableParts().testFlag(QCPLegend::spItems);
 }
 
 void QCPAbstractLegendItem::leaveLegendWhenDestroyed(QObject* subject)
@@ -342,8 +365,8 @@ void QCPAbstractLegendItem::leaveLegendWhenDestroyed(QObject* subject)
         connect(subject, &QObject::destroyed, this,
                 [this]
                 {
-                    if (mParentLegend)
-                        mParentLegend->removeItem(this);
+                    if (QCPLegend* owner = legend())
+                        owner->removeItem(this);
                 });
 }
 
@@ -366,7 +389,7 @@ void QCPAbstractLegendItem::repaintWhenBusyChanges(QCPAbstractPlottable* plottab
 */
 QPen QCPPlottableLegendItem::getIconBorderPen() const
 {
-    return mSelected ? mParentLegend->selectedIconBorderPen() : mParentLegend->iconBorderPen();
+    return legendIconBorderPen();
 }
 
 /*! \internal
@@ -405,7 +428,7 @@ void QCPPlottableLegendItem::draw(QCPPainter* painter)
 
     painter->setFont(getFont());
     painter->setPen(QPen(getTextColor()));
-    QSize iconSize = mParentLegend->iconSize();
+    const QSize iconSize = legendIconSize();
 
     QString displayName = mPlottable->name();
     if (showBusy)
@@ -422,10 +445,12 @@ void QCPPlottableLegendItem::draw(QCPPainter* painter)
     int textHeight = qMax(textRect.height(), iconSize.height());
     QCPLabelRenderer::drawWith(
         renderer, painter,
-        QRect(mRect.x() + iconSize.width() + mParentLegend->iconTextPadding(), mRect.y(),
+        QRect(mRect.x() + iconSize.width() + legendIconTextPadding(), mRect.y(),
               textRect.width(), textHeight),
         painter->font(), painter->pen().color(), displayName,
         Qt::TextDontClip | Qt::AlignLeft | Qt::AlignVCenter);
+    if (iconSize.isEmpty())
+        return;
 
     painter->save();
     painter->setClipRect(iconRect, Qt::IntersectClip);
@@ -465,10 +490,10 @@ QSize QCPPlottableLegendItem::minimumOuterSizeHint() const
     }
 
     QSize result(0, 0);
-    QSize iconSize = mParentLegend->iconSize();
+    const QSize iconSize = legendIconSize();
     const QSize textSize = QCPLabelRenderer::measureWith(QCPLabelRenderer::defaultRenderer(),
                                                          getFont(), displayName);
-    result.setWidth(iconSize.width() + mParentLegend->iconTextPadding() + textSize.width());
+    result.setWidth(iconSize.width() + legendIconTextPadding() + textSize.width());
     result.setHeight(qMax(textSize.height(), iconSize.height()));
     result.rwidth() += mMargins.left() + mMargins.right();
     result.rheight() += mMargins.top() + mMargins.bottom();

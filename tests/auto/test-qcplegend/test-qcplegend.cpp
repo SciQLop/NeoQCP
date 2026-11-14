@@ -210,6 +210,32 @@ void TestQCPLegend::aRowAddedAsAnElementBelongsToItsNewLegend()
   QCOMPARE(row->parentLegend().get(), other);
 }
 
+// A row taken out of its legend and put into a layout that is not a legend has no legend: it draws
+// and lays out as text only, and the legend it left can go.
+void TestQCPLegend::aRowTakenOutOfItsLegendOutlivesIt()
+{
+  mPlot->setAutoAddPlottableToLegend(false);
+  auto *graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  graph->setName("orphan");
+  QPointer<QCPLegend> other = new QCPLegend;
+  mPlot->axisRect()->insetLayout()->addElement(other, Qt::AlignTop | Qt::AlignLeft);
+  auto *row = new QCPPlottableLegendItem(other, graph);
+  QVERIFY(other->addItem(row));
+  QVERIFY(other->take(row));
+  mPlot->axisRect()->insetLayout()->addElement(row, Qt::AlignBottom | Qt::AlignRight);
+
+  delete other.data();
+  mPlot->setInteractions(QCP::iSelectLegend);
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  QVERIFY(!row->parentLegend());
+  QVERIFY(static_cast<QCPLayoutElement*>(row)->minimumOuterSizeHint().width() > 0);
+  QCOMPARE(row->selectTest(row->rect().center(), true), -1.0);
+  row->setSelected(true); // no legend to tell: nothing to dereference either
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  delete graph;            // the row leaves no legend
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+}
+
 void TestQCPLegend::aSlotDeletingTheLegendARowJoinsIsSafe()
 {
   mPlot->setAutoAddPlottableToLegend(false);
