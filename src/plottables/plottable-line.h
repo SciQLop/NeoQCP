@@ -75,7 +75,8 @@ public:
     // The gradient, range and scale type are the colour mapping inherited from
     // QCPAbstractColorMapped: a coloured line follows its key axis rect's colour
     // scale, and setColorScale() on an uncoloured line makes it a user at once.
-    // A plain line never shows a colour bar; clearColorValues() drops the scale.
+    // A plain line never shows its rect's colour bar: clearColorValues() leaves the
+    // rect's scale. A scale picked with setColorScale(), or none, stays the line's.
     void setColorValues(std::shared_ptr<const std::vector<double>> values);
     void setColorValues(std::vector<double> values);
     void clearColorValues();

@@ -312,8 +312,7 @@ void QCPAbstractLine::clearColorValues()
     const bool hadValues = mColor.hasValues();
     if (hadValues)
         mColor.clearValues();
-    if (colorScale())
-        setColorScale(nullptr);
+    leaveRectScale();
     if (hadValues)
         lineChanged();
 }

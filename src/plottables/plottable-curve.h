@@ -140,8 +140,6 @@ protected:
     // reimplemented virtual methods:
     //! One value per data point, in container order: the curve has no key window to colour.
     [[nodiscard]] std::optional<int> colorValueCount() const override;
-    //! Read at every layout pass: data() edits the container behind every setter's back.
-    [[nodiscard]] bool showsColorScale() const override;
     //! A plain line or none: a step or an impulse needs vertices the curve does not have.
     [[nodiscard]] bool acceptsLineStyle(LineStyle style) const override;
     virtual void draw(QCPDrawContext& context) const override;
@@ -157,11 +155,15 @@ protected:
                        const QCPScatterStyle& style, bool coloured) const;
     double pointDistance(const QPointF& pixelPoint,
                          QCPCurveDataContainer::const_iterator& closestData) const;
-    //! The graph's rule: data of another size clears the colour values, and the bar with them.
+    //! The graph's rule: data of another size clears the colour values and leaves the rect's scale.
     void dropColoursOfAnotherSize();
 
     friend class QCustomPlot;
     friend class QCPLegend;
+
+private:
+    //! Read at every layout pass: data() edits the container behind every setter's back.
+    [[nodiscard]] bool showsColorScale() const override;
 };
 Q_DECLARE_METATYPE(QCPCurve::LineStyle)
 

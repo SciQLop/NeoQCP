@@ -40,8 +40,11 @@ public:
     Q_SLOT void setDataRange(const QCPRange& dataRange);
     Q_SLOT void setDataScaleType(QCPAxis::ScaleType scaleType);
     Q_SLOT void setGradient(const QCPColorGradient& gradient);
-    //! Joins \a colorScale, or detaches with null. Virtual: a subclass with its own rule (a frame
-    //! that has no rect scale to fall back to) refuses through a base pointer and the property.
+    //! Joins \a colorScale, or none with null. The choice sticks: a plottable given null never
+    //! joins its rect's scale on its own, and one given a scale keeps it through moves and new
+    //! data. Until called, the plottable follows its key axis rect's scale. Virtual: a subclass
+    //! with its own rule (a frame that has no rect scale to fall back to) refuses through a base
+    //! pointer and the property.
     virtual void setColorScale(QCPColorScale* colorScale);
     //! A move to another rect's axes takes that rect's scale when this one followed its old rect's;
     //! a scale the user picked, or none, stays.
@@ -59,10 +62,6 @@ public:
     //! A colour map always does; a line only once it has colour values.
     [[nodiscard]] virtual bool joinsOnArrival() const { return true; }
 
-    //! Whether this plottable maps anything through its scale now: a rect shows its own scale only
-    //! while one of its users does. A curve whose values no longer match its data does not.
-    [[nodiscard]] virtual bool showsColorScale() const { return true; }
-
 signals:
     void dataRangeChanged(const QCPRange& newRange);
     void dataScaleTypeChanged(QCPAxis::ScaleType scaleType);
@@ -74,14 +73,14 @@ protected:
     virtual void colorMappingChanged() { markDirty(); }
 
     //! Takes the key axis rect's scale, if it has one, and hands its values to the renderer.
-    //! Called at the end of a subclass constructor, where colorMappingChanged() is the subclass's.
+    //! Does nothing once setColorScale() was called. Called at the end of a subclass constructor,
+    //! where colorMappingChanged() is the subclass's.
     void followKeyAxisRectScale();
-
-    //! True while followKeyAxisRectScale() is handing its rect's scale to setColorScale(): a
-    //! subclass uses it to tell an automatic join from a user's explicit scale.
-    bool mJoiningKeyAxisRectScale = false;
-    //! The scale held is its rect's, joined automatically: a move to another rect follows it.
-    bool mFollowsRectScale = false;
+    //! Leaves the rect's scale when this plottable follows it; a scale the user picked stays.
+    //! For a plottable that stops colouring: a plain line shows no colour bar.
+    void leaveRectScale();
+    //! Whether the scale attached is one setColorScale() picked, not the rect's.
+    [[nodiscard]] bool hasUserColorScale() const;
 
     // property members:
     QCPRange mDataRange;
@@ -89,13 +88,30 @@ protected:
     QCPColorGradient mGradient;
 
 private:
+    //! Which scale this plottable uses: its rect's (the default), the one setColorScale() picked,
+    //! or none. Only setColorScale() changes it; dropping the scale on the way (no colour values
+    //! left, the scale deleted, a take) keeps it.
+    enum class ScaleChoice
+    {
+        Rect,
+        User,
+        None
+    };
+
     friend class QCPColorScale;
-    // adopt() joins the new rect's scale through followKeyAxisRectScale().
+    // adopt() joins the new rect's scale through followKeyAxisRectScale(); take() leaves the scale.
     friend class QCustomPlot;
+    // Its bar shows while one of its users shows the scale.
+    friend class QCPAxisRect;
+    //! Whether this plottable maps anything through its scale now: a rect shows its own scale only
+    //! while one of its users does. A curve whose values no longer match its data does not.
+    [[nodiscard]] virtual bool showsColorScale() const { return true; }
+    void attachColorScale(QCPColorScale* colorScale);
     void applyDataRange(const QCPRange& dataRange);
     void applyDataScaleType(QCPAxis::ScaleType scaleType);
     void applyGradient(const QCPColorGradient& gradient);
     void detachColorScale();
 
+    ScaleChoice mScaleChoice = ScaleChoice::Rect;
     QCPColorScale* mColorScale = nullptr;
 };

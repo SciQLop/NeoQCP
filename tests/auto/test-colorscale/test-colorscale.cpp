@@ -320,3 +320,16 @@ void TestColorScale::aScaleSlotDeletingTheMovedMapIsSafe()
     QVERIFY(!moved);
     mPlot->replot();
 }
+
+void TestColorScale::anOptOutSurvivesATakeAndAdd()
+{
+    auto* map = mapWithRange(mPlot->xAxis, mPlot->yAxis, 0, 1);
+    map->setColorScale(nullptr);
+
+    QCustomPlot other;
+    other.resize(400, 300);
+    auto added = other.add(mPlot->take(qcp::makeHandle<QCPHandle<QCPColorMap>>(map)));
+    QVERIFY(added);
+    QCOMPARE(added->colorScale(), nullptr);
+    QVERIFY2(other.findChildren<QCPColorScale*>().isEmpty(), "the opted-out map made the new rect's scale");
+}

@@ -83,14 +83,9 @@ bool QCPGraph::areaIsAxisRect() const
     return mSystem && qobject_cast<QCPAxisRect*>(mSystem->area());
 }
 
-bool QCPGraph::hasExplicitColorScale() const
-{
-    return mExplicitColorScale && colorScale().get() != nullptr;
-}
-
 bool QCPGraph::colourNeedsAScale() const
 {
-    return drawsInDataSpace() && !areaIsAxisRect() && !hasExplicitColorScale();
+    return drawsInDataSpace() && !areaIsAxisRect() && !hasUserColorScale();
 }
 
 double QCPGraph::dataSpaceBaseline() const
@@ -1138,7 +1133,7 @@ void QCPGraph::setSystem(QCPCoordinateSystem* system)
     // A9: an area that is not an axis rect hands out no colour scale to join, so colour values
     // need an explicit one before the frame is taken.
     if (system && system->kind() != QCPTransform::Kind::Cartesian && mColor.hasValues()
-        && !hasExplicitColorScale() && !qobject_cast<QCPAxisRect*>(system->area()))
+        && !hasUserColorScale() && !qobject_cast<QCPAxisRect*>(system->area()))
     {
         QCP_CHECK_OR_RETURN(false,
                             "colour values on a non-rect area need an explicit colour scale");
@@ -1148,7 +1143,7 @@ void QCPGraph::setSystem(QCPCoordinateSystem* system)
     QCPAbstractLine::setSystem(system);
     // I6: colour values join the colour scale of the area they are on. A move inside one plot is
     // not an adoption, so the join has to be redone here; an explicit scale is the user's and stays.
-    if (mColor.hasValues() && !hasExplicitColorScale() && areaIsAxisRect())
+    if (mColor.hasValues() && !hasUserColorScale() && areaIsAxisRect())
         followKeyAxisRectScale();
 }
 
@@ -1160,8 +1155,6 @@ void QCPGraph::setColorScale(QCPColorScale* colorScale)
         QCP_CHECK_OR_RETURN(false,
                             "colour values on a non-rect area need an explicit colour scale");
     }
-    if (!mJoiningKeyAxisRectScale)
-        mExplicitColorScale = colorScale != nullptr;
     QCPAbstractColorMapped::setColorScale(colorScale);
 }
 
@@ -1292,16 +1285,15 @@ void QCPGraph::requestOrigin()
 // when nothing was stashed for the committed source, and dataChanged on an in-place mutation).
 void QCPGraph::applyColorSizeRule(int newSize)
 {
-    // A scale the user picked on an uncoloured graph is not this rule's to drop: only a resize
-    // that clears the values this graph had leaves only an uncoloured graph behind.
+    // Only a resize that clears the values leaves the rect's scale; a scale the user picked stays.
     const bool clearedValues = mColor.hasValues() && mColor.size() != newSize;
     if (clearedValues)
         mColor.clearValues();
     if (mColor.hasValues())
         return;
     mWantOrigin->store(false);
-    if (clearedValues && colorScale())
-        setColorScale(nullptr);
+    if (clearedValues)
+        leaveRectScale();
 }
 
 double QCPGraph::componentValueAt(int column, int index) const

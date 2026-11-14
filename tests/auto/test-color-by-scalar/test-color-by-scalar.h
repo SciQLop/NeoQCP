@@ -77,6 +77,11 @@ private slots:
     void newDataAfterUncolouringStopsTheOriginRequest();
     void aCurveGivenDataOfAnotherSizeDropsItsColours();
     void aCurveEditedThroughItsContainerHidesTheBar();
+    // The scale choice (the rect's, the user's, none) survives every automatic path.
+    void anOptOutBeforeColourValuesSticks();
+    void anOptOutSurvivesUncolouring();
+    void aColouredGraphsOptOutSurvivesAMove();
+    void aCurvesUserScaleSurvivesAResize();
 
 private:
     QCustomPlot* mPlot = nullptr;

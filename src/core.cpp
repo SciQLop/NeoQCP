@@ -1705,13 +1705,11 @@ bool QCustomPlot::removePlottable(QCPAbstractPlottable* plottable)
 
 namespace
 {
-// What still points at a plottable that leaves without being destroyed: the colour scale it follows,
-// its bars group and its stack. Destruction undoes these by itself.
+// What still points at a bars plottable that leaves without being destroyed: its bars group and its
+// stack. Destruction undoes these by itself.
 void leaveSiblings(QCPAbstractPlottable* plottable)
 {
-    if (auto* mapped = qobject_cast<QCPAbstractColorMapped*>(plottable))
-        mapped->setColorScale(nullptr);
-    else if (auto* bars = qobject_cast<QCPBars*>(plottable))
+    if (auto* bars = qobject_cast<QCPBars*>(plottable))
     {
         bars->setBarsGroup(nullptr);
         bars->moveBelow(nullptr);
@@ -1731,6 +1729,9 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     // Its setters emit: every signal waits for the scope, so a slot that deletes the plottable or
     // the plot runs once this call is done with it.
     const QCPEmissionScope scope(this);
+    // The scale stays the old plot's; the choice of one stays the plottable's (see adopt).
+    if (auto* mapped = qobject_cast<QCPAbstractColorMapped*>(plottable))
+        mapped->attachColorScale(nullptr);
     leaveSiblings(plottable);
     plottable->setPipelineScheduler(nullptr);
     for (QCPLegend* legend : findChildren<QCPLegend*>())
@@ -5338,7 +5339,8 @@ bool QCustomPlot::registerJoinedPlottable(QCPAbstractPlottable* plottable)
     plottable->mRegisteredPlot = this;
     if (auto* graph = qobject_cast<QCPGraph*>(plottable))
         registerGraph(graph);
-    // The scale it followed belonged to the plot it left: join the new rect's, as a fresh one does.
+    // The scale it followed belonged to the plot it left: join the new rect's, as a fresh one does,
+    // unless it chose a scale or none (followKeyAxisRectScale() then does nothing).
     if (auto* mapped = qobject_cast<QCPAbstractColorMapped*>(plottable);
         mapped && mapped->joinsOnArrival())
         mapped->followKeyAxisRectScale();

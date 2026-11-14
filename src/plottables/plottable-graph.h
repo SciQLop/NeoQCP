@@ -298,8 +298,6 @@ protected:
     [[nodiscard]] double dataSpaceFillValue(double value) const;
     //! Whether the system's area is an axis rect, whose colour scale colour values can join.
     [[nodiscard]] bool areaIsAxisRect() const;
-    //! Whether the scale attached came from setColorScale(), not from an earlier rect.
-    [[nodiscard]] bool hasExplicitColorScale() const;
     //! Whether colour values are set on a frame that has no explicit colour scale to map them.
     [[nodiscard]] bool colourNeedsAScale() const;
 
@@ -335,9 +333,6 @@ protected:
     //! Whether the cartesian pipeline is bypassed (the data-space branch): a system change clears
     //! the bins only when the branch itself changes, not on an axis change within cartesian.
     bool mPipelineBypassed = false;
-    //! Whether the current colour scale came from setColorScale(): a scale a rect handed the graph
-    //! is not the explicit one a non-rect area needs.
-    bool mExplicitColorScale = false;
     //! The data the recording was made from changed: the adapter records it again.
     mutable quint64 mRevision = 0;
     // Debounce timer: defers expensive L2 rebuild until panning stops

@@ -22,6 +22,8 @@ private slots:
     // A map moved to another rect's axes follows that rect's scale, unless the user chose one.
     void aMovedMapFollowsItsNewRectsScale();
     void aScaleSlotDeletingTheMovedMapIsSafe();
+    // A map moved to another plot keeps its opt-out.
+    void anOptOutSurvivesATakeAndAdd();
 
     // The 2.x path keeps its scale in the layout and the rect's stays hidden.
     void aUserMadeScaleStillWorks();

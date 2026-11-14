@@ -67,7 +67,23 @@ void QCPAbstractColorMapped::setGradient(const QCPColorGradient& gradient)
 
 void QCPAbstractColorMapped::setColorScale(QCPColorScale* colorScale)
 {
-    mFollowsRectScale = mJoiningKeyAxisRectScale && colorScale;
+    mScaleChoice = colorScale ? ScaleChoice::User : ScaleChoice::None;
+    attachColorScale(colorScale);
+}
+
+void QCPAbstractColorMapped::leaveRectScale()
+{
+    if (mScaleChoice == ScaleChoice::Rect)
+        attachColorScale(nullptr);
+}
+
+bool QCPAbstractColorMapped::hasUserColorScale() const
+{
+    return mScaleChoice == ScaleChoice::User && mColorScale;
+}
+
+void QCPAbstractColorMapped::attachColorScale(QCPColorScale* colorScale)
+{
     if (mColorScale == colorScale)
         return;
     markDirty();
@@ -147,7 +163,7 @@ void QCPAbstractColorMapped::setSystem(QCPCoordinateSystem* system)
 {
     // The system's signals wait for the join below: a slot may delete this plottable.
     const QCPEmissionScope scope(mParentPlot);
-    const bool follows = mFollowsRectScale;
+    const bool follows = mScaleChoice == ScaleChoice::Rect && mColorScale;
     QCPAbstractPlottable::setSystem(system);
     if (!follows || !system || mSystem != system)
         return;
@@ -155,20 +171,21 @@ void QCPAbstractColorMapped::setSystem(QCPCoordinateSystem* system)
     if (qobject_cast<QCPAxisRect*>(system->area()))
         followKeyAxisRectScale();
     else
-        setColorScale(nullptr);
+        attachColorScale(nullptr);
 }
 
 void QCPAbstractColorMapped::detachColorScale()
 {
     if (!mColorScale)
         return;
-    mFollowsRectScale = false;
     mColorScale = nullptr;
     qcpEmit(this, mParentPlot, &QCPAbstractColorMapped::colorScaleChanged);
 }
 
 void QCPAbstractColorMapped::followKeyAxisRectScale()
 {
+    if (mScaleChoice != ScaleChoice::Rect)
+        return;
     // A cartesian frame hands out the key axis; a user system on an axis rect has no projection but
     // still has that rect's colour scale to join. An area that is not an axis rect has none, and
     // the caller's values then need an explicit scale.
@@ -186,22 +203,6 @@ void QCPAbstractColorMapped::followKeyAxisRectScale()
     // with no range of its own yet leaves the scale's own default range alone.
     // The scale setters and setColorScale() signal, and a slot may delete this plottable.
     const QPointer<QCPAbstractColorMapped> alive(this);
-    struct Joining
-    {
-        // Guarded: the early returns below exist because a slot may have deleted the plottable.
-        QPointer<QCPAbstractColorMapped> owner;
-
-        explicit Joining(QCPAbstractColorMapped* o) : owner(o)
-        {
-            o->mJoiningKeyAxisRectScale = true;
-        }
-
-        ~Joining()
-        {
-            if (owner)
-                owner->mJoiningKeyAxisRectScale = false;
-        }
-    } joining(this);
     if (madeHere)
     {
         scale->setGradient(mGradient);
@@ -212,7 +213,7 @@ void QCPAbstractColorMapped::followKeyAxisRectScale()
         if (!alive)
             return;
     }
-    setColorScale(scale.get());
+    attachColorScale(scale.get());
     if (!alive)
         return;
     colorMappingChanged();

@@ -1201,10 +1201,11 @@ void TestColorByScalar::newDataKeepsAnUncolouredLinesChosenScale()
     mg->setDataSource(makeSource({ 0, 1, 2, 3, 4 }, { { 0, 1, 0, 1, 0 } }));
     QCOMPARE(mg->colorScale(), scale);
 
-    // Coloured, then resized: the values are gone, so the scale goes with them.
+    // Coloured, then resized: the values are gone, the scale the user picked stays.
     mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0, 0.0 });
     mg->setDataSource(makeSource({ 0, 1, 2 }, { { 0, 1, 0 } }));
-    QCOMPARE(mg->colorScale(), nullptr);
+    QVERIFY(!mg->hasColorValues());
+    QCOMPARE(mg->colorScale(), scale);
 }
 
 // An uncoloured line stops asking the pipeline for the colour origin at its next data.
@@ -1371,4 +1372,80 @@ void TestColorByScalar::aCurveEditedThroughItsContainerHidesTheBar()
     curve->data()->removeAfter(2.5);
     mPlot->replot();
     QVERIFY2(scale->visible(), "the bar did not come back with a matching size");
+}
+
+// setColorScale(nullptr) on a line with no scale yet is a choice: its first colour values must not
+// join the rect's scale.
+void TestColorByScalar::anOptOutBeforeColourValuesSticks()
+{
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
+    mg->setColorScale(nullptr);
+    mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
+    QVERIFY(mg->hasColorValues());
+    QCOMPARE(mg->colorScale(), nullptr);
+
+    auto* curve = new QCPCurve(mPlot->xAxis, mPlot->yAxis);
+    curve->setData(QVector<double> { 0, 1, 2 }, QVector<double> { 0, 1, 0 });
+    curve->setColorScale(nullptr);
+    curve->setColorValues(std::vector<double> { 0, 1, 2 });
+    QVERIFY(curve->hasColorValues());
+    QCOMPARE(curve->colorScale(), nullptr);
+
+    mPlot->replot();
+    QVERIFY2(mPlot->findChildren<QCPColorScale*>().isEmpty()
+                 || !mPlot->axisRect()->colorScale()->visible(),
+             "an opted-out line showed the rect's colour bar");
+}
+
+// Uncoloured, then coloured again: the opt-out is still the line's choice.
+void TestColorByScalar::anOptOutSurvivesUncolouring()
+{
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
+    mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
+    QVERIFY(mg->colorScale());
+    mg->setColorScale(nullptr);
+
+    mg->clearColorValues();
+    mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
+    QCOMPARE(mg->colorScale(), nullptr);
+
+    mg->setDataSource(makeSource({ 0, 1, 2 }, { { 0, 1, 0 } }));
+    mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0 });
+    QCOMPARE(mg->colorScale(), nullptr);
+}
+
+// A move to another rect re-joins the scale of a graph that followed its rect, never one that opted out.
+void TestColorByScalar::aColouredGraphsOptOutSurvivesAMove()
+{
+    auto* bottom = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(1, 0, bottom);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
+    mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
+    mg->setColorScale(nullptr);
+
+    mg->setKeyAxis(bottom->axis(QCPAxis::atBottom));
+    mg->setValueAxis(bottom->axis(QCPAxis::atLeft));
+    QCOMPARE(mg->colorScale(), nullptr);
+}
+
+// A scale the user picked is kept while a resize drops the values, and maps the next ones.
+void TestColorByScalar::aCurvesUserScaleSurvivesAResize()
+{
+    auto* own = new QCPColorScale(mPlot);
+    mPlot->plotLayout()->addElement(0, 1, own);
+    auto* curve = new QCPCurve(mPlot->xAxis, mPlot->yAxis);
+    curve->setData(QVector<double> { 0, 1, 2 }, QVector<double> { 0, 1, 0 });
+    curve->setColorScale(own);
+    curve->setColorValues(std::vector<double> { 0, 1, 2 });
+
+    curve->setData(QVector<double> { 0, 1, 2, 3 }, QVector<double> { 0, 1, 0, 1 });
+    QVERIFY(!curve->hasColorValues());
+    QCOMPARE(curve->colorScale(), own);
+
+    curve->setColorValues(std::vector<double> { 0, 1, 2, 3 });
+    QCOMPARE(curve->colorScale(), own);
+    QVERIFY2(mPlot->findChildren<QCPColorScale*>().size() == 1, "the curve made the rect's scale");
 }
