@@ -595,6 +595,13 @@ private:
     void cutAnchorLinks(QCPAbstractItem* item);
     // Also themes a rect's own colour scale, which QCPAxisRect makes after the theme was set.
     void applyThemeToAxis(QCPAxis* axis);
+    // The ancestor watch of an aligned plot; QCPAlignmentGroup and QCPLayout call in as friends.
+    static bool isAligned(const QCPLayoutElement* element);
+    bool hasAlignedElements() const;
+    void watchAncestors();
+    void layoutAdopted(QCPLayoutElement* element);
+    // The widgets between this plot and its window, filtered while an element is aligned.
+    QList<QPointer<QWidget>> mWatchedAncestors;
 
 protected:
     // property members:
@@ -659,8 +666,6 @@ protected:
     bool mRepaintAskedDuringReplot = false;
     // An aligned element's layout moved an edge its margin was computed from (settleAlignment).
     bool mAlignmentUnsettled = false;
-    // The widgets between this plot and its window, filtered while an element is aligned.
-    QList<QPointer<QWidget>> mWatchedAncestors;
     // Layout updates in a row that ended unsettled: the second one stops asking for more.
     int mUnsettledLayouts = 0;
     quint64 mRepaintTicket = 0;
@@ -756,10 +761,6 @@ protected:
     virtual void updateLayout();
     void settleAlignment(QCPLayoutGrid* layout);
     void notifyAlignmentGroups();
-    static bool isAligned(const QCPLayoutElement* element);
-    bool hasAlignedElements() const;
-    void watchAncestors();
-    void layoutAdopted(QCPLayoutElement* element);
     void relayoutAlignmentGroups();
     void restoreViewportAfterExport(const QRect& screenViewport);
     void adoptWidgetViewport();
