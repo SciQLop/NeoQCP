@@ -576,6 +576,21 @@ Behaviour changes for 2.1 polar users:
   - Clicking inside a polar graph's fill selects it, as for cartesian graphs.
   - setSystem() with a non-polar system is refused as misuse.
 
+Milestone 5f (the triage). Every backlog item is fixed, scheduled, or written down in docs/limits.md
+("Known limits of 3.0"). No release.
+  - A rect's colour maps and coloured lines share its colour scale; setColorScale(nullptr) opts one out, and
+        that choice sticks through new data, resizes, moves and take/add. A rect hides its bar for a curve it
+        cannot colour.
+  - draw(QCPDrawContext&) is pure on QCPAbstractPlottable and QCPAbstractItem: a subclass must record its
+        drawing.
+  - setBrush on a graph keeps each fill's target (constant or column) and changes only the brush.
+  - Removing graph data at a NaN key reports a misuse and changes nothing.
+  - Alignment groups follow a move of a plot's container widget.
+  - Fix: the step histogram drew boxes instead of an outline; the bracket decorator on a user system; error-bar
+        whisker clicks; polar tick-label click boxes; a NaN row in a filled curve; a linked axis switched to
+        log; a curve given data of another size kept its colour values; a colour map moved to another rect
+        kept the old scale; a legend re-wrap sent a burst of stretch signals; a legend row's legend pointer.
+
 Milestone 5e (the meta-object surface). Every user-facing property is a Q_PROPERTY, and every writable
 one has a change signal, so it can be bound from C++. Additive, except for the few breaks below.
   - Every writable property has a NOTIFY: xChanged(T) with the new value, deferred like every NeoQCP
