@@ -312,6 +312,8 @@ it instead of `property("name")`.
 |---|---|---|
 | `QCPAxisBase` | `tickVector`, `tickVectorLabels` | `tickVector()`, `tickVectorLabels()` |
 | `QCPAxis` | `grid` | `grid()` |
+| `QCustomPlot` | `plotLayout` | `plotLayout()` |
+| `QCPLayer` | `index`, `children` | `index()`, `children()` |
 | `QCPLayerable` | `parentPlot`, `parentLayerable` | `parentPlot()`, `parentLayerable()` |
 | `QCPLayoutElement` | `layout`, `rect` | `layout()`, `rect()` |
 | `QCPLayoutGrid` | `rowCount`, `columnCount` | `rowCount()`, `columnCount()` |
@@ -342,3 +344,10 @@ it instead of `property("name")`.
 - `QCPAbstractItem::clipAxisRectChanged` also fires on `setClipArea` when the clip axis rect moves.
 - Writing `QCPItemPixmap::scaled` through the property (a binding, `setProperty`) resets the two modes to their
   defaults, as it did before; `scaledChanged` fires only when `scaled` moves.
+- `QCPLayer::parentPlot` and `name` are `CONSTANT`.
+- `QCustomPlot::themeChanged()` (new, no value) fires when `setTheme` installs another theme and whenever the theme
+  emits `changed()`: the seven `theme*` properties notify through it. The theme keeps its direct `changed()`.
+- `viewportChanged` also fires during an export, which sets the export size and restores the screen viewport.
+- The plot setters `setBackgroundScaled`, `setBackgroundScaledMode`, `setAutoAddPlottableToLegend`,
+  `setSelectionTolerance`, `setNoAntialiasingOnDrag`, `setMultiSelectModifier` and `setBackground(QPixmap)` return
+  on an equal value.

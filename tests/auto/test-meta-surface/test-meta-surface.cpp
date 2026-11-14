@@ -476,12 +476,16 @@ struct Fixture
 {
     const char* name;
     std::function<QObject*(QCustomPlot&)> make;
+    bool deferred = true; // the theme emits at once (E-5): it has no plot to defer through
 };
 
 const QVector<Fixture>& fixtures()
 {
     static const QVector<Fixture> list {
         { "QCPAxis", [](QCustomPlot& plot) -> QObject* { return plot.xAxis; } },
+        { "QCustomPlot", [](QCustomPlot& plot) -> QObject* { return &plot; } },
+        { "QCPLayer", [](QCustomPlot& plot) -> QObject* { return plot.layer("main").get(); } },
+        { "QCPTheme", [](QCustomPlot& plot) -> QObject* { return plot.theme().get(); }, false },
         { "QCPGrid", [](QCustomPlot& plot) -> QObject* { return plot.xAxis->grid().get(); } },
         { "QCPLayoutGrid", [](QCustomPlot& plot) -> QObject* { return plot.plotLayout().get(); } },
         { "QCPAxisRect", [](QCustomPlot& plot) -> QObject* { return plot.axisRect().get(); } },
@@ -551,7 +555,9 @@ QCustomPlot* plotOf(QObject* object)
 {
     if (auto* layerable = qobject_cast<QCPLayerable*>(object))
         return layerable->parentPlot();
-    return nullptr;
+    if (auto* layer = qobject_cast<QCPLayer*>(object))
+        return layer->parentPlot();
+    return qobject_cast<QCustomPlot*>(object);
 }
 
 QColor otherColor(const QColor& color)
@@ -789,6 +795,13 @@ const QSet<QByteArray>& pendingClasses()
     return list;
 }
 
+// The library's classes, not Qt's (QWidget, QRhiWidget): the surface under test is ours.
+bool isOurs(const QMetaObject* meta)
+{
+    const QByteArray name = meta->className();
+    return name.startsWith("QCP") || name == "QCustomPlot";
+}
+
 // The class whose Q_PROPERTY declares property \a index of \a meta.
 const QMetaObject* declaringClass(const QMetaObject* meta, int index)
 {
@@ -812,8 +825,8 @@ QVector<Declared> declaredClasses()
     for (int f = 0; f < fixtures().size(); ++f)
     {
         auto plot = newPlot();
-        for (const QMetaObject* meta = fixtures()[f].make(*plot)->metaObject();
-             meta != &QObject::staticMetaObject; meta = meta->superClass())
+        for (const QMetaObject* meta = fixtures()[f].make(*plot)->metaObject(); isOurs(meta);
+             meta = meta->superClass())
             if (!seen.contains(meta))
             {
                 seen.insert(meta);
@@ -989,6 +1002,35 @@ const QVector<Writer>& writers()
           },
           { "barsGroup" },
           { } },
+        { "QCustomPlot::setBackground(pixmap, scaled, mode)",
+          [](QCustomPlot& plot) -> QObject* { return &plot; },
+          [](QObject* o)
+          {
+              static const QPixmap shared = []
+              {
+                  QPixmap pixmap(2, 2);
+                  pixmap.fill(Qt::red);
+                  return pixmap;
+              }(); // one image: the second call moves nothing
+              qobject_cast<QCustomPlot*>(o)->setBackground(shared, false, Qt::IgnoreAspectRatio);
+          },
+          { "background", "backgroundScaled", "backgroundScaledMode" },
+          { } },
+        { "a theme setter",
+          [](QCustomPlot& plot) -> QObject* { return &plot; },
+          [](QObject* o) { qobject_cast<QCustomPlot*>(o)->theme()->setGrid(Qt::red); },
+          { "themeGrid" },
+          { "viewport" } },
+        { "QCustomPlot::setTheme",
+          [](QCustomPlot& plot) -> QObject* { return &plot; },
+          [](QObject* o)
+          {
+              static QCPTheme dark; // outlives every plot of the test run
+              dark.setBackground(Qt::black);
+              qobject_cast<QCustomPlot*>(o)->setTheme(&dark);
+          },
+          { "themeBackground" },
+          { } },
         { "QCPAbstractItem::setClipArea",
           [](QCustomPlot& plot) -> QObject* { return plot.add<QCPItemLine>().get(); },
           [](QObject* o)
@@ -1089,6 +1131,16 @@ bool probeOnce(Sender* sender, Signal signal, std::function<void()> write,
 const QVector<Nested>& nestedWriters()
 {
     static const QVector<Nested> list {
+        { "QCustomPlot::setBackground(pixmap, scaled, mode)",
+          [](QCustomPlot& plot)
+          {
+              QPixmap pixmap(2, 2);
+              pixmap.fill(Qt::red);
+              return probeOnce(
+                  &plot, &QCustomPlot::backgroundChanged,
+                  [&] { plot.setBackground(pixmap, true, Qt::IgnoreAspectRatio); },
+                  [&] { return plot.backgroundScaledMode() == Qt::IgnoreAspectRatio; });
+          } },
         { "QCPBarsGroup::clear",
           [](QCustomPlot& plot)
           {
@@ -1162,6 +1214,37 @@ void TestMetaSurface::nestedWriterSignalsWaitForTheWriter()
     QVERIFY(nestedWriters()[writer].run(*plot));
 }
 
+void TestMetaSurface::themeSlotDeletingThePlot_data()
+{
+    QTest::addColumn<bool>("shared");
+    QTest::newRow("the plot's own theme") << false;
+    QTest::newRow("a theme two plots share") << true;
+}
+
+// E-5: the theme emits changed() at once, from a setter whose last action it is. A slot that
+// deletes a plot reading the theme (its owner, when it is the plot's own) leaves nothing to run.
+void TestMetaSurface::themeSlotDeletingThePlot()
+{
+    QFETCH(bool, shared);
+    QCPTheme external;
+    QPointer<QCustomPlot> doomed(newPlot().release());
+    auto survivor = newPlot();
+    if (shared)
+    {
+        doomed->setTheme(&external);
+        survivor->setTheme(&external);
+    }
+    QCPTheme* theme = doomed->theme().get();
+    QSignalSpy survivorTheme(survivor.get(), &QCustomPlot::themeChanged);
+    int later = 0;
+    QObject::connect(theme, &QCPTheme::changed, survivor.get(), [&] { delete doomed.data(); });
+    QObject::connect(theme, &QCPTheme::changed, survivor.get(), [&] { ++later; });
+    theme->setGrid(Qt::red);
+    QVERIFY(doomed.isNull());
+    QCOMPARE(later, shared ? 1 : 0); // the plot's own theme died with it, mid-emission
+    QCOMPARE(survivorTheme.count(), shared ? 1 : 0);
+}
+
 void TestMetaSurface::exceptionsNameRealProperties()
 {
     for (const Exception& e : exceptions())
@@ -1181,7 +1264,8 @@ void TestMetaSurface::everyNotifyPropertyNotifiesOncePerChange_data()
         const QMetaObject* meta = fixtures()[f].make(*plot)->metaObject();
         // QObject's own objectName is Qt's, with its own BINDABLE storage: not ours to check.
         for (int i = QObject::staticMetaObject.propertyCount(); i < meta->propertyCount(); ++i)
-            if (isNotifyProperty(meta->property(i)) && hasGenericRow(meta, meta->property(i)))
+            if (isNotifyProperty(meta->property(i)) && hasGenericRow(meta, meta->property(i))
+                && isOurs(declaringClass(meta, i)))
                 QTest::addRow("%s::%s", fixtures()[f].name, meta->property(i).name())
                     << f << QByteArray(meta->property(i).name());
     }
@@ -1214,7 +1298,7 @@ void TestMetaSurface::everyNotifyPropertyNotifiesOncePerChange()
     {
         QCPEmissionScope scope(plot.get());
         QVERIFY(meta.write(object, other));
-        QCOMPARE(spy.count(), 0);
+        QCOMPARE(spy.count(), fixtures()[fixture].deferred ? 0 : 1);
     }
     QCOMPARE(spy.count(), 1);
     QVERIFY(same(meta.read(object), other));

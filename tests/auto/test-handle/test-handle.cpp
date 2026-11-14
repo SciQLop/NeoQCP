@@ -441,8 +441,10 @@ void TestHandle::thePlotHandsOutHandles()
     QVERIFY(plot.itemAt(QPointF()) == nullptr);
     QVERIFY(plot.layoutElementAt(QPointF()) != nullptr);
     QCOMPARE(plot.axisRects().first().get(), plot.axisRect(0).get());
-    // The object-typed property keeps its pointer type: moc assigns the getter's handle to it (H-7).
-    QCOMPARE(plot.property("plotLayout").value<QCPLayoutGrid*>(), plot.plotLayout().get());
+    // The object-typed property keeps its pointer type: moc assigns the getter's handle to it
+    // (H-7). plotLayout left the surface in 5e (E-11); the axis's constant axisRect is one such
+    // property.
+    QCOMPARE(plot.xAxis->property("axisRect").value<QCPAxisRect*>(), plot.axisRect().get());
 }
 
 void TestHandle::aDeletedDefaultAxisTestsFalse()
@@ -954,11 +956,8 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
     QCPAbstractLegendItem* row = legend->item(0).get();
     QVERIFY(row);
 
-    QCOMPARE(plot.property("plotLayout").value<QCPLayoutGrid*>(), plot.plotLayout().get());
     QCOMPARE(axis->property("axisRect").value<QCPAxisRect*>(), axis->axisRect().get());
     QCOMPARE(layer->property("parentPlot").value<QCustomPlot*>(), layer->parentPlot().get());
-    QCOMPARE(layer->property("children").value<QList<QCPLayerable*>>(),
-             qcp::pointers(layer->children()));
     QCOMPARE(graph->property("layer").value<QCPLayer*>(), graph->layer().get());
     QCOMPARE(tracer->property("graph").value<QCPGraph*>(), tracer->graph().get());
     QCOMPARE(item->property("clipAxisRect").value<QCPAxisRect*>(), item->clipAxisRect().get());
@@ -1017,7 +1016,8 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
     const std::pair<QObject*, const char*> dropped[] = {
         { axis, "grid" },      { graph, "parentPlot" }, { graph, "parentLayerable" },
         { rect, "layout" },    { row, "parentLegend" }, { below, "barAbove" },
-        { above, "barBelow" }, { errors, "data" },
+        { above, "barBelow" }, { errors, "data" },      { &plot, "plotLayout" },
+        { layer, "children" }, { layer, "index" },
     };
     for (const auto& [object, name] : dropped)
         QVERIFY2(object->metaObject()->indexOfProperty(name) < 0, name);
@@ -1029,9 +1029,7 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
 
     // What has no setter stays read-only, so no write path can reach it.
     const QMetaObject* layerMeta = layer->metaObject();
-    QVERIFY(!layerMeta->property(layerMeta->indexOfProperty("children")).isWritable());
-    const QMetaObject* plotMeta = plot.metaObject();
-    QVERIFY(!plotMeta->property(plotMeta->indexOfProperty("plotLayout")).isWritable());
+    QVERIFY(!layerMeta->property(layerMeta->indexOfProperty("parentPlot")).isWritable());
     QCOMPARE(gMisuses, 0);
 }
 

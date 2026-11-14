@@ -59,12 +59,10 @@ class QCP_LIB_DECL QCPLayer : public QObject
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QCustomPlot* parentPlot READ parentPlot)
-    Q_PROPERTY(QString name READ name)
-    Q_PROPERTY(int index READ index)
-    Q_PROPERTY(QList<QCPLayerable*> children READ childrenRaw)
-    Q_PROPERTY(bool visible READ visible WRITE setVisible)
-    Q_PROPERTY(LayerMode mode READ mode WRITE setMode)
+    Q_PROPERTY(QCustomPlot* parentPlot READ parentPlot CONSTANT)
+    Q_PROPERTY(QString name READ name CONSTANT)
+    Q_PROPERTY(bool visible READ visible WRITE setVisible NOTIFY visibleChanged)
+    Q_PROPERTY(LayerMode mode READ mode WRITE setMode NOTIFY modeChanged)
     /// \endcond
 
 public:
@@ -125,6 +123,10 @@ public:
     // only.
     void markDirty();
 
+signals:
+    void visibleChanged(bool visible);
+    void modeChanged(QCPLayer::LayerMode mode);
+
 protected:
     // property members:
     QCustomPlot* mParentPlot;
@@ -184,8 +186,7 @@ private:
     mutable int mItemIndexBuilds = 0;
 
     // Every cache derived from the child list (index, axes, plottables) is stale after it changes.
-    // The Q_PROPERTY's raw READ (K6): a QList of handles is not a property type. The library's hot
-    // paths read this one too (K8).
+    // The raw list the library's hot paths read (K8).
     [[nodiscard]] QList<QCPLayerable*> childrenRaw() const { return mChildren; }
     void childrenChanged();
     void invalidateItemIndex();

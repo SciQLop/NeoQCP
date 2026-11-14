@@ -320,6 +320,62 @@ using qcp::guarded;
   \see replot, beforeReplot, afterLayout
 */
 
+/*! \fn void QCustomPlot::viewportChanged(const QRect& viewport)
+
+  This signal is emitted when \ref viewport changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::backgroundChanged(const QPixmap& background)
+
+  This signal is emitted when \ref background changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::backgroundScaledChanged(bool backgroundScaled)
+
+  This signal is emitted when \ref backgroundScaled changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::backgroundScaledModeChanged(Qt::AspectRatioMode backgroundScaledMode)
+
+  This signal is emitted when \ref backgroundScaledMode changes, after the plot delivers its
+  deferred signals.
+*/
+
+/*! \fn void QCustomPlot::autoAddPlottableToLegendChanged(bool autoAddPlottableToLegend)
+
+  This signal is emitted when \ref autoAddPlottableToLegend changes, after the plot delivers its
+  deferred signals.
+*/
+
+/*! \fn void QCustomPlot::selectionToleranceChanged(int selectionTolerance)
+
+  This signal is emitted when \ref selectionTolerance changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::noAntialiasingOnDragChanged(bool noAntialiasingOnDrag)
+
+  This signal is emitted when \ref noAntialiasingOnDrag changes, after the plot delivers its
+  deferred signals.
+*/
+
+/*! \fn void QCustomPlot::multiSelectModifierChanged(Qt::KeyboardModifier multiSelectModifier)
+
+  This signal is emitted when \ref multiSelectModifier changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::themeChanged()
+
+  This signal is emitted when the theme the \c theme* properties read changes: \ref setTheme
+  installs another one, or the theme changes a value (QCPTheme::changed, also through the
+  forwarders such as \ref setThemeBackground). It carries no value: a slot reads the property it
+  cares about. Delivered after the plot's deferred signals.
+*/
+
 /* end of documentation of signals */
 /* start of documentation of public members */
 
@@ -649,6 +705,7 @@ void QCustomPlot::setTheme(QCPTheme* theme)
     mTheme = resolved;
     connectThemeSignal();
     applyTheme();
+    qcpEmit(this, this, &QCustomPlot::themeChanged);
 }
 
 void QCustomPlot::connectThemeSignal()
@@ -663,6 +720,8 @@ void QCustomPlot::connectThemeSignal()
                 applyTheme();
             });
         }
+        // The theme* properties read the theme: they moved now (E-5b).
+        qcpEmit(this, this, &QCustomPlot::themeChanged);
     });
 }
 
@@ -950,7 +1009,10 @@ void QCustomPlot::setNotAntialiasedElement(QCP::AntialiasedElement notAntialiase
 */
 void QCustomPlot::setAutoAddPlottableToLegend(bool on)
 {
+    if (mAutoAddPlottableToLegend == on)
+        return;
     mAutoAddPlottableToLegend = on;
+    qcpEmit(this, this, &QCustomPlot::autoAddPlottableToLegendChanged, autoAddPlottableToLegend());
 }
 
 /*!
@@ -1055,7 +1117,10 @@ void QCustomPlot::updateGestureInput()
 */
 void QCustomPlot::setSelectionTolerance(int pixels)
 {
+    if (mSelectionTolerance == pixels)
+        return;
     mSelectionTolerance = pixels;
+    qcpEmit(this, this, &QCustomPlot::selectionToleranceChanged, selectionTolerance());
 }
 
 /*!
@@ -1069,7 +1134,10 @@ void QCustomPlot::setSelectionTolerance(int pixels)
 */
 void QCustomPlot::setNoAntialiasingOnDrag(bool enabled)
 {
+    if (mNoAntialiasingOnDrag == enabled)
+        return;
     mNoAntialiasingOnDrag = enabled;
+    qcpEmit(this, this, &QCustomPlot::noAntialiasingOnDragChanged, noAntialiasingOnDrag());
 }
 
 /*!
@@ -1112,7 +1180,10 @@ void QCustomPlot::setPlottingHint(QCP::PlottingHint hint, bool enabled)
 */
 void QCustomPlot::setMultiSelectModifier(Qt::KeyboardModifier modifier)
 {
+    if (mMultiSelectModifier == modifier)
+        return;
     mMultiSelectModifier = modifier;
+    qcpEmit(this, this, &QCustomPlot::multiSelectModifierChanged, multiSelectModifier());
 }
 
 /*!
@@ -1274,9 +1345,12 @@ void QCustomPlot::syncViewportToWidgetSize()
 void QCustomPlot::setViewport(const QRect& rect)
 {
     ++mViewEpoch;
+    const bool moved = rect != mViewport;
     mViewport = rect;
     if (mPlotLayout)
         mPlotLayout->setOuterRect(mViewport);
+    if (moved)
+        qcpEmit(this, this, &QCustomPlot::viewportChanged, mViewport);
 }
 
 /*!
@@ -1349,8 +1423,11 @@ QSize QCustomPlot::rhiOutputSize() const
 */
 void QCustomPlot::setBackground(const QPixmap& pm)
 {
+    if (pm.cacheKey() == mBackgroundPixmap.cacheKey())
+        return;
     mBackgroundPixmap = pm;
     mScaledBackgroundPixmap = QPixmap();
+    qcpEmit(this, this, &QCustomPlot::backgroundChanged, mBackgroundPixmap);
 }
 
 /*!
@@ -1380,10 +1457,12 @@ void QCustomPlot::setBackground(const QBrush& brush)
 */
 void QCustomPlot::setBackground(const QPixmap& pm, bool scaled, Qt::AspectRatioMode mode)
 {
-    mBackgroundPixmap = pm;
-    mScaledBackgroundPixmap = QPixmap();
-    mBackgroundScaled = scaled;
-    mBackgroundScaledMode = mode;
+    // Three properties at once: their signals wait for the scope, a slot may delete the plot.
+    const QCPEmissionScope scope(this);
+    mScaledBackgroundPixmap = QPixmap(); // a new mode alone must rescale too
+    setBackground(pm);
+    setBackgroundScaled(scaled);
+    setBackgroundScaledMode(mode);
 }
 
 /*!
@@ -1398,7 +1477,10 @@ void QCustomPlot::setBackground(const QPixmap& pm, bool scaled, Qt::AspectRatioM
 */
 void QCustomPlot::setBackgroundScaled(bool scaled)
 {
+    if (mBackgroundScaled == scaled)
+        return;
     mBackgroundScaled = scaled;
+    qcpEmit(this, this, &QCustomPlot::backgroundScaledChanged, backgroundScaled());
 }
 
 /*!
@@ -1409,7 +1491,10 @@ void QCustomPlot::setBackgroundScaled(bool scaled)
 */
 void QCustomPlot::setBackgroundScaledMode(Qt::AspectRatioMode mode)
 {
+    if (mBackgroundScaledMode == mode)
+        return;
     mBackgroundScaledMode = mode;
+    qcpEmit(this, this, &QCustomPlot::backgroundScaledModeChanged, backgroundScaledMode());
 }
 
 /*!

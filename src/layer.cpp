@@ -102,14 +102,24 @@
   "overlay" layers, the last containing the selection rect, are set to \ref lmBuffered.
 */
 
+/*! \fn void QCPLayer::visibleChanged(bool visible)
+
+  This signal is emitted when \ref visible changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPLayer::modeChanged(QCPLayer::LayerMode mode)
+
+  This signal is emitted when \ref mode changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start documentation of inline functions */
 
 /*! \fn QList<QCPHandle<QCPLayerable>> QCPLayer::children() const
 
   Returns a list of handles to all layerables on this layer. The order corresponds to the rendering
   order: layerables with higher indices are drawn above layerables with lower indices.
-
-  The Q_PROPERTY's READ is the raw \ref childrenRaw: a list of handles is not a property type (K6).
 */
 
 /*! \fn int QCPLayer::index() const
@@ -175,6 +185,7 @@ void QCPLayer::setVisible(bool visible)
         return;
     invalidatePaintBuffer(); // a hidden layer's translation is not a valid stand-in
     mVisible = visible;
+    qcpEmit(this, mParentPlot, &QCPLayer::visibleChanged, this->visible());
 }
 
 /*!
@@ -205,6 +216,7 @@ void QCPLayer::setMode(QCPLayer::LayerMode mode)
         mMode = mode;
         if (QSharedPointer<QCPAbstractPaintBuffer> pb = mPaintBuffer.toStrongRef())
             pb->setInvalidated();
+        qcpEmit(this, mParentPlot, &QCPLayer::modeChanged, this->mode());
     }
 }
 

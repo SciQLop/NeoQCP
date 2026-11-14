@@ -38,6 +38,8 @@ private slots:
     void everyWriterBesidesTheSetterNotifies();
     void nestedWriterSignalsWaitForTheWriter_data();
     void nestedWriterSignalsWaitForTheWriter();
+    void themeSlotDeletingThePlot_data();
+    void themeSlotDeletingThePlot();
     void exceptionsNameRealProperties();
     void everyNotifyPropertyNotifiesOncePerChange_data();
     void everyNotifyPropertyNotifiesOncePerChange();

@@ -107,25 +107,32 @@ class QCP_LIB_DECL QCustomPlot : public QRhiWidget
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QRect viewport READ viewport WRITE setViewport)
-    Q_PROPERTY(QPixmap background READ background WRITE setBackground)
-    Q_PROPERTY(bool backgroundScaled READ backgroundScaled WRITE setBackgroundScaled)
+    Q_PROPERTY(QRect viewport READ viewport WRITE setViewport NOTIFY viewportChanged)
+    Q_PROPERTY(QPixmap background READ background WRITE setBackground NOTIFY backgroundChanged)
+    Q_PROPERTY(bool backgroundScaled READ backgroundScaled WRITE setBackgroundScaled NOTIFY
+                   backgroundScaledChanged)
     Q_PROPERTY(Qt::AspectRatioMode backgroundScaledMode READ backgroundScaledMode WRITE
-                   setBackgroundScaledMode)
-    Q_PROPERTY(QCPLayoutGrid* plotLayout READ plotLayout)
+                   setBackgroundScaledMode NOTIFY backgroundScaledModeChanged)
     Q_PROPERTY(bool autoAddPlottableToLegend READ autoAddPlottableToLegend WRITE
-                   setAutoAddPlottableToLegend)
-    Q_PROPERTY(int selectionTolerance READ selectionTolerance WRITE setSelectionTolerance)
-    Q_PROPERTY(bool noAntialiasingOnDrag READ noAntialiasingOnDrag WRITE setNoAntialiasingOnDrag)
+                   setAutoAddPlottableToLegend NOTIFY autoAddPlottableToLegendChanged)
+    Q_PROPERTY(int selectionTolerance READ selectionTolerance WRITE setSelectionTolerance NOTIFY
+                   selectionToleranceChanged)
+    Q_PROPERTY(bool noAntialiasingOnDrag READ noAntialiasingOnDrag WRITE setNoAntialiasingOnDrag
+                   NOTIFY noAntialiasingOnDragChanged)
     Q_PROPERTY(Qt::KeyboardModifier multiSelectModifier READ multiSelectModifier WRITE
-                   setMultiSelectModifier)
-    Q_PROPERTY(QColor themeBackground READ themeBackground WRITE setThemeBackground)
-    Q_PROPERTY(QColor themeForeground READ themeForeground WRITE setThemeForeground)
-    Q_PROPERTY(QColor themeGrid READ themeGrid WRITE setThemeGrid)
-    Q_PROPERTY(QColor themeSubGrid READ themeSubGrid WRITE setThemeSubGrid)
-    Q_PROPERTY(QColor themeSelection READ themeSelection WRITE setThemeSelection)
-    Q_PROPERTY(QColor themeLegendBackground READ themeLegendBackground WRITE setThemeLegendBackground)
-    Q_PROPERTY(QColor themeLegendBorder READ themeLegendBorder WRITE setThemeLegendBorder)
+                   setMultiSelectModifier NOTIFY multiSelectModifierChanged)
+    Q_PROPERTY(
+        QColor themeBackground READ themeBackground WRITE setThemeBackground NOTIFY themeChanged)
+    Q_PROPERTY(
+        QColor themeForeground READ themeForeground WRITE setThemeForeground NOTIFY themeChanged)
+    Q_PROPERTY(QColor themeGrid READ themeGrid WRITE setThemeGrid NOTIFY themeChanged)
+    Q_PROPERTY(QColor themeSubGrid READ themeSubGrid WRITE setThemeSubGrid NOTIFY themeChanged)
+    Q_PROPERTY(
+        QColor themeSelection READ themeSelection WRITE setThemeSelection NOTIFY themeChanged)
+    Q_PROPERTY(QColor themeLegendBackground READ themeLegendBackground WRITE
+                   setThemeLegendBackground NOTIFY themeChanged)
+    Q_PROPERTY(QColor themeLegendBorder READ themeLegendBorder WRITE setThemeLegendBorder NOTIFY
+                   themeChanged)
     /// \endcond
 
 public:
@@ -501,6 +508,15 @@ signals:
     void mouseMove(QMouseEvent* event);
     void mouseRelease(QMouseEvent* event);
     void mouseWheel(QWheelEvent* event);
+    void viewportChanged(const QRect& viewport);
+    void backgroundChanged(const QPixmap& background);
+    void backgroundScaledChanged(bool backgroundScaled);
+    void backgroundScaledModeChanged(Qt::AspectRatioMode backgroundScaledMode);
+    void autoAddPlottableToLegendChanged(bool autoAddPlottableToLegend);
+    void selectionToleranceChanged(int selectionTolerance);
+    void noAntialiasingOnDragChanged(bool noAntialiasingOnDrag);
+    void multiSelectModifierChanged(Qt::KeyboardModifier multiSelectModifier);
+    void themeChanged();
 
     void plottableClick(QCPAbstractPlottable* plottable, int dataIndex, QMouseEvent* event);
     void plottableDoubleClick(QCPAbstractPlottable* plottable, int dataIndex, QMouseEvent* event);
