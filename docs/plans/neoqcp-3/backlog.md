@@ -49,7 +49,7 @@ say otherwise.
 | a29 | 4e | `QCPLineEnding::draw` builds a QPainterPath per call | dev note | - |
 | a30 | 4e | Unclipped tracer crosshair spans the axis rect, not the widget | limit → [limits.md#items](../../limits.md#items) | items.md |
 | a31 | 4e | Rect/ellipse keep a positions-based `dataExtent` | dev note | `items/item-rect.cpp` |
-| a32 | 4e | Layer index pads an error-bar command by its pen only | fixed 45dfc64 | `painting/draw-context.cpp` |
+| a32 | 4e | Layer index pads an error-bar command by its pen only | fixed 45dfc64 | `drawable.cpp`, `plottables/plottable-errorbar.cpp` |
 | a33 | 4e | Two-colour OHLC strokes grouped per colour | limit → [limits.md#other-plottables](../../limits.md#other-plottables) | plottables.md |
 | a34 | 4e | Painter-only plottable records an empty list when hit-tested; a subclass that forgets `draw(QCPDrawContext&)` draws nothing silently | fixed b1d7e69, a8f8b6d | `plottables/plottable.h` |
 | a35 | 4d | Log linked axis re-clamped late | fixed 239fd90 | `axis/axis-base.cpp` |
@@ -64,7 +64,7 @@ say otherwise.
 | a44 | 4c | Zero-height histogram bin draws no base hairline | limit → [limits.md#other-plottables](../../limits.md#other-plottables) | plottables.md |
 | a45 | 4c | Step histogram legend icon is a box, not a line | limit → [limits.md#other-plottables](../../limits.md#other-plottables) | plottables.md |
 | a46 | 4c | Curve given data of another size keeps colour values: bar shown, curve uncoloured | fixed d9192c5, 3596de6 | `plottables/plottable-curve.cpp` |
-| a47 | 4c | Moving a plottable to another rect's axes keeps the old rect's scale | fixed 61640ed, ce2817b | `plottables/plottable.cpp` |
+| a47 | 4c | Moving a plottable to another rect's axes keeps the old rect's scale | fixed 61640ed, ce2817b, 7e6edd6 | `plottables/plottable-colormapped.cpp` |
 | a48 | 4c | 1000-text zoom 5 % slower on llvmpipe | dev note | - |
 | a49 | 5b | Handle hash changes when its object dies | limit → [limits.md#api-reference](../../limits.md#api-reference) | api.md |
 | a50 | 5b | `Q_FUNC_INFO` strings show the handle type | dev note | - |
