@@ -35,6 +35,24 @@
 
 #include <utility>
 
+/*! \fn void QCPArea::backgroundChanged(const QPixmap& background)
+
+  This signal is emitted when the background pixmap changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPArea::backgroundScaledChanged(bool backgroundScaled)
+
+  This signal is emitted when \ref backgroundScaled changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPArea::backgroundScaledModeChanged(Qt::AspectRatioMode backgroundScaledMode)
+
+  This signal is emitted when \ref backgroundScaledMode changes, after the plot delivers its
+  deferred signals.
+*/
+
 QCPArea::QCPArea(QCustomPlot* parentPlot)
         : QCPLayoutElement(parentPlot)
         , mBackgroundBrush(Qt::NoBrush)
@@ -335,6 +353,7 @@ void QCPArea::setBackground(const QPixmap& pm)
     mBackgroundPixmap = pm;
     mScaledBackgroundPixmap = QPixmap();
     markDirty();
+    qcpEmit(this, mParentPlot, &QCPArea::backgroundChanged, mBackgroundPixmap);
 }
 
 /*! \overload
@@ -368,11 +387,12 @@ void QCPArea::setBackground(const QPixmap& pm, bool scaled, Qt::AspectRatioMode 
     if (pm.cacheKey() == mBackgroundPixmap.cacheKey() && scaled == mBackgroundScaled
         && mode == mBackgroundScaledMode)
         return;
-    mBackgroundPixmap = pm;
-    mScaledBackgroundPixmap = QPixmap();
-    mBackgroundScaled = scaled;
-    mBackgroundScaledMode = mode;
-    markDirty();
+    // Three properties at once: their signals wait for the scope, a slot may delete the area.
+    const QCPEmissionScope scope(mParentPlot);
+    mScaledBackgroundPixmap = QPixmap(); // a new mode alone must rescale too
+    setBackground(pm);
+    setBackgroundScaled(scaled);
+    setBackgroundScaledMode(mode);
 }
 
 /*!
@@ -391,6 +411,7 @@ void QCPArea::setBackgroundScaled(bool scaled)
         return;
     mBackgroundScaled = scaled;
     markDirty();
+    qcpEmit(this, mParentPlot, &QCPArea::backgroundScaledChanged, backgroundScaled());
 }
 
 /*!
@@ -406,6 +427,7 @@ void QCPArea::setBackgroundScaledMode(Qt::AspectRatioMode mode)
         return;
     mBackgroundScaledMode = mode;
     markDirty();
+    qcpEmit(this, mParentPlot, &QCPArea::backgroundScaledModeChanged, backgroundScaledMode());
 }
 
 /*! \internal

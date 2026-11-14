@@ -45,10 +45,11 @@ class QCP_LIB_DECL QCPArea : public QCPLayoutElement
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QPixmap background READ background WRITE setBackground)
-    Q_PROPERTY(bool backgroundScaled READ backgroundScaled WRITE setBackgroundScaled)
+    Q_PROPERTY(QPixmap background READ background WRITE setBackground NOTIFY backgroundChanged)
+    Q_PROPERTY(bool backgroundScaled READ backgroundScaled WRITE setBackgroundScaled NOTIFY
+                   backgroundScaledChanged)
     Q_PROPERTY(Qt::AspectRatioMode backgroundScaledMode READ backgroundScaledMode WRITE
-                   setBackgroundScaledMode)
+                   setBackgroundScaledMode NOTIFY backgroundScaledModeChanged)
     /// \endcond
 
 public:
@@ -108,6 +109,11 @@ public:
     // Called while an axis that is leaving the area still exists: the systems that used it go too,
     // before their axes dangle.
     void axisRemoved(const QCPAxisBase* axis);
+
+signals:
+    void backgroundChanged(const QPixmap& background);
+    void backgroundScaledChanged(bool backgroundScaled);
+    void backgroundScaledModeChanged(Qt::AspectRatioMode backgroundScaledMode);
 
 protected:
     // property members:

@@ -787,14 +787,6 @@ bool isNotifyProperty(const QMetaProperty& property)
     return property.hasNotifySignal() && property.isWritable();
 }
 
-// The classes whose existing properties do not have their NOTIFY yet; each area of Task 2 empties
-// its part of the list.
-const QSet<QByteArray>& pendingClasses()
-{
-    static const QSet<QByteArray> list { "QCPArea" };
-    return list;
-}
-
 // The library's classes, not Qt's (QWidget, QRhiWidget): the surface under test is ours.
 bool isOurs(const QMetaObject* meta)
 {
@@ -857,8 +849,7 @@ void TestMetaSurface::everyPropertyIsConstantOrNotifies_data()
     QTest::addColumn<int>("fixture");
     QTest::addColumn<QByteArray>("className");
     for (const Declared& d : declaredClasses())
-        if (!pendingClasses().contains(d.meta->className()))
-            QTest::newRow(d.meta->className()) << d.fixture << QByteArray(d.meta->className());
+        QTest::newRow(d.meta->className()) << d.fixture << QByteArray(d.meta->className());
 }
 
 // E-11: a property is constant, or it has a change signal; a read-only one without a signal is
@@ -1030,6 +1021,20 @@ const QVector<Writer>& writers()
               qobject_cast<QCustomPlot*>(o)->setTheme(&dark);
           },
           { "themeBackground" },
+          { } },
+        { "QCPArea::setBackground(pixmap, scaled, mode)",
+          [](QCustomPlot& plot) -> QObject* { return plot.axisRect().get(); },
+          [](QObject* o)
+          {
+              static const QPixmap shared = []
+              {
+                  QPixmap pixmap(2, 2);
+                  pixmap.fill(Qt::red);
+                  return pixmap;
+              }(); // one image: the second call moves nothing
+              qobject_cast<QCPArea*>(o)->setBackground(shared, false, Qt::IgnoreAspectRatio);
+          },
+          { "background", "backgroundScaled", "backgroundScaledMode" },
           { } },
         { "QCPAbstractItem::setClipArea",
           [](QCustomPlot& plot) -> QObject* { return plot.add<QCPItemLine>().get(); },
