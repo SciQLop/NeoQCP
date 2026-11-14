@@ -516,3 +516,15 @@ that no section above lists, and the behaviour changes of 5f.
 - `setBrush` on a graph keeps each fill's target (a constant or another column) and changes only its brush.
 - A legend row reads its legend from the layout it sits in. `parentLegend()` is null until the row is added to a
   legend.
+- A curve given data of another size (`setData`, `addData`, a container edit) drops its colour values and leaves
+  its rect's colour scale, as a graph does (#46). A scale picked with `setColorScale()` stays.
+- `QCPGraph::removeData()`, `removeDataBefore()` and `removeDataAfter()` at a NaN key report a misuse and change
+  nothing (#80). Under the default handler a debug build aborts.
+- A group legend row that is not selectable answers a hit test that does not ask for selectable parts, as a plain
+  row does.
+- The colour scale choice sticks (final review I1). `setColorScale(nullptr)` before colour values keeps the
+  line out of its rect's bar; new values, a resize, a move to another rect or a take and add never re-join it. A
+  scale picked with `setColorScale()` survives a resize that drops the values.
+- `QCPAbstractColorMapped::showsColorScale()` is private, and the protected `mFollowsRectScale` and
+  `mJoiningKeyAxisRectScale` are gone. `QCPPlottableLegendItem::getIconBorderPen()` is gone: use
+  `legendIconBorderPen()`. `QCustomPlot`'s ancestor watch (`isAligned`, `watchAncestors`, ...) is private.

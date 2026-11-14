@@ -179,7 +179,7 @@ These patterns need a change:
 Behaviour that changed:
 
 - **Default pen.** Column *i* of a new graph takes colour *i* of the palette, with a cosmetic pen (width 0). A graph with one column is drawn in the palette's first colour, a blue close to 2.x's. Call `setPen()` for another look.
-- **Shape misuses.** Keys and values of different lengths, and a NaN key, are misuses: the call reports one and changes nothing. 2.x truncated unequal data and let NaN keys through.
+- **Shape misuses.** Keys and values of different lengths, and a NaN key, are misuses: the call reports one and changes nothing. 2.x truncated unequal data and let NaN keys through. `removeData()`, `removeDataBefore()` and `removeDataAfter()` at a NaN key are misuses too; under the default handler a debug build aborts.
 - **Sorting.** `setData()` with `double` keys and `double` columns sorts unsorted keys, unless `alreadySorted = true`. Other types must come sorted.
 - **Selection.** A selected graph draws its selected segments with each column's selected pen (the column's pen, 1.5 pixels wider). When you style the selection decorator or set one of your own, its pen, brush and marker style draw them instead. Markers of a selected segment take the selected pen as their outline. The selection type works as in 2.x: with the default `stWhole`, a click selects the whole graph and a click with the multi-select modifier deselects it.
 - **Hit details.** `selectTest()` hands a graph's hit back as a `QVariantMap` with `componentIndex` and `dataIndex`, not as a `QCPDataSelection`. `details.value<QCPDataSelection>()` gives an empty selection. Read the row with `qcp::hitDataIndex(details)`, which takes either form.
@@ -282,6 +282,7 @@ Plot-wide settings:
 | Overriding `QCPAbstractPlottable::draw(QCPPainter*)` or `drawLegendIcon(QCPPainter*, const QRectF&)` (both final) | override `draw(QCPDrawContext&)`, and `drawLegendIcon(QCPDrawContext&)` for an icon of its own; `context.painter()` keeps painter code no command expresses |
 | `QCPAbstractPlottable1D::drawPolyline()`, `QCPAbstractPlottable::applyFillAntialiasingHint()`/`applyScattersAntialiasingHint()`, `QCPSelectionDecorator::applyPen()`/`applyBrush()` | record through `draw(QCPDrawContext&)`; inside a `context.painter()` callback, set the pen, brush and antialiasing on the painter directly |
 | Overriding `QCPStatisticalBox::drawStatisticalBox()` | override `draw(QCPDrawContext&)` |
+| `QCPPlottableLegendItem::getIconBorderPen()` | `legendIconBorderPen()`, on every legend row |
 | `QCPPolarAxisAngular` as a layout element (`addElement`, its background, inset layout, drag and wheel, `addRadialAxis`, `add<QCPPolarGraph>`) | `QCPPolarArea`, which owns the angular axis, the radial axes and the grid |
 | `QCPPolarAxisRadial::ScaleType`, the polar axes' `SelectablePart(s)`, `rangeDrag`/`rangeZoom` | `QCPAxisBase::ScaleType`, `QCPAxisBase::SelectablePart(s)`, `rangeDraggable`/`rangeZoomable` |
 | Overriding `QCPAbstractPlottable::axesChanged()` (NeoQCP 3.0 preview) | override `systemDidChange()`: a plottable now moves between coordinate systems |
