@@ -47,6 +47,7 @@ polar
 coordinate-systems
 performance
 migrating
+limits
 ```
 
 ```{toctree}
