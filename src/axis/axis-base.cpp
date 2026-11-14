@@ -562,12 +562,13 @@ void QCPAxisBase::refreshFromLink()
     fresh.normalize();
     if (!QCPRange::validRange(fresh))
         return;
+    // Compared once sanitized: a scale type change that only sanitizes must still take effect.
+    fresh = mScaleType == stLogarithmic ? fresh.sanitizedForLogScale() : fresh.sanitizedForLinScale();
     const bool reversed = source->mRangeReversed != mLink->decreasing;
     if (fresh.lower == mRange.lower && fresh.upper == mRange.upper && reversed == mRangeReversed)
         return;
     const QCPRange oldRange = mRange;
-    mRange
-        = mScaleType == stLogarithmic ? fresh.sanitizedForLogScale() : fresh.sanitizedForLinScale();
+    mRange = fresh;
     const bool reversalChanged = reversed != mRangeReversed;
     // Both signals wait for the scope: a rangeChanged slot may delete this axis.
     std::optional<QCPEmissionScope> scope;

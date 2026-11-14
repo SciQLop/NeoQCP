@@ -367,7 +367,11 @@ void TestLinkedAxes::scaleTypeOnALinkedAxisLeavesTheSourceAlone()
     plot.xAxis2->setScaleType(QCPAxis::stLogarithmic);
     QCOMPARE(gMisuses, 0);
     QCOMPARE(plot.xAxis->range(), QCPRange(-5, 5));
-    QCOMPARE(plot.xAxis2->range(), QCPRange(-5, 5));
+    // The linked axis sanitizes its own copy: a log range never spans zero.
+    QVERIFY2(plot.xAxis2->range().lower * plot.xAxis2->range().upper > 0,
+             qPrintable(QStringLiteral("(%1, %2)")
+                            .arg(plot.xAxis2->range().lower)
+                            .arg(plot.xAxis2->range().upper)));
     QCOMPARE(plot.xAxis2->scaleType(), QCPAxis::stLogarithmic);
 
     plot.xAxis->setRange(1, 10);
