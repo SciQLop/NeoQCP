@@ -66,6 +66,13 @@ QObject* itemOn(QCustomPlot& plot)
     return plot.add<Item>().get();
 }
 
+QCPPolarArea* polarAreaOn(QCustomPlot& plot)
+{
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(3, 0, area);
+    return area;
+}
+
 QCPAxisRect* axisRectOn(QCustomPlot& plot)
 {
     auto* rect = new QCPAxisRect(&plot);
@@ -508,6 +515,22 @@ const QVector<Fixture>& fixtures()
         { "QCPCurve", [](QCustomPlot& plot) -> QObject* { return curveOn(plot); } },
         { "QCPBars", [](QCustomPlot& plot) -> QObject* { return barsOn(plot); } },
         { "QCPBarsGroup", [](QCustomPlot& plot) -> QObject* { return new QCPBarsGroup(&plot); } },
+        { "QCPPolarArea", [](QCustomPlot& plot) -> QObject* { return polarAreaOn(plot); } },
+        { "QCPPolarAxisAngular",
+          [](QCustomPlot& plot) -> QObject* { return polarAreaOn(plot)->angularAxis().get(); } },
+        { "QCPPolarAxisRadial",
+          [](QCustomPlot& plot) -> QObject* { return polarAreaOn(plot)->radialAxis().get(); } },
+        { "QCPPolarGrid",
+          [](QCustomPlot& plot) -> QObject* { return polarAreaOn(plot)->grid().get(); } },
+        { "QCPPolarGraph",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              QCPPolarArea* area = polarAreaOn(plot);
+              return new QCPPolarGraph(area->angularAxis(), area->radialAxis());
+          } },
+        { "QCPOverlay", [](QCustomPlot& plot) -> QObject* { return plot.overlay().get(); } },
+        { "QCPSelectionRect",
+          [](QCustomPlot& plot) -> QObject* { return plot.selectionRect().get(); } },
         { "QCPItemBracket", itemOn<QCPItemBracket> },
         { "QCPItemCurve", itemOn<QCPItemCurve> },
         { "QCPItemEllipse", itemOn<QCPItemEllipse> },
@@ -739,6 +762,7 @@ struct Exception
     MakeValue accepted;
     MakeValue probe; // the value the rule writes, when it needs one
     const char* why;
+    bool reportsMisuse = false; // the refusal goes through the misuse channel
 };
 
 QCPSelectionDecorator* freshDecorator() { return new QCPSelectionDecorator; }
@@ -769,7 +793,7 @@ const QVector<Exception>& exceptions()
           "repaints when only a component differs (plottable-line.cpp:84)" },
         { &QCPPolarAxisAngular::staticMetaObject, "scaleType", Rule::Refuses, nullptr,
           [](QObject*) { return QVariant::fromValue(QCPAxisBase::stLogarithmic); },
-          "the ring has no logarithmic scale (angularaxis.cpp:938)" },
+          "the ring has no logarithmic scale (angularaxis.cpp:938)", true },
     };
     return list;
 }
@@ -1219,6 +1243,28 @@ void TestMetaSurface::nestedWriterSignalsWaitForTheWriter()
     QVERIFY(nestedWriters()[writer].run(*plot));
 }
 
+// E-4c's motive: a layout pass writes the outer rect of every element inside replot's scope. A
+// listener hears the move once, after the replot, never in the middle of it.
+void TestMetaSurface::layoutPassSignalsAfterTheReplot()
+{
+    auto plot = newPlot();
+    settle(*plot);
+    QCPAxisRect* rect = plot->axisRect().get();
+    int heard = 0;
+    bool duringReplot = false;
+    QObject::connect(rect, &QCPLayoutElement::outerRectChanged, rect,
+                     [&]
+                     {
+                         ++heard;
+                         duringReplot = duringReplot || plot->isReplotting();
+                     });
+    plot->resize(500, 350);
+    plot->replot();
+    QCOMPARE(heard, 1);
+    QVERIFY(!duringReplot);
+    QCOMPARE(rect->outerRect(), QRect(0, 0, 500, 350));
+}
+
 void TestMetaSurface::themeSlotDeletingThePlot_data()
 {
     QTest::addColumn<bool>("shared");
@@ -1269,8 +1315,10 @@ void TestMetaSurface::everyNotifyPropertyNotifiesOncePerChange_data()
         const QMetaObject* meta = fixtures()[f].make(*plot)->metaObject();
         // QObject's own objectName is Qt's, with its own BINDABLE storage: not ours to check.
         for (int i = QObject::staticMetaObject.propertyCount(); i < meta->propertyCount(); ++i)
+            // A property a subclass declares again (the curve's) is reached by name only there.
             if (isNotifyProperty(meta->property(i)) && hasGenericRow(meta, meta->property(i))
-                && isOurs(declaringClass(meta, i)))
+                && isOurs(declaringClass(meta, i))
+                && meta->indexOfProperty(meta->property(i).name()) == i)
                 QTest::addRow("%s::%s", fixtures()[f].name, meta->property(i).name())
                     << f << QByteArray(meta->property(i).name());
     }
@@ -1376,6 +1424,8 @@ void TestMetaSurface::exceptionRulesHold()
             }
             QCOMPARE(meta.read(object), before);
             QCOMPARE(spy.count(), 0);
+            QCOMPARE(int(test_misuse::calls.size()), ex.reportsMisuse ? 1 : 0);
+            test_misuse::calls.clear();
             break;
         }
         case Rule::Clamps:

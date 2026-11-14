@@ -38,6 +38,7 @@ private slots:
     void everyWriterBesidesTheSetterNotifies();
     void nestedWriterSignalsWaitForTheWriter_data();
     void nestedWriterSignalsWaitForTheWriter();
+    void layoutPassSignalsAfterTheReplot();
     void themeSlotDeletingThePlot_data();
     void themeSlotDeletingThePlot();
     void exceptionsNameRealProperties();
