@@ -46,6 +46,7 @@ QCPItemSpan::QCPItemSpan(QCustomPlot* parentPlot, Qt::Orientation orientation)
         , upperEdge(createPosition(QLatin1String("upperEdge")))
         , center(createAnchor(QLatin1String("center"), aiCenter))
 {
+    const QScopedValueRollback quiet(mEdgesQuiet, true);
     const bool vertical = mOrientation == Qt::Vertical;
     for (QCPItemPosition* edge : { lowerEdge, upperEdge })
     {
@@ -79,12 +80,23 @@ void QCPItemSpan::setRange(const QCPRange& range)
 {
     if (range == this->range())
         return;
+    const QScopedValueRollback quiet(mEdgesQuiet, true);
     markDirty();
     const bool vertical = mOrientation == Qt::Vertical;
     lowerEdge->setCoords(vertical ? range.lower : 0, vertical ? 0 : range.lower);
     upperEdge->setCoords(vertical ? range.upper : 1, vertical ? 1 : range.upper);
     // Emit last: a slot may delete this span.
     qcpEmit(this, mParentPlot, &QCPItemSpan::rangeChanged, range);
+}
+
+void QCPItemSpan::positionMoved(const QCPItemPosition* position, QPointF before)
+{
+    if (mEdgesQuiet || (position != lowerEdge && position != upperEdge))
+        return;
+    const bool vertical = mOrientation == Qt::Vertical;
+    const QPointF now = position->coords();
+    if ((vertical ? now.x() : now.y()) != (vertical ? before.x() : before.y()))
+        qcpEmit(this, mParentPlot, &QCPItemSpan::rangeChanged, range());
 }
 
 void QCPItemSpan::draw(QCPDrawContext& context) const
@@ -182,6 +194,8 @@ void QCPItemSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
 {
     if (mDragPart == hpNone)
         return;
+    // The drag signals the range itself, once, below.
+    QScopedValueRollback quiet(mEdgesQuiet, true);
 
     const bool vertical = mOrientation == Qt::Vertical;
     const Qt::Orientation edgeAxis = vertical ? Qt::Horizontal : Qt::Vertical;

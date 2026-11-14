@@ -326,7 +326,7 @@ QCPPolarAxisRadial::QCPPolarAxisRadial(QCPPolarArea* area)
         , mNumberPrecision(6)
         , mNumberFormatChar('g')
         , mNumberBeautifulPowers(true)
-        , mNumberMultiplyCross(false)
+        , mNumberMultiplyCross(true) // what the label painter draws by default
         ,
         // ticks and subticks:
         mTicks(true)
@@ -607,9 +607,6 @@ void QCPPolarAxisRadial::setTickLabelMode(LabelMode mode)
 */
 void QCPPolarAxisRadial::setNumberFormat(const QString& formatCode)
 {
-    // The getter is what the signal reports; the members can move without it (the angular axis
-    // reads the cross from its label painter).
-    const QString before = numberFormat();
     const QChar previousChar = mNumberFormatChar;
     const bool previousBeautiful = mNumberBeautifulPowers;
     const bool previousCross = mNumberMultiplyCross;
@@ -674,8 +671,7 @@ void QCPPolarAxisRadial::setNumberFormat(const QString& formatCode)
     mLabelPainter.setSubstituteExponent(mNumberBeautifulPowers);
     mLabelPainter.setMultiplicationSymbol(mNumberMultiplyCross ? QCPLabelPainterPrivate::SymbolCross
                                                                : QCPLabelPainterPrivate::SymbolDot);
-    if (numberFormat() != before)
-        qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::numberFormatChanged, numberFormat());
+    qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::numberFormatChanged, numberFormat());
 }
 
 /*!

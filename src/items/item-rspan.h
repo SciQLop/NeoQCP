@@ -49,6 +49,7 @@ signals:
     void valueRangeChanged(const QCPRange& newRange);
 
 protected:
+    void positionMoved(const QCPItemPosition* position, QPointF before) override;
     enum AnchorIndex { aiTopLeft, aiTopRight, aiBottomRight, aiBottomLeft, aiCenter };
 
     HitPart mDragPart = hpNone;

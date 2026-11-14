@@ -17,6 +17,7 @@ QCPItemRSpan::QCPItemRSpan(QCustomPlot* parentPlot)
     , bottomLeft(createAnchor(QLatin1String("bottomLeft"), aiBottomLeft))
     , center(createAnchor(QLatin1String("center"), aiCenter))
 {
+    const QScopedValueRollback quiet(mEdgesQuiet, true);
     leftEdge->setType(QCPItemPosition::ptPlotCoords);
     leftEdge->setCoords(0, 0);
 
@@ -50,6 +51,7 @@ void QCPItemRSpan::setKeyRange(const QCPRange& range)
 {
     if (keyRange() == range)
         return;
+    const QScopedValueRollback quiet(mEdgesQuiet, true);
     markDirty();
     leftEdge->setCoords(range.lower, leftEdge->coords().y());
     rightEdge->setCoords(range.upper, rightEdge->coords().y());
@@ -61,11 +63,23 @@ void QCPItemRSpan::setValueRange(const QCPRange& range)
 {
     if (valueRange() == range)
         return;
+    const QScopedValueRollback quiet(mEdgesQuiet, true);
     markDirty();
     bottomEdge->setCoords(bottomEdge->coords().x(), range.lower);
     topEdge->setCoords(topEdge->coords().x(), range.upper);
     // Emit last: a slot may delete this span.
     qcpEmit(this, mParentPlot, &QCPItemRSpan::valueRangeChanged, range);
+}
+
+void QCPItemRSpan::positionMoved(const QCPItemPosition* position, QPointF before)
+{
+    if (mEdgesQuiet)
+        return;
+    const QPointF now = position->coords();
+    if ((position == leftEdge || position == rightEdge) && now.x() != before.x())
+        qcpEmit(this, mParentPlot, &QCPItemRSpan::keyRangeChanged, keyRange());
+    else if ((position == topEdge || position == bottomEdge) && now.y() != before.y())
+        qcpEmit(this, mParentPlot, &QCPItemRSpan::valueRangeChanged, valueRange());
 }
 
 std::optional<double> QCPItemRSpan::hitTest(QCP::Pixels at, QVariant* details) const
@@ -221,6 +235,8 @@ void QCPItemRSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
 {
     if (mDragPart == hpNone)
         return;
+    // The drag signals both ranges itself, once, below.
+    QScopedValueRollback quiet(mEdgesQuiet, true);
 
     const double dx = event->pos().x() - startPos.x();
     const double dy = event->pos().y() - startPos.y();

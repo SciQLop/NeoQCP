@@ -3,6 +3,7 @@
 
 #include "../global.h"
 #include "item.h"
+#include <QScopedValueRollback>
 
 class QCustomPlot;
 
@@ -53,6 +54,8 @@ protected:
     QBrush mBrush, mSelectedBrush;
     QPen mBorderPen, mSelectedBorderPen;
     bool mMovable = true;
+    // True while the span moves its own edges: the writer signals the range once, when it is done.
+    bool mEdgesQuiet = false;
 
     QBrush mainBrush() const { return mSelected ? mSelectedBrush : mBrush; }
 

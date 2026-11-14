@@ -62,6 +62,7 @@ private:
     QList<QCPAbstractPlottable*> membersRaw() const;
     void detach(QCPAbstractPlottable* plottable, bool restoreRow);
     void updateLegendRow();
+    void memberLeft();
     void markRowDirty();
     //! Signals visible() when it moved since the last signal: members change it from outside.
     void noteVisibility();

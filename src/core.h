@@ -583,6 +583,7 @@ private:
     // The axes add<T>() puts a new plottable on; both null (one misuse) when it must refuse.
     [[nodiscard]] std::pair<QCPAxis*, QCPAxis*> axesForAdd() const;
     bool detach(QCPAbstractPlottable* plottable);
+    void forgetSystemOf(QCPAbstractPlottable* plottable);
     bool detach(QCPAbstractItem* item);
     bool adopt(QCPAbstractPlottable* plottable);
     bool adopt(QCPAbstractItem* item);

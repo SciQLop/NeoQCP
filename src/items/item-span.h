@@ -54,6 +54,7 @@ signals:
     void rangeChanged(const QCPRange& newRange);
 
 protected:
+    void positionMoved(const QCPItemPosition* position, QPointF before) override;
     enum AnchorIndex
     {
         aiCenter

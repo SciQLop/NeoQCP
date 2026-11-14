@@ -154,9 +154,19 @@ void QCPPlottableGroup::removeMember(QCPAbstractPlottable* plottable)
 {
     if (!plottable || plottable->mGroup != this)
         return;
-    // Two signals: a slot of the first may delete this group.
-    const QCPEmissionScope scope(mParentPlot);
     detach(plottable, true);
+    memberLeft();
+}
+
+/*! \internal
+
+  What follows a member leaving, by removeMember or by the plot (take, removal, delete): the
+  legend row, membersChanged, and visibleChanged when the last shown member left. Two signals: a
+  slot of the first may delete this group.
+*/
+void QCPPlottableGroup::memberLeft()
+{
+    const QCPEmissionScope scope(mParentPlot);
     updateLegendRow();
     qcpEmit(this, mParentPlot, &QCPPlottableGroup::membersChanged);
     noteVisibility();
@@ -182,16 +192,12 @@ bool QCPPlottableGroup::visible() const
 
 void QCPPlottableGroup::setVisible(bool visible)
 {
+    // The members' signals, and this group's relayed from them, wait for the loop: a slot may
+    // delete a member, this group or the plot.
+    const QCPEmissionScope scope(mParentPlot);
     markRowDirty();
-    // A member's visibleChanged slot may delete this group or another member: iterate a copy of
-    // the guarded list, never raw pointers.
-    QPointer<QCPPlottableGroup> self = this;
-    const auto snapshot = mMembers;
-    for (const auto& member : snapshot)
-        if (member)
-            setShown(member, visible);
-    if (!self)
-        return;
+    for (QCPAbstractPlottable* member : membersRaw())
+        setShown(member, visible);
     markRowDirty();
     noteVisibility();
 }

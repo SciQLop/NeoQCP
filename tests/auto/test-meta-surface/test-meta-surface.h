@@ -50,6 +50,10 @@ private slots:
     void everyGadgetPropertyReadsWhatItWrites();
     void revisionNotifiesThroughChanged_data();
     void revisionNotifiesThroughChanged();
+    void gadgetSettersKeepTheirRules();
+    void antialiasingSetsStayApart();
+    void polarNumberFormatIsWhatIsDrawn_data();
+    void polarNumberFormatIsWhatIsDrawn();
     void everyNotifyPropertyNotifiesOncePerChange_data();
     void everyNotifyPropertyNotifiesOncePerChange();
     void exceptionRulesHold_data();

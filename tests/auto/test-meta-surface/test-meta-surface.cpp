@@ -109,6 +109,13 @@ T* firstPlottable(QCustomPlot& plot)
     return qobject_cast<T*>(plot.plottable(0).get());
 }
 
+QCPPlottableGroup* groupOfOneOn(QCustomPlot& plot)
+{
+    QCPPlottableGroup* group = plot.addPlottableGroup(QStringLiteral("group")).get();
+    group->addMember(graphOn(plot));
+    return group;
+}
+
 QCPCurve* curveOn(QCustomPlot& plot)
 {
     auto* curve = new QCPCurve(plot.xAxis, plot.yAxis);
@@ -1313,6 +1320,85 @@ const QVector<Writer>& writers()
           { qobject_cast<QCPIntervals*>(o)->setSelection(QCPDataSelection(QCPDataRange(1, 2))); },
           { "selectedRows", "selection" },
           { "style" } },
+        { "removePlottable of a group's last member",
+          [](QCustomPlot& plot) -> QObject* { return groupOfOneOn(plot); },
+          [](QObject* o)
+          {
+              QCustomPlot* plot = qobject_cast<QCPPlottableGroup*>(o)->parentPlot().get();
+              if (plot->plottableCount() > 0)
+                  (void)plot->removePlottable(plot->plottable(0).get());
+          },
+          { "visible" },
+          { "name" } },
+        { "take() of a group's last member",
+          [](QCustomPlot& plot) -> QObject* { return groupOfOneOn(plot); },
+          [](QObject* o)
+          {
+              static std::unique_ptr<QCPGraph> taken; // outlives the plot of the row
+              QCustomPlot* plot = qobject_cast<QCPPlottableGroup*>(o)->parentPlot().get();
+              if (plot->graphCount() > 0)
+                  taken = plot->take(plot->graph(0));
+          },
+          { "visible" },
+          { "name" } },
+        { "deleting a group's last member",
+          [](QCustomPlot& plot) -> QObject* { return groupOfOneOn(plot); },
+          [](QObject* o)
+          {
+              QCustomPlot* plot = qobject_cast<QCPPlottableGroup*>(o)->parentPlot().get();
+              if (plot->plottableCount() > 0)
+                  delete plot->plottable(0).get();
+          },
+          { "visible" },
+          { "name" } },
+        { "take() of a plottable",
+          [](QCustomPlot& plot) -> QObject* { return graphOn(plot); },
+          [](QObject* o)
+          {
+              static std::unique_ptr<QCPGraph> taken; // outlives the plot of the row
+              auto* graph = qobject_cast<QCPGraph*>(o);
+              if (QCustomPlot* plot = graph->parentPlot())
+                  taken = plot->take(QCPHandle<QCPGraph>(graph));
+          },
+          { "system", "keyAxis", "valueAxis" },
+          { "name" } },
+        { "QCPItemRSpanOps::setLeftEdge",
+          [](QCustomPlot& plot) -> QObject* { return plot.add<QCPItemRSpan>().get(); },
+          [](QObject* o)
+          {
+              qcp::makeHandle<qcp::HandleFor<QCPItemRSpan>>(qobject_cast<QCPItemRSpan*>(o))
+                  .setLeftEdge(-4, 0);
+          },
+          { "keyRange" },
+          { "valueRange" } },
+        { "QCPItemRSpanOps::setTopEdge",
+          [](QCustomPlot& plot) -> QObject* { return plot.add<QCPItemRSpan>().get(); },
+          [](QObject* o)
+          {
+              qcp::makeHandle<qcp::HandleFor<QCPItemRSpan>>(qobject_cast<QCPItemRSpan*>(o))
+                  .setTopEdge(0, 9);
+          },
+          { "valueRange" },
+          { "keyRange" } },
+        { "QCPItemRSpan's raw right edge",
+          [](QCustomPlot& plot) -> QObject* { return plot.add<QCPItemRSpan>().get(); },
+          [](QObject* o) { qobject_cast<QCPItemRSpan*>(o)->rightEdge->setCoords(8, 0); },
+          { "keyRange" },
+          { "valueRange" } },
+        { "QCPItemSpanOps::setUpperEdge",
+          [](QCustomPlot& plot) -> QObject* { return plot.add<QCPItemSpan>(Qt::Vertical).get(); },
+          [](QObject* o)
+          {
+              qcp::makeHandle<qcp::HandleFor<QCPItemSpan>>(qobject_cast<QCPItemSpan*>(o))
+                  .setUpperEdge(7, 1);
+          },
+          { "range" },
+          { "brush" } },
+        { "QCPItemSpan's raw lower edge",
+          [](QCustomPlot& plot) -> QObject* { return plot.add<QCPItemSpan>(Qt::Vertical).get(); },
+          [](QObject* o) { qobject_cast<QCPItemSpan*>(o)->lowerEdge->setCoords(-2, 0); },
+          { "range" },
+          { "brush" } },
         { "QCPAxisBase::setRangeLower",
           [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
           [](QObject* o) { qobject_cast<QCPAxis*>(o)->setRangeLower(-3); },
@@ -1983,6 +2069,46 @@ const QVector<Deleting>& deletingWriters()
               plot.findChild<QCPPolarArea*>()->radialAxis()->setAngleReference(
                   QCPPolarAxisRadial::arAbsolute);
           } },
+        { "QCPPlottableGroup::setVisible",
+          [](QCustomPlot& plot)
+          {
+              QCPPlottableGroup* group = plot.addPlottableGroup(QStringLiteral("group")).get();
+              QCPGraph* graph = twoColumnGraphOn(plot);
+              group->addMember(graph);
+              graph->setComponentVisible(0, false);
+              graph->setComponentVisible(1, false);
+              return std::pair<QObject*, const char*>(group, "visible");
+          },
+          [](QCustomPlot& plot) { plot.plottableGroups().first()->setVisible(true); } },
+        { "QCPItemPosition::setType on a span edge",
+          [](QCustomPlot& plot)
+          {
+              plot.replot(); // the edge keeps its pixel: the axis rect needs its size
+              return std::pair<QObject*, const char*>(plot.add<QCPItemRSpan>().get(), "keyRange");
+          },
+          [](QCustomPlot& plot)
+          { plot.findChild<QCPItemRSpan*>()->leftEdge->setType(QCPItemPosition::ptAbsolute); } },
+        { "QCPItemPosition::setParentAnchor on a span edge",
+          [](QCustomPlot& plot)
+          {
+              plot.replot();
+              QCPItemText* text = plot.add<QCPItemText>().get();
+              text->position->setCoords(3, 3);
+              return std::pair<QObject*, const char*>(plot.add<QCPItemRSpan>().get(), "keyRange");
+          },
+          [](QCustomPlot& plot)
+          {
+              plot.findChild<QCPItemRSpan*>()->leftEdge->setParentAnchor(
+                  plot.findChild<QCPItemText*>()->position, true);
+          } },
+        { "QCPItemPosition::set on a span edge",
+          [](QCustomPlot& plot)
+          {
+              plot.replot();
+              return std::pair<QObject*, const char*>(plot.add<QCPItemRSpan>().get(), "keyRange");
+          },
+          [](QCustomPlot& plot)
+          { plot.findChild<QCPItemRSpan*>()->leftEdge->set(QCP::Pixels { 5, 5 }); } },
         { "QCPAxisRect::setupFullAxesBox", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(plot.xAxis2.get(), "visible"); },
           [](QCustomPlot& plot) { plot.axisRect()->setupFullAxesBox(); } },
@@ -2235,6 +2361,10 @@ void TestMetaSurface::everyFormRowHolds()
             QVERIFY(property.hasNotifySignal());
             QCOMPARE(property.notifySignal().name(),
                      r.notify ? QByteArray(r.notify) : QByteArray(r.property) + "Changed");
+            // A signal that carries a value carries the property's type (themeChanged() carries
+            // none).
+            if (property.notifySignal().parameterCount() > 0)
+                QCOMPARE(property.notifySignal().parameterMetaType(0), property.metaType());
             break;
         case Form::Constant:
             QVERIFY(property.isConstant());
@@ -2281,7 +2411,7 @@ void TestMetaSurface::everyGadgetPropertyReadsWhatItWrites_data()
 }
 
 // The gadget properties carry no signal (E-7): a write through the meta-object stores the value
-// a read gives back, and leaves the value it was written on otherwise equal to a setter call's.
+// a read gives back.
 void TestMetaSurface::everyGadgetPropertyReadsWhatItWrites()
 {
     QFETCH(int, gadget);
@@ -2296,6 +2426,68 @@ void TestMetaSurface::everyGadgetPropertyReadsWhatItWrites()
     QVERIFY(!same(other, current));
     QVERIFY(meta.writeOnGadget(value.data(), other));
     QVERIFY(same(meta.readOnGadget(value.constData()), other));
+}
+
+// A gadget write goes through the setter, so its rules hold: a gradient keeps two levels at least.
+void TestMetaSurface::gadgetSettersKeepTheirRules()
+{
+    QVariant gradient = QVariant::fromValue(QCPColorGradient());
+    const QMetaObject* meta = gradient.metaType().metaObject();
+    const QMetaProperty levelCount = meta->property(meta->indexOfProperty("levelCount"));
+    QVERIFY(levelCount.writeOnGadget(gradient.data(), QVariant(1)));
+    QCOMPARE(levelCount.readOnGadget(gradient.constData()).toInt(), 2);
+}
+
+// The two antialiasing sets never share an element: forcing one on takes it out of the other set,
+// and only it.
+void TestMetaSurface::antialiasingSetsStayApart()
+{
+    auto plot = newPlot();
+    plot->setAntialiasedElements(QCP::aeNone);
+    plot->setNotAntialiasedElements(QCP::aeAxes | QCP::aeGrid);
+    plot->setAntialiasedElements(QCP::aeAxes);
+    QCOMPARE(plot->antialiasedElements(), QCP::AntialiasedElements(QCP::aeAxes));
+    QCOMPARE(plot->notAntialiasedElements(), QCP::AntialiasedElements(QCP::aeGrid));
+
+    plot->setNotAntialiasedElements(QCP::aeAxes | QCP::aeGrid);
+    QCOMPARE(plot->antialiasedElements(), QCP::AntialiasedElements(QCP::aeNone));
+
+    plot->setAntialiasedElements(QCP::aeAxes | QCP::aeLegend);
+    plot->setNotAntialiasedElement(QCP::aeAxes, true);
+    QCOMPARE(plot->antialiasedElements(), QCP::AntialiasedElements(QCP::aeLegend));
+    QCOMPARE(plot->notAntialiasedElements(), QCP::AntialiasedElements(QCP::aeAxes | QCP::aeGrid));
+
+    plot->setAntialiasedElement(QCP::aeGrid, true);
+    QCOMPARE(plot->antialiasedElements(), QCP::AntialiasedElements(QCP::aeLegend | QCP::aeGrid));
+    QCOMPARE(plot->notAntialiasedElements(), QCP::AntialiasedElements(QCP::aeAxes));
+}
+
+void TestMetaSurface::polarNumberFormatIsWhatIsDrawn_data()
+{
+    QTest::addColumn<bool>("radial");
+    QTest::newRow("angular") << false;
+    QTest::newRow("radial") << true;
+}
+
+// The format a polar axis reports is the one it draws: writing it back draws the same picture.
+// The labels need a decimal power to show the multiplication sign.
+void TestMetaSurface::polarNumberFormatIsWhatIsDrawn()
+{
+    QFETCH(bool, radial);
+    auto plot = newPlot();
+    QCPPolarArea* area = polarAreaOn(*plot);
+    QCPAxisBase* axis = radial ? static_cast<QCPAxisBase*>(area->radialAxis().get())
+                               : static_cast<QCPAxisBase*>(area->angularAxis().get());
+    axis->setRange(0, 4e7);
+    // The angular axis ticks every 30 by default: a few ticks, not a million.
+    if (auto fixed = axis->ticker().dynamicCast<QCPAxisTickerFixed>())
+        fixed->setTickStep(1e7);
+    const QImage before = plot->toPixmap(400, 300).toImage();
+    const QVariant reported = axis->property("numberFormat");
+    QVERIFY(axis->setProperty("numberFormat", QStringLiteral("e")));
+    QVERIFY(axis->setProperty("numberFormat", reported));
+    QCOMPARE(axis->property("numberFormat"), reported);
+    QCOMPARE(plot->toPixmap(400, 300).toImage(), before);
 }
 
 void TestMetaSurface::revisionNotifiesThroughChanged_data()

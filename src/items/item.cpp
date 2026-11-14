@@ -484,6 +484,8 @@ void QCPItemPosition::setArea(QCPArea* area)
 */
 void QCPItemPosition::setType(QCPItemPosition::PositionType type)
 {
+    // A span signals its range from each coordinate write: a slot may delete the item mid-call.
+    const QCPEmissionScope scope(mParentPlot);
     // A framed position cannot retain through the per-slot setters: the first of the two calls sees
     // a mixed pair, and a mixed pair has no pixel under a frame that does not separate. Read the
     // pixel once, change both slots, place it once.
@@ -643,6 +645,8 @@ bool QCPItemPosition::parentChainReachesThis(QCPItemAnchor* parent) const
 */
 bool QCPItemPosition::setParentAnchor(QCPItemAnchor* parentAnchor, bool keepPixelPosition)
 {
+    // A span signals its range from each coordinate write: a slot may delete the item mid-call.
+    const QCPEmissionScope scope(mParentPlot);
     bool successX = setParentAnchorX(parentAnchor, keepPixelPosition);
     bool successY = setParentAnchorY(parentAnchor, keepPixelPosition);
     return successX && successY;
@@ -793,8 +797,11 @@ void QCPItemPosition::setCoords(double key, double value)
         return;
     if (mParentItem)
         mParentItem->markDirty();
+    const QPointF before(mKey, mValue);
     mKey = key;
     mValue = value;
+    if (mParentItem)
+        mParentItem->positionMoved(this, before); // last: a span signals its range from there
 }
 
 void QCPItemPosition::assignCoords(double key, double value)
@@ -1193,12 +1200,14 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
 */
 void QCPItemPosition::set(const QCP::Position& position)
 {
-  if (const auto* data = std::get_if<QCP::Data>(&position))
-  {
-    detachFromParent(this);
-    setType(ptPlotCoords);
-    setCoords(data->x, data->y);
-  }
+    // A span signals its range from each coordinate write: a slot may delete the item mid-call.
+    const QCPEmissionScope scope(mParentPlot);
+    if (const auto* data = std::get_if<QCP::Data>(&position))
+    {
+        detachFromParent(this);
+        setType(ptPlotCoords);
+        setCoords(data->x, data->y);
+    }
   else if (const auto* pixels = std::get_if<QCP::Pixels>(&position))
   {
     detachFromParent(this);

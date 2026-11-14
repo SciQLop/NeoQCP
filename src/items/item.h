@@ -415,6 +415,14 @@ protected:
     // introduced virtual methods:
     virtual QPointF anchorPixelPosition(int anchorId) const;
 
+    //! Called by \a position after its coordinates moved from \a before, as its last action: an
+    //! item whose properties read its positions signals them here. The default does nothing.
+    virtual void positionMoved(const QCPItemPosition* position, QPointF before)
+    {
+        Q_UNUSED(position)
+        Q_UNUSED(before)
+    }
+
     // non-virtual methods:
     double rectDistance(const QRectF& rect, const QPointF& pos, bool filledRect) const;
     QCPItemPosition* createPosition(const QString& name);

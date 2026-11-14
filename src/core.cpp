@@ -1034,7 +1034,7 @@ void QCustomPlot::setAntialiasedElements(const QCP::AntialiasedElements& antiali
 
     // make sure elements aren't in mNotAntialiasedElements and mAntialiasedElements simultaneously:
     if ((mNotAntialiasedElements & mAntialiasedElements) != 0)
-        mNotAntialiasedElements |= ~mAntialiasedElements;
+        mNotAntialiasedElements &= ~mAntialiasedElements;
     notifyAntialiasing(before);
 }
 
@@ -1055,7 +1055,7 @@ void QCustomPlot::setAntialiasedElement(QCP::AntialiasedElement antialiasedEleme
 
     // make sure elements aren't in mNotAntialiasedElements and mAntialiasedElements simultaneously:
     if ((mNotAntialiasedElements & mAntialiasedElements) != 0)
-        mNotAntialiasedElements |= ~mAntialiasedElements;
+        mNotAntialiasedElements &= ~mAntialiasedElements;
     notifyAntialiasing(before);
 }
 
@@ -1084,7 +1084,7 @@ void QCustomPlot::setNotAntialiasedElements(const QCP::AntialiasedElements& notA
 
     // make sure elements aren't in mNotAntialiasedElements and mAntialiasedElements simultaneously:
     if ((mNotAntialiasedElements & mAntialiasedElements) != 0)
-        mAntialiasedElements |= ~mNotAntialiasedElements;
+        mAntialiasedElements &= ~mNotAntialiasedElements;
     notifyAntialiasing(before);
 }
 
@@ -1106,7 +1106,7 @@ void QCustomPlot::setNotAntialiasedElement(QCP::AntialiasedElement notAntialiase
 
     // make sure elements aren't in mNotAntialiasedElements and mAntialiasedElements simultaneously:
     if ((mNotAntialiasedElements & mAntialiasedElements) != 0)
-        mAntialiasedElements |= ~mNotAntialiasedElements;
+        mAntialiasedElements &= ~mNotAntialiasedElements;
     notifyAntialiasing(before);
 }
 
@@ -1739,7 +1739,7 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     const QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
     plottable->moveToLayer(nullptr, false);
     plottable->setParentLayerable(nullptr);
-    plottable->forgetSystem();
+    forgetSystemOf(plottable);
     plottable->mReportedLostAxis = true;
     plottable->mRegisteredPlot = nullptr;
     plottable->mParentPlot = nullptr;
@@ -1747,11 +1747,30 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     // What follows it (a band filled to it) learns it left: it drops the link.
     plottable->markDependentsDirty();
     if (group)
-    {
-        group->updateLegendRow();
-        qcpEmit(group.data(), this, &QCPPlottableGroup::membersChanged);
-    }
+        group->memberLeft();
     return true;
+}
+
+/*! \internal
+
+  A taken plottable leaves its system and axes. Its signals go through this plot, which holds
+  detach's scope: the plottable has no plot of its own any more when they are delivered.
+*/
+void QCustomPlot::forgetSystemOf(QCPAbstractPlottable* plottable)
+{
+    const bool hadSystem = plottable->mSystem;
+    const bool hadKeyAxis = plottable->keyAxisRaw();
+    const bool hadValueAxis = plottable->valueAxisRaw();
+    plottable->forgetSystem();
+    if (hadSystem)
+        qcpEmit(plottable, this, &QCPAbstractPlottable::systemChanged,
+                static_cast<QCPCoordinateSystem*>(nullptr));
+    if (hadKeyAxis)
+        qcpEmit(plottable, this, &QCPAbstractPlottable::keyAxisChanged,
+                static_cast<QCPAxis*>(nullptr));
+    if (hadValueAxis)
+        qcpEmit(plottable, this, &QCPAbstractPlottable::valueAxisChanged,
+                static_cast<QCPAxis*>(nullptr));
 }
 
 /*! \internal
@@ -1909,10 +1928,7 @@ void QCustomPlot::deletePlottable(QCPAbstractPlottable* plottable)
     delete plottable;
     // Only now: a slot may call removePlottable again, and must find this one gone.
     if (group)
-    {
-        group->updateLegendRow();
-        qcpEmit(group.data(), this, &QCPPlottableGroup::membersChanged);
-    }
+        group->memberLeft();
 }
 
 /*! \internal
@@ -1945,10 +1961,7 @@ void QCustomPlot::plottableDestroyed(QCPAbstractPlottable* plottable)
 {
     QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
     if (group)
-    {
-        group->updateLegendRow();
-        qcpEmit(group.data(), this, &QCPPlottableGroup::membersChanged);
-    }
+        group->memberLeft();
 }
 
 /*! \overload
