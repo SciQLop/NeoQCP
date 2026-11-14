@@ -946,6 +946,9 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
     }
     const QCPAxis* keyBefore = keyAxisRaw();
     const QCPAxis* valueBefore = valueAxisRaw();
+    // A late join (registerJoinedPlottable) and the axes signal: everything waits until the frame
+    // is taken, as a slot may delete this plottable or the plot.
+    const QCPEmissionScope scope(mParentPlot);
     systemWillChange(system);
     mSystem = system;
     // The area it draws in is the one it hangs on: hiding the area it left must not hide it, and

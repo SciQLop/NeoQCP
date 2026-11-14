@@ -1323,9 +1323,20 @@ struct Deleting
     // Builds the scene and returns the object and the signal whose slot deletes the plot.
     std::function<std::pair<QObject*, const char*>(QCustomPlot&)> arm;
     std::function<void(QCustomPlot&)> write;
+    bool deletesSender = false; // the slot deletes the object that signals, not the plot
 };
 
 QCPAxis* unlistedAxis = nullptr; // made by one row's arm, listed by its write
+// Taken by one row's arm, given back by its write.
+std::unique_ptr<QCPItemText> pendingItem;
+std::unique_ptr<QCPGraph> pendingGraph;
+
+std::pair<QObject*, const char*> armPendingItem(QCustomPlot& plot)
+{
+    QCPItemText* text = plot.add<QCPItemText>().get();
+    pendingItem = plot.take(QCPHandle<QCPItemText>(text));
+    return { pendingItem.get(), "layer" };
+}
 
 const QVector<Deleting>& deletingWriters()
 {
@@ -1408,6 +1419,17 @@ const QVector<Deleting>& deletingWriters()
               return std::pair<QObject*, const char*>(second, "offset");
           },
           [](QCustomPlot& plot) { plot.axisRect()->removeAxis(plot.xAxis.get()); } },
+        { "QCustomPlot::add(item)", armPendingItem,
+          [](QCustomPlot& plot) { plot.add(std::move(pendingItem)); } },
+        { "QCustomPlot::add(item), deleting the item", armPendingItem,
+          [](QCustomPlot& plot) { plot.add(std::move(pendingItem)); }, true },
+        { "QCustomPlot::add(plottable)",
+          [](QCustomPlot& plot)
+          {
+              pendingGraph = plot.take(QCPHandle<QCPGraph>(graphOn(plot)));
+              return std::pair<QObject*, const char*>(plot.legend.get(), "rowStretchFactors");
+          },
+          [](QCustomPlot& plot) { plot.add(std::move(pendingGraph)); } },
         { "QCPAxisRect::setupFullAxesBox", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(plot.xAxis2.get(), "visible"); },
           [](QCustomPlot& plot) { plot.axisRect()->setupFullAxesBox(); } },
@@ -1429,18 +1451,20 @@ void TestMetaSurface::slotDeletingThePlotDuringAWriter()
     const Deleting& d = deletingWriters()[writer];
     QPointer<QCustomPlot> plot(newPlot().release());
     const auto [sender, property] = d.arm(*plot);
+    QPointer<QObject> victim(d.deletesSender ? sender : static_cast<QObject*>(plot.data()));
     MetaTrigger trigger;
     // Once: the plot's teardown sends more signals, and a QPointer is cleared only by ~QObject.
     bool fired = false;
-    trigger.action = [&plot, &fired]
+    trigger.action = [&victim, &fired]
     {
         if (std::exchange(fired, true))
             return;
-        delete plot.data();
+        delete victim.data();
     };
     connectTrigger(sender, property, &trigger);
     d.write(*plot);
-    QVERIFY2(plot.isNull(), "the signal never fired");
+    QVERIFY2(victim.isNull(), "the signal never fired");
+    delete plot.data();
 }
 
 void TestMetaSurface::exceptionsNameRealProperties()

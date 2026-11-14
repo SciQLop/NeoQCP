@@ -891,6 +891,9 @@ qcp::HandleFor<T> QCustomPlot::add(std::unique_ptr<T> object)
                   "add(std::unique_ptr<T>) takes plottables and items");
     using Handle = qcp::HandleFor<T>;
     QCP_CHECK_OR_RETURN(object, "the pointer is empty", Handle{});
+    // Joining signals (its layer, the legend's rows): they wait until the object is dirtied, as a
+    // slot may delete it or the plot.
+    const QCPEmissionScope scope(this);
     if (!adopt(object.get()))
         return Handle{};
     Handle handle = qcp::makeHandle<Handle>(object.release());

@@ -1749,6 +1749,9 @@ bool QCustomPlot::adopt(QCPAbstractItem* item)
     QCP_CHECK_OR_RETURN(!item->parentPlot(), "the object already belongs to a plot: take it first",
                         false);
     QCP_CHECK_OR_RETURN(axisRect(), "the plot has no axis rect", false);
+    // registerItem's layer and colours signal: they wait until the item is in, as a slot may
+    // delete it or the plot.
+    const QCPEmissionScope scope(this);
     item->setParent(this);
     item->initializeParentPlot(this);
     for (QCPItemAnchor* anchor : item->mAnchors)
