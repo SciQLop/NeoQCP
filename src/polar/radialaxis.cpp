@@ -1240,15 +1240,9 @@ void QCPPolarAxisRadial::draw(QCPPainter* painter)
                                                          // pixels to angular axis
                 {
                     const QPointF tickAnchor = tickPosition + tickNormal * mSubTickLengthOut;
-                    const QString text = mTickVectorLabels.at(i);
-                    mLabelPainter.drawTickLabel(painter, tickAnchor, text);
-                    // The same box is kept, for clicks on the label.
-                    const QSizeF extent
-                        = QCP::paintedMetricsF(getTickLabelFont()).boundingRect(text).size();
-                    const QPointF anchor = tickAnchor
-                        + tickNormal * (mLabelPainter.padding() + extent.height() / 2.0);
-                    mTickLabelBoxes.append(QRectF(
-                        anchor - QPointF(extent.width() / 2.0, extent.height() / 2.0), extent));
+                    // The drawn rect is the click box, rotation included.
+                    mTickLabelBoxes.append(
+                        mLabelPainter.drawTickLabel(painter, tickAnchor, mTickVectorLabels.at(i)));
                 }
             }
         }

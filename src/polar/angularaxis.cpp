@@ -449,17 +449,10 @@ void QCPPolarAxisAngular::draw(QCPPainter* painter)
                     || (mTickVectorCosSin.at(i) - mTickVectorCosSin.first()).manhattanLength()
                         > 5 / 180.0 * M_PI)
                 {
-                    const QString text = mTickVectorLabels.at(i);
-                    mLabelPainter.drawTickLabel(painter, outerTick, text);
-                    // The label painter centres the text on the anchor it computes from the tick;
-                    // the same box is kept here, for clicks on the label.
-                    const QSizeF extent
-                        = QCP::paintedMetricsF(getTickLabelFont()).boundingRect(text).size();
-                    const QPointF anchor = outerTick
-                        + mTickVectorCosSin.at(i)
-                            * (mLabelPainter.padding() + extent.height() / 2.0);
-                    mTickLabelBoxes.append(QRectF(
-                        anchor - QPointF(extent.width() / 2.0, extent.height() / 2.0), extent));
+                    // The drawn rect is the click box: a rebuilt one drifts from where the label
+                    // painter actually anchors the text.
+                    mTickLabelBoxes.append(
+                        mLabelPainter.drawTickLabel(painter, outerTick, mTickVectorLabels.at(i)));
                 }
             }
         }

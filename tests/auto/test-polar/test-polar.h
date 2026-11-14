@@ -55,6 +55,8 @@ private slots:
     void insetAndBackgroundAreAreaFeatures();
     void backgroundStaysInsideTheDisc();
     void polarAxisPartsAreClickable();
+    void angularTickLabelInkIsHittable();
+    void rotatedRadialTickLabelInkIsHittable();
     void radialDragAndWheelWork();
     void angularWheelZoomRequeuesTheRepaint();
     void theAngularAxisRefusesALogScale();

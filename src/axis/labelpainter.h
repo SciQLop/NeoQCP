@@ -126,7 +126,8 @@ public:
     // virtual int size() const;
 
     // non-property methods:
-    void drawTickLabel(QCPPainter* painter, const QPointF& tickPos, const QString& text);
+    //! Draws one label at \a tickPos and returns the rect it covers, in pixels.
+    QRectF drawTickLabel(QCPPainter* painter, const QPointF& tickPos, const QString& text);
     void clearCache();
 
     // constants that may be used with setMultiplicationSymbol:
@@ -178,7 +179,7 @@ protected:
     QFontMetrics mCachedFontMetrics {QFont()};
 
     // introduced virtual methods:
-    virtual void drawLabelMaybeCached(QCPPainter* painter, const QFont& font, const QColor& color,
+    virtual QRectF drawLabelMaybeCached(QCPPainter* painter, const QFont& font, const QColor& color,
                                       const QPointF& pos, AnchorSide side, double rotation,
                                       const QString& text);
     virtual QByteArray generateLabelParameterHash()

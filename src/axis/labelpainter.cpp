@@ -139,7 +139,7 @@ int QCPLabelPainterPrivate::cacheSize() const
     return mLabelCache.maxCost();
 }
 
-void QCPLabelPainterPrivate::drawTickLabel(QCPPainter* painter, const QPointF& tickPos,
+QRectF QCPLabelPainterPrivate::drawTickLabel(QCPPainter* painter, const QPointF& tickPos,
                                            const QString& text)
 {
     double realRotation = mRotation;
@@ -164,8 +164,8 @@ void QCPLabelPainterPrivate::drawTickLabel(QCPPainter* painter, const QPointF& t
 
     realSide = rotationCorrectedSide(
         realSide, realRotation); // rotation angles may change the true anchor side of the label
-    drawLabelMaybeCached(painter, mFont, mColor, getAnchorPos(tickPos), realSide, realRotation,
-                         text);
+    return drawLabelMaybeCached(painter, mFont, mColor, getAnchorPos(tickPos), realSide,
+                                realRotation, text);
 }
 
 /*! \internal
@@ -258,15 +258,15 @@ QByteArray QCPLabelPainterPrivate::generateLabelParameterHash() const
   superscripted powers, the font is temporarily made smaller by a fixed factor (see \ref
   getTickLabelData).
 */
-void QCPLabelPainterPrivate::drawLabelMaybeCached(QCPPainter* painter, const QFont& font,
+QRectF QCPLabelPainterPrivate::drawLabelMaybeCached(QCPPainter* painter, const QFont& font,
                                                   const QColor& color, const QPointF& pos,
                                                   AnchorSide side, double rotation,
                                                   const QString& text)
 {
     // warning: if you change anything here, also adapt getMaxTickLabelSize() accordingly!
     if (text.isEmpty())
-        return;
-    QSize finalSize;
+        return {};
+    QRectF drawn;
 
     if (mParentPlot->plottingHints().testFlag(QCP::phCacheLabels)
         && !painter->modes().testFlag(QCPPainter::pmNoCaching)) // label caching enabled
@@ -299,9 +299,9 @@ void QCPLabelPainterPrivate::drawLabelMaybeCached(QCPPainter* painter, const QFo
         if (!labelClippedByBorder)
         {
             painter->drawPixmap(pos + cachedLabel->offset, cachedLabel->pixmap);
-            finalSize = cachedLabel->pixmap.size()
-                / mParentPlot
-                      ->bufferDevicePixelRatio(); // TODO: collect this in a member rect list?
+            drawn = QRectF(pos + cachedLabel->offset,
+                           QSizeF(cachedLabel->pixmap.size())
+                               / mParentPlot->bufferDevicePixelRatio());
         }
         mLabelCache.insert(QString::fromUtf8(key), cachedLabel);
     }
@@ -327,16 +327,10 @@ void QCPLabelPainterPrivate::drawLabelMaybeCached(QCPPainter* painter, const QFo
         if (!labelClippedByBorder)
         {
             drawText(painter, pos, labelData);
-            finalSize = labelData.rotatedTotalBounds.size();
+            drawn = QRectF(labelData.rotatedTotalBounds).translated(pos);
         }
     }
-    /*
-    // expand passed tickLabelsSize if current tick label is larger:
-    if (finalSize.width() > tickLabelsSize->width())
-      tickLabelsSize->setWidth(finalSize.width());
-    if (finalSize.height() > tickLabelsSize->height())
-      tickLabelsSize->setHeight(finalSize.height());
-    */
+    return drawn;
 }
 
 QPointF QCPLabelPainterPrivate::getAnchorPos(const QPointF& tickPos)

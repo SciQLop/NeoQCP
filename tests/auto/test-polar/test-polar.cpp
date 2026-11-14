@@ -1533,3 +1533,79 @@ void TestPolar::deletingTheAngularAxisMidDragIsSafe()
     QCOMPARE(area->angularAxis(), nullptr);
     settle(plot);
 }
+
+namespace
+{
+// The pixels a label colour paints: the plot rendered with white labels, then black ones. The
+// second render is the last draw, so the axis' hit boxes are those of the black labels.
+template <typename Axis>
+std::vector<QPoint> labelInk(QCustomPlot& plot, Axis* axis)
+{
+    plot.setBackground(QBrush(Qt::white));
+    axis->setTickLabelColor(Qt::white);
+    const QImage blank = plot.toPixmap(400, 300).toImage();
+    axis->setTickLabelColor(Qt::black);
+    const QImage drawn = plot.toPixmap(400, 300).toImage();
+    std::vector<QPoint> ink;
+    for (int y = 0; y < drawn.height(); ++y)
+        for (int x = 0; x < drawn.width(); ++x)
+            if (drawn.pixel(x, y) != blank.pixel(x, y))
+                ink.emplace_back(x, y);
+    return ink;
+}
+
+// Ink a click cannot select as a tick label, allowing one pixel of antialiasing past the box.
+std::vector<QPoint> unhittableInk(QCPAxisBase* axis, const std::vector<QPoint>& ink)
+{
+    std::vector<QPoint> missed;
+    for (const QPoint& p : ink)
+    {
+        bool hit = false;
+        for (int dy = -1; dy <= 1 && !hit; ++dy)
+            for (int dx = -1; dx <= 1 && !hit; ++dx)
+                hit = partAt(axis, QPointF(p + QPoint(dx, dy))) == QCPAxisBase::spTickLabels;
+        if (!hit)
+            missed.push_back(p);
+    }
+    return missed;
+}
+
+QString describe(const std::vector<QPoint>& missed, std::size_t inkCount)
+{
+    QString text = QString("%1 of %2 ink pixels miss").arg(missed.size()).arg(inkCount);
+    if (!missed.empty())
+        text += QString(", first at (%1, %2)").arg(missed.front().x()).arg(missed.front().y());
+    return text;
+}
+} // namespace
+
+// The hit box is the rect the label painter drew, not one rebuilt beside it: at 0 and 180 degrees
+// a wide label sits beside its tick, not centred on it.
+void TestPolar::angularTickLabelInkIsHittable()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    QCPPolarAxisAngular* angular = area->angularAxis();
+    angular->setRange(0, 360);
+    area->radialAxis()->setTickLabels(false);
+    settle(plot);
+    const std::vector<QPoint> ink = labelInk(plot, angular);
+    QVERIFY(!ink.empty());
+    const std::vector<QPoint> missed = unhittableInk(angular, ink);
+    QVERIFY2(missed.empty(), qPrintable(describe(missed, ink.size())));
+}
+
+void TestPolar::rotatedRadialTickLabelInkIsHittable()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    QCPPolarAxisRadial* radial = area->radialAxis();
+    radial->setRange(0, 1000);
+    radial->setTickLabelRotation(45);
+    area->angularAxis()->setTickLabels(false);
+    settle(plot);
+    const std::vector<QPoint> ink = labelInk(plot, radial);
+    QVERIFY(!ink.empty());
+    const std::vector<QPoint> missed = unhittableInk(radial, ink);
+    QVERIFY2(missed.empty(), qPrintable(describe(missed, ink.size())));
+}
