@@ -33,6 +33,9 @@
 #include "layer.h"
 #include "spatial-index.h"
 #include "vector2d.h"
+#include <optional>
+
+class QCPEmissionScope;
 
 class QCPPainter;
 class QCustomPlot;
@@ -210,6 +213,8 @@ protected:
 
     // reimplemented virtual methods:
     virtual QCPItemPosition* toQCPItemPosition() override { return this; }
+
+    [[nodiscard]] std::optional<QCPEmissionScope> signallingScope() const;
 
 private:
     Q_DISABLE_COPY(QCPItemPosition)
@@ -415,8 +420,8 @@ protected:
     // introduced virtual methods:
     virtual QPointF anchorPixelPosition(int anchorId) const;
 
-    //! Called by \a position after its coordinates moved from \a before, as its last action: an
-    //! item whose properties read its positions signals them here. The default does nothing.
+    //! Called by \a position after its coordinates moved from \a before, as its last action, when
+    //! \ref mPositionsSignal is set: an item whose properties read its positions signals them here.
     virtual void positionMoved(const QCPItemPosition* position, QPointF before)
     {
         Q_UNUSED(position)
@@ -434,6 +439,12 @@ private:
     QPointer<QCustomPlot> mRegisteredPlot; // the plot whose item list holds this one
     //! True while the destructor detaches the anchors: their item has lost its virtuals.
     bool mDetachingAnchors = false;
+
+protected:
+    //! Set by an item whose properties read its positions (the spans): its positions call
+    //! positionMoved and hold an emission scope in their multi-step setters. Off, a position write
+    //! costs neither, which item creation (two positions per item) would feel.
+    bool mPositionsSignal = false;
 
     friend class QCustomPlot;
     friend class QCPItemAnchor;

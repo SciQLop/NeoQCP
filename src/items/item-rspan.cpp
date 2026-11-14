@@ -17,6 +17,7 @@ QCPItemRSpan::QCPItemRSpan(QCustomPlot* parentPlot)
     , bottomLeft(createAnchor(QLatin1String("bottomLeft"), aiBottomLeft))
     , center(createAnchor(QLatin1String("center"), aiCenter))
 {
+    mPositionsSignal = true; // its ranges read the edges
     const QScopedValueRollback quiet(mEdgesQuiet, true);
     leftEdge->setType(QCPItemPosition::ptPlotCoords);
     leftEdge->setCoords(0, 0);

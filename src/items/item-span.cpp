@@ -46,6 +46,7 @@ QCPItemSpan::QCPItemSpan(QCustomPlot* parentPlot, Qt::Orientation orientation)
         , upperEdge(createPosition(QLatin1String("upperEdge")))
         , center(createAnchor(QLatin1String("center"), aiCenter))
 {
+    mPositionsSignal = true; // its range reads the edges
     const QScopedValueRollback quiet(mEdgesQuiet, true);
     const bool vertical = mOrientation == Qt::Vertical;
     for (QCPItemPosition* edge : { lowerEdge, upperEdge })

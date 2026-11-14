@@ -422,8 +422,9 @@ rows are the behaviour that moved with the new properties.
   transform and plottables, the area's systems, the group's elements and an axis's link stay off.
 - The span range signals (`keyRangeChanged`, `valueRangeChanged`, `rangeChanged`) also fire when an edge
   position moves: the handle's `setLeftEdge` and friends, and a raw `span->leftEdge->setCoords(...)`. A position
-  calls the new protected virtual `QCPAbstractItem::positionMoved(position, before)` after its coordinates move
-  (ABI). `QCPItemPosition::setType`, `setParentAnchor` and `set(QCP::Position)` hold an emission scope.
+  calls the new protected virtual `QCPAbstractItem::positionMoved(position, before)` after its coordinates move,
+  when its item sets the protected flag `mPositionsSignal` (the spans do; ABI). For such an item,
+  `QCPItemPosition::setType`, `setParentAnchor` and `set(QCP::Position)` hold an emission scope.
 - **Fixed:** the antialiasing setters kept the two sets apart with `|= ~` (2.x). Forcing an element on put every
   other element into the never-antialiased set. Now forcing an element on takes only that element out of the
   other set.

@@ -485,7 +485,7 @@ void QCPItemPosition::setArea(QCPArea* area)
 void QCPItemPosition::setType(QCPItemPosition::PositionType type)
 {
     // A span signals its range from each coordinate write: a slot may delete the item mid-call.
-    const QCPEmissionScope scope(mParentPlot);
+    const auto scope = signallingScope();
     // A framed position cannot retain through the per-slot setters: the first of the two calls sees
     // a mixed pair, and a mixed pair has no pixel under a frame that does not separate. Read the
     // pixel once, change both slots, place it once.
@@ -646,7 +646,7 @@ bool QCPItemPosition::parentChainReachesThis(QCPItemAnchor* parent) const
 bool QCPItemPosition::setParentAnchor(QCPItemAnchor* parentAnchor, bool keepPixelPosition)
 {
     // A span signals its range from each coordinate write: a slot may delete the item mid-call.
-    const QCPEmissionScope scope(mParentPlot);
+    const auto scope = signallingScope();
     bool successX = setParentAnchorX(parentAnchor, keepPixelPosition);
     bool successY = setParentAnchorY(parentAnchor, keepPixelPosition);
     return successX && successY;
@@ -791,6 +791,18 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
 
   \see setPixelPosition
 */
+/*! \internal
+
+  The scope a multi-step setter holds when its item signals from its positions (\ref
+  QCPAbstractItem::positionMoved), none otherwise.
+*/
+std::optional<QCPEmissionScope> QCPItemPosition::signallingScope() const
+{
+    if (mParentItem && mParentItem->mPositionsSignal)
+        return std::optional<QCPEmissionScope>(std::in_place, mParentPlot);
+    return std::nullopt;
+}
+
 void QCPItemPosition::setCoords(double key, double value)
 {
     if (key == mKey && value == mValue)
@@ -800,7 +812,7 @@ void QCPItemPosition::setCoords(double key, double value)
     const QPointF before(mKey, mValue);
     mKey = key;
     mValue = value;
-    if (mParentItem)
+    if (mParentItem && mParentItem->mPositionsSignal)
         mParentItem->positionMoved(this, before); // last: a span signals its range from there
 }
 
@@ -1201,7 +1213,7 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
 void QCPItemPosition::set(const QCP::Position& position)
 {
     // A span signals its range from each coordinate write: a slot may delete the item mid-call.
-    const QCPEmissionScope scope(mParentPlot);
+    const auto scope = signallingScope();
     if (const auto* data = std::get_if<QCP::Data>(&position))
     {
         detachFromParent(this);
