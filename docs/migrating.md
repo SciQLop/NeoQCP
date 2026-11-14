@@ -185,7 +185,7 @@ Behaviour that changed:
 - **Hit details.** `selectTest()` hands a graph's hit back as a `QVariantMap` with `componentIndex` and `dataIndex`, not as a `QCPDataSelection`. `details.value<QCPDataSelection>()` gives an empty selection. Read the row with `qcp::hitDataIndex(details)`, which takes either form.
 - **Legend.** The row of a graph with one column shows the graph's name, unless you named the column yourself. A graph without data shows its pen next to its name.
 - **Logarithmic value axis.** A fill to a value the axis cannot place, and the baseline of impulses, go to the range bound nearer zero.
-- **Brushes.** `setBrush()` fills every column down to zero and replaces fills to a constant or between columns. Fills to another graph stay and take the new brush. `setBrush(Qt::NoBrush)` removes every fill, the ones to another graph too, as 2.x drew no channel without a brush. A later `setBrush()` fills to zero: call `setComponentFillToGraph()` again to get the band back.
+- **Brushes.** `setBrush()` fills every column without a fill down to zero. A column that already has a fill keeps where it fills to (a constant, another column, another graph) and takes the new brush. `setBrush(Qt::NoBrush)` removes every fill, the ones to another graph too, as 2.x drew no channel without a brush. A later `setBrush()` fills to zero: call `setComponentFillToGraph()` again to get the band back.
 - **Fill partners.** A fill to another graph goes when that graph leaves the plot or its frame (taken, or moved to another axis rect), as it goes when that graph is deleted.
 - **Removing points.** `removeData(from, to)` removes nothing when `from >= to`, as 2.x.
 - **Equal values.** `setPen()` with the pen the graph already has does not repaint.

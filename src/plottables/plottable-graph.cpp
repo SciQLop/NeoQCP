@@ -1235,12 +1235,11 @@ void QCPGraph::componentVisibilityToggled()
 
 void QCPGraph::applyBrushToComponent(int index, const QBrush& brush)
 {
-    // 2.x's brush coloured the channel: a fill to another graph keeps its partner, and no brush
-    // meant no channel.
-    const auto fill = componentFill(index);
+    // 2.x's brush coloured the channel: a fill keeps what it fills to (another graph, a constant,
+    // a column), and no brush meant no channel.
     if (brush.style() == Qt::NoBrush)
         clearComponentFill(index);
-    else if (fill && std::holds_alternative<FillToGraph>(fill->target))
+    else if (componentFill(index))
         setComponentFillBrush(index, brush);
     else
         setComponentFill(index, 0.0, brush);

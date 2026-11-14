@@ -4685,6 +4685,28 @@ void TestMultiGraph::setBrushAfterAFillToGraphRecoloursIt()
     QVERIFY(!lower->componentFill(0).has_value());
 }
 
+// F-3 (overrules 5c R-2): setBrush recolours a fill and keeps where it fills to.
+void TestMultiGraph::setBrushKeepsAFillsConstantAndColumnTargets()
+{
+    auto* mg = redAndBlueHorizontalLines(mPlot);
+    QVERIFY(mg->setComponentFill(0, 5.0, QBrush(Qt::green)));
+    QVERIFY(mg->setComponentFillBetween(1, 0, QBrush(Qt::green)));
+    const QBrush brush(QColor(255, 0, 0, 120));
+    mg->setBrush(brush);
+
+    const auto toConstant = mg->componentFill(0);
+    QVERIFY(toConstant.has_value());
+    QVERIFY(std::holds_alternative<double>(toConstant->target));
+    QCOMPARE(std::get<double>(toConstant->target), 5.0);
+    QCOMPARE(mg->effectiveFillBrush(*toConstant), brush);
+
+    const auto toColumn = mg->componentFill(1);
+    QVERIFY(toColumn.has_value());
+    QVERIFY(std::holds_alternative<int>(toColumn->target));
+    QCOMPARE(std::get<int>(toColumn->target), 0);
+    QCOMPARE(mg->effectiveFillBrush(*toColumn), brush);
+}
+
 // A band made with the default brush takes the graph's brush, as 2.x's channel did.
 void TestMultiGraph::aFillToGraphTakesTheGraphBrush()
 {

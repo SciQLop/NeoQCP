@@ -270,6 +270,7 @@ private slots:
     // R3: the brush colours a fill to another graph
     void setBrushBeforeAFillToGraphKeepsTheBand();
     void setBrushAfterAFillToGraphRecoloursIt();
+    void setBrushKeepsAFillsConstantAndColumnTargets();
     void aFillToGraphTakesTheGraphBrush();
     // R4: a negative log range closes toward zero
     void aNegativeLogRangeFillsToTheUpperBound();
