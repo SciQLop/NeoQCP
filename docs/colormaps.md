@@ -157,9 +157,19 @@ With column normalization, a column without points shows as zero. It does not co
 
 ## Colour scales
 
-A <a href="api/classQCPColorScale.html">QCPColorScale</a> is a layout element.
-Put it in the plot layout next to the axis rect, then attach it with `setColorScale()`.
-{doc}`layout` explains layouts.
+Every axis rect owns one <a href="api/classQCPColorScale.html">QCPColorScale</a>, reached with `axisRect()->colorScale()`.
+It is shown while something uses it, in the rect's right margin by default.
+A colour map, a 2D histogram or a line with colour values joins its rect's scale on its own.
+So all of them on one rect share one gradient and one data range.
+Change the gradient of one and every other follows.
+
+To give a plottable its own colours, call `setColorScale(nullptr)` on it.
+It then keeps its own gradient and range, and shows no colour bar.
+The rect hides its bar once nobody uses it.
+The gradient example below does this for each stripe.
+
+You can also make a scale yourself, put it in the plot layout and attach it with `setColorScale()`, as in the first example.
+It replaces the rect's scale for that plottable. {doc}`layout` explains layouts.
 
 Once attached, the map and the scale share three properties: the gradient, the data range and the data scale type.
 Change one on either side and the other follows.

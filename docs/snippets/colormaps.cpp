@@ -197,6 +197,7 @@ DOC_SNIPPET(colormaps_gradients, 600, 560)
             stripe->data()->setCell(k, 0, k);
             stripe->data()->setCell(k, 1, k);
         }
+        stripe->setColorScale(nullptr);   // leave the rect's shared scale: one gradient per stripe
         stripe->setGradient(QCPColorGradient::GradientPreset(presets.value(i)));
         stripe->setDataRange(QCPRange(0, 255));
         names->addTick(i, presets.key(i));
