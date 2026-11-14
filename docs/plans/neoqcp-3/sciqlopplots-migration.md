@@ -356,7 +356,9 @@ it instead of `property("name")`.
 ### New properties (Task 3)
 
 The one-argument setter/getter pairs that had no `Q_PROPERTY` are properties now, each with an `xChanged(T)`
-signal. Nothing that compiled stops compiling; the rows below are the behaviour that moved with them.
+signal. One rename breaks the source of a subclass (the **Break** row below); two new virtuals change the
+vtables of `QCPAbstractPlottable` and `QCPAbstractItem`, so compiled subclasses must be rebuilt (ABI). The other
+rows are the behaviour that moved with the new properties.
 
 - Axes and polar classes: `QCPAxisBase::rangeDraggable` / `rangeZoomable`, `QCPAxis::labelRenderer`, every pair of
   `QCPPolarAxisAngular`, `QCPPolarAxisRadial` and `QCPPolarGrid`, `QCPPolarArea::rangeZoomFactor`, and
@@ -364,8 +366,9 @@ signal. Nothing that compiled stops compiling; the rows below are the behaviour 
 - `QCPAxisBase::setRangeDraggable` / `setRangeZoomable`, `QCPPolarArea::setRangeZoomFactor` and
   `QCPPolarGraph::setScatterStyle` return on an equal value. `QCPPolarArea::setRangeZoomFactor` moved out of line.
 - The polar axes' `setTickLabelRotation` compares the clamped angle, like `QCPAxis`'s.
-- The polar axes' `numberFormatChanged` fires only when `numberFormat()` moves. The angular axis reads its
-  multiplication sign from its label painter, so a write can move the members without moving the getter.
+- The polar axes report what they draw: their default number format is `"gbc"` (beautiful powers, cross sign),
+  the label painter's default. The radial axis used to report `"gb"` while drawing the cross. The drawing does
+  not change; `numberFormat()` of a default radial axis does.
 - The plot: `creationModeEnabled`, `creationModifier`, `bufferDevicePixelRatio`, `antialiasedElements`,
   `notAntialiasedElements`, `interactions`, `plottingHints`, `selectionRectMode`, `selectionRect`, `theme`
   (through the existing `themeChanged()`), `skipReplotsWhenHidden`, `itemIndexing`, `dataSwapDebounceMs`,
@@ -399,11 +402,13 @@ signal. Nothing that compiled stops compiling; the rows below are the behaviour 
   name is the `system` property's signal. A subclass overriding the hook fails to compile (`override`) until
   renamed.
 - `systemChanged(nullptr)` also fires when `setKeyAxis` / `setValueAxis` leave the plottable without a system.
-  A plottable taken out of the plot (`take`) loses its system without a signal, as its axes do.
+  `take` signals `systemChanged(nullptr)`, `keyAxisChanged(nullptr)` and `valueAxisChanged(nullptr)` for what
+  it clears.
 - `QCPPlottableGroup::visibleChanged` fires whenever `visible()` moves: `setVisible`, a member shown or hidden on
-  its own, a member added or removed.
+  its own, a member added or removed, and a member leaving through the plot (`take`, `removePlottable`, a plain
+  delete).
 - `QCPIntervals::selectedRowsChanged` fires with every selection change that moves the rows.
-  `emitSelectionChanged()` (protected) is virtual for it. `StackMode`, `Style` and `EditModes` are registered
+  `emitSelectionChanged()` (protected) is virtual for it (ABI). `StackMode`, `Style` and `EditModes` are registered
   (`Q_ENUM` / `Q_FLAG`). `setForbidOverlap` moved out of line.
 - `setContourLevels` and `setAutoContourLevels` of the colour map 2 and the 2D histogram signal `contourLevelsChanged`
   only when the levels move; `setContourPen` returns on an equal pen. `QCPHistogram::setStyle` and
@@ -415,3 +420,10 @@ signal. Nothing that compiled stops compiling; the rows below are the behaviour 
   `CONSTANT`; `revision` is read-only with `changed()` as its NOTIFY (a binding on it connects to `changed()`, so
   the system starts signalling). `QCPArea::insetLayout` and `QCPAlignmentGroup::sides` are `CONSTANT`. The system's
   transform and plottables, the area's systems, the group's elements and an axis's link stay off.
+- The span range signals (`keyRangeChanged`, `valueRangeChanged`, `rangeChanged`) also fire when an edge
+  position moves: the handle's `setLeftEdge` and friends, and a raw `span->leftEdge->setCoords(...)`. A position
+  calls the new protected virtual `QCPAbstractItem::positionMoved(position, before)` after its coordinates move
+  (ABI). `QCPItemPosition::setType`, `setParentAnchor` and `set(QCP::Position)` hold an emission scope.
+- **Fixed:** the antialiasing setters kept the two sets apart with `|= ~` (2.x). Forcing an element on put every
+  other element into the never-antialiased set. Now forcing an element on takes only that element out of the
+  other set.

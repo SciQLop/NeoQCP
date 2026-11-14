@@ -174,21 +174,21 @@ Totals over the 477 rows of sections 2 and 3.1: plain 387, constant 3, dropped 1
 
 | property | type | form | NOTIFY | note |
 |---|---|---|---|---|
-| `brush` | `QBrush` | plain | `brushChanged(const QBrush&)` |  |
-| `selectedBrush` | `QBrush` | plain | `selectedBrushChanged(const QBrush&)` |  |
-| `borderPen` | `QPen` | plain | `borderPenChanged(const QPen&)` |  |
-| `selectedBorderPen` | `QPen` | plain | `selectedBorderPenChanged(const QPen&)` |  |
-| `movable` | `bool` | plain | `movableChanged(bool)` |  |
+| `brush` | `QBrush` | plain | `brushChanged(const QBrush&)` | declared once on `QCPAbstractSpanItem` (Task 3); this class inherits it |
+| `selectedBrush` | `QBrush` | plain | `selectedBrushChanged(const QBrush&)` | declared once on `QCPAbstractSpanItem` (Task 3); this class inherits it |
+| `borderPen` | `QPen` | plain | `borderPenChanged(const QPen&)` | declared once on `QCPAbstractSpanItem` (Task 3); this class inherits it |
+| `selectedBorderPen` | `QPen` | plain | `selectedBorderPenChanged(const QPen&)` | declared once on `QCPAbstractSpanItem` (Task 3); this class inherits it |
+| `movable` | `bool` | plain | `movableChanged(bool)` | declared once on `QCPAbstractSpanItem` (Task 3); this class inherits it |
 
 ### `QCPItemSpan` (`items/item-span.h`)
 
 | property | type | form | NOTIFY | note |
 |---|---|---|---|---|
-| `brush` | `QBrush` | plain | `brushChanged(const QBrush&)` |  |
-| `selectedBrush` | `QBrush` | plain | `selectedBrushChanged(const QBrush&)` |  |
-| `borderPen` | `QPen` | plain | `borderPenChanged(const QPen&)` |  |
-| `selectedBorderPen` | `QPen` | plain | `selectedBorderPenChanged(const QPen&)` |  |
-| `movable` | `bool` | plain | `movableChanged(bool)` |  |
+| `brush` | `QBrush` | plain | `brushChanged(const QBrush&)` | declared once on `QCPAbstractSpanItem` (Task 3); this class inherits it |
+| `selectedBrush` | `QBrush` | plain | `selectedBrushChanged(const QBrush&)` | declared once on `QCPAbstractSpanItem` (Task 3); this class inherits it |
+| `borderPen` | `QPen` | plain | `borderPenChanged(const QPen&)` | declared once on `QCPAbstractSpanItem` (Task 3); this class inherits it |
+| `selectedBorderPen` | `QPen` | plain | `selectedBorderPenChanged(const QPen&)` | declared once on `QCPAbstractSpanItem` (Task 3); this class inherits it |
+| `movable` | `bool` | plain | `movableChanged(bool)` | declared once on `QCPAbstractSpanItem` (Task 3); this class inherits it |
 
 ### `QCPItemStraightLine` (`items/item-straightline.h`)
 
