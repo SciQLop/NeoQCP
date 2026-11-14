@@ -59,6 +59,10 @@ public:
     //! A colour map always does; a line only once it has colour values.
     [[nodiscard]] virtual bool joinsOnArrival() const { return true; }
 
+    //! Whether this plottable maps anything through its scale now: a rect shows its own scale only
+    //! while one of its users does. A curve whose values no longer match its data does not.
+    [[nodiscard]] virtual bool showsColorScale() const { return true; }
+
 signals:
     void dataRangeChanged(const QCPRange& newRange);
     void dataScaleTypeChanged(QCPAxis::ScaleType scaleType);

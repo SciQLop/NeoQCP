@@ -140,6 +140,8 @@ protected:
     // reimplemented virtual methods:
     //! One value per data point, in container order: the curve has no key window to colour.
     [[nodiscard]] std::optional<int> colorValueCount() const override;
+    //! Read at every layout pass: data() edits the container behind every setter's back.
+    [[nodiscard]] bool showsColorScale() const override;
     //! A plain line or none: a step or an impulse needs vertices the curve does not have.
     [[nodiscard]] bool acceptsLineStyle(LineStyle style) const override;
     virtual void draw(QCPDrawContext& context) const override;

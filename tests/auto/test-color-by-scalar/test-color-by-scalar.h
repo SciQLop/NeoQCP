@@ -76,6 +76,7 @@ private slots:
     void newDataKeepsAnUncolouredLinesChosenScale();
     void newDataAfterUncolouringStopsTheOriginRequest();
     void aCurveGivenDataOfAnotherSizeDropsItsColours();
+    void aCurveEditedThroughItsContainerHidesTheBar();
 
 private:
     QCustomPlot* mPlot = nullptr;

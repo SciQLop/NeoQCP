@@ -470,6 +470,11 @@ std::optional<int> QCPCurve::colorValueCount() const
                                      : std::optional<int>(mDataContainer->size());
 }
 
+bool QCPCurve::showsColorScale() const
+{
+    return mColor.hasValues() && mColor.size() == mDataContainer->size();
+}
+
 bool QCPCurve::acceptsLineStyle(LineStyle style) const
 {
     QCP_CHECK_OR_RETURN(style == lsNone || style == lsLine,
@@ -492,7 +497,7 @@ void QCPCurve::draw(QCPDrawContext& context) const
         recordFill(context);
 
     // Values set for other data, of another size, would colour the wrong points.
-    const bool coloured = mColor.hasValues() && mColor.size() == mDataContainer->size();
+    const bool coloured = showsColorScale();
     QList<QCPDataRange> selectedSegments, unselectedSegments;
     getDataSegments(selectedSegments, unselectedSegments);
     recordSegments(context, unselectedSegments, false, coloured);

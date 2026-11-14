@@ -1352,3 +1352,23 @@ void TestColorByScalar::aCurveGivenDataOfAnotherSizeDropsItsColours()
     QVERIFY(curve->hasColorValues());
     QVERIFY(curve->colorScale());
 }
+
+// data() hands out the container, which no setter sees: the rect decides whether its bar shows from
+// what the curve can colour now, so values for another size show no bar.
+void TestColorByScalar::aCurveEditedThroughItsContainerHidesTheBar()
+{
+    auto* curve = new QCPCurve(mPlot->xAxis, mPlot->yAxis);
+    curve->setData(QVector<double> { 0, 1, 2 }, QVector<double> { 0, 1, 0 });
+    curve->setColorValues(std::vector<double> { 0, 1, 2 });
+    const auto scale = mPlot->axisRect()->colorScale();
+    mPlot->replot();
+    QVERIFY(scale->visible());
+
+    curve->data()->add(QCPCurveData(3, 3, 1));
+    mPlot->replot();
+    QVERIFY2(!scale->visible(), "the bar stayed for a curve drawn uncoloured");
+
+    curve->data()->removeAfter(2.5);
+    mPlot->replot();
+    QVERIFY2(scale->visible(), "the bar did not come back with a matching size");
+}

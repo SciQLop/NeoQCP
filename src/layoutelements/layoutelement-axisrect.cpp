@@ -34,6 +34,7 @@
 #include "../items/item.h"
 #include "../misuse.h"
 #include "../painting/painter.h"
+#include "../plottables/plottable-colormapped.h"
 #include "../plottables/plottable-graph.h"
 #include "../plottables/plottable.h"
 #include <QSet>
@@ -917,7 +918,12 @@ QCPColorScaleOps<QCPColorScale> QCPAxisRect::colorScale()
 */
 QCPColorScale* QCPAxisRect::usedColorScale() const
 {
-    return (mColorScale && !mColorScale->users().isEmpty()) ? mColorScale.data() : nullptr;
+    if (!mColorScale)
+        return nullptr;
+    const auto users = mColorScale->users();
+    const bool shown = std::any_of(users.begin(), users.end(),
+                                   [](const auto& user) { return user && user->showsColorScale(); });
+    return shown ? mColorScale.data() : nullptr;
 }
 
 /*! \internal
