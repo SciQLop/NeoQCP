@@ -193,6 +193,42 @@ void TestQCPLegend::clickAwayDeletingTheLegendFromAnItemDeselectionIsSafe()
   QCOMPARE(mPlot->legend, nullptr);
 }
 
+// A row made for one legend and put into another as a plain element belongs to the one it sits in:
+// deleting the first must not leave it drawing through a null legend.
+void TestQCPLegend::aRowAddedAsAnElementBelongsToItsNewLegend()
+{
+  mPlot->setAutoAddPlottableToLegend(false);
+  auto *graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  auto *other = new QCPLegend;
+  mPlot->axisRect()->insetLayout()->addElement(other, Qt::AlignTop | Qt::AlignLeft);
+  auto *row = new QCPPlottableLegendItem(mPlot->legend, graph);
+  QVERIFY(other->addElement(row));
+  QCOMPARE(row->parentLegend().get(), other);
+
+  delete mPlot->legend;
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  QCOMPARE(row->parentLegend().get(), other);
+}
+
+void TestQCPLegend::aSlotDeletingTheLegendARowJoinsIsSafe()
+{
+  mPlot->setAutoAddPlottableToLegend(false);
+  auto *graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  QPointer<QCPLegend> other = new QCPLegend;
+  mPlot->axisRect()->insetLayout()->addElement(other, Qt::AlignTop | Qt::AlignLeft);
+  QPointer<QCPAbstractLegendItem> row = new QCPPlottableLegendItem(mPlot->legend, graph);
+  bool ran = false;
+  connect(other, &QCPLayoutGrid::rowStretchFactorsChanged, mPlot, [&] {
+    ran = true;
+    delete other.data();
+  }, Qt::SingleShotConnection);
+  other->addElement(row);
+  QVERIFY(ran);
+  QVERIFY(!other);
+  QVERIFY(!row);
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+}
+
 // Removing a row re-wraps the legend: the grid's stretch factors signal once, with the final list,
 // and a list that ends where it started does not signal at all. A new graph swaps the base's plain
 // row for its group row: that is one row added, so one signal too.

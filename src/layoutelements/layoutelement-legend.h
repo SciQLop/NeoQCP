@@ -91,7 +91,7 @@ signals:
 
 protected:
     // property members:
-    QPointer<QCPLegend> mParentLegend; // follows the item into QCPLegend::addItem
+    QPointer<QCPLegend> mParentLegend; // follows the item into the legend it is added to
     QFont mFont;
     QColor mTextColor;
     QFont mSelectedFont;
@@ -111,6 +111,8 @@ protected:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
     virtual QRect clipRect() const override;
     virtual void draw(QCPPainter* painter) override = 0;
+    //! A row belongs to the legend it sits in, however it got there (addItem or addElement).
+    virtual void layoutChanged() override;
     // events:
     virtual void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
                              bool* selectionStateChanged) override;

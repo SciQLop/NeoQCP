@@ -17,6 +17,8 @@ private slots:
   void deselectSlotDeletingTheLegendIsSafe();
   void clickAwayDeletingTheLegendFromItsDeselectionIsSafe();
   void clickAwayDeletingTheLegendFromAnItemDeselectionIsSafe();
+  void aRowAddedAsAnElementBelongsToItsNewLegend();
+  void aSlotDeletingTheLegendARowJoinsIsSafe();
   void removingAnItemSignalsTheStretchFactorsOnce();
   void aStretchSlotDeletingTheLegendOnRemovalIsSafe();
   

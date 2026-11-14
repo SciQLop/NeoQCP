@@ -330,6 +330,12 @@ QCPHandle<QCPLegend> QCPAbstractLegendItem::parentLegend() const
     return QCPHandle<QCPLegend>(mParentLegend);
 }
 
+void QCPAbstractLegendItem::layoutChanged()
+{
+    if (auto* legend = qobject_cast<QCPLegend*>(mParentLayout))
+        mParentLegend = legend;
+}
+
 void QCPAbstractLegendItem::leaveLegendWhenDestroyed(QObject* subject)
 {
     if (subject)
@@ -1062,7 +1068,6 @@ bool QCPLegend::addItem(QCPAbstractLegendItem* item)
     const QCPEmissionScope scope(mParentPlot);
     if (!addElement(item))
         return false;
-    item->mParentLegend = this;
     markDirty(); // an item made earlier joins the layout: its layer was not marked by this
     if (item->selected())
         noteItemSelection();
