@@ -274,6 +274,8 @@ public:
     bool hasItem(QCPAbstractLegendItem* item) const;
     bool hasItemWithPlottable(const QCPAbstractPlottable* plottable) const;
     Q_INVOKABLE bool addItem(QCPAbstractLegendItem* item);
+    // An item leaving can take the last selected one with it: selectedParts may move.
+    QCPLayoutElement* takeAt(int index) override;
     Q_INVOKABLE bool removeItem(int index);
     bool removeItem(QCPAbstractLegendItem* item);
     Q_INVOKABLE void clearItems();
@@ -325,6 +327,10 @@ protected:
 
 private:
     Q_DISABLE_COPY_MOVE(QCPLegend)
+
+    //! Signals selectionChanged when an item's selection, or an item leaving, moved selectedParts.
+    void noteItemSelection();
+    bool mApplyingSelection = false; // setSelectedParts deselects the items and signals once
 
     // The rows raw: the legend's own setters and selection passes loop over them (K8).
     QCPAbstractLegendItem* itemRaw(int index) const;

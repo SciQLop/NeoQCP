@@ -411,6 +411,7 @@ protected:
     //! False, and one misuse the first time, while the key or value axis is gone.
     bool drawableAxes() const;
     void dropSystem();
+    void leavePlotOnDestruction();
 
 private:
     Q_DISABLE_COPY_MOVE(QCPAbstractPlottable)

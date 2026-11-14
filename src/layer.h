@@ -339,6 +339,8 @@ protected:
     void setParentLayerable(QCPLayerable* parentLayerable);
     bool moveToLayer(QCPLayer* layer, bool prepend);
     void emitLayerChanged();
+    //! Leaves the layer without a signal: for a destructor, where nothing may listen any more.
+    void leaveLayerSilently();
     void applyAntialiasingHint(QCPPainter* painter, bool localAntialiased,
                                QCP::AntialiasedElement overrideElement) const;
 

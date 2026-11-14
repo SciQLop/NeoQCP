@@ -188,6 +188,8 @@ void QCPArea::axisRemoved(const QCPAxisBase* axis)
 {
     if (!axis)
         return;
+    // The plottables of a dying system signal it: a slot runs once every system is gone.
+    const QCPEmissionScope scope(mParentPlot);
     // Collect, then remove in place: emptying the list first would put a system that a slot creates
     // during the detach in front of the ones that were already there.
     QList<QPointer<QCPCoordinateSystem>> dying;

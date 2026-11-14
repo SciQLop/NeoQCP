@@ -43,6 +43,7 @@
 #include <functional>
 #include <memory>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 
 class QCPPainter;
@@ -850,6 +851,42 @@ protected:
     friend class TestHitRule;
 };
 
+namespace qcp::detail
+{
+// How a deferred emission keeps an argument until delivery: a pointer to a QObject is held by a
+// QPointer, so a slot gets null, not a dangling pointer, when the object died in between.
+template <typename T>
+T held(T value)
+{
+    return value;
+}
+
+template <typename T>
+    requires std::is_base_of_v<QObject, std::remove_cv_t<T>>
+QPointer<T> held(T* value)
+{
+    return QPointer<T>(value);
+}
+
+template <typename T>
+T& delivered(T& value)
+{
+    return value;
+}
+
+template <typename T>
+T* delivered(QPointer<T>& value)
+{
+    return value.data();
+}
+
+template <typename... Args>
+auto holdForDelivery(Args&&... args)
+{
+    return std::make_tuple(held(std::decay_t<Args>(std::forward<Args>(args)))...);
+}
+} // namespace qcp::detail
+
 /*!
   qcpEmit for a sender that counts the receivers of \a signal itself (connectNotify) and calls
   only when there is one: the probe would repeat what it knows, at the cost of a mutex
@@ -866,10 +903,13 @@ void qcpEmitHeard(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(Sign
         (sender->*signal)(std::forward<Args>(args)...);
         return;
     }
-    auto copied = std::make_tuple(std::forward<Args>(args)...);
-    plot->deliver(sender, [sender, signal, copied = std::move(copied)]() mutable {
-        std::apply([&](auto&... values) { (sender->*signal)(values...); }, copied);
-    });
+    auto copied = qcp::detail::holdForDelivery(std::forward<Args>(args)...);
+    plot->deliver(sender,
+                  [sender, signal, copied = std::move(copied)]() mutable
+                  {
+                      std::apply([&](auto&... values)
+                                 { (sender->*signal)(qcp::detail::delivered(values)...); }, copied);
+                  });
 }
 
 /*!
@@ -917,10 +957,11 @@ void qcpEmitIf(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalA
 {
     if (!plot || !plot->mEmissions.isOpen())
         return (sender->*signal)(std::forward<Args>(args)...);
-    auto copied = std::make_tuple(std::forward<Args>(args)...);
+    auto copied = qcp::detail::holdForDelivery(std::forward<Args>(args)...);
     plot->deliver(sender, [sender, signal, stillValid, copied = std::move(copied)]() mutable {
         if (stillValid())
-            std::apply([&](auto&... values) { (sender->*signal)(values...); }, copied);
+            std::apply([&](auto&... values)
+                       { (sender->*signal)(qcp::detail::delivered(values)...); }, copied);
     });
 }
 

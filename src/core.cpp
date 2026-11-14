@@ -944,6 +944,9 @@ QCPHandle<QCPPipelineScheduler> QCustomPlot::pipelineScheduler() const
 QCPHandle<QCPOverlay> QCustomPlot::overlay()
 {
     if (!mOverlay && !mBeingDestroyed) {
+        // The layer's mode signals: a slot may delete the plot. It runs once the overlay is made
+        // and the handle taken, which then reads null.
+        const QCPEmissionScope scope(this);
         QCPLayer* notifLayer = layer(QLatin1String("notification"));
         if (!notifLayer) {
             (void)addLayer(QLatin1String("notification"));
@@ -954,6 +957,7 @@ QCPHandle<QCPOverlay> QCustomPlot::overlay()
 
         mOverlay = new QCPOverlay(this);
         mOverlay->setLayer(notifLayer);
+        return QCPHandle<QCPOverlay>(mOverlay.data()); // made before the scope delivers
     }
     return QCPHandle<QCPOverlay>(mOverlay.data());
 }
@@ -1922,6 +1926,9 @@ bool QCustomPlot::adopt(QCPAbstractItem* item)
 */
 void QCustomPlot::deletePlottable(QCPAbstractPlottable* plottable)
 {
+    // The legend re-wraps as the row leaves and signals: a slot may delete the plot or another
+    // plottable, so it runs once the plottable is gone.
+    const QCPEmissionScope scope(this);
     // Unlisted while still whole, so a subclass's own legend row goes too; the destructor skips it.
     QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
     plottable->mRegisteredPlot = nullptr;
@@ -2019,6 +2026,8 @@ bool QCustomPlot::removePlottableGroup(QCPPlottableGroup* group)
 int QCustomPlot::clearPlottables()
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", 0);
+    // One delivery after the loop: a slot may delete the plot.
+    const QCPEmissionScope scope(this);
     int c = mPlottables.size();
     while (!mPlottables.isEmpty())
         deletePlottable(mPlottables.last());
@@ -2210,6 +2219,8 @@ bool QCustomPlot::removeGraph(int index)
 int QCustomPlot::clearGraphs()
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", 0);
+    // One delivery after the loop: a slot may delete the plot.
+    const QCPEmissionScope scope(this);
     int c = mGraphs.size();
     while (!mGraphs.isEmpty())
         (void)removeGraph(mGraphs.last());

@@ -25,6 +25,8 @@
 
 #include "layoutelement-legend.h"
 
+#include <QScopedValueRollback>
+
 #include "../axis/labelrenderer.h"
 
 #include "../core.h"
@@ -214,9 +216,14 @@ void QCPAbstractLegendItem::setSelected(bool selected)
 {
     if (mSelected == selected)
         return;
+    // The legend's selectedParts moves with it: two signals, and a slot of the first may delete
+    // this item.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mSelected = selected;
     qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectionChanged);
+    if (mParentLegend)
+        mParentLegend->noteItemSelection();
 }
 
 /* inherits documentation from base class */
@@ -851,6 +858,7 @@ void QCPLegend::setSelectedParts(const SelectableParts& selected)
         if (mSelectedParts.testFlag(spItems)
             && !newSelected.testFlag(spItems)) // spItems flag was unset, so clear item selection
         {
+            const QScopedValueRollback applying(mApplyingSelection, true);
             if (!deselectItems(this))
                 return;
         }
@@ -1056,7 +1064,29 @@ bool QCPLegend::addItem(QCPAbstractLegendItem* item)
         return false;
     item->mParentLegend = this;
     markDirty(); // an item made earlier joins the layout: its layer was not marked by this
+    if (item->selected())
+        noteItemSelection();
     return true;
+}
+
+QCPLayoutElement* QCPLegend::takeAt(int index)
+{
+    QCPLayoutElement* taken = QCPLayoutGrid::takeAt(index);
+    // Only a set spItems can move on a removal; the scan is skipped otherwise.
+    if (taken && mSelectedParts.testFlag(spItems))
+        noteItemSelection();
+    return taken;
+}
+
+void QCPLegend::noteItemSelection()
+{
+    if (mApplyingSelection)
+        return;
+    const SelectableParts now = selectedParts();
+    if (now == mSelectedParts)
+        return;
+    mSelectedParts = now;
+    qcpEmit(this, mParentPlot, &QCPLegend::selectionChanged);
 }
 
 /*! \overload
@@ -1074,6 +1104,8 @@ bool QCPLegend::addItem(QCPAbstractLegendItem* item)
 */
 bool QCPLegend::removeItem(int index)
 {
+    // The item's leaving may signal selectionChanged before the re-wrap: a slot runs at the end.
+    const QCPEmissionScope scope(mParentPlot);
     if (QCPAbstractLegendItem* ali = itemRaw(index))
     {
         bool success = remove(ali);
@@ -1099,6 +1131,8 @@ bool QCPLegend::removeItem(int index)
 */
 bool QCPLegend::removeItem(QCPAbstractLegendItem* item)
 {
+    // The item's leaving may signal selectionChanged before the re-wrap: a slot runs at the end.
+    const QCPEmissionScope scope(mParentPlot);
     bool success = remove(item);
     if (success)
         setFillOrder(fillOrder(), true); // gets rid of empty cell by reordering

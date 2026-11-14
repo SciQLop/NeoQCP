@@ -635,7 +635,7 @@ QCPHandle<QCPArea> QCPAbstractPlottable::area() const
 QCPAbstractPlottable::~QCPAbstractPlottable()
 {
     if (mRegisteredPlot)
-        mRegisteredPlot->plottableDestroyed(this);
+        leavePlotOnDestruction();
     if (mSelectionDecorator)
     {
         delete mSelectionDecorator;
@@ -1461,9 +1461,27 @@ bool QCPAbstractPlottable::removeFromLegend() const
 */
 void QCPAbstractPlottable::dropSystem()
 {
+    // setSystem's signals wait for the write below: a slot may delete this plottable.
+    const QCPEmissionScope scope(mParentPlot);
     if (mSystem)
         setSystem(nullptr);
     mReportedLostAxis = false;
+}
+
+/*! \internal
+
+  A plain delete of a plottable still in its plot: the plot unlists it, which signals (the legend's
+  rows, the group). A slot may delete the plot, so everything that reaches the plot happens before
+  the scope delivers, and nothing after it does.
+*/
+void QCPAbstractPlottable::leavePlotOnDestruction()
+{
+    QCustomPlot* plot = mRegisteredPlot;
+    const QCPEmissionScope scope(plot);
+    if (parent() == plot)
+        setParent(nullptr); // the plot's own deletion must not delete this a second time
+    plot->plottableDestroyed(this);
+    leaveLayerSilently();
 }
 
 bool QCPAbstractPlottable::drawableAxes() const

@@ -117,6 +117,14 @@ QCPPlottableGroup* groupOfOneOn(QCustomPlot& plot)
     return group;
 }
 
+// Two legend rows: removing one collapses a row, which the legend grid signals.
+std::pair<QObject*, const char*> armedOnTheLegendOfTwo(QCustomPlot& plot)
+{
+    graphOn(plot);
+    graphOn(plot);
+    return { plot.legend.get(), "rowStretchFactors" };
+}
+
 QCPCurve* curveOn(QCustomPlot& plot)
 {
     auto* curve = new QCPCurve(plot.xAxis, plot.yAxis);
@@ -156,6 +164,14 @@ QCPPolarArea* polarAreaOn(QCustomPlot& plot)
     auto* area = new QCPPolarArea(&plot);
     plot.plotLayout()->addElement(3, 0, area);
     return area;
+}
+
+// A polar graph on the area's second radial axis.
+QCPPolarGraph* polarGraphOnASecondRadialAxis(QCustomPlot& plot)
+{
+    QCPPolarArea* area = polarAreaOn(plot);
+    QCPPolarAxisRadial* radial = area->addRadialAxis().get();
+    return new QCPPolarGraph(area->angularAxis().get(), radial);
 }
 
 QCPAxisRect* axisRectOn(QCustomPlot& plot)
@@ -1400,6 +1416,41 @@ const QVector<Writer>& writers()
           [](QObject* o) { qobject_cast<QCPItemSpan*>(o)->lowerEdge->setCoords(-2, 0); },
           { "range" },
           { "brush" } },
+        { "a legend item selected",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              graphOn(plot);
+              return plot.legend.get();
+          },
+          [](QObject* o) { qobject_cast<QCPLegend*>(o)->item(0)->setSelected(true); },
+          { "selectedParts" },
+          { "font" } },
+        { "a legend item deselected",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              graphOn(plot);
+              plot.legend->item(0)->setSelected(true);
+              return plot.legend.get();
+          },
+          [](QObject* o) { qobject_cast<QCPLegend*>(o)->item(0)->setSelected(false); },
+          { "selectedParts" },
+          { "font" } },
+        { "a selected legend item removed",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              graphOn(plot);
+              graphOn(plot);
+              plot.legend->item(0)->setSelected(true);
+              return plot.legend.get();
+          },
+          [](QObject* o)
+          {
+              auto* legend = qobject_cast<QCPLegend*>(o);
+              if (legend->item(0) && legend->item(0)->selected())
+                  legend->removeItem(0);
+          },
+          { "selectedParts" },
+          { "font" } },
         { "QCPAxisBase::setRangeLower",
           [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
           [](QObject* o) { qobject_cast<QCPAxis*>(o)->setRangeLower(-3); },
@@ -2110,6 +2161,52 @@ const QVector<Deleting>& deletingWriters()
           },
           [](QCustomPlot& plot)
           { plot.findChild<QCPItemRSpan*>()->leftEdge->set(QCP::Pixels { 5, 5 }); } },
+        { "QCustomPlot::removePlottable", armedOnTheLegendOfTwo,
+          [](QCustomPlot& plot) { (void)plot.removePlottable(plot.plottable(0).get()); } },
+        { "QCustomPlot::clearPlottables", armedOnTheLegendOfTwo,
+          [](QCustomPlot& plot) { plot.clearPlottables(); } },
+        { "QCustomPlot::removeGraph", armedOnTheLegendOfTwo,
+          [](QCustomPlot& plot) { (void)plot.removeGraph(0); } },
+        { "deleting a plottable", armedOnTheLegendOfTwo,
+          [](QCustomPlot& plot) { delete plot.plottable(0).get(); } },
+        { "QCPPolarArea::removeRadialAxis",
+          [](QCustomPlot& plot)
+          {
+              return std::pair<QObject*, const char*>(polarGraphOnASecondRadialAxis(plot),
+                                                      "system");
+          },
+          [](QCustomPlot& plot)
+          {
+              QCPPolarArea* area = plot.findChild<QCPPolarArea*>();
+              (void)area->removeRadialAxis(area->radialAxes().last().get());
+          },
+          true },
+        { "deleting a polar area",
+          [](QCustomPlot& plot)
+          {
+              return std::pair<QObject*, const char*>(polarGraphOnASecondRadialAxis(plot),
+                                                      "system");
+          },
+          [](QCustomPlot& plot) { delete plot.findChild<QCPPolarArea*>(); }, true },
+        { "deleting an axis",
+          [](QCustomPlot& plot)
+          {
+              auto* graph = new QCPGraph(plot.xAxis2, plot.yAxis);
+              return std::pair<QObject*, const char*>(graph, "system");
+          },
+          [](QCustomPlot& plot) { delete plot.xAxis2.get(); }, true },
+        { "QCPGraph::setColorValues joining the rect's colour scale", [](QCustomPlot& plot)
+          { return std::pair<QObject*, const char*>(graphOn(plot), "colorScaleChanged()"); },
+          [](QCustomPlot& plot) { plot.graph(0)->setColorValues(std::vector<double> { 1, 2, 3 }); },
+          true },
+        { "QCustomPlot::overlay on an existing notification layer",
+          [](QCustomPlot& plot)
+          {
+              (void)plot.addLayer(QStringLiteral("notification"));
+              return std::pair<QObject*, const char*>(
+                  plot.layer(QStringLiteral("notification")).get(), "mode");
+          },
+          [](QCustomPlot& plot) { (void)plot.overlay(); } },
         { "QCPAxisRect::setupFullAxesBox", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(plot.xAxis2.get(), "visible"); },
           [](QCustomPlot& plot) { plot.axisRect()->setupFullAxesBox(); } },
@@ -2431,6 +2528,24 @@ void TestMetaSurface::everyGadgetPropertyReadsWhatItWrites()
 
 // A slot of a span's range signal that moves an edge in turn signals again: the writer's quiet
 // guard covers its own edge writes only.
+// A deferred signal's pointer argument names an object that may die before delivery: the slot gets
+// null rather than a dangling pointer.
+void TestMetaSurface::deferredPointerToADeadObjectArrivesNull()
+{
+    auto plot = newPlot();
+    QCPItemTracer* tracer = plot->add<QCPItemTracer>().get();
+    QCPGraph* graph = graphOn(*plot);
+    QSignalSpy spy(tracer, &QCPItemTracer::graphChanged);
+    {
+        QCPEmissionScope scope(plot.get());
+        tracer->setGraph(graph);
+        delete graph;
+    }
+    QVERIFY(spy.count() >= 1);
+    // QVERIFY, not QCOMPARE: a failing QCOMPARE would print the dangling object.
+    QVERIFY(spy.first().first().value<QCPGraph*>() == nullptr);
+}
+
 void TestMetaSurface::spanSlotMovingAnEdgeIsHeard()
 {
     auto plot = newPlot();

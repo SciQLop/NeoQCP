@@ -52,6 +52,7 @@ private slots:
     void revisionNotifiesThroughChanged();
     void gadgetSettersKeepTheirRules();
     void spanSlotMovingAnEdgeIsHeard();
+    void deferredPointerToADeadObjectArrivesNull();
     void antialiasingSetsStayApart();
     void polarNumberFormatIsWhatIsDrawn_data();
     void polarNumberFormatIsWhatIsDrawn();

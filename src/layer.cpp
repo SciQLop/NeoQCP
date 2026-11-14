@@ -671,6 +671,11 @@ QCPLayerable::QCPLayerable(QCustomPlot* plot, QString targetLayer, QCPLayerable*
 
 QCPLayerable::~QCPLayerable()
 {
+    leaveLayerSilently();
+}
+
+void QCPLayerable::leaveLayerSilently()
+{
     if (mLayer)
     {
         mLayer->removeChild(this);

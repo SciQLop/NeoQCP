@@ -171,10 +171,20 @@ void QCPAbstractColorMapped::followKeyAxisRectScale()
     const QPointer<QCPAbstractColorMapped> alive(this);
     struct Joining
     {
-        bool& flag;
-        explicit Joining(bool& f) : flag(f) { flag = true; }
-        ~Joining() { flag = false; }
-    } joining(mJoiningKeyAxisRectScale);
+        // Guarded: the early returns below exist because a slot may have deleted the plottable.
+        QPointer<QCPAbstractColorMapped> owner;
+
+        explicit Joining(QCPAbstractColorMapped* o) : owner(o)
+        {
+            o->mJoiningKeyAxisRectScale = true;
+        }
+
+        ~Joining()
+        {
+            if (owner)
+                owner->mJoiningKeyAxisRectScale = false;
+        }
+    } joining(this);
     if (madeHere)
     {
         scale->setGradient(mGradient);
