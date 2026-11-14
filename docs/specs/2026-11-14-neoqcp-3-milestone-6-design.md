@@ -13,7 +13,8 @@ The goal is a fresh, well-designed NeoQCP with a clean, elegant and powerful API
 - hard cases from the matplotlib gallery, built with a simpler and better API ("being able to build them with a
   simple and elegant C++ code means Python will even be simpler");
 - user-written plot types and annotations that torture the drawing API ("should feel like something you want to use
-  and play with"), Snake and a brick breaker among them.
+  and play with"), Asteroids and a brick breaker among them (Asteroids replaced Snake, maintainer 2026-11-14:
+  Snake only draws grid squares).
 
 Two read-only surveys already ran against 3.0 as it is (`.superpowers/mpl-challenge/selection.md`, 25 gallery cases:
 4 clean, 15 awkward, 6 missing; `.superpowers/extension-challenge/selection.md`, 10 extension programs: 3 easy, 6
@@ -46,8 +47,8 @@ code compiles, runs and draws the right picture. The target code is fixed before
 1. Ten target programs, written in the API above, read and approved by the maintainer before the library changes:
    - **Plot types and annotations** (the drawing API):
      1. lollipop chart: a new plot type; click selects one lollipop; selected look; legend icon;
-     2. Snake: annotations moved every tick, a score label on top, a game-over banner, arrow keys without a click
-        first;
+     2. Asteroids: rotated polygons, many moving shapes, held keys (thrust while turning) without a click first,
+        wrap-around at the edges, a score label on top, a game-over banner;
      3. brick breaker: many static shapes, a paddle dragged with the mouse, collisions in data space;
      4. a callout annotation the user can drag and resize, pointer tip on a data point, text box in pixels.
    - **Matplotlib hard cases** (gallery numbers from the survey):
@@ -66,7 +67,8 @@ code compiles, runs and draws the right picture. The target code is fixed before
 
 ## Non-goals
 
-- Missing plot families: vector fields, violins, polar bars, size-by-value markers (survey pattern 3). Later.
+- Missing plot families (survey pattern 3). They are in the backlog, "New plot types", to be written later with the
+  same public drawing API a user has, as further torture tests.
 - The data model and threading (project 3).
 - Python bindings; the SciQLopPlots port; a release.
 - New game features in the library. The games use only generic API.

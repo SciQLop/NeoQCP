@@ -218,3 +218,21 @@ say otherwise.
 | f7 | 5f | Error-bar hit test builds the backbone and whisker list per bar on every click | dev note | `plottables/plottable-errorbar.cpp` |
 | f8 | 5f | Curve fill records one polygon per NaN run (GPU: one raster per run) | dev note | `plottables/plottable-curve.cpp` |
 | f9 | 5f | Bracket user-system test checks strokes near the skewed ends only, not their absence elsewhere | dev note | `tests/auto/` |
+
+## New plot types and benchmark ideas (milestone 6 brainstorm, 2026-11-14)
+
+Missing for scientific plotting (`.superpowers/mpl-challenge/selection.md`, pattern 3). Each is to be written with the
+public drawing API only, as a user would: every one is also a torture test of that API.
+
+| # | Item | Outcome | Where |
+|---|---|---|---|
+| n1 | Vector field (quiver) and streamlines | project: new plot types | gallery #15 |
+| n2 | Polar spectrogram and polar bars (wedges) | project: new plot types | gallery #22 |
+| n3 | Violin and box plots computed from raw data | project: new plot types | gallery #16, #17 |
+| n4 | Scatter with size by value, and a size legend | project: new plot types | gallery #23 |
+| n5 | Stacked areas | project: new plot types | gallery #21 |
+| n6 | Event (raster) plot | project: new plot types | matplotlib eventplot |
+| n7 | Hexbin | project: new plot types | gallery #18 |
+| n8 | Categorical axis (text keys) | project: new plot types | gallery #6 |
+| n9 | Contour labels and per-level styles | project: new plot types | gallery #13 |
+| n10 | Peak-fit editor: drag peaks, resize widths with handles, live fit and residual panel | benchmark idea | annotations + linked panels |
