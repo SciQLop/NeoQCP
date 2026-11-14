@@ -230,7 +230,11 @@ public:
 
     QCPTransform transform() const override { return QCPTransform(); }
     QRect clipRect() const override { return area()->rect(); }
-    QCP::Capabilities capabilities() const override { return QCP::capStraightSegments; }
+    QCP::Capabilities capabilities() const override { return caps; }
+    QCPTransform::Kind kind() const override { return kindValue; }
+
+    QCP::Capabilities caps = QCP::capStraightSegments;
+    QCPTransform::Kind kindValue = QCPTransform::Kind::Custom;
 };
 
 class FlatArea : public QCPArea
@@ -251,12 +255,20 @@ public:
     [[nodiscard]] FlatAxis* key() const { return mKey; }
     [[nodiscard]] FlatAxis* value() const { return mValue; }
 
+    //! What the systems it makes offer and claim to be: a colour map needs a cartesian rectangle
+    //! with a scale beside it.
+    QCP::Capabilities systemCaps = QCP::capStraightSegments;
+    QCPTransform::Kind systemKind = QCPTransform::Kind::Custom;
+
 protected:
     QCPCoordinateSystem* createSystem(QCPAxisBase* key, QCPAxisBase* value) override
     {
         if (!key || !value || key == value)
             return nullptr;
-        return new FlatSystem(this, key, value);
+        auto* system = new FlatSystem(this, key, value);
+        system->caps = systemCaps;
+        system->kindValue = systemKind;
+        return system;
     }
 
 private:
@@ -2483,6 +2495,30 @@ void TestUserSystem::aMultiGraphColourWithoutAScaleIsRefused()
     QCOMPARE(other->system(), own);
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear();
+}
+
+// The rect's scale a map joined on its own belongs to the rect it left: an area that is not an axis
+// rect has none to hand out, so the map is left with none, not with the old rect's.
+void TestUserSystem::aMapMovedOffAnAxisRectLeavesItsScale()
+{
+    QCustomPlot plot;
+    plot.plotLayout()->clear();
+    auto* cartesian = new QCPAxisRect(&plot);
+    auto* flat = new FlatArea(&plot);
+    flat->systemCaps = QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale;
+    flat->systemKind = QCPTransform::Kind::Cartesian;
+    plot.plotLayout()->addElement(0, 0, cartesian);
+    plot.plotLayout()->addElement(1, 0, flat);
+    settle(plot);
+    QCPCoordinateSystem* flatSystem = flat->system(flat->key(), flat->value());
+    QVERIFY(flatSystem);
+
+    auto* map = new QCPColorMap(cartesian->axis(QCPAxis::atBottom), cartesian->axis(QCPAxis::atLeft));
+    QCOMPARE(map->colorScale(), cartesian->colorScale().get());
+    map->setSystem(flatSystem);
+    QCOMPARE(map->system(), flatSystem);
+    QVERIFY(!map->colorScale());
+    QVERIFY2(cartesian->colorScale()->users().isEmpty(), "the rect kept a bar for a map it lost");
 }
 
 void TestUserSystem::aDecoratedMultiGraphJoinsASkewRect()

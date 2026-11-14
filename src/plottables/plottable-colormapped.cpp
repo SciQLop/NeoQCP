@@ -149,8 +149,13 @@ void QCPAbstractColorMapped::setSystem(QCPCoordinateSystem* system)
     const QCPEmissionScope scope(mParentPlot);
     const bool follows = mFollowsRectScale;
     QCPAbstractPlottable::setSystem(system);
-    if (follows && system && mSystem == system)
+    if (!follows || !system || mSystem != system)
+        return;
+    // The scale belonged to the rect it left: an area that is not an axis rect has none to give.
+    if (qobject_cast<QCPAxisRect*>(system->area()))
         followKeyAxisRectScale();
+    else
+        setColorScale(nullptr);
 }
 
 void QCPAbstractColorMapped::detachColorScale()
