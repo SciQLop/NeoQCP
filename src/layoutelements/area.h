@@ -45,6 +45,7 @@ class QCP_LIB_DECL QCPArea : public QCPLayoutElement
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(QCPLayoutInset* insetLayout READ insetLayout CONSTANT)
     Q_PROPERTY(QPixmap background READ background WRITE setBackground NOTIFY backgroundChanged)
     Q_PROPERTY(bool backgroundScaled READ backgroundScaled WRITE setBackgroundScaled NOTIFY
                    backgroundScaledChanged)

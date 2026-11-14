@@ -607,6 +607,21 @@ const QVector<Fixture>& fixtures()
         { "QCPIntervals", [](QCustomPlot& plot) -> QObject* { return intervalsOn(plot); } },
         { "QCPWaterfallGraph", [](QCustomPlot& plot) -> QObject*
           { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); } },
+        { "QCPCartesianSystem", [](QCustomPlot& plot) -> QObject*
+          { return plot.axisRect()->system(plot.xAxis, plot.yAxis).get(); } },
+        { "QCPPolarSystem",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              QCPPolarArea* area = polarAreaOn(plot);
+              return area->system(area->angularAxis().get(), area->radialAxis().get()).get();
+          } },
+        { "QCPAlignmentGroup",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              return QCPAlignmentGroup::create({ plot.axisRect().get(), axisRectOn(plot) },
+                                               QCP::msLeft)
+                  .data();
+          } },
         { "QCPPlottableGroup",
           [](QCustomPlot& plot) -> QObject*
           {
@@ -1870,6 +1885,28 @@ const QVector<Deleting>& deletingWriters()
           },
           [](QCustomPlot& plot)
           { plot.plottableGroups().first()->removeMember(plot.plottable(0).get()); } },
+        { "QCPPolarAxisAngular::setAngle",
+          [](QCustomPlot& plot)
+          {
+              QCPPolarArea* area = polarAreaOn(plot);
+              QCPCoordinateSystem* system
+                  = area->system(area->angularAxis().get(), area->radialAxis().get()).get();
+              return std::pair<QObject*, const char*>(system, "changed()");
+          },
+          [](QCustomPlot& plot) { plot.findChild<QCPPolarArea*>()->angularAxis()->setAngle(30); } },
+        { "QCPPolarAxisRadial::setAngleReference",
+          [](QCustomPlot& plot)
+          {
+              QCPPolarArea* area = polarAreaOn(plot);
+              QCPCoordinateSystem* system
+                  = area->system(area->angularAxis().get(), area->radialAxis().get()).get();
+              return std::pair<QObject*, const char*>(system, "changed()");
+          },
+          [](QCustomPlot& plot)
+          {
+              plot.findChild<QCPPolarArea*>()->radialAxis()->setAngleReference(
+                  QCPPolarAxisRadial::arAbsolute);
+          } },
         { "QCPAxisRect::setupFullAxesBox", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(plot.xAxis2.get(), "visible"); },
           [](QCustomPlot& plot) { plot.axisRect()->setupFullAxesBox(); } },
@@ -2030,6 +2067,18 @@ const QVector<FormRow>& formRows()
                  { &QCPPipelineScheduler::staticMetaObject, { "maxThreads" } } })
             for (const char* name : names)
                 r += { { meta, name, Form::Off } };
+        for (const char* name : { "area", "keyAxis", "valueAxis", "capabilities" })
+            r += { { &QCPCoordinateSystem::staticMetaObject, name, Form::Constant } };
+        r += { { &QCPCoordinateSystem::staticMetaObject, "revision", Form::Derived, "changed" },
+               { &QCPCoordinateSystem::staticMetaObject, "transform", Form::Off },
+               { &QCPCoordinateSystem::staticMetaObject, "plottables", Form::Off },
+               { &QCPArea::staticMetaObject, "insetLayout", Form::Constant },
+               { &QCPArea::staticMetaObject, "systems", Form::Off },
+               { &QCPArea::staticMetaObject, "systemsListen", Form::Off },
+               { &QCPAlignmentGroup::staticMetaObject, "sides", Form::Constant },
+               { &QCPAlignmentGroup::staticMetaObject, "elements", Form::Off },
+               { &QCPAxisBase::staticMetaObject, "linkSource", Form::Off },
+               { &QCPAxisBase::staticMetaObject, "link", Form::Off } };
         r += plainRows(&QCPAbstractPlottable::staticMetaObject, { "system", "wantsLegend" });
         r += { { &QCPAbstractPlottable::staticMetaObject, "busy", Form::Off } };
         r += plainRows(&QCPColorMap2::staticMetaObject,
@@ -2169,6 +2218,37 @@ void TestMetaSurface::everyGadgetPropertyReadsWhatItWrites()
     QVERIFY(!same(other, current));
     QVERIFY(meta.writeOnGadget(value.data(), other));
     QVERIFY(same(meta.readOnGadget(value.constData()), other));
+}
+
+void TestMetaSurface::revisionNotifiesThroughChanged_data()
+{
+    QTest::addColumn<bool>("polar");
+    QTest::newRow("cartesian") << false;
+    QTest::newRow("polar") << true;
+}
+
+// The derived revision (section 3.3): a binding on it hears the mapping move through changed(),
+// whose listener count the binding's connection raises.
+void TestMetaSurface::revisionNotifiesThroughChanged()
+{
+    QFETCH(bool, polar);
+    auto plot = newPlot();
+    QCPPolarArea* area = polar ? polarAreaOn(*plot) : nullptr;
+    QCPCoordinateSystem* system = polar
+        ? area->system(area->angularAxis().get(), area->radialAxis().get()).get()
+        : plot->axisRect()->system(plot->xAxis, plot->yAxis).get();
+    QBindable<quint64> revision(system, "revision");
+    QVERIFY(revision.isValid());
+    const quint64 before = revision.value();
+    int notified = 0;
+    const QPropertyNotifier notifier = revision.addNotifier([&] { ++notified; });
+    if (polar)
+        area->radialAxis()->setRange(0, 7);
+    else
+        plot->xAxis->setRange(3, 7);
+    QVERIFY(notified >= 1);
+    QVERIFY(revision.value() != before);
+    QCOMPARE(revision.value(), system->revision());
 }
 
 void TestMetaSurface::everyNotifyPropertyNotifiesOncePerChange_data()

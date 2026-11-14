@@ -411,3 +411,7 @@ signal. Nothing that compiled stops compiling; the rows below are the behaviour 
 - Value types (E-7): `QCPScatterStyle`, `QCPLineEnding` and `QCPColorGradient` have gadget properties (no signal;
   `QMetaProperty::readOnGadget` / `writeOnGadget`). The tickers, label painter, selection decorators, item
   position and painter have none.
+- The 3.0 classes (section 3.3): `QCPCoordinateSystem::area`, `keyAxis`, `valueAxis` and `capabilities` are
+  `CONSTANT`; `revision` is read-only with `changed()` as its NOTIFY (a binding on it connects to `changed()`, so
+  the system starts signalling). `QCPArea::insetLayout` and `QCPAlignmentGroup::sides` are `CONSTANT`. The system's
+  transform and plottables, the area's systems, the group's elements and an axis's link stay off.

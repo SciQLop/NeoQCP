@@ -33,6 +33,9 @@
 class QCP_LIB_DECL QCPAlignmentGroup : public QObject
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(QCP::MarginSides sides READ sides CONSTANT)
+    /// \endcond
 
 public:
     ~QCPAlignmentGroup() override;

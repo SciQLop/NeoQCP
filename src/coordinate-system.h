@@ -26,6 +26,9 @@ class QCPArea;
 class QCPAxis;
 class QCPAxisBase;
 class QCPAxisRect;
+// The properties name the area and axis types: the moc output needs them complete.
+Q_MOC_INCLUDE("layoutelements/area.h")
+Q_MOC_INCLUDE("axis/axis-base.h")
 
 struct QCPKeyWindow;
 struct QCPDrawnView;
@@ -56,6 +59,13 @@ namespace qcp
 class QCP_LIB_DECL QCPCoordinateSystem : public QObject
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(QCPArea* area READ area CONSTANT)
+    Q_PROPERTY(QCPAxisBase* keyAxis READ keyAxis CONSTANT)
+    Q_PROPERTY(QCPAxisBase* valueAxis READ valueAxis CONSTANT)
+    Q_PROPERTY(QCP::Capabilities capabilities READ capabilities CONSTANT)
+    Q_PROPERTY(quint64 revision READ revision NOTIFY changed)
+    /// \endcond
 
 public:
     ~QCPCoordinateSystem() override;
