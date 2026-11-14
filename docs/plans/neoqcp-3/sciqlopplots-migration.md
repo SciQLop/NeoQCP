@@ -497,3 +497,22 @@ to SciQLopPlots' own slots and to any binding it adds:
 - A binding must not capture a `QBindable` of another object: it crashes once that object is deleted. Hold a
   `QPointer` and build the `QBindable` inside the binding (R-14).
 - A plain setter call on a bound property keeps the binding; the next change of a dependency writes over it.
+
+## From milestone 5f (triage)
+
+SciQLopPlots will be rebuilt on NeoQCP 3.0, not ported line by line. These are the breaks a compile probe found
+that no section above lists, and the behaviour changes of 5f.
+
+### Compile breaks
+
+- `qcp::algo::HistogramNormalization` is now `QCP::HistogramNormalization` (`global.h`). `qcp_enums.hpp` and
+  the `to_qcp`/`from_qcp` overloads in `SciQLopHistogram.cpp` follow it.
+- `mScatterStyle` is gone from the line plottables: read `scatterStyle()` (`SciQLopTimeColoredCurve.cpp`).
+
+### Behaviour changes
+
+- `draw(QCPDrawContext&)` is pure on `QCPAbstractPlottable` and on `QCPAbstractItem`. A subclass without it no
+  longer compiles; before, it drew nothing.
+- `setBrush` on a graph keeps each fill's target (a constant or another column) and changes only its brush.
+- A legend row reads its legend from the layout it sits in. `parentLegend()` is null until the row is added to a
+  legend.

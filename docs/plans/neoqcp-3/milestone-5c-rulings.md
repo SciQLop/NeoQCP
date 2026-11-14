@@ -25,6 +25,7 @@ workspace `neoqcp`.
   replace a fill to another graph; the negative-log baseline is the bound nearer zero. Cost: none.
 - R-2 (S2): `setBrush` still replaces a fill to a constant or between columns (2.x had no such fills). Cost: one flag
   on a fill.
+  **Overruled in 5f (F-3): `setBrush` keeps the fill's target (constant or column) and changes only its brush.**
 - R-3 (S2): "the user styled the decorator" is a decorator subclass, or a default decorator whose pen, brush or marker
   differ from a fresh one (`simplify:` note). Cost: a decorator restyled back to the exact default looks untouched.
 - R-4 (S2): selected markers outline with the selected pen (2.x); a selected component's error bars all draw in the
