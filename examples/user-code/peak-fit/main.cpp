@@ -143,9 +143,9 @@ int main(int argc, char** argv)
 
     auto spectrum = plot.axisRect();
     auto residuals = plot.addAxisRect({ .shareX = spectrum, .stretch = 0.35 });
-    spectrum->axis(QCPAxis::atLeft)->setLabel("counts");
-    residuals->axis(QCPAxis::atLeft)->setLabel("residual");
-    residuals->axis(QCPAxis::atBottom)->setLabel("energy (keV)");
+    spectrum->yAxis()->setLabel("counts");
+    residuals->yAxis()->setLabel("residual");
+    residuals->xAxis()->setLabel("energy (keV)");
 
     QList<QCPHandle<Peak>> peaks;
     for (double centre : { 22.0, 52.0, 67.0 })

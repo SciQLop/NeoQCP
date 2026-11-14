@@ -205,10 +205,6 @@ int main(int argc, char** argv)
     QCustomPlot plot;
     plot.resize(800, 600);
     plot.setBackground(Qt::black);
-    plot.xAxis->setRange(0, Game::width);
-    plot.yAxis->setRange(0, Game::height);
-    plot.xAxis->setVisible(false);
-    plot.yAxis->setVisible(false);
 
     const QPolygonF shipOutline { { 1, 0 }, { -0.7, 0.6 }, { -0.4, 0 }, { -0.7, -0.6 } };
     const QPolygonF rockOutline { { 1, 0 },   { 0.6, 0.7 },  { 0, 0.9 },   { -0.7, 0.8 },
@@ -216,6 +212,10 @@ int main(int argc, char** argv)
     const QPolygonF bulletOutline { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } };
 
     auto ax = plot.axisRect();
+    ax->xAxis()->setRange(0, Game::width);
+    ax->yAxis()->setRange(0, Game::height);
+    ax->xAxis()->setVisible(false);
+    ax->yAxis()->setVisible(false);
     auto rocks = ax->add<Sprites>(rockOutline, QColor(200, 200, 200));
     auto bullets = ax->add<Sprites>(bulletOutline, QColor(255, 220, 90));
     auto ship = ax->add<Sprites>(shipOutline, QColor(120, 220, 255));

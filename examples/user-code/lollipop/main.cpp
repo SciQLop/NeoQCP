@@ -7,9 +7,11 @@
 using namespace QCP::Literals;
 
 // A stem from zero to each value and a disc at its tip. Click picks one lollipop.
-class QCPLollipop : public QCPAbstractPlottable1D<QCPGraphData>
+class QCPLollipop : public QCPPlottable1D<QCPGraphData>
 {
 public:
+    using QCPPlottable1D::QCPPlottable1D;
+
     void draw(QCPDrawContext& context) const override
     {
         for (int i = 0; i < dataCount(); ++i)
@@ -18,7 +20,7 @@ public:
             const QCP::Data tip { point.key, point.value };
             const bool picked = selection().contains(i);
             const QPen stem(pen().color(), picked ? 3.5 : 1.5);
-            context.setDatum(i);
+            context.setDataIndex(i);
             context.line(QCP::Data { point.key, 0 }, tip, stem);
             context.circle(tip, picked ? 8_px : 5_px, stem, brush());
         }
@@ -41,7 +43,8 @@ int main(int argc, char** argv)
     const std::vector<double> rainfall { 78, 61, 55, 52, 63, 49, 62, 53, 47, 64, 79, 76 };
 
     const QColor blue(31, 119, 180);
-    auto lollipops = plot.axisRect()->add<QCPLollipop>(month, rainfall)
+    auto ax = plot.axisRect();
+    auto lollipops = ax->add<QCPLollipop>(month, rainfall)
                          .setName("rainfall (mm)")
                          .setPen(QPen(blue))
                          .setBrush(blue);
@@ -49,7 +52,7 @@ int main(int argc, char** argv)
 
     plot.setInteractions(QCP::iSelectPlottables);
     plot.legend->setVisible(true);
-    plot.xAxis->setLabel("month");
+    ax->xAxis()->setLabel("month");
     plot.rescaleAxes();
     plot.show();
     return app.exec();

@@ -137,13 +137,13 @@ int main(int argc, char** argv)
     QCustomPlot plot;
     plot.resize(800, 520);
     plot.setBackground(QColor(20, 20, 30));
-    plot.xAxis->setRange(0, 100);
-    plot.yAxis->setRange(0, 60);
-    plot.xAxis->setVisible(false);
-    plot.yAxis->setVisible(false);
 
     Breakout game;
     auto ax = plot.axisRect();
+    ax->xAxis()->setRange(0, 100);
+    ax->yAxis()->setRange(0, 60);
+    ax->xAxis()->setVisible(false);
+    ax->yAxis()->setVisible(false);
     QList<QCPHandle<Brick>> bricks;
     for (int row = 0; row < 6; ++row)
         for (int column = 0; column < 12; ++column)

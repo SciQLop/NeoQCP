@@ -86,16 +86,10 @@ int main(int argc, char** argv)
     auto peak = ax->add<Callout>(QCP::Data { firstMax, std::exp(-firstMax / 8) },
                                  "First maximum.\nDrag the box; resize it from its corner.");
 
-    auto ring = ax->add<QCPItemEllipse>();
-    ring->topLeft->setParentAnchor(peak->tip);
-    ring->topLeft->setCoords(-7, -7);
-    ring->bottomRight->setParentAnchor(peak->tip);
-    ring->bottomRight->setCoords(7, 7);
-
-    auto note = ax->add<QCPItemText>();
-    note->position->setParentAnchor(peak->box);
-    note->position->setCoords(0, 50);
-    note->setText("hangs below the box");
+    ax->ellipse(peak->tip + QCP::PixelOffset { -7, -7 }, peak->tip + QCP::PixelOffset { 7, 7 },
+                { .pen = QPen(QColor(214, 39, 40), 2) });
+    ax->text(peak->box + QCP::PixelOffset { 0, 50 }, "hangs below the box",
+             { .alignment = Qt::AlignHCenter | Qt::AlignTop });
 
     plot.setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
     plot.rescaleAxes();

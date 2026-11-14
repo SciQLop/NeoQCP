@@ -135,10 +135,6 @@ app = QApplication(sys.argv)
 plot = QCustomPlot()
 plot.resize(800, 600)
 plot.setBackground(Qt.black)
-plot.xAxis.setRange(0, Game.width)
-plot.yAxis.setRange(0, Game.height)
-plot.xAxis.setVisible(False)
-plot.yAxis.setVisible(False)
 
 ship_outline = QPolygonF([QPointF(1, 0), QPointF(-0.7, 0.6), QPointF(-0.4, 0), QPointF(-0.7, -0.6)])
 rock_outline = QPolygonF([QPointF(x, y) for x, y in
@@ -147,6 +143,10 @@ rock_outline = QPolygonF([QPointF(x, y) for x, y in
 bullet_outline = QPolygonF([QPointF(1, 0), QPointF(0, 1), QPointF(-1, 0), QPointF(0, -1)])
 
 ax = plot.axisRect()
+ax.xAxis().setRange(0, Game.width)
+ax.yAxis().setRange(0, Game.height)
+ax.xAxis().setVisible(False)
+ax.yAxis().setVisible(False)
 rocks = ax.add(Sprites, rock_outline, QColor(200, 200, 200))
 bullets = ax.add(Sprites, bullet_outline, QColor(255, 220, 90))
 ship = ax.add(Sprites, ship_outline, QColor(120, 220, 255))

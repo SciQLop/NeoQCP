@@ -12,7 +12,7 @@ in `docs/plans/neoqcp-3/m6-vocabulary.md`. Each folder has the C++ target and a 
 | `callout/` | An annotation mixing data and pixel positions: the tip on a data point, a rounded box in pixels from it, dragged and resized from a corner handle, with `tip` and `box` anchors other items hang on | extension survey 2 (callout), pattern 6 (coordinate gaps) |
 | `peak-fit/` | Three peak annotations, centre dragged and width resized from two edges; a plain function refits; the model and a residual panel below, sharing x, update with no sync code | extension survey 6 (drag on own points), mpl survey 4 (shared axes) |
 
-Why the lollipop derives from the 1D base, `QCPAbstractPlottable1D<QCPGraphData>`: it needs the least code. The base
+Why the lollipop derives from the 1D base, `QCPPlottable1D<QCPGraphData>`: it needs the least code. The base
 already keeps sorted (key, value) points, per-point selection and the legend row, so the class is `draw()` and the
 legend icon. `QCPBars` would bring a width, stacking, bar groups and a bar-rectangle hit test that a lollipop has to
 undo; `QCPGraph` brings a resampled multi-column line pipeline that a `draw()` override would bypass.

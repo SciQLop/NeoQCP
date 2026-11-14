@@ -6,7 +6,7 @@ import numpy as np
 from PySide6.QtGui import QColor, QPen
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
-from NeoQCP import QCP, QCPAxis, QCPItem, QCustomPlot
+from NeoQCP import QCP, QCPItem, QCustomPlot
 
 
 def basis(x, peaks):
@@ -68,9 +68,9 @@ counts = 12 + rng.normal(0, 6, energy.size) + basis(energy, [(25, 2.5), (48, 4),
 
 spectrum = plot.axisRect()
 residuals = plot.addAxisRect(shareX=spectrum, stretch=0.35)
-spectrum.axis(QCPAxis.atLeft).setLabel("counts")
-residuals.axis(QCPAxis.atLeft).setLabel("residual")
-residuals.axis(QCPAxis.atBottom).setLabel("energy (keV)")
+spectrum.yAxis().setLabel("counts")
+residuals.yAxis().setLabel("residual")
+residuals.xAxis().setLabel("energy (keV)")
 
 peaks = [spectrum.add(Peak, centre, 4.0) for centre in (22.0, 52.0, 67.0)]
 

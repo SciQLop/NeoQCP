@@ -97,13 +97,13 @@ app = QApplication(sys.argv)
 plot = QCustomPlot()
 plot.resize(800, 520)
 plot.setBackground(QColor(20, 20, 30))
-plot.xAxis.setRange(0, 100)
-plot.yAxis.setRange(0, 60)
-plot.xAxis.setVisible(False)
-plot.yAxis.setVisible(False)
 
 game = Breakout()
 ax = plot.axisRect()
+ax.xAxis().setRange(0, 100)
+ax.yAxis().setRange(0, 60)
+ax.xAxis().setVisible(False)
+ax.yAxis().setVisible(False)
 bricks = [ax.add(Brick, QRectF(column * 100 / 12, 36 + row * 3, 100 / 12, 3),
                  QColor.fromHsv(row * 50, 160, 230))
           for row in range(6) for column in range(12)]
