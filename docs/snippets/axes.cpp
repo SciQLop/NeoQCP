@@ -203,3 +203,26 @@ DOC_SNIPPET(axes_linked, 600, 400)
     upperX->setRange(0, 10);   // the lower x axis follows
     // [/axes_linked]
 }
+
+DOC_SNIPPET(axes_secondary_units, 600, 360)
+{
+    // [axes_secondary_units]
+    QVector<double> hour(25), celsius(25);
+    for (int i = 0; i < 25; ++i)
+    {
+        hour[i] = i;
+        celsius[i] = 12 - 6 * std::cos(2 * std::numbers::pi * i / 24);
+    }
+    customPlot->addGraph()->setData(hour, celsius);
+    customPlot->xAxis->setLabel("hour");
+    customPlot->yAxis->setLabel("temperature [°C]");
+
+    // The right axis shows the left one's range in Fahrenheit.
+    customPlot->yAxis2->setVisible(true);
+    customPlot->yAxis2->setLabel("temperature [°F]");
+    customPlot->yAxis2->linkTo(customPlot->yAxis,
+                               [](double c) { return c * 9 / 5 + 32; },     // forward
+                               [](double f) { return (f - 32) * 5 / 9; });  // inverse
+    customPlot->rescaleAxes();
+    // [/axes_secondary_units]
+}

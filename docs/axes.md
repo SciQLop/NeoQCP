@@ -223,3 +223,24 @@ Connect one to the other, and the second axis follows the first.
 `rangeChanged` passes the old range too, so a slot can take either `(newRange, oldRange)` or just
 `newRange`.
 The axis also emits `scaleTypeChanged` when the scale type changes.
+
+### A second axis in other units
+
+`linkTo()` makes an axis follow another one through two functions.
+`forward` turns the source's values into this axis' units. `inverse` turns them back.
+The linked axis keeps its own ticks and label, so it shows the same range in other units.
+
+```{literalinclude} snippets/axes.cpp
+:start-after: // [axes_secondary_units]
+:end-before: // [/axes_secondary_units]
+:language: cpp
+:dedent:
+```
+
+![Temperature in Celsius on the left, Fahrenheit on the right](images/axes-secondary-units.png)
+
+- The two functions must undo each other. Give both, or neither: without them the axes show the same range.
+- Pan or zoom either axis, the other follows. A range set on the linked axis goes back through `inverse`.
+- Both axes must be on the same plot and have the same orientation. Links do not chain: a source cannot be linked itself.
+- The linked axis follows the source's direction: reverse the source, not the linked axis.
+- `unlink()` ends the link.
