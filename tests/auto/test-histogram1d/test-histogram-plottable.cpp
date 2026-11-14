@@ -675,6 +675,23 @@ void TestHistogramPlottable::stepRecordsOnlyAPolyline()
     QVERIFY(std::find(line->points->begin(), line->points->end(), QPointF(2, 6)) != line->points->end());
 }
 
+// A step is the top profile: it drops to the base only where a run of bars starts or ends, not
+// at every inner edge (that would draw one box per bin).
+void TestHistogramPlottable::stepDropsToTheBaseOnlyAtRunEnds()
+{
+    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    h->setColumnColors({Qt::red});
+    h->setStyle(QCPHistogram::sStep);
+    h->setBinned({0, 1, 2, 3}, {{3, 6, 2}});
+    mPlot->xAxis->setRange(0, 3);
+    mPlot->yAxis->setRange(0, 8);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    const auto* line = firstPolyline(h->core());
+    QVERIFY(line);
+    const std::vector<QPointF> expected {{0, 0}, {0, 3}, {1, 3}, {1, 6}, {2, 6}, {2, 2}, {3, 2}, {3, 0}};
+    QCOMPARE(*line->points, expected);
+}
+
 void TestHistogramPlottable::logValueAxisDrawsOnlyPositiveHeights()
 {
     auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);

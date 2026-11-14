@@ -49,6 +49,7 @@ private slots:
     void aPanKeepsTheRecording();
     void stepIsOnePolylinePerColumn();
     void stepRecordsOnlyAPolyline();
+    void stepDropsToTheBaseOnlyAtRunEnds();
     void logValueAxisDrawsOnlyPositiveHeights();
     void logValueAxisBaseFollowsTheAxisBottom();
     void stepBreaksAtAnAbsentBar();

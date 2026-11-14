@@ -422,8 +422,9 @@ void QCPHistogram::recordBars(QCPDrawContext& context, int column, const ColumnL
     recordRects(context, column, look.outline, look.fill);
 }
 
-// The top profile in data space: up over each bin, down to the base, one NaN break per gap. Same
-// shape as the old pixel outline, so the recording survives a pan.
+// The top profile in data space: up from the base where a run starts, across each bin's top, down
+// to the base where the run ends, one NaN break per gap. Inner edges only step between heights,
+// or the outline would close a box around every bin.
 void QCPHistogram::recordStep(QCPDrawContext& context, int column, const ColumnLook& look) const
 {
     // The fill has no edge of its own: the polyline below is the only outline of a step.
@@ -443,19 +444,25 @@ void QCPHistogram::recordStep(QCPDrawContext& context, int column, const ColumnL
             inRun = false;
             continue;
         }
-        if (!inRun && !points.empty())
-            points.push_back(breakPoint);
-        inRun = true;
         const double left = mResult->edges[b];
-        const double right = mResult->edges[b + 1];
-        points.emplace_back(left, base);
+        if (!inRun)
+        {
+            if (!points.empty())
+            {
+                points.emplace_back(points.back().x(), base);
+                points.push_back(breakPoint);
+            }
+            points.emplace_back(left, base);
+        }
+        inRun = true;
         points.emplace_back(left, heights[b]);
-        points.emplace_back(right, heights[b]);
-        points.emplace_back(right, base);
+        points.emplace_back(mResult->edges[b + 1], heights[b]);
     }
-    if (!points.empty())
-        context.polyline(std::make_shared<const std::vector<QPointF>>(std::move(points)),
-                         look.outline);
+    if (points.empty())
+        return;
+    points.emplace_back(points.back().x(), base);
+    context.polyline(std::make_shared<const std::vector<QPointF>>(std::move(points)),
+                     look.outline);
 }
 
 // A log axis has no zero: the bars start at its lower bound, so the recording follows that bound.
