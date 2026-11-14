@@ -384,16 +384,6 @@ void QCPAbstractLegendItem::repaintWhenBusyChanges(QCPAbstractPlottable* plottab
 
 /*! \internal
 
-  Returns the pen that shall be used to draw the icon border, taking into account the selection
-  state of this item.
-*/
-QPen QCPPlottableLegendItem::getIconBorderPen() const
-{
-    return legendIconBorderPen();
-}
-
-/*! \internal
-
   Returns the text color that shall be used to draw text, taking into account the selection state
   of this item.
 */
@@ -459,9 +449,9 @@ void QCPPlottableLegendItem::draw(QCPPainter* painter)
     mPlottable->drawLegendIcon(painter, iconRect);
     painter->restore();
 
-    if (getIconBorderPen().style() != Qt::NoPen)
+    if (const QPen border = legendIconBorderPen(); border.style() != Qt::NoPen)
     {
-        painter->setPen(getIconBorderPen());
+        painter->setPen(border);
         painter->setBrush(Qt::NoBrush);
         int halfPen = qCeil(painter->pen().widthF() * 0.5) + 1;
         painter->setClipRect(mOuterRect.adjusted(-halfPen, -halfPen, halfPen, halfPen));

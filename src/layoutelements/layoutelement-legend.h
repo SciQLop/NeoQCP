@@ -151,7 +151,6 @@ protected:
     virtual QSize minimumOuterSizeHint() const override;
 
     // non-virtual methods:
-    QPen getIconBorderPen() const;
     QColor getTextColor() const;
     QFont getFont() const;
 
