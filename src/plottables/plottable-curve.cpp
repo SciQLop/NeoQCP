@@ -256,6 +256,7 @@ void QCPCurve::setData(QSharedPointer<QCPCurveDataContainer> data)
         return;
     markDirty();
     mDataContainer = data;
+    dropColoursOfAnotherSize();
 }
 
 /*! \overload
@@ -339,6 +340,7 @@ void QCPCurve::addData(const QVector<double>& t, const QVector<double>& keys,
     }
     mDataContainer->add(
         tempData, alreadySorted); // don't modify tempData beyond this to prevent copy on write
+    dropColoursOfAnotherSize();
 }
 
 /*! \overload
@@ -378,6 +380,7 @@ void QCPCurve::addData(const QVector<double>& keys, const QVector<double>& value
     }
     mDataContainer->add(tempData,
                         true); // don't modify tempData beyond this to prevent copy on write
+    dropColoursOfAnotherSize();
 }
 
 /*! \overload
@@ -389,6 +392,7 @@ void QCPCurve::addData(const QVector<double>& keys, const QVector<double>& value
 void QCPCurve::addData(double t, double key, double value)
 {
     mDataContainer->add(QCPCurveData(t, key, value));
+    dropColoursOfAnotherSize();
 }
 
 /*! \overload
@@ -407,6 +411,13 @@ void QCPCurve::addData(double key, double value)
         mDataContainer->add(QCPCurveData((mDataContainer->constEnd() - 1)->t + 1.0, key, value));
     else
         mDataContainer->add(QCPCurveData(0.0, key, value));
+    dropColoursOfAnotherSize();
+}
+
+void QCPCurve::dropColoursOfAnotherSize()
+{
+    if (mColor.hasValues() && mColor.size() != mDataContainer->size())
+        clearColorValues();
 }
 
 /*!

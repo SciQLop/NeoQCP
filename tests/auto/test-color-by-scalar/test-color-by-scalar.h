@@ -75,6 +75,7 @@ private slots:
     void aTakenColouredLineJoinsItsNewPlotsScale();
     void newDataKeepsAnUncolouredLinesChosenScale();
     void newDataAfterUncolouringStopsTheOriginRequest();
+    void aCurveGivenDataOfAnotherSizeDropsItsColours();
 
 private:
     QCustomPlot* mPlot = nullptr;

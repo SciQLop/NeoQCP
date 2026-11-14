@@ -155,6 +155,8 @@ protected:
                        const QCPScatterStyle& style, bool coloured) const;
     double pointDistance(const QPointF& pixelPoint,
                          QCPCurveDataContainer::const_iterator& closestData) const;
+    //! The graph's rule: data of another size clears the colour values, and the bar with them.
+    void dropColoursOfAnotherSize();
 
     friend class QCustomPlot;
     friend class QCPLegend;

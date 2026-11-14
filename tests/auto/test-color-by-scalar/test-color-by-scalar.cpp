@@ -1326,3 +1326,29 @@ void TestColorByScalar::firstColouredCommitSlotDeletingTheGraphIsSafe()
     QVERIFY(mg->commitPendingData());
     QCOMPARE(mPlot->plottableCount(), 0);
 }
+
+// The graph's rule on the curve: data of another size clears the colour values and the bar with
+// them, rather than showing a bar for a curve that is drawn uncoloured.
+void TestColorByScalar::aCurveGivenDataOfAnotherSizeDropsItsColours()
+{
+    auto* curve = new QCPCurve(mPlot->xAxis, mPlot->yAxis);
+    curve->setData(QVector<double> { 0, 1, 2 }, QVector<double> { 0, 1, 0 });
+    curve->setColorValues(std::vector<double> { 0, 1, 2 });
+    QVERIFY(curve->hasColorValues());
+    QVERIFY(curve->colorScale());
+
+    curve->setData(QVector<double> { 0, 1, 2, 3 }, QVector<double> { 0, 1, 0, 1 });
+    QVERIFY(!curve->hasColorValues());
+    QVERIFY(!curve->colorScale());
+
+    curve->setColorValues(std::vector<double> { 0, 1, 2, 3 });
+    curve->addData(4, 0);
+    QVERIFY(!curve->hasColorValues());
+    QVERIFY(!curve->colorScale());
+
+    curve->setData(QVector<double> { 0, 1 }, QVector<double> { 0, 1 });
+    curve->setColorValues(std::vector<double> { 0, 1 });
+    curve->setData(QVector<double> { 5, 6 }, QVector<double> { 1, 0 }); // same size keeps them
+    QVERIFY(curve->hasColorValues());
+    QVERIFY(curve->colorScale());
+}
