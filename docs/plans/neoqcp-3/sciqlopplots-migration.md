@@ -482,3 +482,18 @@ rows are the behaviour that moved with the new properties.
   `systemChanged(nullptr)` after it is done with itself.
 - `QCustomPlot::overlay()` delivers the notification layer's `modeChanged` after the overlay is made; a slot that
   deletes the plot leaves the returned handle null.
+
+### Delivery rules for slots and bindings
+
+The user-facing text is `docs/migrating.md`, "Properties, change signals and bindings". The points that matter
+to SciQLopPlots' own slots and to any binding it adds:
+
+- A change signal is queued only when something listens at the write. A slot connected after the write and
+  before the delivery misses that one change (ruling R-3): read the property when connecting.
+- A pointer property that goes null because its target died sends no change signal: a plottable's axes, an
+  error bar's data plottable, a tracer's graph. Watch the target's `destroyed()` (R-10).
+- Signals sent from a destructor or during plot teardown arrive at once. A slot must not delete the plot there
+  (R-11).
+- A binding must not capture a `QBindable` of another object: it crashes once that object is deleted. Hold a
+  `QPointer` and build the `QBindable` inside the binding (R-14).
+- A plain setter call on a bound property keeps the binding; the next change of a dependency writes over it.

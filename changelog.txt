@@ -576,6 +576,49 @@ Behaviour changes for 2.1 polar users:
   - Clicking inside a polar graph's fill selects it, as for cartesian graphs.
   - setSystem() with a non-polar system is refused as misuse.
 
+Milestone 5e (the meta-object surface). Every user-facing property is a Q_PROPERTY, and every writable
+one has a change signal, so it can be bound from C++. Additive, except for the few breaks below.
+  - Every writable property has a NOTIFY: xChanged(T) with the new value, deferred like every NeoQCP
+        signal (4a), sent once after the operation, never on an equal write. Existing signals keep their
+        signatures. Every function that moves a value sends the signal, not only the setter
+        (QCPAxis::setColor, the two-length tick setters, setRangeLower/Upper, take(), ...).
+  - Bindings: QBindable<T>(object, "name"). No bindableX() accessors and no BINDABLE storage: Qt's
+        storage notify runs the owner's handler after the observers with no liveness check, so an
+        observer that deletes the object would crash it. A plain write does not break a binding.
+  - A change signal is queued only when something listens at that moment: a slot connected between
+        the write and the delivery misses that change.
+  - A deferred signal's QObject* argument arrives as nullptr if the object died before delivery.
+  - The one-argument setter/getter pairs that had no property are properties now, the plot's
+        (interactions, antialiased elements, current layer, theme, ...) included. QCPScatterStyle,
+        QCPLineEnding and QCPColorGradient have gadget properties. The 3.0 classes (coordinate
+        systems, areas, alignment groups) show their read-only surface.
+  - QCustomPlot::themeChanged() is new; the seven theme* properties notify through it.
+  - CONSTANT where a value is fixed for the object's life: QCPAxis::axisType and axisRect,
+        QCPLayer::parentPlot and name, and six properties of the 3.0 classes.
+  - Read-only properties that moved without a signal are off the surface (tickVector, plotLayout,
+        a layerable's parentPlot, a layout element's rect, QCPErrorBars::data, ...). Their
+        accessors stay.
+  - New Q_ENUMs on the intervals, spans, pipeline scheduler and item creation state. 32
+        Q_DECLARE_METATYPE lines on enums moc registers are deleted; the registered names are
+        unchanged. 35 actions are Q_INVOKABLE (layout, legend, plot removal and export, axis range).
+        Every QObject class says Q_DISABLE_COPY_MOVE.
+  - Removing a plottable, dropping a coordinate system, selecting a legend item and overlay()
+        deliver their signals after they are done with their objects: a slot may delete the plot.
+  - Fix: the antialiasing setters put every other element into the never-antialiased set when one
+        was forced on (|= ~ for &= ~, from 2.x); the polar axes reported one number format and drew
+        another (a default axis now reports "gbc"); QCPLegend::selectionChanged did not fire when an
+        item was selected; QCPPlottableGroup::visible did not follow members leaving the plot; a
+        span's edge writes did not signal its range.
+
+Behaviour changes for 2.x users:
+  - Setters that used to repaint or re-register on an equal value now return early.
+  - A grid's stretch-factor signals also fire when rows or columns are added or collapsed, and an
+        export sends viewportChanged twice (set, then restored).
+  - The protected hook QCPAbstractPlottable::systemChanged() (3.0 preview) is now systemDidChange();
+        systemChanged(QCPCoordinateSystem*) is the system property's signal.
+  - New virtuals: QCPAbstractItem::positionMoved(), QCPAbstractPlottable::emitSelectionChanged() and
+        a QCPLegend::takeAt() override. Subclasses must be rebuilt.
+
 Milestone 5d (the rest of the old API). What milestone 4 kept only for 2.x and 5a-5c did not remove
 goes. Source-breaking for code that subclassed plottables, used margin groups or a span's pen.
   - Every plottable records, its legend icon too: statistical box and intervals as native commands;

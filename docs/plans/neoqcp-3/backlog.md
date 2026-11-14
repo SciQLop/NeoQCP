@@ -180,6 +180,36 @@ user would see and where the code is. Fixed items are deleted, not ticked.
   `getOptimizedLineDataAll` and the indexed forms are only used by tests. Remove them with the
   data-source work that retires QCPGraph2.
 
+## From milestone 5e (the meta-object surface)
+
+- **No `BINDABLE` storage** (E-0, ruling R-1). Properties are plain `NOTIFY` ones; a binding goes through Qt's
+  adaptor, `QBindable<T>(obj, "name")`. The storage form was dropped because Qt's
+  `QObjectBindableProperty::notify` runs the observers first and then the owner's handler, with no liveness
+  check: an observer that deletes the object makes Qt run the handler on freed memory. Revisit if Qt adds the
+  check, or if lazy bindings become a real need.
+- **Stretch-factor bursts.** A legend add or remove re-wraps its grid (`setFillOrder(order, true)`), and each
+  step sends a stretch-factor signal with the value of that moment: `[]`, `[1]`, `[1, 1]`, ... up to the final
+  list. The last one is right. Fix: sample the lists when `setFillOrder` starts and signal once at the end.
+  Only a listener pays today (E-4c).
+- **Layout-sensitive bench rows.** `QCPItems_Add10k` and `QCPItems_RestyleAll10k` move by 5-30 % with code
+  placement alone (ruling R-19). Judge them on several linker layouts (mold `--shuffle-sections`) or on an
+  external harness, not on one A/B.
+- **A setter's scope costs something when nothing listens.** `setTickLength(in, out)` and the polar two-length
+  setters open an emission scope around their two setters: +3-4 % on `QCPAxis_SetTickLength10kItems`
+  (ruling R-17). The scopes of `setTheme`, the legend, plottable removal and legend selection are unbenched
+  (R-18). Upgrade: open the scope only when one of the signals has a receiver.
+- **`QCPGraph::setComponentErrorBars` emits with no scope, then keeps working.** Hiding the bound columns sends
+  `componentVisibilityChanged`; the function then hides the next column and marks the decorations. A slot that
+  deletes the graph there reads freed memory. Pre-existing (the signal predates 5e), same class as the final
+  review's I1/I2: one scope at the top, plus a deleting-writer row.
+- **`QCPDrawContext_ReplayMarkers100k` +10.2 % at the end of 5e.** 9 pairs; 5e changed nothing on the replay
+  path. The base build is bimodal (35.4 or 39.5 M ticks), the new one sits at 39.0. Check it on several linker
+  layouts before looking for code (`baseline.md`, "End of milestone 5e").
+- **No bench row adds or removes plottables, or touches the legend or the theme.** The final fix batch's
+  removal and selection scopes are unmeasured.
+- **`QCPHitAction` is not registered.** It is a global `enum class`, outside any meta-object scope; moving it
+  into `QCP` breaks `hitsAt` callers.
+
 ## From milestone 5d (the rest of the old API)
 
 - **Financial and error-bar legend icons assume a plain fit transform.** Their painter callbacks take the icon
