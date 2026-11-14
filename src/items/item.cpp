@@ -1886,19 +1886,8 @@ QPointF QCPItem::anchorPixelPosition(int anchorId) const
     return {};
 }
 
-/*! \internal
-
-  Creates a QCPItemPosition, registers it with this item and returns a pointer to it. The specified
-  \a name must be a unique string that is usually identical to the variable name of the position
-  member (This is needed to provide the name-based \ref position access to positions).
-
-  Don't delete positions created by this function manually, as the item will take care of it.
-
-  Use this function in the constructor (initialization list) of the specific item subclass to
-  create each position member. Don't create QCPItemPositions with \b new yourself, because they
-  won't be registered with the item properly.
-
-  \see createAnchor
+/*!
+  Asks for this item to be recorded and drawn again. Call it after changing what draw() reads.
 */
 void QCPItem::update()
 {
@@ -2024,6 +2013,20 @@ QCPItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>& positio
     return QCPItemExtent { keyAxis, valueAxis, box, pixelPad, system };
 }
 
+/*! \internal
+
+  Creates a QCPItemPosition, registers it with this item and returns a pointer to it. The specified
+  \a name must be a unique string that is usually identical to the variable name of the position
+  member (This is needed to provide the name-based \ref position access to positions).
+
+  Don't delete positions created by this function manually, as the item will take care of it.
+
+  Use this function in the constructor (initialization list) of the specific item subclass to
+  create each position member. Don't create QCPItemPositions with \b new yourself, because they
+  won't be registered with the item properly.
+
+  \see createAnchor
+*/
 QCPItemPosition* QCPItem::createPosition(const QString& name)
 {
     if (hasAnchor(name))

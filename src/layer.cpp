@@ -683,6 +683,10 @@ void QCPLayerable::leaveLayerSilently()
     }
 }
 
+/*!
+  Asks for this object to be recorded and drawn again. Call it after changing what draw() reads.
+*/
+
 // Invalidates rather than dirties: an appearance change must be drawn, never hidden by a pan
 // shifting the layer's old frame (QCPLayer::markDirty, for range changes, allows that).
 //

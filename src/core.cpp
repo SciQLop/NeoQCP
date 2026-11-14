@@ -4816,7 +4816,7 @@ void QCustomPlot::draw(QCPPainter* painter)
 /*! \internal
 
   Performs the layout update steps defined by \ref QCPLayoutElement::UpdatePhase, by calling \ref
-  QCPLayoutElement::update on the main plot layout.
+  QCPLayoutElement::updateLayout on the main plot layout.
 
   Here, the layout elements calculate their positions and margins, and prepare for the following
   draw call.

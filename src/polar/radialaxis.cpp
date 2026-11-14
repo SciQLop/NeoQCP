@@ -342,7 +342,7 @@ QCPPolarAxisRadial::QCPPolarAxisRadial(QCPPolarArea* area)
         ,
         // internal members:
         mRadius(1)
-        , // non-zero initial value, will be overwritten in ::update() according to inner rect
+        , // non-zero initial value, will be overwritten in ::updateLayout() according to inner rect
         mLabelPainter(mParentPlot)
 {
     mRange = QCPRange(0, 5);

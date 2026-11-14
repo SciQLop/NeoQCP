@@ -989,7 +989,7 @@ void QCPAxisRect::colorScaleUsersChanged()
   This method is called automatically upon replot and doesn't need to be called by users of
   QCPAxisRect.
 
-  Calls the base class implementation to update the margins (see \ref QCPArea::update), which also
+  Calls the base class implementation to update the margins (see \ref QCPArea::updateLayout), which also
   lays out the inset layout inside the rect, then prepares the axes' ticks.
 
   \seebaseclassmethod

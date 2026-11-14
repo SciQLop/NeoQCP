@@ -397,7 +397,7 @@ bool QCPLayoutElement::alignedEdgeMoved() const
   UpdatePhase. The phases are run through in the order of the enum values. For details about what
   happens at the different phases, see the documentation of \ref UpdatePhase.
 
-  Layout elements that have child elements should call the \ref update method of their child
+  Layout elements that have child elements should call the \ref updateLayout method of their child
   elements, and pass the current \a phase unchanged.
 
   The default implementation executes the automatic margin mechanism in the \ref upMargins phase.
@@ -665,7 +665,7 @@ QCPLayout::QCPLayout() { }
   Finally, the call is propagated down to all child \ref QCPLayoutElement "QCPLayoutElements".
 
   For details about this method and the update phases, see the documentation of \ref
-  QCPLayoutElement::update.
+  QCPLayoutElement::updateLayout.
 */
 void QCPLayout::updateLayout(UpdatePhase phase)
 {
@@ -820,7 +820,7 @@ void QCPLayout::sizeConstraintsChanged() const
 
   \ref getSectionSizes may help with the reimplementation of this function.
 
-  \see update
+  \see updateLayout
 */
 void QCPLayout::layoutChildren() { }
 

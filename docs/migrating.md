@@ -329,6 +329,8 @@ The base classes of the 3.0 line lose the word. No alias is kept: rename the nam
 | `QCPLayerable::markDirty()` and every override | `QCPLayerable::update()` |
 | `contentChanged()` on a plottable or an item | `update()` |
 | `QCPLayoutElement::update(UpdatePhase)` and every override | `QCPLayoutElement::updateLayout(UpdatePhase)` |
+| `QCPLayout::updateLayout()` (protected hook) | `layoutChildren()` |
+| `QCPDrawnCore::contentChanged()` | `newGeneration()` |
 
 A layout element override that keeps the old `update(UpdatePhase)` name no longer compiles when it says `override`.
 `QCPLayer::markDirty()` is a layer-level repaint request and keeps its name.

@@ -56,7 +56,7 @@ class QCP_LIB_DECL QCPLayoutElement : public QCPLayerable
 public:
     /*!
       Defines the phases of the update process, that happens just before a replot. At each phase,
-      \ref update is called with the according UpdatePhase value.
+      \ref updateLayout is called with the according UpdatePhase value.
     */
     enum UpdatePhase
     {

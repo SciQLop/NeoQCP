@@ -57,7 +57,6 @@ protected:
     using QCPAxisRect::mouseMoveEvent;
     using QCPAxisRect::mousePressEvent;
     using QCPAxisRect::mouseReleaseEvent;
-    using QCPAxisRect::update;
     using QCPAxisRect::wheelEvent;
     virtual void draw(QCPPainter* painter) override;
     void updateGradientImage();
