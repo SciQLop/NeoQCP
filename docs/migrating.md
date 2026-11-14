@@ -334,3 +334,4 @@ A layout element override that keeps the old `update(UpdatePhase)` name no longe
 `QCPLayer::markDirty()` is a layer-level repaint request and keeps its name.
 `QCPLayout::updateLayout()` (the protected hook that positions the children) is `layoutChildren()`, so that the two
 `updateLayout` names do not hide each other in a subclass.
+`QCPDrawnCore::contentChanged()` (the generation bump behind `update()`) is `newGeneration()`.

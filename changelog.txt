@@ -97,7 +97,7 @@ Automatic repaint:
         fill costs one mark. Not seen by the plot: a ticker changed in place and a selection
         decorator's pen; call requestRepaint() after changing them.
   - A layer marked after it was drawn in a replot gets one more repaint on the next turn.
-  - The setter rule (for subclass authors, see QCPLayerable::markDirty()): return early on an equal
+  - The setter rule (for subclass authors, see QCPLayerable::update()): return early on an equal
         value, mark, then store and emit. A call that changes nothing never marks, and nothing marks
         from inside a replot's layout or draw: either would repaint forever or lose pan translation.
 
@@ -156,7 +156,7 @@ Milestone 3 (drawing and extension API). Additive, except for the behaviour chan
 
 Writing a plot type: derive from QCPDrawn<Base> (QCPPlottable, a QCPPlottable1D<T>
         or QCPItem), override draw(QCPDrawContext&), append commands with the context's
-        helpers, and mark a change from a setter with contentChanged(). The base's old drawing
+        helpers, and mark a change from a setter with update(). The base's old drawing
         virtuals are answered from the recording. examples/custom-drawable (RangeBand: a fill and a
         label, 73 lines of code) is a complete one.
   - A recording is transform independent; a replay is not. The plot records once and replays the
@@ -1472,4 +1472,4 @@ Milestone 6a (names). Breaking, in the 3.0 preview line.
   - update() redraws, updateLayout() lays out: QCPLayerable::markDirty() and its overrides are update(),
         contentChanged() on plottables and items is gone (update() replaces it), and
         QCPLayoutElement::update(UpdatePhase) and its overrides are updateLayout(UpdatePhase).
-        QCPLayer::markDirty() keeps its name. The protected QCPLayout::updateLayout() hook is layoutChildren().
+        QCPLayer::markDirty() keeps its name. The protected QCPLayout::updateLayout() hook is layoutChildren(), and QCPDrawnCore::contentChanged() is newGeneration().
