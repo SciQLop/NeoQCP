@@ -127,3 +127,21 @@ Counts are `grep -o` hits on the 2026-11-14 tree (`src/`, `tests/`, `examples/` 
 7. **6g, fill and zoom indicator:** `QCPFillBetween` (deleting the component fills), `zoomIndicator`. Fill-between
    and inset-zoom compile.
 8. **6h, annotations:** `QCPItemAnnotation` and `QCPConnector`. Annotations compiles.
+
+## Gate (2026-11-14)
+
+The maintainer read the eleven targets and the page and answered "let's try like this": the targets stand as
+written and the 17 decisions above are taken as chosen. Stage 2 follows the proposed order.
+
+Stage 1 controller rulings:
+
+- Five naming minors of the Task 2 review (two meanings of `add<T>`, two ways to reach axes, `setDatum`, the `keyPress`
+  clash, "Abstract" dropped for items only) were fixed at once, since Task 3 reused the vocabulary.
+- The shared-x "one call" reading became the single grid call (`setAxisRectGrid` with share options).
+- Equal panel widths in the spectrogram target (colour bar beside one panel) are checked on its picture in stage 2.
+- `QCPFillBetween` absorbs the graph's component fills (decision 1).
+- No separate whole-branch review for stage 1: each task had a fresh review and the maintainer gate is the last one.
+
+Deferred minors: the Asteroids rules (~117 lines) and the peak-fit solver (~60 lines) are long; the legend-icon
+frame meaning of `QCP::AxisRatio` (decision 8); `docs/writing-a-plot-type.md` still names the non-existent
+`QCPDrawn<Base>` (rewritten in 6c/6d).
