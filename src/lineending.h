@@ -36,6 +36,12 @@ class QCPPainter;
 class QCP_LIB_DECL QCPLineEnding
 {
     Q_GADGET
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(EndingStyle style READ style WRITE setStyle)
+    Q_PROPERTY(double width READ width WRITE setWidth)
+    Q_PROPERTY(double length READ length WRITE setLength)
+    Q_PROPERTY(bool inverted READ inverted WRITE setInverted)
+    /// \endcond
 
 public:
     /*!

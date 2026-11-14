@@ -1,5 +1,7 @@
 #include "test-meta-surface.h"
 #include "../misuse-recorder.h"
+#include "datasource/async-pipeline.h"
+#include "datasource/pipeline-scheduler.h"
 #include <QBindable>
 #include <QProperty>
 #include <memory>
@@ -771,6 +773,20 @@ const QVector<std::pair<QMetaType, Different>>& differentValues()
                 auto* area = plotOf(object)->findChild<QCPPolarArea*>();
                 QCPPolarAxisRadial* first = area->radialAxis().get();
                 return v == first ? area->addRadialAxis().get() : first;
+            }),
+        differentFor<QMap<double, QColor>>(
+            [](const QMap<double, QColor>& v, QObject*)
+            {
+                QMap<double, QColor> stops = v;
+                stops.insert(0.25, otherColor(v.value(0.25)));
+                return stops;
+            }),
+        differentFor<QPainterPath>(
+            [](const QPainterPath& v, QObject*)
+            {
+                QPainterPath path = v;
+                path.addEllipse(QRectF(-2, -2, 4, 4));
+                return path;
             }),
         differentFor<QList<int>>([](const QList<int>& v, QObject*)
                                  { return v.isEmpty() ? QList<int> { 0 } : QList<int> { }; }),
@@ -1992,6 +2008,28 @@ const QVector<FormRow>& formRows()
         for (const char* name :
              { "type", "typeX", "typeY", "coords", "axisRect", "system", "area", "pixelPosition" })
             r += { { &QCPItemPosition::staticMetaObject, name, Form::Off } };
+        for (const auto& [meta, names] : std::initializer_list<
+                 std::pair<const QMetaObject*, std::initializer_list<const char*>>> {
+                 { &QCPColorGradient::staticMetaObject,
+                   { "levelCount", "colorStops", "colorInterpolation", "nanHandling", "nanColor",
+                     "periodic" } },
+                 { &QCPLineEnding::staticMetaObject, { "style", "width", "length", "inverted" } },
+                 { &QCPScatterStyle::staticMetaObject,
+                   { "size", "shape", "pen", "brush", "pixmap", "customPath" } } })
+            for (const char* name : names)
+                r += { { meta, name, Form::Gadget } };
+        for (const auto& [meta, names] : std::initializer_list<
+                 std::pair<const QMetaObject*, std::initializer_list<const char*>>> {
+                 { &QCPSelectionDecorator::staticMetaObject,
+                   { "pen", "brush", "usedScatterProperties" } },
+                 { &QCPSelectionDecoratorBracket::staticMetaObject,
+                   { "bracketPen", "bracketBrush", "bracketWidth", "bracketHeight", "bracketStyle",
+                     "tangentToData", "tangentAverage" } },
+                 { &QCPPainter::staticMetaObject, { "antialiasing", "modes" } },
+                 { &QCPAsyncPipelineBase::staticMetaObject, { "scheduler" } },
+                 { &QCPPipelineScheduler::staticMetaObject, { "maxThreads" } } })
+            for (const char* name : names)
+                r += { { meta, name, Form::Off } };
         r += plainRows(&QCPAbstractPlottable::staticMetaObject, { "system", "wantsLegend" });
         r += { { &QCPAbstractPlottable::staticMetaObject, "busy", Form::Off } };
         r += plainRows(&QCPColorMap2::staticMetaObject,
@@ -2087,6 +2125,50 @@ void TestMetaSurface::everyFormRowHolds()
         case Form::Off:
             break;
     }
+}
+
+namespace
+{
+// E-7: the three value types whose properties are gadget ones, each from its default value.
+const QVector<std::pair<const char*, QVariant>>& gadgets()
+{
+    static const QVector<std::pair<const char*, QVariant>> list {
+        { "QCPScatterStyle", QVariant::fromValue(QCPScatterStyle()) },
+        { "QCPLineEnding", QVariant::fromValue(QCPLineEnding()) },
+        { "QCPColorGradient", QVariant::fromValue(QCPColorGradient()) },
+    };
+    return list;
+}
+} // namespace
+
+void TestMetaSurface::everyGadgetPropertyReadsWhatItWrites_data()
+{
+    QTest::addColumn<int>("gadget");
+    QTest::addColumn<int>("property");
+    for (int g = 0; g < gadgets().size(); ++g)
+    {
+        const QMetaObject* meta = gadgets()[g].second.metaType().metaObject();
+        for (int i = 0; i < meta->propertyCount(); ++i)
+            QTest::addRow("%s::%s", gadgets()[g].first, meta->property(i).name()) << g << i;
+    }
+}
+
+// The gadget properties carry no signal (E-7): a write through the meta-object stores the value
+// a read gives back, and leaves the value it was written on otherwise equal to a setter call's.
+void TestMetaSurface::everyGadgetPropertyReadsWhatItWrites()
+{
+    QFETCH(int, gadget);
+    QFETCH(int, property);
+    QVariant value = gadgets()[gadget].second;
+    const QMetaProperty meta = value.metaType().metaObject()->property(property);
+    QVERIFY(meta.isWritable());
+    QVERIFY(!meta.hasNotifySignal());
+    const QVariant current = meta.readOnGadget(value.constData());
+    const QVariant other = differentValue(meta, current, nullptr);
+    QVERIFY2(other.isValid(), meta.typeName());
+    QVERIFY(!same(other, current));
+    QVERIFY(meta.writeOnGadget(value.data(), other));
+    QVERIFY(same(meta.readOnGadget(value.constData()), other));
 }
 
 void TestMetaSurface::everyNotifyPropertyNotifiesOncePerChange_data()

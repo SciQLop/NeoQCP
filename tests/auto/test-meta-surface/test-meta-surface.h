@@ -46,6 +46,8 @@ private slots:
     void exceptionsNameRealProperties();
     void everyFormRowHolds_data();
     void everyFormRowHolds();
+    void everyGadgetPropertyReadsWhatItWrites_data();
+    void everyGadgetPropertyReadsWhatItWrites();
     void everyNotifyPropertyNotifiesOncePerChange_data();
     void everyNotifyPropertyNotifiesOncePerChange();
     void exceptionRulesHold_data();

@@ -408,3 +408,6 @@ signal. Nothing that compiled stops compiling; the rows below are the behaviour 
 - `setContourLevels` and `setAutoContourLevels` of the colour map 2 and the 2D histogram signal `contourLevelsChanged`
   only when the levels move; `setContourPen` returns on an equal pen. `QCPHistogram::setStyle` and
   `setColumnColors`, `QCPPolarGraph::setScatterStyle` return on an equal value.
+- Value types (E-7): `QCPScatterStyle`, `QCPLineEnding` and `QCPColorGradient` have gadget properties (no signal;
+  `QMetaProperty::readOnGadget` / `writeOnGadget`). The tickers, label painter, selection decorators, item
+  position and painter have none.

@@ -33,6 +33,14 @@ class QCPPainter;
 class QCP_LIB_DECL QCPScatterStyle
 {
     Q_GADGET
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(double size READ size WRITE setSize)
+    Q_PROPERTY(ScatterShape shape READ shape WRITE setShape)
+    Q_PROPERTY(QPen pen READ pen WRITE setPen)
+    Q_PROPERTY(QBrush brush READ brush WRITE setBrush)
+    Q_PROPERTY(QPixmap pixmap READ pixmap WRITE setPixmap)
+    Q_PROPERTY(QPainterPath customPath READ customPath WRITE setCustomPath)
+    /// \endcond
 
 public:
     /*!

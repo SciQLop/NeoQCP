@@ -32,6 +32,15 @@
 class QCP_LIB_DECL QCPColorGradient
 {
     Q_GADGET
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(int levelCount READ levelCount WRITE setLevelCount)
+    Q_PROPERTY(QMap<double, QColor> colorStops READ colorStops WRITE setColorStops)
+    Q_PROPERTY(
+        ColorInterpolation colorInterpolation READ colorInterpolation WRITE setColorInterpolation)
+    Q_PROPERTY(NanHandling nanHandling READ nanHandling WRITE setNanHandling)
+    Q_PROPERTY(QColor nanColor READ nanColor WRITE setNanColor)
+    Q_PROPERTY(bool periodic READ periodic WRITE setPeriodic)
+    /// \endcond
 
 public:
     /*!
