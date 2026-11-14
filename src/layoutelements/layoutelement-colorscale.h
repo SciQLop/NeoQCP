@@ -128,7 +128,7 @@ public:
     void rescaleDataRange(bool onlyVisibleMaps);
 
     // reimplemented virtual methods:
-    virtual void update(UpdatePhase phase) override;
+    virtual void updateLayout(UpdatePhase phase) override;
 
 signals:
     void dataRangeChanged(const QCPRange& newRange);

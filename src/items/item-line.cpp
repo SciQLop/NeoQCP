@@ -115,7 +115,7 @@ void QCPItemLine::setPen(const QPen& pen)
 {
     if (pen == mPen)
         return;
-    markDirty();
+    update();
     mPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemLine::penChanged, this->pen());
 }
@@ -129,7 +129,7 @@ void QCPItemLine::setSelectedPen(const QPen& pen)
 {
     if (pen == mSelectedPen)
         return;
-    markDirty();
+    update();
     mSelectedPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemLine::selectedPenChanged, selectedPen());
 }
@@ -146,7 +146,7 @@ void QCPItemLine::setHead(const QCPLineEnding& head)
 {
     if (mHead == head)
         return;
-    markDirty();
+    update();
     mHead = head;
     qcpEmit(this, mParentPlot, &QCPItemLine::headChanged, this->head());
 }
@@ -163,7 +163,7 @@ void QCPItemLine::setTail(const QCPLineEnding& tail)
 {
     if (mTail == tail)
         return;
-    markDirty();
+    update();
     mTail = tail;
     qcpEmit(this, mParentPlot, &QCPItemLine::tailChanged, this->tail());
 }

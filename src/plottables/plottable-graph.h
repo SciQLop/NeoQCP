@@ -62,7 +62,7 @@ public:
     [[nodiscard]] QCPMultiDataSource* dataSource() const { return mDataSource.get(); }
     virtual void dataChanged();
     //! A content change: drops a fill whose partner lost its component, then marks the layer.
-    void markDirty() override;
+    void update() override;
 
     QCPGraphPipeline& pipeline() { return mPipeline; }
     const QCPGraphPipeline& pipeline() const { return mPipeline; }

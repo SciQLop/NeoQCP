@@ -30,7 +30,7 @@ void QCPItemRichText::setCornerRadius(double radius)
 {
     if (radius == mCornerRadius)
         return;
-    markDirty();
+    update();
     mCornerRadius = radius;
     qcpEmit(this, mParentPlot, &QCPItemRichText::cornerRadiusChanged, mCornerRadius);
 }
@@ -39,7 +39,7 @@ void QCPItemRichText::setHtml(const QString& html)
 {
     if (html == mHtml)
         return;
-    markDirty();
+    update();
     mHtml = html;
     mDoc.setDefaultFont(textStyle().font);
     mDoc.setHtml(html);

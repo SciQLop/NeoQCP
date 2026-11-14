@@ -59,7 +59,7 @@ void QCPLine::setComponentNames(const QStringList& names)
     if (std::equal(names.cbegin(), names.cbegin() + n, mComponents.cbegin(),
                    [](const QString& name, const auto& c) { return c.name == name; }))
         return;
-    markDirty();
+    update();
     for (int i = 0; i < n; ++i)
         mComponents[i].name = names[i];
 }
@@ -70,7 +70,7 @@ void QCPLine::setComponentColors(const QList<QColor>& colors)
     if (std::equal(colors.cbegin(), colors.cbegin() + n, mComponents.cbegin(),
                    [](const QColor& color, const auto& c) { return c.pen.color() == color; }))
         return;
-    markDirty();
+    update();
     for (int i = 0; i < n; ++i) {
         mComponents[i].pen.setColor(colors[i]);
         mComponents[i].selectedPen = defaultSelectedPen(mComponents[i].pen);
@@ -90,7 +90,7 @@ void QCPLine::setComponentPens(const QList<QPen>& pens)
     if (std::equal(pens.cbegin(), pens.cbegin() + n, mComponents.cbegin(),
                    [](const QPen& pen, const auto& c) { return c.pen == pen; }))
         return;
-    markDirty();
+    update();
     for (int i = 0; i < n; ++i) {
         mComponents[i].pen = pens[i];
         mComponents[i].selectedPen = defaultSelectedPen(pens[i]);
@@ -159,7 +159,7 @@ void QCPLine::setComponentInLegend(int index, bool inLegend)
     const bool hidden = mComponents[index].hiddenByErrorBars;
     if (mComponents[index].inLegend == inLegend && !hidden)
         return;
-    markDirty();
+    update();
     mComponents[index].hiddenByErrorBars = false; // from here on, the caller's choice
     if (mComponents[index].inLegend != inLegend)
     {
@@ -257,7 +257,7 @@ void QCPLine::setColorValues(std::shared_ptr<const std::vector<double>> values)
     // Joining or leaving a scale signals colorScaleChanged: deliver it once this line is done,
     // so a slot may delete it.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     if (!values || values->empty())
         return clearColorValues();
     // A pending source (staged but not yet committed) is what the values will apply to

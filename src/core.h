@@ -996,7 +996,7 @@ qcp::HandleFor<T> QCustomPlot::add(std::unique_ptr<T> object)
     if (!adopt(object.get()))
         return Handle{};
     Handle handle = qcp::makeHandle<Handle>(object.release());
-    handle.get()->markDirty();
+    handle.get()->update();
     return handle;
 }
 

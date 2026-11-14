@@ -127,7 +127,7 @@ void TestPaintBuffer::contentDirty_fallbackMarksAllDirty()
     for (const auto& buf : mPlot->mPaintBuffers)
         QVERIFY(!buf->contentDirty());
 
-    // replot() without prior markDirty() should still repaint everything
+    // replot() without prior update() should still repaint everything
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     for (const auto& buf : mPlot->mPaintBuffers)
         QVERIFY(!buf->contentDirty());

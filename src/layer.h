@@ -300,7 +300,7 @@ public:
     // Schedules a full repaint of this layerable's layer next turn; a no-op without a plot or a
     // layer. GUI thread only. Virtual so an item can tell its layer that its extent may have
     // changed: an item that moves leaves the index and is tested one by one until the next rebuild.
-    virtual void markDirty();
+    virtual void update();
 
 signals:
     void layerChanged(QCPLayer* newLayer);

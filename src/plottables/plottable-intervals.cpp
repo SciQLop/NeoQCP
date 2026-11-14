@@ -118,7 +118,7 @@ QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* 
     if (hasLaneLayout())
         connect(layout, &QCPLaneLayout::changed, this, [this] {
             regroupIfLanesWereAdded();
-            markDirty();
+            update();
         });
     connect(this, &QCPPlottable::selectionChanged, this, &QCPIntervals::markLayersDirty);
     if (!mParentPlot || !mSystem)
@@ -133,7 +133,7 @@ QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* 
 
 void QCPIntervals::setData(qcp::intervals::Columns columns)
 {
-    markDirty();
+    update();
     if (auto error = qcp::intervals::invalidColumns(columns))
         throw std::invalid_argument(*error);
     const QCPLaneLayout::Batch lanesChangedLast(mLayout);
@@ -220,7 +220,7 @@ void QCPIntervals::setCategoryNames(const QStringList& names)
 {
     if (mCategoryNames == names)
         return;
-    markDirty();
+    update();
     mCategoryNames = names;
 }
 
@@ -265,7 +265,7 @@ void QCPIntervals::setCategoryColors(const QVector<QColor>& colors)
 {
     if (colors == mCategoryColors)
         return;
-    markDirty();
+    update();
     mCategoryColors = colors;
 }
 
@@ -311,9 +311,9 @@ void QCPIntervals::requestRepaint()
     markLayersDirty(); // marking schedules the repaint
 }
 
-void QCPIntervals::markDirty()
+void QCPIntervals::update()
 {
-    if (!mCore.contentChanged())
+    if (!mCore.newGeneration())
         return;
     markLayersDirty(); // the labels are made from the same geometry
     markDependentsDirty();
@@ -496,7 +496,7 @@ void QCPIntervals::setSelectedRows(const QVector<int>& rows)
         if (row >= 0 && row < rowCount())
             sel.addDataRange(QCPDataRange(row, row + 1), false);
     sel.simplify();
-    markDirty();
+    update();
     setSelection(sel);
 }
 
@@ -876,7 +876,7 @@ void QCPIntervals::setEditable(bool editable)
 {
     if (editable == mEditable)
         return;
-    markDirty();
+    update();
     mEditable = editable;
     if (!editable)
         mGesture.reset();
@@ -886,7 +886,7 @@ void QCPIntervals::setEditable(bool editable)
 void QCPIntervals::setEditModes(EditModes modes) {
     if (mEditModes == modes)
         return;
-    markDirty();
+    update();
     mEditModes = modes;
     qcpEmit(this, mParentPlot, &QCPIntervals::editModesChanged, mEditModes);
 }
@@ -895,7 +895,7 @@ void QCPIntervals::setSnap(SnapMode mode, double step)
 {
     if (mode == mSnap && step == mSnapStep)
         return;
-    markDirty();
+    update();
     mSnap = mode;
     mSnapStep = step;
 }
@@ -906,7 +906,7 @@ void QCPIntervals::setStackMode(StackMode mode)
         return;
     // Outlives the batch: the lane layout's signal and this one are delivered together.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     const QCPLaneLayout::Batch lanesChangedLast(mLayout);
     mStack = mode;
     updateSubRows();
@@ -918,7 +918,7 @@ void QCPIntervals::setCategoryOrder(std::vector<int> order)
 {
     if (mCategoryOrder == order)
         return;
-    markDirty();
+    update();
     const QCPLaneLayout::Batch lanesChangedLast(mLayout);
     mCategoryOrder = std::move(order);
     updateSubRows();
@@ -1012,7 +1012,7 @@ void QCPIntervals::setSnapTimes(std::vector<double> times)
     std::ranges::sort(times);
     if (times == mSnapTimes && mSnap == snTimes)
         return;
-    markDirty();
+    update();
     mSnapTimes = std::move(times);
     mSnap = snTimes;
 }
@@ -1277,7 +1277,7 @@ void QCPIntervals::setStyle(Style style)
 {
     if (mStyle == style)
         return;
-    markDirty(); // it marks the label layer too
+    update(); // it marks the label layer too
     mStyle = style;
     qcpEmit(this, mParentPlot, &QCPIntervals::styleChanged, mStyle);
 }

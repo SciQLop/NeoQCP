@@ -106,7 +106,7 @@ void QCPItemEllipse::setPen(const QPen& pen)
 {
     if (pen == mPen)
         return;
-    markDirty();
+    update();
     mPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemEllipse::penChanged, this->pen());
 }
@@ -120,7 +120,7 @@ void QCPItemEllipse::setSelectedPen(const QPen& pen)
 {
     if (pen == mSelectedPen)
         return;
-    markDirty();
+    update();
     mSelectedPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemEllipse::selectedPenChanged, selectedPen());
 }
@@ -135,7 +135,7 @@ void QCPItemEllipse::setBrush(const QBrush& brush)
 {
     if (brush == mBrush)
         return;
-    markDirty();
+    update();
     mBrush = brush;
     qcpEmit(this, mParentPlot, &QCPItemEllipse::brushChanged, this->brush());
 }
@@ -150,7 +150,7 @@ void QCPItemEllipse::setSelectedBrush(const QBrush& brush)
 {
     if (brush == mSelectedBrush)
         return;
-    markDirty();
+    update();
     mSelectedBrush = brush;
     qcpEmit(this, mParentPlot, &QCPItemEllipse::selectedBrushChanged, selectedBrush());
 }

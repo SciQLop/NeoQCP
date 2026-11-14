@@ -97,7 +97,7 @@ protected:
             change(*object);
             if constexpr (std::derived_from<T, QCPLayerable>)
                 if (T* alive = this->get())
-                    alive->markDirty();
+                    alive->update();
         }
         return static_cast<const Ret&>(*this);
     }

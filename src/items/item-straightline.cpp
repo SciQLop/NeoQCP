@@ -84,7 +84,7 @@ void QCPItemStraightLine::setPen(const QPen& pen)
 {
     if (pen == mPen)
         return;
-    markDirty();
+    update();
     mPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemStraightLine::penChanged, this->pen());
 }
@@ -98,7 +98,7 @@ void QCPItemStraightLine::setSelectedPen(const QPen& pen)
 {
     if (pen == mSelectedPen)
         return;
-    markDirty();
+    update();
     mSelectedPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemStraightLine::selectedPenChanged, selectedPen());
 }

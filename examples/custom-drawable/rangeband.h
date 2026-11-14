@@ -28,19 +28,19 @@ public:
         mKeys = keys;
         mLower = lower;
         mUpper = upper;
-        contentChanged();
+        update();
     }
 
     void setBrush(const QBrush& brush)
     {
         mBrush = brush;
-        contentChanged();
+        update();
     }
 
     void setLabel(const QString& label)
     {
         mLabel = label;
-        contentChanged();
+        update();
     }
 
     void draw(QCPDrawContext& context) const override

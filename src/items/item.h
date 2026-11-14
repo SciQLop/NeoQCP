@@ -305,7 +305,7 @@ public:
     Q_SLOT void setSelectable(QCP::SelectionType selectable);
     Q_SLOT void setSelected(bool selected);
     // Tells the layer that this item may have moved (see QCPLayer::noteItemExtentChanged).
-    void markDirty() override;
+    void update() override;
 
     // reimplemented virtual methods:
     //! The click path: the distance to the recording, or -1 when the click misses it.
@@ -338,9 +338,6 @@ public:
 
     //! The legend icon: the recording, unless the class records its own.
     void drawLegendIcon(QCPDrawContext& icon) const override { draw(icon); }
-
-    //! A setter's name for the content generation the layer needs.
-    void contentChanged() { markDirty(); }
 
     /*! Returns what this item occupies, in data coordinates, or none when a box cannot describe it.
 

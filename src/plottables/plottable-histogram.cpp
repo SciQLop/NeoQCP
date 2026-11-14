@@ -203,7 +203,7 @@ std::shared_ptr<Histogram1D> QCPHistogram::pipelineResult() const
 
 void QCPHistogram::setDataSource(std::shared_ptr<QCPMultiDataSource> source)
 {
-    markDirty();
+    update();
     mDataSource = std::move(source);
     const QPointer<QCPHistogram> alive(this);
     mPipeline.setSource(mDataSource);
@@ -229,7 +229,7 @@ void QCPHistogram::setBinned(std::vector<double> edges, std::vector<std::vector<
     mDataSource.reset();
     mAutoRange.reset();
     installTransform();
-    markDirty(); // before the pipeline signals below: a slot may delete this histogram
+    update(); // before the pipeline signals below: a slot may delete this histogram
     const QPointer<QCPHistogram> alive(this);
     mPipeline.setSource(nullptr);
     if (!alive)
@@ -247,7 +247,7 @@ void QCPHistogram::setBins(int bins)
         return;
     // The rebinning may signal busyChanged: a slot may delete this histogram.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mBins = bins;
     refreshBinning();
     qcpEmit(this, mParentPlot, &QCPHistogram::binsChanged, mBins);
@@ -260,7 +260,7 @@ void QCPHistogram::setFixedRange(std::optional<QCPRange> range)
         qWarning() << "QCPHistogram::setFixedRange: log bins need a positive range, ignored";
         return;
     }
-    markDirty();
+    update();
     mFixedRange = range;
     refreshBinning();
 }
@@ -271,7 +271,7 @@ void QCPHistogram::setNormalization(QCP::HistogramNormalization norm)
         return;
     // The rebinning may signal busyChanged: a slot may delete this histogram.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mNormalization = norm;
     refreshBinning();
     qcpEmit(this, mParentPlot, &QCPHistogram::normalizationChanged, mNormalization);
@@ -331,7 +331,7 @@ void QCPHistogram::rememberEdges()
 
 void QCPHistogram::requestReplot()
 {
-    markDirty(); // marking schedules the repaint
+    update(); // marking schedules the repaint
 }
 
 void QCPHistogram::binForExport()

@@ -147,7 +147,7 @@ void QCPAxisBase::scaleTypeDidChange()
 */
 void QCPAxisBase::markAppearanceDirty()
 {
-    markDirty();
+    update();
 }
 
 /*! \internal

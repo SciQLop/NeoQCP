@@ -102,7 +102,7 @@ void QCPItemRect::setPen(const QPen& pen)
 {
     if (pen == mPen)
         return;
-    markDirty();
+    update();
     mPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemRect::penChanged, this->pen());
 }
@@ -116,7 +116,7 @@ void QCPItemRect::setSelectedPen(const QPen& pen)
 {
     if (pen == mSelectedPen)
         return;
-    markDirty();
+    update();
     mSelectedPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemRect::selectedPenChanged, selectedPen());
 }
@@ -131,7 +131,7 @@ void QCPItemRect::setBrush(const QBrush& brush)
 {
     if (brush == mBrush)
         return;
-    markDirty();
+    update();
     mBrush = brush;
     qcpEmit(this, mParentPlot, &QCPItemRect::brushChanged, this->brush());
 }
@@ -146,7 +146,7 @@ void QCPItemRect::setSelectedBrush(const QBrush& brush)
 {
     if (brush == mSelectedBrush)
         return;
-    markDirty();
+    update();
     mSelectedBrush = brush;
     qcpEmit(this, mParentPlot, &QCPItemRect::selectedBrushChanged, selectedBrush());
 }

@@ -87,7 +87,7 @@ void QCPSelectionDecorator::setPen(const QPen& pen)
 {
     mPen = pen;
     if (mPlottable)
-        mPlottable->markDirty(); // the decorator paints through the plottable, which records its look
+        mPlottable->update(); // the decorator paints through the plottable, which records its look
 }
 
 /*!
@@ -97,7 +97,7 @@ void QCPSelectionDecorator::setBrush(const QBrush& brush)
 {
     mBrush = brush;
     if (mPlottable)
-        mPlottable->markDirty();
+        mPlottable->update();
 }
 
 /*!
@@ -113,7 +113,7 @@ void QCPSelectionDecorator::setScatterStyle(const QCPScatterStyle& scatterStyle,
     mScatterStyle = scatterStyle;
     setUsedScatterProperties(usedProperties);
     if (mPlottable)
-        mPlottable->markDirty(); // the decorator paints through the plottable, which records its look
+        mPlottable->update(); // the decorator paints through the plottable, which records its look
 }
 
 /*!
@@ -128,7 +128,7 @@ void QCPSelectionDecorator::setUsedScatterProperties(
 {
     mUsedScatterProperties = properties;
     if (mPlottable)
-        mPlottable->markDirty(); // the decorator paints through the plottable, which records its look
+        mPlottable->update(); // the decorator paints through the plottable, which records its look
 }
 
 /*!
@@ -704,11 +704,11 @@ QPointF QCPPlottable::stallPixelOffset() const
   that draw this plottable's data. A pan or a zoom never reaches it, so a range change still reuses
   the recording.
 */
-void QCPPlottable::markDirty()
+void QCPPlottable::update()
 {
-    if (!mCore.contentChanged())
+    if (!mCore.newGeneration())
         return;
-    QCPLayerable::markDirty();
+    QCPLayerable::update();
     markDependentsDirty();
 }
 
@@ -759,7 +759,7 @@ void QCPPlottable::markDependentsDirty()
         if (!dependent)
             mDependents.removeAt(i);
         else
-            dependent->markDirty();
+            dependent->update();
     }
 }
 
@@ -807,8 +807,8 @@ void QCPPlottable::markLegendRows(QCPLayoutElement* element, QCPPlottable* plott
             auto* row = qobject_cast<QCPPlottableLegendItem*>(item);
             if (!row || row->plottableRaw() != plottable)
                 continue;
-            item->markDirty();
-            legend->markDirty(); // the row may not carry the legend's layer yet
+            item->update();
+            legend->update(); // the row may not carry the legend's layer yet
         }
     }
     for (QCPLayoutElement* child : element->elementsRaw(false))
@@ -835,7 +835,7 @@ void QCPPlottable::setAntialiasedFill(bool enabled)
 {
     if (mAntialiasedFill == enabled)
         return;
-    markDirty();
+    update();
     mAntialiasedFill = enabled;
     qcpEmit(this, mParentPlot, &QCPPlottable::antialiasedFillChanged, antialiasedFill());
 }
@@ -850,7 +850,7 @@ void QCPPlottable::setAntialiasedScatters(bool enabled)
 {
     if (mAntialiasedScatters == enabled)
         return;
-    markDirty();
+    update();
     mAntialiasedScatters = enabled;
     qcpEmit(this, mParentPlot, &QCPPlottable::antialiasedScattersChanged,
             antialiasedScatters());
@@ -868,7 +868,7 @@ void QCPPlottable::setPen(const QPen& pen)
 {
     if (mPen == pen)
         return;
-    markDirty();
+    update();
     mPen = pen;
     qcpEmit(this, mParentPlot, &QCPPlottable::penChanged, mPen);
 }
@@ -886,7 +886,7 @@ void QCPPlottable::setBrush(const QBrush& brush)
 {
     if (mBrush == brush)
         return;
-    markDirty();
+    update();
     mBrush = brush;
     qcpEmit(this, mParentPlot, &QCPPlottable::brushChanged, this->brush());
 }
@@ -926,7 +926,7 @@ void QCPPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
             mKeyAxis = key;
             mValueAxis = value;
         }
-        markDirty();
+        update();
         systemDidChange();
         return axesMoved(keyBefore, valueBefore);
     }
@@ -940,7 +940,7 @@ void QCPPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
         mSystem = nullptr;
         mKeyAxis = key;
         mValueAxis = value;
-        markDirty();
+        update();
         systemDidChange();
         if (hadSystem)
             qcpEmit(this, mParentPlot, &QCPPlottable::systemChanged,
@@ -983,7 +983,7 @@ void QCPPlottable::setSystem(QCPCoordinateSystem* system)
     // the plot through the one path adoption uses: lists, legend row, graph list, colour scale.
     if (mSystem && !mRegisteredPlot && mParentPlot)
         mParentPlot->registerJoinedPlottable(this);
-    contentChanged(); // the new frame's recording, then whatever follows an axis pair
+    update(); // the new frame's recording, then whatever follows an axis pair
     systemDidChange();
     qcpEmit(this, mParentPlot, &QCPPlottable::systemChanged, mSystem.data());
     axesMoved(keyBefore, valueBefore);
@@ -1032,7 +1032,7 @@ void QCPPlottable::setSelection(QCPDataSelection selection)
     selection.enforceType(mSelectable);
     if (assignSelection(selection))
     {
-        markDirty(); // the selection decides what a plottable draws: the next frame must not reuse the last one
+        update(); // the selection decides what a plottable draws: the next frame must not reuse the last one
         emitSelectionChanged();
     }
 }
@@ -1071,14 +1071,14 @@ void QCPPlottable::setSelectionDecorator(QCPSelectionDecorator* decorator)
     {
         if (decorator->registerWithPlottable(this))
         {
-            markDirty(); // the recording baked the old decorator's look, or a callback to it
+            update(); // the recording baked the old decorator's look, or a callback to it
             delete mSelectionDecorator; // delete old decorator if necessary
             mSelectionDecorator = decorator;
         }
     }
     else if (mSelectionDecorator) // just clear decorator
     {
-        markDirty(); // a recording that still held the decorator's callback would run it
+        update(); // a recording that still held the decorator's callback would run it
         delete mSelectionDecorator;
         mSelectionDecorator = nullptr;
     }
@@ -1107,7 +1107,7 @@ void QCPPlottable::setSelectable(QCP::SelectionType selectable)
         // Through the hook: a subclass that spreads its selection (a graph's components) trims too.
         const bool selectionTrimmed = trimmed != mSelection && assignSelection(trimmed);
         if (selectionTrimmed)
-            markDirty();
+            update();
         const QCPEmissionScope scope(mParentPlot);
         qcpEmit(this, mParentPlot, &QCPPlottable::selectableChanged);
         if (selectionTrimmed)
@@ -1391,7 +1391,7 @@ void QCPPlottable::setWantsLegend(bool wants)
         return;
     // The legend's rows signal before this one: a slot of theirs may delete this plottable.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mWantsLegend = wants;
     if (mGroup)
         mRowOnLeave = wants;

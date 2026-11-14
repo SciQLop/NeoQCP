@@ -325,12 +325,12 @@ void QCPLayoutElement::setMaximumSize(int width, int height)
 
 void QCPLayoutElement::markLayoutAppearanceDirty()
 {
-    markDirty();
+    update();
 }
 
 void QCPLayout::markLayoutAppearanceDirty()
 {
-    markDirty();
+    update();
     for (int i = 0; i < elementCount(); ++i)
         if (QCPLayoutElement* element = elementAtRaw(i))
             element->markLayoutAppearanceDirty();
@@ -403,7 +403,7 @@ bool QCPLayoutElement::alignedEdgeMoved() const
   The default implementation executes the automatic margin mechanism in the \ref upMargins phase.
   Subclasses should make sure to call the base class implementation.
 */
-void QCPLayoutElement::update(UpdatePhase phase)
+void QCPLayoutElement::updateLayout(UpdatePhase phase)
 {
     // The margins were computed from the outer rect of the previous pass. A resize only tightens
     // the rect in upLayout, so a pass whose rect no longer matches what its margin assumed must
@@ -659,7 +659,7 @@ void QCPLayoutElement::layoutChanged() { }
 QCPLayout::QCPLayout() { }
 
 /*!
-  If \a phase is \ref upLayout, calls \ref updateLayout, which subclasses may reimplement to
+  If \a phase is \ref upLayout, calls \ref layoutChildren, which subclasses may reimplement to
   reposition and resize their cells.
 
   Finally, the call is propagated down to all child \ref QCPLayoutElement "QCPLayoutElements".
@@ -667,20 +667,20 @@ QCPLayout::QCPLayout() { }
   For details about this method and the update phases, see the documentation of \ref
   QCPLayoutElement::update.
 */
-void QCPLayout::update(UpdatePhase phase)
+void QCPLayout::updateLayout(UpdatePhase phase)
 {
-    QCPLayoutElement::update(phase);
+    QCPLayoutElement::updateLayout(phase);
 
     // set child element rects according to layout:
     if (phase == upLayout)
-        updateLayout();
+        layoutChildren();
 
     // propagate update call to child elements:
     const int elCount = elementCount();
     for (int i = 0; i < elCount; ++i)
     {
         if (QCPLayoutElement* el = elementAtRaw(i))
-            el->update(phase);
+            el->updateLayout(phase);
     }
 }
 
@@ -822,7 +822,7 @@ void QCPLayout::sizeConstraintsChanged() const
 
   \see update
 */
-void QCPLayout::updateLayout() { }
+void QCPLayout::layoutChildren() { }
 
 /*! \internal
 
@@ -895,7 +895,7 @@ void QCPLayout::releaseElement(QCPLayoutElement* el)
 
 /*! \internal
 
-  This is a helper function for the implementation of \ref updateLayout in subclasses.
+  This is a helper function for the implementation of \ref layoutChildren in subclasses.
 
   It calculates the sizes of one-dimensional sections with provided constraints on maximum section
   sizes, minimum section sizes, relative stretch factors and the final total size of all sections.
@@ -1746,7 +1746,7 @@ void QCPLayoutGrid::indexToRowCol(int index, int& row, int& column) const
 }
 
 /* inherits documentation from base class */
-void QCPLayoutGrid::updateLayout()
+void QCPLayoutGrid::layoutChildren()
 {
     QVector<int> minColWidths, minRowHeights, maxColWidths, maxRowHeights;
     getMinimumRowColSizes(&minColWidths, &minRowHeights);
@@ -1971,7 +1971,7 @@ QSize QCPLayoutGrid::maximumOuterSizeHint() const
   row. The minimum width of a column is the largest minimum width of any element's outer rect in
   that column.
 
-  This is a helper function for \ref updateLayout.
+  This is a helper function for \ref layoutChildren.
 
   \see getMaximumRowColSizes
 */
@@ -2005,7 +2005,7 @@ void QCPLayoutGrid::getMinimumRowColSizes(QVector<int>* minColWidths,
   row. The maximum width of a column is the smallest maximum width of any element's outer rect in
   that column.
 
-  This is a helper function for \ref updateLayout.
+  This is a helper function for \ref layoutChildren.
 
   \see getMinimumRowColSizes
 */
@@ -2181,7 +2181,7 @@ void QCPLayoutInset::setInsetRect(int index, const QRectF& rect)
 }
 
 /* inherits documentation from base class */
-void QCPLayoutInset::updateLayout()
+void QCPLayoutInset::layoutChildren()
 {
     for (int i = 0; i < mElements.size(); ++i)
     {

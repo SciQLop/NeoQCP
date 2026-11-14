@@ -288,9 +288,9 @@ bool QCPPolarArea::plotTakesNewParts() const
 }
 
 /* inherits documentation from base class */
-void QCPPolarArea::update(UpdatePhase phase)
+void QCPPolarArea::updateLayout(UpdatePhase phase)
 {
-    QCPArea::update(phase);
+    QCPArea::updateLayout(phase);
 
     switch (phase)
     {

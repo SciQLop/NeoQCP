@@ -72,7 +72,7 @@ The replay resolves them through the frame's <a href="api/classQCPTransform.html
 
 ## Telling the plot what changed
 
-A setter stores the value and calls `contentChanged()`:
+A setter stores the value and calls `update()`:
 
 ````{literalinclude} ../examples/custom-drawable/rangeband.h
 :language: cpp
@@ -80,9 +80,9 @@ A setter stores the value and calls `contentChanged()`:
 :end-before: void setBrush
 ````
 
-`contentChanged()` starts a new generation and marks the object dirty, which schedules the repaint.
-It is the same call as `markDirty()`, which the classic bases already make from their setters
-(`setPen`, `setSelected`, ...), so those keep working without a change.
+`update()` starts a new generation and marks the object dirty, which schedules the repaint.
+The classic bases already make the same call from their setters (`setPen`, `setSelected`, ...),
+so those keep working without a change.
 
 The plot records again only when it must:
 

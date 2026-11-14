@@ -191,7 +191,7 @@ void QCPErrorBars::setData(QSharedPointer<QCPErrorBarsDataContainer> data)
 {
     if (mDataContainer == data)
         return;
-    markDirty();
+    update();
     mDataContainer = data;
 }
 
@@ -206,7 +206,7 @@ void QCPErrorBars::setData(QSharedPointer<QCPErrorBarsDataContainer> data)
 */
 void QCPErrorBars::setData(const QVector<double>& error)
 {
-    markDirty();
+    update();
     mDataContainer->clear();
     addData(error);
 }
@@ -223,7 +223,7 @@ void QCPErrorBars::setData(const QVector<double>& error)
 */
 void QCPErrorBars::setData(const QVector<double>& errorMinus, const QVector<double>& errorPlus)
 {
-    markDirty();
+    update();
     mDataContainer->clear();
     addData(errorMinus, errorPlus);
 }
@@ -269,7 +269,7 @@ void QCPErrorBars::setDataPlottable(QCPPlottable* plottable)
     if (plottable == mDataPlottable)
         return;
 
-    markDirty();
+    update();
     if (QCPPlottable* previous = mDataPlottable.data())
         previous->removeDependent(this);
     mDataPlottable = plottable;
@@ -284,7 +284,7 @@ void QCPErrorBars::setDataPlottable(QCPPlottable* plottable)
 */
 void QCPErrorBars::detachDataPlottable()
 {
-    markDirty();
+    update();
     QCPPlottable* previous = mDataPlottable.data();
     if (!previous)
         return;
@@ -302,7 +302,7 @@ void QCPErrorBars::setErrorType(ErrorType type)
 {
     if (mErrorType == type)
         return;
-    markDirty();
+    update();
     mErrorType = type;
     qcpEmit(this, mParentPlot, &QCPErrorBars::errorTypeChanged, errorType());
 }
@@ -315,7 +315,7 @@ void QCPErrorBars::setWhiskerWidth(double pixels)
 {
     if (mWhiskerWidth == pixels)
         return;
-    markDirty();
+    update();
     mWhiskerWidth = pixels;
     qcpEmit(this, mParentPlot, &QCPErrorBars::whiskerWidthChanged, whiskerWidth());
 }
@@ -329,7 +329,7 @@ void QCPErrorBars::setSymbolGap(double pixels)
 {
     if (mSymbolGap == pixels)
         return;
-    markDirty();
+    update();
     mSymbolGap = pixels;
     qcpEmit(this, mParentPlot, &QCPErrorBars::symbolGapChanged, symbolGap());
 }
@@ -367,7 +367,7 @@ void QCPErrorBars::addData(const QVector<double>& errorMinus, const QVector<doub
     const int n = qMin(errorMinus.size(), errorPlus.size());
     if (n == 0)
         return;
-    markDirty();
+    update();
     mDataContainer->reserve(n);
     for (int i = 0; i < n; ++i)
         mDataContainer->append(QCPErrorBarsData(errorMinus.at(i), errorPlus.at(i)));
@@ -384,7 +384,7 @@ void QCPErrorBars::addData(const QVector<double>& errorMinus, const QVector<doub
 */
 void QCPErrorBars::addData(double error)
 {
-    markDirty();
+    update();
     mDataContainer->append(QCPErrorBarsData(error));
 }
 
@@ -400,7 +400,7 @@ void QCPErrorBars::addData(double error)
 */
 void QCPErrorBars::addData(double errorMinus, double errorPlus)
 {
-    markDirty();
+    update();
     mDataContainer->append(QCPErrorBarsData(errorMinus, errorPlus));
 }
 

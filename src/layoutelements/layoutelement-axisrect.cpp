@@ -994,16 +994,16 @@ void QCPAxisRect::colorScaleUsersChanged()
 
   \seebaseclassmethod
 */
-void QCPAxisRect::update(UpdatePhase phase)
+void QCPAxisRect::updateLayout(UpdatePhase phase)
 {
     QCPColorScale* scale = usedColorScale();
     if (mColorScale)
         mColorScale->setVisible(scale != nullptr);
     // A hidden scale is not touched at all: no layout pass, no draw, no cost per replot.
     if (scale && phase == upMargins)
-        scale->update(phase); // its minimum size is the margin this rect has to add
+        scale->updateLayout(phase); // its minimum size is the margin this rect has to add
 
-    QCPArea::update(phase);
+    QCPArea::updateLayout(phase);
 
     if (phase == upPreparation)
         for (QCPAxis* axis : axesRaw())
@@ -1014,7 +1014,7 @@ void QCPAxisRect::update(UpdatePhase phase)
         if (phase == upLayout)
             placeColorScale();
         if (phase != upMargins) // already done before the margins were computed
-            scale->update(phase);
+            scale->updateLayout(phase);
     }
 }
 

@@ -299,9 +299,9 @@ public:
     using QCPAxisRect::QCPAxisRect;
     int passes = 0;
 
-    void update(UpdatePhase phase) override
+    void updateLayout(UpdatePhase phase) override
     {
-        QCPAxisRect::update(phase);
+        QCPAxisRect::updateLayout(phase);
         if (phase == upLayout)
             ++passes;
     }

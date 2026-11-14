@@ -110,7 +110,7 @@ void QCPItemCurve::setPen(const QPen& pen)
 {
     if (pen == mPen)
         return;
-    markDirty();
+    update();
     mPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemCurve::penChanged, this->pen());
 }
@@ -124,7 +124,7 @@ void QCPItemCurve::setSelectedPen(const QPen& pen)
 {
     if (pen == mSelectedPen)
         return;
-    markDirty();
+    update();
     mSelectedPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemCurve::selectedPenChanged, selectedPen());
 }
@@ -141,7 +141,7 @@ void QCPItemCurve::setHead(const QCPLineEnding& head)
 {
     if (mHead == head)
         return;
-    markDirty();
+    update();
     mHead = head;
     qcpEmit(this, mParentPlot, &QCPItemCurve::headChanged, this->head());
 }
@@ -158,7 +158,7 @@ void QCPItemCurve::setTail(const QCPLineEnding& tail)
 {
     if (mTail == tail)
         return;
-    markDirty();
+    update();
     mTail = tail;
     qcpEmit(this, mParentPlot, &QCPItemCurve::tailChanged, this->tail());
 }

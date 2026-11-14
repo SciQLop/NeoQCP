@@ -35,7 +35,7 @@ void QCPSpanItem::setBrush(const QBrush& brush)
 {
     if (brush == mBrush)
         return;
-    markDirty();
+    update();
     mBrush = brush;
     qcpEmit(this, mParentPlot, &QCPSpanItem::brushChanged, mBrush);
 }
@@ -44,7 +44,7 @@ void QCPSpanItem::setSelectedBrush(const QBrush& brush)
 {
     if (brush == mSelectedBrush)
         return;
-    markDirty();
+    update();
     mSelectedBrush = brush;
     qcpEmit(this, mParentPlot, &QCPSpanItem::selectedBrushChanged, mSelectedBrush);
 }
@@ -53,7 +53,7 @@ void QCPSpanItem::setBorderPen(const QPen& pen)
 {
     if (pen == mBorderPen)
         return;
-    markDirty();
+    update();
     mBorderPen = pen;
     qcpEmit(this, mParentPlot, &QCPSpanItem::borderPenChanged, mBorderPen);
 }
@@ -62,7 +62,7 @@ void QCPSpanItem::setSelectedBorderPen(const QPen& pen)
 {
     if (pen == mSelectedBorderPen)
         return;
-    markDirty();
+    update();
     mSelectedBorderPen = pen;
     qcpEmit(this, mParentPlot, &QCPSpanItem::selectedBorderPenChanged, mSelectedBorderPen);
 }

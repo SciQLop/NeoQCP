@@ -357,7 +357,7 @@ struct QCPDrawnCore::State
 namespace
 {
 /*!
-  Marks the object as drawing for the guard's lifetime: a contentChanged() from inside a recording
+  Marks the object as drawing for the guard's lifetime: a update() from inside a recording
   is a misuse, since it would re-record on every frame.
 */
 class InsideDraw
@@ -634,12 +634,12 @@ void QCPDrawnCore::notePainted(const QCPDrawnView& view)
     mState->painted = true;
 }
 
-bool QCPDrawnCore::contentChanged()
+bool QCPDrawnCore::newGeneration()
 {
     if (mInsideDraw)
     {
         qcp::reportMisuse(Q_FUNC_INFO,
-                          "contentChanged() from inside a drawing: ignored, it would "
+                          "update() from inside a drawing: ignored, it would "
                           "re-record on every frame");
         return false;
     }

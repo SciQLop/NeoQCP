@@ -275,7 +275,7 @@ void QCPColorScale::setType(QCPAxis::AxisType type)
         // for the scope, so a slot that deletes the scale runs after the last is queued.
         QCPEmissionScope scope(mParentPlot);
         const bool drag = mColorAxis && rangeDrag(), zoom = mColorAxis && rangeZoom();
-        markDirty();
+        update();
         mType = type;
         QCPRange rangeTransfer(0, 6);
         QString labelTransfer;
@@ -385,7 +385,7 @@ void QCPColorScale::setDataScaleType(QCPAxis::ScaleType scaleType)
     if (mDataScaleType != scaleType)
     {
         const QCPEmissionScope scope(mParentPlot);
-        markDirty();
+        update();
         mDataScaleType = scaleType;
         if (mColorAxis)
             mColorAxis.data()->setScaleType(mDataScaleType);
@@ -416,9 +416,9 @@ void QCPColorScale::setGradient(const QCPColorGradient& gradient)
     if (mGradient != gradient)
     {
         const QCPEmissionScope scope(mParentPlot);
-        markDirty();
+        update();
         if (mColorAxis)
-            mColorAxis.data()->markDirty(); // the axis draws the tick labels beside the bar
+            mColorAxis.data()->update(); // the axis draws the tick labels beside the bar
         mGradient = gradient;
         if (mAxisRect)
             mAxisRect.data()->mGradientImageInvalidated = true;
@@ -449,7 +449,7 @@ void QCPColorScale::setLabel(const QString& str)
 
     if (mColorAxis.data()->label() == str)
         return;
-    markDirty();
+    update();
     mColorAxis.data()->setLabel(str); // its labelChanged is ours (setType)
 }
 
@@ -461,9 +461,9 @@ void QCPColorScale::setBarWidth(int width)
 {
     if (width == mBarWidth)
         return;
-    markDirty();
+    update();
     if (mColorAxis)
-        mColorAxis.data()->markDirty(); // the bar width moves the axis beside it
+        mColorAxis.data()->update(); // the bar width moves the axis beside it
     mBarWidth = width;
     usersChanged();
     qcpEmit(this, mParentPlot, &QCPColorScale::barWidthChanged, barWidth());
@@ -628,16 +628,16 @@ int QCPColorScale::calculateAutoMargin(QCP::MarginSide side)
 }
 
 /* inherits documentation from base class */
-void QCPColorScale::update(UpdatePhase phase)
+void QCPColorScale::updateLayout(UpdatePhase phase)
 {
-    QCPLayoutElement::update(phase);
+    QCPLayoutElement::updateLayout(phase);
     if (!mAxisRect)
     {
         qDebug() << Q_FUNC_INFO << "internal axis rect was deleted";
         return;
     }
 
-    mAxisRect.data()->update(phase);
+    mAxisRect.data()->updateLayout(phase);
 
     switch (phase)
     {

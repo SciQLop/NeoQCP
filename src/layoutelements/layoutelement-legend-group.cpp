@@ -55,7 +55,7 @@ void QCPGroupLegendItem::setExpanded(bool expanded)
 {
     if (mExpanded == expanded)
         return;
-    markDirty();
+    update();
     mExpanded = expanded;
     qcpEmit(this, mParentPlot, &QCPGroupLegendItem::expandedChanged, mExpanded);
 }
@@ -67,7 +67,7 @@ void QCPGroupLegendItem::setSelectedComponent(int index)
 {
     if (index == mSelectedComponent)
         return;
-    markDirty();
+    update();
     mSelectedComponent = index;
     qcpEmit(this, mParentPlot, &QCPGroupLegendItem::selectedComponentChanged, mSelectedComponent);
 }

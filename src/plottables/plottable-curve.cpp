@@ -254,7 +254,7 @@ void QCPCurve::setData(QSharedPointer<QCPCurveDataContainer> data)
 {
     if (mDataContainer == data)
         return;
-    markDirty();
+    update();
     mDataContainer = data;
     dropColoursOfAnotherSize();
 }

@@ -166,7 +166,7 @@ void QCPItemText::setColor(const QColor& color)
 {
     if (color == mColor)
         return;
-    markDirty();
+    update();
     mColor = color;
     qcpEmit(this, mParentPlot, &QCPItemText::colorChanged, this->color());
 }
@@ -178,7 +178,7 @@ void QCPItemText::setSelectedColor(const QColor& color)
 {
     if (color == mSelectedColor)
         return;
-    markDirty();
+    update();
     mSelectedColor = color;
     qcpEmit(this, mParentPlot, &QCPItemText::selectedColorChanged, selectedColor());
 }
@@ -193,7 +193,7 @@ void QCPItemText::setPen(const QPen& pen)
 {
     if (pen == mPen)
         return;
-    markDirty();
+    update();
     mPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemText::penChanged, this->pen());
 }
@@ -208,7 +208,7 @@ void QCPItemText::setSelectedPen(const QPen& pen)
 {
     if (pen == mSelectedPen)
         return;
-    markDirty();
+    update();
     mSelectedPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemText::selectedPenChanged, selectedPen());
 }
@@ -223,7 +223,7 @@ void QCPItemText::setBrush(const QBrush& brush)
 {
     if (brush == mBrush)
         return;
-    markDirty();
+    update();
     mBrush = brush;
     qcpEmit(this, mParentPlot, &QCPItemText::brushChanged, this->brush());
 }
@@ -238,7 +238,7 @@ void QCPItemText::setSelectedBrush(const QBrush& brush)
 {
     if (brush == mSelectedBrush)
         return;
-    markDirty();
+    update();
     mSelectedBrush = brush;
     qcpEmit(this, mParentPlot, &QCPItemText::selectedBrushChanged, selectedBrush());
 }
@@ -252,7 +252,7 @@ void QCPItemText::setFont(const QFont& font)
 {
     if (font == mFont)
         return;
-    markDirty();
+    update();
     mFont = font;
     qcpEmit(this, mParentPlot, &QCPItemText::fontChanged, this->font());
 }
@@ -266,7 +266,7 @@ void QCPItemText::setSelectedFont(const QFont& font)
 {
     if (font == mSelectedFont)
         return;
-    markDirty();
+    update();
     mSelectedFont = font;
     qcpEmit(this, mParentPlot, &QCPItemText::selectedFontChanged, selectedFont());
 }
@@ -281,7 +281,7 @@ void QCPItemText::setText(const QString& text)
 {
     if (text == mText)
         return;
-    markDirty();
+    update();
     mText = text;
     qcpEmit(this, mParentPlot, &QCPItemText::textChanged, this->text());
 }
@@ -302,7 +302,7 @@ void QCPItemText::setPositionAlignment(Qt::Alignment alignment)
 {
     if (alignment == mPositionAlignment)
         return;
-    markDirty();
+    update();
     mPositionAlignment = alignment;
     qcpEmit(this, mParentPlot, &QCPItemText::positionAlignmentChanged, positionAlignment());
 }
@@ -315,7 +315,7 @@ void QCPItemText::setTextAlignment(Qt::Alignment alignment)
 {
     if (alignment == mTextAlignment)
         return;
-    markDirty();
+    update();
     mTextAlignment = alignment;
     qcpEmit(this, mParentPlot, &QCPItemText::textAlignmentChanged, textAlignment());
 }
@@ -328,7 +328,7 @@ void QCPItemText::setRotation(double degrees)
 {
     if (degrees == mRotation)
         return;
-    markDirty();
+    update();
     mRotation = degrees;
     qcpEmit(this, mParentPlot, &QCPItemText::rotationChanged, rotation());
 }
@@ -341,7 +341,7 @@ void QCPItemText::setPadding(const QMargins& padding)
 {
     if (padding == mPadding)
         return;
-    markDirty();
+    update();
     mPadding = padding;
     qcpEmit(this, mParentPlot, &QCPItemText::paddingChanged, this->padding());
 }

@@ -123,7 +123,7 @@ QCPWaterfallGraph::QCPWaterfallGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
 
 void QCPWaterfallGraph::setDataSource(std::shared_ptr<QCPMultiDataSource> source)
 {
-    markDirty();
+    update();
     mOriginalSource = std::move(source);
     mNormDirty = true;
     rebuildAdapter();
@@ -142,7 +142,7 @@ void QCPWaterfallGraph::setOffsetMode(OffsetMode mode)
         return;
     // The new source restarts the pipeline, which may signal: a slot may delete this graph.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mOffsetMode = mode;
     rebuildAdapter();
     qcpEmit(this, mParentPlot, &QCPWaterfallGraph::offsetModeChanged, mOffsetMode);
@@ -153,7 +153,7 @@ void QCPWaterfallGraph::setUniformSpacing(double spacing)
         return;
     // The new source restarts the pipeline, which may signal: a slot may delete this graph.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mUniformSpacing = spacing;
     rebuildAdapter();
     qcpEmit(this, mParentPlot, &QCPWaterfallGraph::uniformSpacingChanged, mUniformSpacing);
@@ -164,7 +164,7 @@ void QCPWaterfallGraph::setOffsets(const QVector<double>& offsets)
         return;
     // The new source restarts the pipeline, which may signal: a slot may delete this graph.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mUserOffsets = offsets;
     rebuildAdapter();
     qcpEmit(this, mParentPlot, &QCPWaterfallGraph::offsetsChanged, mUserOffsets);
@@ -175,7 +175,7 @@ void QCPWaterfallGraph::setNormalize(bool enabled)
         return;
     // The new source restarts the pipeline, which may signal: a slot may delete this graph.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mNormalize = enabled;
     mNormDirty = true;
     rebuildAdapter();
@@ -187,7 +187,7 @@ void QCPWaterfallGraph::setGain(double gain)
         return;
     // The new source restarts the pipeline, which may signal: a slot may delete this graph.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mGain = gain;
     rebuildAdapter();
     qcpEmit(this, mParentPlot, &QCPWaterfallGraph::gainChanged, mGain);

@@ -116,7 +116,7 @@ struct Construct<T>
         if (!created->system())
             return Handle{};
         Handle handle = makeHandle<Handle>(created.release());
-        handle.get()->markDirty();
+        handle.get()->update();
         if constexpr (sizeof...(Args) > 0)
             detail::setDataOrUndo(plot, handle, std::forward<Args>(args)...);
         return handle;
@@ -136,7 +136,7 @@ struct Construct<T>
         if (!detail::plotHasAxisRect(plot))
             return Handle{};
         Handle handle = makeHandle<Handle>(new T(&plot, std::forward<Args>(args)...));
-        handle.get()->markDirty();
+        handle.get()->update();
         return handle;
     }
 };
@@ -154,7 +154,7 @@ struct Construct<T>
         if (!axis)
             return Handle{};
         Handle handle = makeHandle<Handle>(axis);
-        handle.get()->markDirty();
+        handle.get()->update();
         return handle;
     }
 };
@@ -239,7 +239,7 @@ qcp::HandleFor<T> QCPAxisRect::add(QCPAxis* key, QCPAxis* value, Args&&... args)
     if (!created->system())
         return Handle { };
     Handle handle = qcp::makeHandle<Handle>(created.release());
-    handle.get()->markDirty();
+    handle.get()->update();
     if constexpr (sizeof...(Args) > 0)
         qcp::detail::setDataOrUndo(*mParentPlot, handle, std::forward<Args>(args)...);
     return handle;
@@ -263,7 +263,7 @@ qcp::HandleFor<T> QCPPolarArea::add(Args&&... args)
     if (!plottable->system())
         return Handle { };
     Handle handle = qcp::makeHandle<Handle>(plottable.release());
-    handle.get()->markDirty();
+    handle.get()->update();
     if constexpr (sizeof...(Args) > 0)
         qcp::detail::setDataOrUndo(*mParentPlot, handle, std::forward<Args>(args)...);
     return handle;
@@ -288,7 +288,7 @@ qcp::HandleFor<T> QCPPolarArea::add(std::unique_ptr<T> plottable)
                         "the plottable cannot join this plot", Handle { });
     plottable.release();
     Handle handle = qcp::makeHandle<Handle>(object);
-    object->markDirty();
+    object->update();
     return handle;
 }
 

@@ -117,7 +117,7 @@ void QCPPolarGraph::setPeriodic(bool enabled)
     if (mPeriodic == enabled)
         return;
     mPeriodic = enabled;
-    markDirty();
+    update();
     qcpEmit(this, mParentPlot, &QCPPolarGraph::periodicChanged, periodic());
 }
 
@@ -126,7 +126,7 @@ void QCPPolarGraph::setLineStyle(LineStyle ls)
     if (mLineStyle == ls)
         return;
     mLineStyle = ls;
-    markDirty();
+    update();
     qcpEmit(this, mParentPlot, &QCPPolarGraph::lineStyleChanged, lineStyle());
 }
 
@@ -135,14 +135,14 @@ void QCPPolarGraph::setScatterStyle(const QCPScatterStyle& style)
     if (style == mScatterStyle)
         return;
     mScatterStyle = style;
-    markDirty();
+    update();
     qcpEmit(this, mParentPlot, &QCPPolarGraph::scatterStyleChanged, scatterStyle());
 }
 
 void QCPPolarGraph::setData(QSharedPointer<QCPGraphDataContainer> data)
 {
     mDataContainer = data;
-    markDirty();
+    update();
 }
 
 void QCPPolarGraph::setData(const QVector<double>& keys, const QVector<double>& values,
@@ -163,13 +163,13 @@ void QCPPolarGraph::addData(const QVector<double>& keys, const QVector<double>& 
     for (int i = 0; i < n; ++i)
         points[i] = QCPGraphData(keys[i], values[i]);
     mDataContainer->add(points, alreadySorted);
-    markDirty();
+    update();
 }
 
 void QCPPolarGraph::addData(double key, double value)
 {
     mDataContainer->add(QCPGraphData(key, value));
-    markDirty();
+    update();
 }
 
 void QCPPolarGraph::coordsToPixels(double key, double value, double& x, double& y) const

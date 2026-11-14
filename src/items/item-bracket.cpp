@@ -113,7 +113,7 @@ void QCPItemBracket::setPen(const QPen& pen)
 {
     if (pen == mPen)
         return;
-    markDirty();
+    update();
     mPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemBracket::penChanged, this->pen());
 }
@@ -127,7 +127,7 @@ void QCPItemBracket::setSelectedPen(const QPen& pen)
 {
     if (pen == mSelectedPen)
         return;
-    markDirty();
+    update();
     mSelectedPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemBracket::selectedPenChanged, selectedPen());
 }
@@ -144,7 +144,7 @@ void QCPItemBracket::setLength(double length)
 {
     if (length == mLength)
         return;
-    markDirty();
+    update();
     mLength = length;
     qcpEmit(this, mParentPlot, &QCPItemBracket::lengthChanged, this->length());
 }
@@ -158,7 +158,7 @@ void QCPItemBracket::setStyle(QCPItemBracket::BracketStyle style)
 {
     if (style == mStyle)
         return;
-    markDirty();
+    update();
     mStyle = style;
     qcpEmit(this, mParentPlot, &QCPItemBracket::styleChanged, this->style());
 }

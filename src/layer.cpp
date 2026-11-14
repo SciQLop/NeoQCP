@@ -688,7 +688,7 @@ void QCPLayerable::leaveLayerSilently()
 //
 // Call it first in a setter: after the equality early return and before storing the value, calling
 // helpers or emitting. Marking only schedules a repaint, so nothing may touch `this` afterwards.
-void QCPLayerable::markDirty()
+void QCPLayerable::update()
 {
     if (!mParentPlot || !mLayer)
         return;
@@ -763,7 +763,7 @@ void QCPLayerable::setAntialiased(bool enabled)
 {
     if (enabled == mAntialiased)
         return;
-    markDirty();
+    update();
     mAntialiased = enabled;
     qcpEmit(this, mParentPlot, &QCPLayerable::antialiasedChanged, antialiased());
 }
@@ -894,7 +894,7 @@ void QCPLayerable::setParentLayerable(QCPLayerable* parentLayerable)
     mParentLayerable = parentLayerable;
     if (previous)
         previous->invalidatePaintBuffer(); // the old layer still holds its drawing
-    markDirty(); // and this one takes it
+    update(); // and this one takes it
 }
 
 /*! \internal

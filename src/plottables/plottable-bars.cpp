@@ -147,7 +147,7 @@ void QCPBarsGroup::setSpacingType(SpacingType spacingType)
     if (mSpacingType == spacingType)
         return;
     for (QCPBars* bar : bars())
-        bar->markDirty();
+        bar->update();
     mSpacingType = spacingType;
     bumpRevision();
     qcpEmit(this, mParentPlot, &QCPBarsGroup::spacingTypeChanged, this->spacingType());
@@ -164,7 +164,7 @@ void QCPBarsGroup::setSpacing(double spacing)
     if (mSpacing == spacing)
         return;
     for (QCPBars* bar : bars())
-        bar->markDirty();
+        bar->update();
     mSpacing = spacing;
     bumpRevision();
     qcpEmit(this, mParentPlot, &QCPBarsGroup::spacingChanged, this->spacing());
@@ -640,7 +640,7 @@ void QCPBars::setData(QSharedPointer<QCPBarsDataContainer> data)
 {
     if (mDataContainer == data)
         return;
-    markDirty();
+    update();
     mDataContainer = data;
     notifyGroupRevision();
 }
@@ -674,7 +674,7 @@ void QCPBars::setWidth(double width)
 {
     if (mWidth == width)
         return;
-    markDirty();
+    update();
     mWidth = width;
     notifyGroupRevision();
     qcpEmit(this, mParentPlot, &QCPBars::widthChanged, this->width());
@@ -692,7 +692,7 @@ void QCPBars::setWidthType(QCPBars::WidthType widthType)
 {
     if (mWidthType == widthType)
         return;
-    markDirty();
+    update();
     mWidthType = widthType;
     notifyGroupRevision();
     qcpEmit(this, mParentPlot, &QCPBars::widthTypeChanged, this->widthType());
@@ -719,7 +719,7 @@ void QCPBars::setBarsGroup(QCPBarsGroup* barsGroup)
                     "a bars group needs all its bars in one area, on one key axis");
                 return;
             }
-    markDirty();
+    update();
     // deregister at old group:
     if (mBarsGroup)
         mBarsGroup->unregisterBars(this);
@@ -746,7 +746,7 @@ void QCPBars::setBaseValue(double baseValue)
 {
     if (mBaseValue == baseValue)
         return;
-    markDirty();
+    update();
     mBaseValue = baseValue;
     qcpEmit(this, mParentPlot, &QCPBars::baseValueChanged, this->baseValue());
 }
@@ -760,7 +760,7 @@ void QCPBars::setStackingGap(double pixels)
 {
     if (mStackingGap == pixels)
         return;
-    markDirty();
+    update();
     mStackingGap = pixels;
     qcpEmit(this, mParentPlot, &QCPBars::stackingGapChanged, stackingGap());
 }
@@ -882,7 +882,7 @@ void QCPBars::moveRelativeTo(QCPBars* bars, bool above)
         qcp::reportMisuse(Q_FUNC_INFO, "stacked bars need one coordinate system");
         return;
     }
-    markDirty(); // the restacking below changes what is drawn
+    update(); // the restacking below changes what is drawn
     // A group centres its members from the base each one stands on, so restacking rewires bars of
     // groups other than this one: every group holding a bar that moves here re-records.
     QList<QCPBarsGroup*> groups;

@@ -129,7 +129,7 @@ void QCPGrid::setSubGridVisible(bool visible)
     if (auto* plot = mParentAxis ? mParentAxis->parentPlot().get() : nullptr)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
-    markDirty();
+    update();
     qcpEmit(this, mParentPlot, &QCPGrid::subGridVisibleChanged, subGridVisible());
 }
 
@@ -141,7 +141,7 @@ void QCPGrid::setAntialiasedSubGrid(bool enabled)
     if (enabled == mAntialiasedSubGrid)
         return;
     mAntialiasedSubGrid = enabled;
-    markDirty();
+    update();
     qcpEmit(this, mParentPlot, &QCPGrid::antialiasedSubGridChanged, antialiasedSubGrid());
 }
 
@@ -153,7 +153,7 @@ void QCPGrid::setAntialiasedZeroLine(bool enabled)
     if (enabled == mAntialiasedZeroLine)
         return;
     mAntialiasedZeroLine = enabled;
-    markDirty();
+    update();
     qcpEmit(this, mParentPlot, &QCPGrid::antialiasedZeroLineChanged, antialiasedZeroLine());
 }
 
@@ -168,7 +168,7 @@ void QCPGrid::setPen(const QPen& pen)
     if (auto* plot = mParentAxis ? mParentAxis->parentPlot().get() : nullptr)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
-    markDirty();
+    update();
     qcpEmit(this, mParentPlot, &QCPGrid::penChanged, mPen);
 }
 
@@ -183,7 +183,7 @@ void QCPGrid::setSubGridPen(const QPen& pen)
     if (auto* plot = mParentAxis ? mParentAxis->parentPlot().get() : nullptr)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
-    markDirty();
+    update();
     qcpEmit(this, mParentPlot, &QCPGrid::subGridPenChanged, subGridPen());
 }
 
@@ -201,7 +201,7 @@ void QCPGrid::setZeroLinePen(const QPen& pen)
     if (auto* plot = mParentAxis ? mParentAxis->parentPlot().get() : nullptr)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
-    markDirty();
+    update();
     qcpEmit(this, mParentPlot, &QCPGrid::zeroLinePenChanged, zeroLinePen());
 }
 

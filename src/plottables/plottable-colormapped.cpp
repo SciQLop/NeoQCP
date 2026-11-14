@@ -86,7 +86,7 @@ void QCPColorMapped::attachColorScale(QCPColorScale* colorScale)
 {
     if (mColorScale == colorScale)
         return;
-    markDirty();
+    update();
     const QPointer<QCPColorScale> previous(mColorScale);
     if (mColorScale)
         mColorScale->mUsers.removeOne(this);

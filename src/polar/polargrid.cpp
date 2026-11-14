@@ -145,7 +145,7 @@ void QCPPolarGrid::setRadialAxis(QCPPolarAxisRadial* axis)
 {
     if (axis == mRadialAxis)
         return;
-    markDirty();
+    update();
     mRadialAxis = axis;
     qcpEmit(this, mParentPlot, &QCPPolarGrid::radialAxisChanged, mRadialAxis.data());
 }
@@ -154,7 +154,7 @@ void QCPPolarGrid::setType(GridTypes type)
 {
     if (type == mType)
         return;
-    markDirty();
+    update();
     mType = type;
     qcpEmit(this, mParentPlot, &QCPPolarGrid::typeChanged, mType);
 }
@@ -163,7 +163,7 @@ void QCPPolarGrid::setSubGridType(GridTypes type)
 {
     if (type == mSubGridType)
         return;
-    markDirty();
+    update();
     mSubGridType = type;
     qcpEmit(this, mParentPlot, &QCPPolarGrid::subGridTypeChanged, mSubGridType);
 }
@@ -175,7 +175,7 @@ void QCPPolarGrid::setAntialiasedSubGrid(bool enabled)
 {
     if (enabled == mAntialiasedSubGrid)
         return;
-    markDirty();
+    update();
     mAntialiasedSubGrid = enabled;
     qcpEmit(this, mParentPlot, &QCPPolarGrid::antialiasedSubGridChanged, antialiasedSubGrid());
 }
@@ -187,7 +187,7 @@ void QCPPolarGrid::setAntialiasedZeroLine(bool enabled)
 {
     if (enabled == mAntialiasedZeroLine)
         return;
-    markDirty();
+    update();
     mAntialiasedZeroLine = enabled;
     qcpEmit(this, mParentPlot, &QCPPolarGrid::antialiasedZeroLineChanged, antialiasedZeroLine());
 }
@@ -199,7 +199,7 @@ void QCPPolarGrid::setAngularPen(const QPen& pen)
 {
     if (pen == mAngularPen)
         return;
-    markDirty();
+    update();
     mAngularPen = pen;
     qcpEmit(this, mParentPlot, &QCPPolarGrid::angularPenChanged, angularPen());
 }
@@ -211,7 +211,7 @@ void QCPPolarGrid::setAngularSubGridPen(const QPen& pen)
 {
     if (pen == mAngularSubGridPen)
         return;
-    markDirty();
+    update();
     mAngularSubGridPen = pen;
     qcpEmit(this, mParentPlot, &QCPPolarGrid::angularSubGridPenChanged, angularSubGridPen());
 }
@@ -220,7 +220,7 @@ void QCPPolarGrid::setRadialPen(const QPen& pen)
 {
     if (pen == mRadialPen)
         return;
-    markDirty();
+    update();
     mRadialPen = pen;
     qcpEmit(this, mParentPlot, &QCPPolarGrid::radialPenChanged, radialPen());
 }
@@ -229,7 +229,7 @@ void QCPPolarGrid::setRadialSubGridPen(const QPen& pen)
 {
     if (pen == mRadialSubGridPen)
         return;
-    markDirty();
+    update();
     mRadialSubGridPen = pen;
     qcpEmit(this, mParentPlot, &QCPPolarGrid::radialSubGridPenChanged, radialSubGridPen());
 }
@@ -238,7 +238,7 @@ void QCPPolarGrid::setRadialZeroLinePen(const QPen& pen)
 {
     if (pen == mRadialZeroLinePen)
         return;
-    markDirty();
+    update();
     mRadialZeroLinePen = pen;
     qcpEmit(this, mParentPlot, &QCPPolarGrid::radialZeroLinePenChanged, radialZeroLinePen());
 }

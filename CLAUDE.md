@@ -46,7 +46,7 @@ The library builds as a static library (`libNeoQCP.a`). The public include heade
 - **`core.h/cpp`** — `QCustomPlot` widget class (the main entry point). Inherits `QRhiWidget`. Owns layers, plottables, axes, layout system. Implements `initialize()`/`render()`/`releaseResources()` for RHI compositing.
 - **`global.h`** — Macros, QCP namespace enums/flags, Qt includes. All other headers include this.
 - **`axis/`** — `QCPAxis`, `QCPRange`, axis tickers (datetime, log, pi, text, time, fixed), label painter
-- **`plottables/`** — Graph, curve, bars, colormap, financial, errorbar, statistical box. Base class `QCPAbstractPlottable` in `plottable.h`, 1D plottable template in `plottable1d.h`
+- **`plottables/`** — Graph, curve, bars, colormap, financial, errorbar, statistical box. Base class `QCPPlottable` in `plottable.h`, 1D plottable template in `plottable1d.h`
 - **`items/`** — Overlay items (text, line, rect, ellipse, pixmap, bracket, curve, tracer, straight-line)
 - **`layoutelements/`** — Axis rect, legend, color scale, text element
 - **`painting/`** — Paint buffer hierarchy (`QCPAbstractPaintBuffer` → `QCPPaintBufferPixmap`, `QCPPaintBufferRhi`), `QCPPainter`, compositing shaders in `shaders/`

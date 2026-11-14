@@ -218,7 +218,7 @@ void QCPLegendItem::setSelected(bool selected)
     // The legend's selectedParts moves with it: two signals, and a slot of the first may delete
     // this item.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mSelected = selected;
     qcpEmit(this, mParentPlot, &QCPLegendItem::selectionChanged);
     if (QCPLegend* owner = legend())
@@ -688,7 +688,7 @@ void QCPLegend::setBorderPen(const QPen& pen)
 {
     if (pen == mBorderPen)
         return;
-    markDirty();
+    update();
     mBorderPen = pen;
     qcpEmit(this, mParentPlot, &QCPLegend::borderPenChanged, borderPen());
 }
@@ -700,7 +700,7 @@ void QCPLegend::setBrush(const QBrush& brush)
 {
     if (brush == mBrush)
         return;
-    markDirty();
+    update();
     mBrush = brush;
     qcpEmit(this, mParentPlot, &QCPLegend::brushChanged, this->brush());
 }
@@ -720,7 +720,7 @@ void QCPLegend::setFont(const QFont& font)
         return;
     // The items' signals and ours wait for the scope: a slot may delete the legend mid-loop.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mFont = font;
     for (int i = 0; i < itemCount(); ++i)
     {
@@ -745,7 +745,7 @@ void QCPLegend::setTextColor(const QColor& color)
         return;
     // The items' signals and ours wait for the scope: a slot may delete the legend mid-loop.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mTextColor = color;
     for (int i = 0; i < itemCount(); ++i)
     {
@@ -763,7 +763,7 @@ void QCPLegend::setIconSize(const QSize& size)
 {
     if (size == mIconSize)
         return;
-    markDirty();
+    update();
     mIconSize = size;
     qcpEmit(this, mParentPlot, &QCPLegend::iconSizeChanged, iconSize());
 }
@@ -784,7 +784,7 @@ void QCPLegend::setIconTextPadding(int padding)
 {
     if (padding == mIconTextPadding)
         return;
-    markDirty();
+    update();
     mIconTextPadding = padding;
     qcpEmit(this, mParentPlot, &QCPLegend::iconTextPaddingChanged, iconTextPadding());
 }
@@ -799,7 +799,7 @@ void QCPLegend::setIconBorderPen(const QPen& pen)
 {
     if (pen == mIconBorderPen)
         return;
-    markDirty();
+    update();
     mIconBorderPen = pen;
     qcpEmit(this, mParentPlot, &QCPLegend::iconBorderPenChanged, iconBorderPen());
 }
@@ -868,7 +868,7 @@ void QCPLegend::setSelectedParts(const SelectableParts& selected)
     if (mSelectedParts != newSelected)
     {
         const QCPEmissionScope scope(mParentPlot);
-        markDirty();
+        update();
         if (!mSelectedParts.testFlag(spItems)
             && newSelected.testFlag(spItems)) // attempt to set spItems flag (can't do that)
         {
@@ -898,7 +898,7 @@ void QCPLegend::setSelectedBorderPen(const QPen& pen)
 {
     if (pen == mSelectedBorderPen)
         return;
-    markDirty();
+    update();
     mSelectedBorderPen = pen;
     qcpEmit(this, mParentPlot, &QCPLegend::selectedBorderPenChanged, selectedBorderPen());
 }
@@ -912,7 +912,7 @@ void QCPLegend::setSelectedIconBorderPen(const QPen& pen)
 {
     if (pen == mSelectedIconBorderPen)
         return;
-    markDirty();
+    update();
     mSelectedIconBorderPen = pen;
     qcpEmit(this, mParentPlot, &QCPLegend::selectedIconBorderPenChanged, selectedIconBorderPen());
 }
@@ -927,7 +927,7 @@ void QCPLegend::setSelectedBrush(const QBrush& brush)
 {
     if (brush == mSelectedBrush)
         return;
-    markDirty();
+    update();
     mSelectedBrush = brush;
     qcpEmit(this, mParentPlot, &QCPLegend::selectedBrushChanged, selectedBrush());
 }
@@ -945,7 +945,7 @@ void QCPLegend::setSelectedFont(const QFont& font)
         return;
     // The items' signals and ours wait for the scope: a slot may delete the legend mid-loop.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mSelectedFont = font;
     for (int i = 0; i < itemCount(); ++i)
     {
@@ -968,7 +968,7 @@ void QCPLegend::setSelectedTextColor(const QColor& color)
         return;
     // The items' signals and ours wait for the scope: a slot may delete the legend mid-loop.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mSelectedTextColor = color;
     for (int i = 0; i < itemCount(); ++i)
     {
@@ -1083,7 +1083,7 @@ bool QCPLegend::addItem(QCPLegendItem* item)
     const QCPEmissionScope scope(mParentPlot);
     if (!addElement(item))
         return false;
-    markDirty(); // an item made earlier joins the layout: its layer was not marked by this
+    update(); // an item made earlier joins the layout: its layer was not marked by this
     if (item->selected())
         noteItemSelection();
     return true;

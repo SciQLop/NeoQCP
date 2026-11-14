@@ -228,7 +228,7 @@ void QCPGraph::linesChanged()
 
 void QCPGraph::setDataSource(std::unique_ptr<QCPMultiDataSource> source)
 {
-    markDirty();
+    update();
     setDataSource(std::shared_ptr<QCPMultiDataSource>(std::move(source)));
 }
 
@@ -563,7 +563,7 @@ void QCPGraph::applySourceNow(std::shared_ptr<QCPMultiDataSource> source)
         mPipeline.setSource(nullptr);
         mPipelineBypassed = drawsInDataSpace();
         mAcceptedGeneration = mPipeline.currentGeneration();
-        markDirty();
+        update();
         updateEffectiveBusy();
         return;
     }
@@ -580,7 +580,7 @@ void QCPGraph::applySourceNow(std::shared_ptr<QCPMultiDataSource> source)
     mAcceptedGeneration = mPipeline.hasTransform() ? mPipeline.currentGeneration()
                                                     : mPipeline.currentGeneration() + 1;
     if (!mPipeline.hasTransform())
-        markDirty();
+        update();
     updateEffectiveBusy();
 }
 
@@ -801,10 +801,10 @@ void QCPGraph::syncComponentCount(const QCPMultiDataSource* source)
         dropDecorationsBeyond(newCount);
 }
 
-void QCPGraph::markDirty()
+void QCPGraph::update()
 {
     pruneLostPartnerFills();
-    QCPLine::markDirty();
+    QCPLine::update();
 }
 
 bool QCPGraph::partnerDied(const Fill& fill)
@@ -982,7 +982,7 @@ void QCPGraph::setComponentFillBrush(int owner, const QBrush& brush)
                                  [owner](const Fill& e) { return e.owner == owner; });
     if (it == mFills.end() || it->brush == brush)
         return;
-    markDirty();
+    update();
     it->brush = brush;
     decorationsChanged();
 }
@@ -1112,7 +1112,7 @@ std::optional<QCPGraph::ErrorBars> QCPGraph::componentErrorBars(int value) const
 void QCPGraph::updateBaseSelection()
 {
     // The components' selections changed: their pens are in the recording.
-    markDirty();
+    update();
     QCPDataSelection combined;
     for (const auto& c : mComponents) {
         for (int i = 0; i < c.selection.dataRangeCount(); ++i)
@@ -1188,7 +1188,7 @@ void QCPGraph::setAdaptiveSampling(bool enabled)
 {
     if (mAdaptiveSampling == enabled)
         return;
-    markDirty();
+    update();
     mAdaptiveSampling = enabled;
     linesChanged();
     qcpEmit(this, mParentPlot, &QCPGraph::adaptiveSamplingChanged, adaptiveSampling());
@@ -1198,7 +1198,7 @@ void QCPGraph::setGapThreshold(double threshold)
 {
     if (mGapThreshold == threshold)
         return;
-    markDirty();
+    update();
     mGapThreshold = threshold;
     // The threshold lives on the source the drawing reads; it is set here and when a source is
     // installed, never from the draw, which a pipeline job may be running beside.
@@ -1215,7 +1215,7 @@ void QCPGraph::setGapThreshold(double threshold)
 void QCPGraph::lineChanged()
 {
     linesChanged();
-    markDirty();
+    update();
 }
 
 void QCPGraph::componentVisibilityToggled()
@@ -1316,7 +1316,7 @@ void QCPGraph::setComponentSelection(int index, QCPDataSelection sel)
     sel.simplify(); // the draw searches the ranges: sorted and disjoint
     if (mComponents[index].selection == sel)
         return;
-    markDirty();
+    update();
     mComponents[index].selection = sel;
     updateBaseSelection();
 }

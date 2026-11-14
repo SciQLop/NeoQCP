@@ -110,7 +110,7 @@ void QCPItemPixmap::setPixmap(const QPixmap& pixmap)
 {
     if (pixmap.cacheKey() == mPixmap.cacheKey())
         return;
-    markDirty();
+    update();
     mPixmap = pixmap;
     mScaledPixmapInvalidated = true;
     mImage = QImage(); // the converted picture is the old one
@@ -133,7 +133,7 @@ void QCPItemPixmap::setScaled(bool scaled, Qt::AspectRatioMode aspectRatioMode,
     if (scaled == mScaled && aspectRatioMode == mAspectRatioMode
         && transformationMode == mTransformationMode)
         return;
-    markDirty();
+    update();
     const bool moved = scaled != mScaled;
     mScaled = scaled;
     mAspectRatioMode = aspectRatioMode;
@@ -153,7 +153,7 @@ void QCPItemPixmap::setPen(const QPen& pen)
 {
     if (pen == mPen)
         return;
-    markDirty();
+    update();
     mPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemPixmap::penChanged, this->pen());
 }
@@ -167,7 +167,7 @@ void QCPItemPixmap::setSelectedPen(const QPen& pen)
 {
     if (pen == mSelectedPen)
         return;
-    markDirty();
+    update();
     mSelectedPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemPixmap::selectedPenChanged, selectedPen());
 }

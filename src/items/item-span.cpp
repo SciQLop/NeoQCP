@@ -81,7 +81,7 @@ void QCPItemSpan::setRange(const QCPRange& range)
 {
     if (range == this->range())
         return;
-    markDirty();
+    update();
     {
         // Quiet only while it writes: a slot of the signal below that moves an edge is heard.
         const QScopedValueRollback quiet(mEdgesQuiet, true);

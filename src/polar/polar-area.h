@@ -113,7 +113,7 @@ public:
     qcp::HandleFor<T> add(std::unique_ptr<T> plottable);
 
     // reimplemented virtual methods:
-    virtual void update(UpdatePhase phase) override;
+    virtual void updateLayout(UpdatePhase phase) override;
     virtual QList<QCPHandle<QCPAxisBase>> allAxes() const override;
 
 signals:

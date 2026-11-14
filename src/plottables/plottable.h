@@ -234,10 +234,7 @@ public:
     //! The setter rule: a new content generation, then the layer mark the base needs.
     //!
     //! A pan or a zoom never reaches it, so a range change still reuses the recording.
-    void markDirty() override;
-
-    //! A setter's name for the same thing.
-    void contentChanged() { markDirty(); }
+    void update() override;
 
     // Overlays, tracers and error bars whose drawing follows this plottable's data. A dependent
     // registers when it attaches and unregisters when it detaches; a content change then marks each

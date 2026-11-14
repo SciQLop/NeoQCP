@@ -486,7 +486,7 @@ void QCPPolarAxisAngular::setTicks(bool show)
 {
     if (mTicks != show)
     {
-        markDirty();
+        update();
         mTicks = show;
         // mCachedMarginValid = false;
         qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::ticksChanged, ticks());
@@ -500,7 +500,7 @@ void QCPPolarAxisAngular::setTickLabels(bool show)
 {
     if (mTickLabels != show)
     {
-        markDirty();
+        update();
         mTickLabels = show;
         // mCachedMarginValid = false;
         if (!mTickLabels)
@@ -517,7 +517,7 @@ void QCPPolarAxisAngular::setTickLabelPadding(int padding)
 {
     if (mLabelPainter.padding() == padding)
         return;
-    markDirty();
+    update();
     mLabelPainter.setPadding(padding);
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLabelPaddingChanged, tickLabelPadding());
 }
@@ -531,7 +531,7 @@ void QCPPolarAxisAngular::setTickLabelFont(const QFont& font)
 {
     if (font == mTickLabelFont)
         return;
-    markDirty();
+    update();
     mTickLabelFont = font;
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLabelFontChanged, tickLabelFont());
 }
@@ -545,7 +545,7 @@ void QCPPolarAxisAngular::setTickLabelColor(const QColor& color)
 {
     if (color == mTickLabelColor)
         return;
-    markDirty();
+    update();
     mTickLabelColor = color;
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLabelColorChanged, tickLabelColor());
 }
@@ -563,7 +563,7 @@ void QCPPolarAxisAngular::setTickLabelRotation(double degrees)
 {
     if (mLabelPainter.rotation() == qBound(-90.0, degrees, 90.0))
         return;
-    markDirty();
+    update();
     mLabelPainter.setRotation(degrees);
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLabelRotationChanged, tickLabelRotation());
 }
@@ -574,7 +574,7 @@ void QCPPolarAxisAngular::setTickLabelMode(LabelMode mode)
                                           : QCPLabelPainterPrivate::amSkewedRotated;
     if (mLabelPainter.anchorMode() == anchor)
         return;
-    markDirty();
+    update();
     mLabelPainter.setAnchorMode(anchor);
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLabelModeChanged, tickLabelMode());
 }
@@ -671,7 +671,7 @@ void QCPPolarAxisAngular::setNumberFormat(const QString& formatCode)
     if (mNumberFormatChar == previousChar && mNumberBeautifulPowers == previousBeautiful
         && mNumberMultiplyCross == previousCross)
         return;
-    markDirty();
+    update();
     mLabelPainter.setSubstituteExponent(mNumberBeautifulPowers);
     mLabelPainter.setMultiplicationSymbol(mNumberMultiplyCross ? QCPLabelPainterPrivate::SymbolCross
                                                                : QCPLabelPainterPrivate::SymbolDot);
@@ -687,7 +687,7 @@ void QCPPolarAxisAngular::setNumberPrecision(int precision)
 {
     if (mNumberPrecision == precision)
         return;
-    markDirty();
+    update();
     mNumberPrecision = precision;
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::numberPrecisionChanged, numberPrecision());
 }
@@ -718,7 +718,7 @@ void QCPPolarAxisAngular::setTickLengthIn(int inside)
 {
     if (mTickLengthIn != inside)
     {
-        markDirty();
+        update();
         mTickLengthIn = inside;
         qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLengthInChanged, tickLengthIn());
     }
@@ -735,7 +735,7 @@ void QCPPolarAxisAngular::setTickLengthOut(int outside)
 {
     if (mTickLengthOut != outside)
     {
-        markDirty();
+        update();
         mTickLengthOut = outside;
         // mCachedMarginValid = false; // only outside tick length can change margin
         qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLengthOutChanged, tickLengthOut());
@@ -753,7 +753,7 @@ void QCPPolarAxisAngular::setSubTicks(bool show)
 {
     if (mSubTicks != show)
     {
-        markDirty();
+        update();
         mSubTicks = show;
         // mCachedMarginValid = false;
         qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::subTicksChanged, subTicks());
@@ -786,7 +786,7 @@ void QCPPolarAxisAngular::setSubTickLengthIn(int inside)
 {
     if (mSubTickLengthIn != inside)
     {
-        markDirty();
+        update();
         mSubTickLengthIn = inside;
         qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::subTickLengthInChanged, subTickLengthIn());
     }
@@ -803,7 +803,7 @@ void QCPPolarAxisAngular::setSubTickLengthOut(int outside)
 {
     if (mSubTickLengthOut == outside)
         return;
-    markDirty();
+    update();
     mSubTickLengthOut = outside;
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::subTickLengthOutChanged, subTickLengthOut());
 }
@@ -817,7 +817,7 @@ void QCPPolarAxisAngular::setBasePen(const QPen& pen)
 {
     if (pen == mBasePen)
         return;
-    markDirty();
+    update();
     mBasePen = pen;
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::basePenChanged, basePen());
 }
@@ -831,7 +831,7 @@ void QCPPolarAxisAngular::setTickPen(const QPen& pen)
 {
     if (pen == mTickPen)
         return;
-    markDirty();
+    update();
     mTickPen = pen;
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickPenChanged, tickPen());
 }
@@ -845,7 +845,7 @@ void QCPPolarAxisAngular::setSubTickPen(const QPen& pen)
 {
     if (pen == mSubTickPen)
         return;
-    markDirty();
+    update();
     mSubTickPen = pen;
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::subTickPenChanged, subTickPen());
 }
@@ -859,7 +859,7 @@ void QCPPolarAxisAngular::setLabelFont(const QFont& font)
 {
     if (mLabelFont != font)
     {
-        markDirty();
+        update();
         mLabelFont = font;
         // mCachedMarginValid = false;
         qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::labelFontChanged, labelFont());
@@ -875,7 +875,7 @@ void QCPPolarAxisAngular::setLabelColor(const QColor& color)
 {
     if (color == mLabelColor)
         return;
-    markDirty();
+    update();
     mLabelColor = color;
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::labelColorChanged, labelColor());
 }
@@ -888,7 +888,7 @@ void QCPPolarAxisAngular::setLabel(const QString& str)
 {
     if (mLabel != str)
     {
-        markDirty();
+        update();
         mLabel = str;
         // mCachedMarginValid = false;
         qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::labelChanged, label());
@@ -904,7 +904,7 @@ void QCPPolarAxisAngular::setLabelPadding(int padding)
 {
     if (mLabelPadding != padding)
     {
-        markDirty();
+        update();
         mLabelPadding = padding;
         // mCachedMarginValid = false;
         qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::labelPaddingChanged, labelPadding());
@@ -920,7 +920,7 @@ void QCPPolarAxisAngular::setSelectedTickLabelFont(const QFont& font)
 {
     if (font != mSelectedTickLabelFont)
     {
-        markDirty();
+        update();
         mSelectedTickLabelFont = font;
         // don't set mCachedMarginValid to false here because margin calculation is always done with
         // non-selected fonts
@@ -938,7 +938,7 @@ void QCPPolarAxisAngular::setSelectedLabelFont(const QFont& font)
 {
     if (font == mSelectedLabelFont)
         return;
-    markDirty();
+    update();
     mSelectedLabelFont = font;
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectedLabelFontChanged, selectedLabelFont());
 }
@@ -952,7 +952,7 @@ void QCPPolarAxisAngular::setSelectedTickLabelColor(const QColor& color)
 {
     if (color != mSelectedTickLabelColor)
     {
-        markDirty();
+        update();
         mSelectedTickLabelColor = color;
         qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectedTickLabelColorChanged,
                 selectedTickLabelColor());
@@ -968,7 +968,7 @@ void QCPPolarAxisAngular::setSelectedLabelColor(const QColor& color)
 {
     if (color == mSelectedLabelColor)
         return;
-    markDirty();
+    update();
     mSelectedLabelColor = color;
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectedLabelColorChanged,
             selectedLabelColor());
@@ -983,7 +983,7 @@ void QCPPolarAxisAngular::setSelectedBasePen(const QPen& pen)
 {
     if (pen == mSelectedBasePen)
         return;
-    markDirty();
+    update();
     mSelectedBasePen = pen;
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectedBasePenChanged, selectedBasePen());
 }
@@ -997,7 +997,7 @@ void QCPPolarAxisAngular::setSelectedTickPen(const QPen& pen)
 {
     if (pen == mSelectedTickPen)
         return;
-    markDirty();
+    update();
     mSelectedTickPen = pen;
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectedTickPenChanged, selectedTickPen());
 }
@@ -1011,7 +1011,7 @@ void QCPPolarAxisAngular::setSelectedSubTickPen(const QPen& pen)
 {
     if (pen == mSelectedSubTickPen)
         return;
-    markDirty();
+    update();
     mSelectedSubTickPen = pen;
     qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectedSubTickPenChanged,
             selectedSubTickPen());
@@ -1155,7 +1155,7 @@ bool QCPPolarAxisAngular::scaleTypeWillChange(ScaleType type)
 */
 void QCPPolarAxisAngular::markAppearanceDirty()
 {
-    markDirty();
+    update();
     if (polarArea())
         polarArea()->markAffectedLayersDirty();
 }

@@ -87,10 +87,10 @@ public:
     };
 
     //! Counts the base setter path: a range change must not come through here.
-    void markDirty() override
+    void update() override
     {
         ++dirtyCalls;
-        QCPItem::markDirty();
+        QCPItem::update();
     }
 
     void draw(QCPDrawContext& context) const override
@@ -99,7 +99,7 @@ public:
         if (everyFrame)
             context.recordEveryFrame();
         if (contentChangeInsideDraw)
-            const_cast<TestShape*>(this)->contentChanged();
+            const_cast<TestShape*>(this)->update();
         if (rangeInsideDraw)
         {
             const std::optional<QCPItemExtent> range = extent();
@@ -276,7 +276,7 @@ public:
             context.text(QCP::Data { 4, 4 }, QStringLiteral("x"), QCPTextStyle { });
     }
 
-    void touch() { contentChanged(); }
+    void touch() { update(); }
 
     //! Test hook: how many times the resolve cache mapped a recording again.
     [[nodiscard]] quint64 remaps() const { return mCore.resolveRemapCount(); }
@@ -380,7 +380,7 @@ public:
             std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
 };
 
-//! A drawn plottable whose legend icon calls a setter: a misuse, like contentChanged() in draw().
+//! A drawn plottable whose legend icon calls a setter: a misuse, like update() in draw().
 class TestIconSetter : public QCPPlottable
 {
 public:
@@ -401,7 +401,7 @@ public:
     {
         ++iconCalls;
         context.polyline(mLine, QPen(Qt::black, 2));
-        const_cast<TestIconSetter*>(this)->contentChanged();
+        const_cast<TestIconSetter*>(this)->update();
     }
 
     //! The adapter's old virtual, which the core's icon path hangs off.
@@ -1663,7 +1663,7 @@ void TestDrawable::setPenReRecordsOnce()
     f.plot->replot();
     QCOMPARE(line->drawCalls, 1);
 
-    line->setPen(QPen(Qt::red, 3)); // an old-base setter: not contentChanged()
+    line->setPen(QPen(Qt::red, 3)); // an old-base setter: not update()
     f.plot->replot();
     QCOMPARE(line->drawCalls, 2);
 }
@@ -1680,7 +1680,7 @@ void TestDrawable::setCoordsMovesTheItem()
     QCOMPARE(before->keyLower, 3.0);
     QCOMPARE(before->valueLower, 3.0);
 
-    shape->mAnchor->setCoords(5, 6); // an old-base setter, through QCPItem::markDirty
+    shape->mAnchor->setCoords(5, 6); // an old-base setter, through QCPItem::update
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 2);
     const std::optional<QCPDataBox> after = shape->drawnDataRange();

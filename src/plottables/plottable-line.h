@@ -118,9 +118,9 @@ protected:
     //! Feeds the base's gradient, range and scale type to the mapper, then redraws.
     void colorMappingChanged() override;
     //! The cached drawing is stale: mark the layer dirty.
-    virtual void lineChanged() { markDirty(); }
+    virtual void lineChanged() { update(); }
     //! A component's visibility changed: mark the layer dirty.
-    virtual void componentVisibilityToggled() { markDirty(); }
+    virtual void componentVisibilityToggled() { update(); }
 
     static QPen defaultSelectedPen(const QPen& pen);
     //! \a style as it draws for \a pen: a style with no pen of its own takes it.

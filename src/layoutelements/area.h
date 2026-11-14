@@ -77,7 +77,7 @@ public:
     void setBackgroundScaledMode(Qt::AspectRatioMode mode);
 
     // reimplemented virtual methods:
-    virtual void update(UpdatePhase phase) override;
+    virtual void updateLayout(UpdatePhase phase) override;
     virtual QList<QCPHandle<QCPLayoutElement>> elements(bool recursive) const override;
 
     //! The axes of the area, as the base type the range model lives in.

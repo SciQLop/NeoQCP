@@ -287,9 +287,9 @@ void QCPArea::destroyInsetLayout()
   Runs the margin pass, then hands the area's rect to the inset layout and updates it: an area
   draws its inset elements inside itself, so its subclass need not know about the inset layout.
 */
-void QCPArea::update(UpdatePhase phase)
+void QCPArea::updateLayout(UpdatePhase phase)
 {
-    QCPLayoutElement::update(phase);
+    QCPLayoutElement::updateLayout(phase);
 
     if (phase == upLayout)
     {
@@ -306,7 +306,7 @@ void QCPArea::update(UpdatePhase phase)
         mInsetLayout->setOuterRect(rect());
     }
 
-    mInsetLayout->update(phase);
+    mInsetLayout->updateLayout(phase);
 }
 
 /* inherits documentation from base class */
@@ -354,7 +354,7 @@ void QCPArea::setBackground(const QPixmap& pm)
         return;
     mBackgroundPixmap = pm;
     mScaledBackgroundPixmap = QPixmap();
-    markDirty();
+    update();
     qcpEmit(this, mParentPlot, &QCPArea::backgroundChanged, mBackgroundPixmap);
 }
 
@@ -374,7 +374,7 @@ void QCPArea::setBackground(const QBrush& brush)
     if (brush == mBackgroundBrush)
         return;
     mBackgroundBrush = brush;
-    markDirty();
+    update();
 }
 
 /*! \overload
@@ -412,7 +412,7 @@ void QCPArea::setBackgroundScaled(bool scaled)
     if (scaled == mBackgroundScaled)
         return;
     mBackgroundScaled = scaled;
-    markDirty();
+    update();
     qcpEmit(this, mParentPlot, &QCPArea::backgroundScaledChanged, backgroundScaled());
 }
 
@@ -428,7 +428,7 @@ void QCPArea::setBackgroundScaledMode(Qt::AspectRatioMode mode)
     if (mode == mBackgroundScaledMode)
         return;
     mBackgroundScaledMode = mode;
-    markDirty();
+    update();
     qcpEmit(this, mParentPlot, &QCPArea::backgroundScaledModeChanged, backgroundScaledMode());
 }
 

@@ -171,7 +171,7 @@ public:
     QPoint center() const { return mRect.center(); }
 
     // reimplemented virtual methods:
-    virtual void update(UpdatePhase phase) override;
+    virtual void updateLayout(UpdatePhase phase) override;
     virtual int calculateAutoMargin(QCP::MarginSide side) override;
 
 signals:

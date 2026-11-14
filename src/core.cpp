@@ -4837,9 +4837,9 @@ void QCustomPlot::updateLayout()
     if (!layout)
         return;
     mAlignmentUnsettled = false;
-    layout->update(QCPLayoutElement::upPreparation);
-    layout->update(QCPLayoutElement::upMargins);
-    layout->update(QCPLayoutElement::upLayout);
+    layout->updateLayout(QCPLayoutElement::upPreparation);
+    layout->updateLayout(QCPLayoutElement::upMargins);
+    layout->updateLayout(QCPLayoutElement::upLayout);
     settleAlignment(layout);
 
     emitReplotSignal(&QCustomPlot::afterLayout);
@@ -4858,8 +4858,8 @@ void QCustomPlot::settleAlignment(QCPLayoutGrid* layout)
     constexpr int maxExtraPasses = 3;
     for (int pass = 0; pass < maxExtraPasses && std::exchange(mAlignmentUnsettled, false); ++pass)
     {
-        layout->update(QCPLayoutElement::upMargins);
-        layout->update(QCPLayoutElement::upLayout);
+        layout->updateLayout(QCPLayoutElement::upMargins);
+        layout->updateLayout(QCPLayoutElement::upLayout);
     }
     if (!std::exchange(mAlignmentUnsettled, false))
     {

@@ -808,7 +808,7 @@ void QCPColorMapData::dataChanged()
 {
     const bool repaintPending = std::exchange(mDataModified, true);
     if (mOwner && !repaintPending)
-        mOwner->markDirty();
+        mOwner->update();
 }
 
 /*!
@@ -826,7 +826,7 @@ void QCPColorMap::setData(QCPColorMapData* data, bool copy)
                  << reinterpret_cast<quintptr>(data);
         return;
     }
-    markDirty();
+    update();
     if (copy)
     {
         *mMapData = *data;
@@ -853,7 +853,7 @@ void QCPColorMap::setInterpolate(bool enabled)
 {
     if (enabled == mInterpolate)
         return;
-    markDirty();
+    update();
     mInterpolate = enabled;
     mMapImageInvalidated = true; // because oversampling factors might need to change
     qcpEmit(this, mParentPlot, &QCPColorMap::interpolateChanged, interpolate());
@@ -874,7 +874,7 @@ void QCPColorMap::setTightBoundary(bool enabled)
 {
     if (mTightBoundary == enabled)
         return;
-    markDirty();
+    update();
     mTightBoundary = enabled;
     qcpEmit(this, mParentPlot, &QCPColorMap::tightBoundaryChanged, tightBoundary());
 }
@@ -888,7 +888,7 @@ QCPRange QCPColorMap::colorDataBounds(bool& found) const
 void QCPColorMap::colorMappingChanged()
 {
     mMapImageInvalidated = true;
-    markDirty();
+    update();
 }
 
 /*!

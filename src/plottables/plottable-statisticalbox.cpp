@@ -309,7 +309,7 @@ void QCPStatisticalBox::setData(QSharedPointer<QCPStatisticalBoxDataContainer> d
 {
     if (mDataContainer == data)
         return;
-    markDirty();
+    update();
     mDataContainer = data;
 }
 
@@ -342,7 +342,7 @@ void QCPStatisticalBox::setWidth(double width)
 {
     if (mWidth == width)
         return;
-    markDirty();
+    update();
     mWidth = width;
     qcpEmit(this, mParentPlot, &QCPStatisticalBox::widthChanged, this->width());
 }
@@ -359,7 +359,7 @@ void QCPStatisticalBox::setWhiskerWidth(double width)
 {
     if (mWhiskerWidth == width)
         return;
-    markDirty();
+    update();
     mWhiskerWidth = width;
     qcpEmit(this, mParentPlot, &QCPStatisticalBox::whiskerWidthChanged, whiskerWidth());
 }
@@ -379,7 +379,7 @@ void QCPStatisticalBox::setWhiskerPen(const QPen& pen)
 {
     if (mWhiskerPen == pen)
         return;
-    markDirty();
+    update();
     mWhiskerPen = pen;
     qcpEmit(this, mParentPlot, &QCPStatisticalBox::whiskerPenChanged, whiskerPen());
 }
@@ -397,7 +397,7 @@ void QCPStatisticalBox::setWhiskerBarPen(const QPen& pen)
 {
     if (mWhiskerBarPen == pen)
         return;
-    markDirty();
+    update();
     mWhiskerBarPen = pen;
     qcpEmit(this, mParentPlot, &QCPStatisticalBox::whiskerBarPenChanged, whiskerBarPen());
 }
@@ -412,7 +412,7 @@ void QCPStatisticalBox::setWhiskerAntialiased(bool enabled)
 {
     if (mWhiskerAntialiased == enabled)
         return;
-    markDirty();
+    update();
     mWhiskerAntialiased = enabled;
     qcpEmit(this, mParentPlot, &QCPStatisticalBox::whiskerAntialiasedChanged, whiskerAntialiased());
 }
@@ -424,7 +424,7 @@ void QCPStatisticalBox::setMedianPen(const QPen& pen)
 {
     if (mMedianPen == pen)
         return;
-    markDirty();
+    update();
     mMedianPen = pen;
     qcpEmit(this, mParentPlot, &QCPStatisticalBox::medianPenChanged, medianPen());
 }
@@ -440,7 +440,7 @@ void QCPStatisticalBox::setOutlierStyle(const QCPScatterStyle& style)
 {
     if (style == mOutlierStyle)
         return;
-    markDirty();
+    update();
     mOutlierStyle = style;
     qcpEmit(this, mParentPlot, &QCPStatisticalBox::outlierStyleChanged, outlierStyle());
 }

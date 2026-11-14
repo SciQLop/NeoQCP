@@ -161,7 +161,7 @@ void QCPItemTracer::setPen(const QPen& pen)
 {
     if (pen == mPen)
         return;
-    markDirty();
+    update();
     mPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemTracer::penChanged, this->pen());
 }
@@ -175,7 +175,7 @@ void QCPItemTracer::setSelectedPen(const QPen& pen)
 {
     if (pen == mSelectedPen)
         return;
-    markDirty();
+    update();
     mSelectedPen = pen;
     qcpEmit(this, mParentPlot, &QCPItemTracer::selectedPenChanged, selectedPen());
 }
@@ -189,7 +189,7 @@ void QCPItemTracer::setBrush(const QBrush& brush)
 {
     if (brush == mBrush)
         return;
-    markDirty();
+    update();
     mBrush = brush;
     qcpEmit(this, mParentPlot, &QCPItemTracer::brushChanged, this->brush());
 }
@@ -203,7 +203,7 @@ void QCPItemTracer::setSelectedBrush(const QBrush& brush)
 {
     if (brush == mSelectedBrush)
         return;
-    markDirty();
+    update();
     mSelectedBrush = brush;
     qcpEmit(this, mParentPlot, &QCPItemTracer::selectedBrushChanged, selectedBrush());
 }
@@ -216,7 +216,7 @@ void QCPItemTracer::setSize(double size)
 {
     if (size == mSize)
         return;
-    markDirty();
+    update();
     mSize = size;
     qcpEmit(this, mParentPlot, &QCPItemTracer::sizeChanged, this->size());
 }
@@ -231,7 +231,7 @@ void QCPItemTracer::setStyle(QCPItemTracer::TracerStyle style)
 {
     if (mStyle == style)
         return;
-    markDirty();
+    update();
     mStyle = style;
     qcpEmit(this, mParentPlot, &QCPItemTracer::styleChanged, this->style());
 }
@@ -263,7 +263,7 @@ void QCPItemTracer::setGraph(QCPGraph* graph, int component)
     const int componentBefore = mComponent;
     if (mGraph)
         mGraph->removeDependent(this);
-    markDirty();
+    update();
     if (graph && graph->parentPlot() == mParentPlot)
     {
         position->setType(QCPItemPosition::ptPlotCoords);
@@ -297,7 +297,7 @@ void QCPItemTracer::setComponent(int component)
         return;
     QCP_CHECK_OR_RETURN(component >= 0 && mGraph->isValidColumn(component),
                         "the component is outside the graph's columns");
-    markDirty();
+    update();
     mComponent = component;
     updatePosition();
     qcpEmit(this, mParentPlot, &QCPItemTracer::componentChanged, mComponent);
@@ -316,7 +316,7 @@ void QCPItemTracer::setGraphKey(double key)
 {
     if (key == mGraphKey)
         return;
-    markDirty();
+    update();
     mGraphKey = key;
     qcpEmit(this, mParentPlot, &QCPItemTracer::graphKeyChanged, graphKey());
 }
@@ -336,7 +336,7 @@ void QCPItemTracer::setInterpolating(bool enabled)
 {
     if (enabled == mInterpolating)
         return;
-    markDirty();
+    update();
     mInterpolating = enabled;
     qcpEmit(this, mParentPlot, &QCPItemTracer::interpolatingChanged, interpolating());
 }

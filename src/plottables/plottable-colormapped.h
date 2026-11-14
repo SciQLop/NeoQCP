@@ -70,7 +70,7 @@ signals:
 
 protected:
     //! Called after the gradient, range or scale type changed: repaint, or hand it to a renderer.
-    virtual void colorMappingChanged() { markDirty(); }
+    virtual void colorMappingChanged() { update(); }
 
     //! Takes the key axis rect's scale, if it has one, and hands its values to the renderer.
     //! Does nothing once setColorScale() was called. Called at the end of a subclass constructor,

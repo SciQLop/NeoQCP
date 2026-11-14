@@ -410,7 +410,7 @@ void QCPItemPosition::setSystem(QCPCoordinateSystem* system)
     }
     const QPointer<QCPArea> previousArea = mArea;
     if (mParentItem)
-        mParentItem->markDirty();
+        mParentItem->update();
     mSystem = system;
     // The 2.x projection exists only on a cartesian frame: a system of the user's own maps through
     // its transform, and 2.x pixel code gets no axis to compute a rectangle with.
@@ -450,7 +450,7 @@ void QCPItemPosition::setArea(QCPArea* area)
     if (mArea == area)
         return;
     if (mParentItem)
-        mParentItem->markDirty();
+        mParentItem->update();
     mArea = area;
     mAxisRect = qobject_cast<QCPAxisRect*>(area);
     if (mParentItem)
@@ -502,7 +502,7 @@ void QCPItemPosition::setType(QCPItemPosition::PositionType type)
         return;
     const QPointF pixel = pixelPosition();
     if (mParentItem)
-        mParentItem->markDirty();
+        mParentItem->update();
     mPositionTypeX = type;
     mPositionTypeY = type;
     setPixelPosition(pixel);
@@ -520,7 +520,7 @@ void QCPItemPosition::setTypeX(QCPItemPosition::PositionType type)
     if (mPositionTypeX != type)
     {
         if (mParentItem)
-            mParentItem->markDirty();
+            mParentItem->update();
         // if switching from or to coordinate type that isn't valid (e.g. because axes or axis rect
         // were deleted), don't try to recover the pixelPosition() because it would output a qDebug
         // warning.
@@ -563,7 +563,7 @@ void QCPItemPosition::setTypeY(QCPItemPosition::PositionType type)
     if (mPositionTypeY != type)
     {
         if (mParentItem)
-            mParentItem->markDirty();
+            mParentItem->update();
         // if switching from or to coordinate type that isn't valid (e.g. because axes or axis rect
         // were deleted), don't try to recover the pixelPosition() because it would output a qDebug
         // warning.
@@ -699,7 +699,7 @@ bool QCPItemPosition::setParentAnchorX(QCPItemAnchor* parentAnchor, bool keepPix
         parentAnchor->pixelPosition();
     }
     if (mParentItem)
-        mParentItem->markDirty();
+        mParentItem->update();
     const bool wasAnchored = mParentAnchorX || mParentAnchorY;
     mParentAnchorX = parentAnchor;
     const bool anchored = mParentAnchorX || mParentAnchorY;
@@ -760,7 +760,7 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
         parentAnchor->pixelPosition();
     }
     if (mParentItem)
-        mParentItem->markDirty();
+        mParentItem->update();
     const bool wasAnchored = mParentAnchorX || mParentAnchorY;
     mParentAnchorY = parentAnchor;
     const bool anchored = mParentAnchorX || mParentAnchorY;
@@ -808,7 +808,7 @@ void QCPItemPosition::setCoords(double key, double value)
     if (key == mKey && value == mValue)
         return;
     if (mParentItem)
-        mParentItem->markDirty();
+        mParentItem->update();
     const QPointF before(mKey, mValue);
     mKey = key;
     mValue = value;
@@ -980,7 +980,7 @@ void QCPItemPosition::setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
                             "the axes of an item position must be the two axes of one area");
     }
     if (mParentItem)
-        mParentItem->markDirty();
+        mParentItem->update();
     const bool projections = resolved && resolved->kind() == QCPTransform::Kind::Cartesian;
     // A system of the user's own hands no 2.x axis: its positions resolve through the frame. The
     // one-axis form (a 2.x position with a single axis) keeps the axis it names.
@@ -1025,7 +1025,7 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
         && qFuzzyCompare(current.y() + 1.0, pixelPosition.y() + 1.0))
         return;
     if (mParentItem)
-        mParentItem->markDirty();
+        mParentItem->update();
     // The inverse of the anchored frame above: the pixel read back, the anchor read back, and the
     // difference stored as the offset in data space.
     if (mSystem && !keyAxisRaw() && !valueAxisRaw() && mParentAnchorX && mParentAnchorY
@@ -1648,7 +1648,7 @@ void QCPItem::setClipToAxisRect(bool clip)
 {
     if (mClipToAxisRect == clip)
         return;
-    markDirty();
+    update();
     mClipToAxisRect = clip;
     if (mClipToAxisRect)
         setParentLayerable(mClipArea.data());
@@ -1673,7 +1673,7 @@ void QCPItem::setClipArea(QCPArea* area)
     // Two signals: a slot of the first may delete the item.
     const QCPEmissionScope scope(mParentPlot);
     const QCPAxisRect* rectBefore = clipAxisRectRaw();
-    markDirty();
+    update();
     mClipArea = area;
     if (mClipToAxisRect)
         setParentLayerable(mClipArea.data());
@@ -1727,7 +1727,7 @@ void QCPItem::setSelected(bool selected)
 {
     if (mSelected == selected)
         return;
-    markDirty();
+    update();
     mSelected = selected;
     qcpEmit(this, mParentPlot, &QCPItem::selectionChanged);
 }
@@ -1900,7 +1900,7 @@ QPointF QCPItem::anchorPixelPosition(int anchorId) const
 
   \see createAnchor
 */
-void QCPItem::markDirty()
+void QCPItem::update()
 {
     // A position may follow an anchor of its own item (a line's end pinned to its start), so the
     // follower walk below can come straight back here. Returning at once while marking stops that
@@ -1909,10 +1909,10 @@ void QCPItem::markDirty()
         return;
     // A new content generation, unless a setter is called from inside draw() (a misuse the core
     // reports): that recording is being made, and marking it now would never settle.
-    if (!mCore.contentChanged())
+    if (!mCore.newGeneration())
         return;
     QScopedValueRollback<bool> marking(mMarking, true);
-    QCPLayerable::markDirty();
+    QCPLayerable::update();
     // The index is in data coordinates and survives range changes, but not a moved item: the item
     // leaves the tree and is tested one by one until the layer rebuilds it.
     if (mLayer)
@@ -1923,15 +1923,15 @@ void QCPItem::markDirty()
 void QCPItem::markFollowersDirty()
 {
     // A position that follows one of this item's anchors moves with it, whatever layer it is on.
-    // A follower may belong to this very item: markDirty() returns at once when it is already
+    // A follower may belong to this very item: update() returns at once when it is already
     // marking, which is what ends the walk.
     for (const QCPItemAnchor* anchor : std::as_const(mAnchors))
     {
         for (QCPItemPosition* follower : anchor->mChildrenX)
-            follower->mParentItem->markDirty();
+            follower->mParentItem->update();
         for (QCPItemPosition* follower : anchor->mChildrenY)
             if (!anchor->mChildrenX.contains(follower))
-                follower->mParentItem->markDirty();
+                follower->mParentItem->update();
     }
 }
 

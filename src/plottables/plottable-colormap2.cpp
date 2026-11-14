@@ -51,7 +51,7 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
             this, [this](uint64_t) {
                 mContours.dataChanged();
                 mRenderer.invalidateMapImage();
-                markDirty(); // marking schedules the repaint
+                update(); // marking schedules the repaint
             });
     connect(&mPipeline, &QCPColormapPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
@@ -158,7 +158,7 @@ void QCPColorMap2::setGapThreshold(double threshold)
         return;
     // The pipeline restart below may signal: a slot may delete this colour map.
     const QCPEmissionScope scope(mParentPlot);
-    markDirty();
+    update();
     mGapThreshold = threshold;
     installResampleTransform();
     // Re-resample so the new threshold shows now, not on the next pan. Without
@@ -171,7 +171,7 @@ void QCPColorMap2::setGapThreshold(double threshold)
 
 void QCPColorMap2::setDataSource(std::unique_ptr<QCPDataSource2D> source)
 {
-    markDirty();
+    update();
     setDataSource(std::shared_ptr<QCPDataSource2D>(std::move(source)));
 }
 
@@ -236,7 +236,7 @@ void QCPColorMap2::colorMappingChanged()
         if (!alive)
             return;
     }
-    markDirty();
+    update();
 }
 
 // A job already running lands with finished(), which repaints and asks again if it was made for
@@ -399,14 +399,14 @@ double QCPColorMap2::selectTest(const QPointF& pos, bool onlySelectable, QVarian
 
 void QCPColorMap2::contoursChanged()
 {
-    markDirty();
+    update();
 }
 
 void QCPColorMap2::setContourLevels(const QVector<double>& levels)
 {
     // Always applied: it also turns automatic levels off, which the levels alone do not show.
     const QVector<double> before = contourLevels();
-    markDirty();
+    update();
     mContours.setLevels(levels);
     contoursChanged();
     if (contourLevels() == before)
@@ -418,7 +418,7 @@ void QCPColorMap2::setContourPen(const QPen& pen)
 {
     if (pen == contourPen())
         return;
-    markDirty();
+    update();
     mContours.setPen(pen);
     contoursChanged();
     qcpEmit(this, mParentPlot, &QCPColorMap2::contourPenChanged, contourPen());
@@ -428,7 +428,7 @@ void QCPColorMap2::setContourLabelEnabled(bool enabled)
 {
     if (enabled == mContours.labelsEnabled())
         return;
-    markDirty();
+    update();
     mContours.setLabelsEnabled(enabled);
     contoursChanged();
     qcpEmit(this, mParentPlot, &QCPColorMap2::contourLabelEnabledChanged, contourLabelEnabled());
@@ -438,7 +438,7 @@ void QCPColorMap2::setAutoContourLevels(int count)
 {
     // Automatic levels drop the explicit ones.
     const QVector<double> before = contourLevels();
-    markDirty();
+    update();
     mContours.setAutoLevels(count);
     contoursChanged();
     if (contourLevels() != before)

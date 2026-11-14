@@ -81,7 +81,7 @@ struct QCP_LIB_DECL QCPItemExtent
   \brief The drawing contract: \a draw records, the three others default to the recording.
 
   A recording is transform independent; a replay is not. The core keeps one recording per object
-  and re-makes it only when the object says it changed (contentChanged) or when the view changed
+  and re-makes it only when the object says it changed (update) or when the view changed
   and the recording contains view-dependent commands.
 */
 class QCP_LIB_DECL QCPDrawable
@@ -146,7 +146,7 @@ public:
     QCPDrawnCore& operator=(const QCPDrawnCore&) = delete;
 
     //! A new generation. False, and one misuse report, when called from inside draw().
-    bool contentChanged();
+    bool newGeneration();
 
     //! What the object occupies, from the recording: QCPItem::dataExtent's two rules.
     //! With \a applyLogRule false, a log axis does not drop a side that reaches zero: a plottable's

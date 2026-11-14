@@ -135,7 +135,7 @@ public:
     bool keyPress(QKeyEvent* event) override;
 
     //! A change that remakes the bars repaints the labels too: they live on a layer of their own.
-    void markDirty() override;
+    void update() override;
 
     double selectTest(const QPointF& pos, bool onlySelectable,
                       QVariant* details = nullptr) const override;

@@ -1469,3 +1469,7 @@ Milestone 6a (names). Breaking, in the 3.0 preview line.
         QCPLine, QCPAbstractColorMapped is QCPColorMapped, QCPAbstractSpanItem is QCPSpanItem,
         QCPAbstractDataSource is QCPDataSource, QCPAbstractDataSource2D is QCPDataSource2D and
         QCPAbstractMultiDataSource is QCPMultiDataSource. QCPAbstractPaintBuffer is internal and keeps its name.
+  - update() redraws, updateLayout() lays out: QCPLayerable::markDirty() and its overrides are update(),
+        contentChanged() on plottables and items is gone (update() replaces it), and
+        QCPLayoutElement::update(UpdatePhase) and its overrides are updateLayout(UpdatePhase).
+        QCPLayer::markDirty() keeps its name. The protected QCPLayout::updateLayout() hook is layoutChildren().

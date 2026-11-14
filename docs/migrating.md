@@ -319,3 +319,18 @@ The base classes of the 3.0 line lose the word. No alias is kept: rename the nam
 | `QCPAbstractMultiDataSource` | `QCPMultiDataSource` |
 
 `QCPAbstractPaintBuffer` is internal and keeps its name. Source files such as `abstract-datasource.h` keep their names.
+
+## `update()` redraws, `updateLayout()` lays out
+
+`update()` now means one thing: draw this object again. No forwarder is kept.
+
+| Old | New |
+|---|---|
+| `QCPLayerable::markDirty()` and every override | `QCPLayerable::update()` |
+| `contentChanged()` on a plottable or an item | `update()` |
+| `QCPLayoutElement::update(UpdatePhase)` and every override | `QCPLayoutElement::updateLayout(UpdatePhase)` |
+
+A layout element override that keeps the old `update(UpdatePhase)` name no longer compiles when it says `override`.
+`QCPLayer::markDirty()` is a layer-level repaint request and keeps its name.
+`QCPLayout::updateLayout()` (the protected hook that positions the children) is `layoutChildren()`, so that the two
+`updateLayout` names do not hide each other in a subclass.

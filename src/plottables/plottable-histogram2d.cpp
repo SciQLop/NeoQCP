@@ -49,7 +49,7 @@ QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
     connect(&mPipeline, &QCPHistogramPipeline::finished,
             this, [this](uint64_t) {
                 invalidateShown();
-                markDirty(); // marking schedules the repaint
+                update(); // marking schedules the repaint
                 const QCPEmissionScope scope(mParentPlot);
                 qcpEmit(this, mParentPlot, &QCPHistogram2D::histogramReady);
             });
@@ -104,7 +104,7 @@ void QCPHistogram2D::installTransform()
 
 void QCPHistogram2D::setDataSource(std::shared_ptr<QCPDataSource> source)
 {
-    markDirty();
+    update();
     mDataSource = std::move(source);
     invalidateBoundsCache();
     mPipeline.setSource(mDataSource);
@@ -149,7 +149,7 @@ void QCPHistogram2D::setBins(int keyBins, int valueBins)
     QCP_CHECK_OR_RETURN(keyBins > 0 && valueBins > 0, "a histogram needs at least one bin", );
     if (keyBins == mKeyBins && valueBins == mValueBins)
         return;
-    markDirty();
+    update();
     mKeyBins = keyBins;
     mValueBins = valueBins;
     installTransform();
@@ -160,7 +160,7 @@ void QCPHistogram2D::setNormalization(QCP::HistogramNormalization norm)
 {
     if (norm == mNormalization)
         return;
-    markDirty();
+    update();
     mNormalization = norm;
     invalidateShown();
     qcpEmit(this, mParentPlot, &QCPHistogram2D::normalizationChanged, mNormalization);
@@ -170,7 +170,7 @@ void QCPHistogram2D::setColumnNormalized(bool normalized)
 {
     if (mColumnNormalized == normalized)
         return;
-    markDirty();
+    update();
     mColumnNormalized = normalized;
     invalidateShown();
     qcpEmit(this, mParentPlot, &QCPHistogram2D::columnNormalizedChanged, mColumnNormalized);
@@ -181,12 +181,12 @@ void QCPHistogram2D::colorMappingChanged()
     mRenderer.setDataScaleType(dataScaleType());
     mRenderer.setDataRange(dataRange());
     mRenderer.setGradient(gradient());
-    markDirty();
+    update();
 }
 
 void QCPHistogram2D::redrawLater()
 {
-    markDirty(); // marking schedules the repaint
+    update(); // marking schedules the repaint
 }
 
 const QCPColorMapData* QCPHistogram2D::binned() const
@@ -374,7 +374,7 @@ void QCPHistogram2D::setContourLevels(const QVector<double>& levels)
 {
     // Always applied: it also turns automatic levels off, which the levels alone do not show.
     const QVector<double> before = contourLevels();
-    markDirty();
+    update();
     mContours.setLevels(levels);
     contoursChanged();
     if (contourLevels() == before)
@@ -386,7 +386,7 @@ void QCPHistogram2D::setAutoContourLevels(int count)
 {
     // Automatic levels drop the explicit ones.
     const QVector<double> before = contourLevels();
-    markDirty();
+    update();
     mContours.setAutoLevels(count);
     contoursChanged();
     if (contourLevels() != before)
@@ -397,7 +397,7 @@ void QCPHistogram2D::setContourPen(const QPen& pen)
 {
     if (pen == contourPen())
         return;
-    markDirty();
+    update();
     mContours.setPen(pen);
     contoursChanged();
     qcpEmit(this, mParentPlot, &QCPHistogram2D::contourPenChanged, contourPen());
@@ -407,7 +407,7 @@ void QCPHistogram2D::setContourLabelEnabled(bool enabled)
 {
     if (enabled == mContours.labelsEnabled())
         return;
-    markDirty();
+    update();
     mContours.setLabelsEnabled(enabled);
     contoursChanged();
     qcpEmit(this, mParentPlot, &QCPHistogram2D::contourLabelEnabledChanged, contourLabelEnabled());

@@ -227,7 +227,7 @@ void TestRepaint::markDirtySchedulesOneRepaint()
     auto plot = settledPlot();
     QSignalSpy after(plot.get(), &QCustomPlot::afterReplot);
     for (int i = 0; i < 1000; ++i)
-        plot->graph(0)->markDirty();
+        plot->graph(0)->update();
     QVERIFY(plot->isRepaintQueued());
     QCOMPARE(after.count(), 0);
     QTRY_COMPARE(after.count(), 1);
@@ -248,7 +248,7 @@ void TestRepaint::dirtyAfterDrawRepaintsNextTurn()
                 if (++count == 1)
                 {
                     plot->graph(0)->setPen(QPen(kBlue, 4));
-                    plot->graph(0)->markDirty();
+                    plot->graph(0)->update();
                 }
             });
     plot->replot();
@@ -274,7 +274,7 @@ void TestRepaint::markDuringDrawRepaintsNextTurn()
         if (++draws > 1)
             return;
         plot->graph(0)->setPen(QPen(kBlue, 4));
-        plot->graph(0)->markDirty(); // "main" is drawn before "overlay"
+        plot->graph(0)->update(); // "main" is drawn before "overlay"
     };
     QSignalSpy after(plot.get(), &QCustomPlot::afterReplot);
     plot->replot();
@@ -299,14 +299,14 @@ void TestRepaint::markAfterDrawSurvivesAnotherDirtyBuffer()
         if (++draws > 1)
             return;
         plot->graph(0)->setPen(QPen(kBlue, 4));
-        plot->graph(0)->markDirty();
+        plot->graph(0)->update();
     };
     int replots = 0;
     connect(plot.get(), &QCustomPlot::afterReplot, plot.get(),
             [&]
             {
                 if (++replots == 1)
-                    hook->markDirty();
+                    hook->update();
             });
     plot->replot();
     waitUntilSettled(*plot);
@@ -324,7 +324,7 @@ void TestRepaint::appearanceChangeIsNotHiddenByTranslation()
     plot.replot();
     fill->stall = QPointF(5, 0); // a pan in progress: the layer would shift its old frame
     fill->setPen(QPen(kBlue));
-    fill->markDirty();
+    fill->update();
     waitUntilSettled(plot);
     const QImage screen = screenOf(&plot);
     QVERIFY(pixelsOfColor(screen, kBlue) > 1000);
@@ -358,7 +358,7 @@ void TestRepaint::afterReplotSlotDirtyingEveryTimeDoesNotStarve()
             [&]
             {
                 ++count;
-                plot->graph(0)->markDirty();
+                plot->graph(0)->update();
             });
     bool timerFired = false;
     QTimer::singleShot(0, plot.get(), [&] { timerFired = true; });
@@ -386,7 +386,7 @@ void TestRepaint::hiddenPlotQueuesNoVisibleWork()
         QCoreApplication::processEvents();
     QSignalSpy after(plot.get(), &QCustomPlot::afterReplot);
     plot->graph(0)->setPen(QPen(kBlue, 4));
-    plot->graph(0)->markDirty();
+    plot->graph(0)->update();
     QCoreApplication::processEvents();
     QCOMPARE(after.count(), 0);
     QVERIFY(!plot->isRepaintQueued());
@@ -403,12 +403,12 @@ void TestRepaint::markDirtyWithoutPlotIsNoOp()
     const auto previous = qcp::setMisuseHandler(countMisuse);
     gMisuses = 0;
     DrawHook orphan(nullptr);
-    orphan.markDirty();
+    orphan.update();
     auto plot = settledPlot();
     auto* layerless = new DrawHook(plot.get());
     layerless->setLayer(static_cast<QCPLayer*>(nullptr));
     waitUntilSettled(*plot); // joining and leaving a layer repaints it
-    layerless->markDirty();
+    layerless->update();
     QVERIFY(!plot->isRepaintQueued());
     QCOMPARE(gMisuses, 0);
     qcp::setMisuseHandler(previous);
@@ -439,7 +439,7 @@ void TestRepaint::syncReplotCancelsTheQueuedOne()
 {
     auto plot = settledPlot();
     QSignalSpy after(plot.get(), &QCustomPlot::afterReplot);
-    plot->graph(0)->markDirty();
+    plot->graph(0)->update();
     plot->replot();
     QCOMPARE(after.count(), 1);
     QVERIFY(!plot->isRepaintQueued());
@@ -468,7 +468,7 @@ void TestRepaint::exportSettlesFirst()
     plot->requestDataSwap();
     const QColor newColor(0, 0, 255);
     plot->graph(0)->setPen(QPen(newColor, 4));
-    plot->graph(0)->markDirty();
+    plot->graph(0)->update();
 
     const QImage image = exportWith(*plot, how, dir.path());
 

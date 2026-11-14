@@ -124,7 +124,7 @@ public:
     void setSizeConstraintRect(SizeConstraintRect constraintRect);
 
     // introduced virtual methods:
-    virtual void update(UpdatePhase phase);
+    virtual void updateLayout(UpdatePhase phase);
     // A layout setter (margins, spacing, stretch, insets) must call this first: it invalidates what
     // this element draws and, for a layout, everything it arranges.
     virtual void markLayoutAppearanceDirty();
@@ -192,7 +192,7 @@ public:
     explicit QCPLayout();
 
     // reimplemented virtual methods:
-    virtual void update(UpdatePhase phase) override;
+    virtual void updateLayout(UpdatePhase phase) override;
     virtual QList<QCPHandle<QCPLayoutElement>> elements(bool recursive) const override;
 
     // introduced virtual methods:
@@ -213,7 +213,7 @@ public:
     void markLayoutAppearanceDirty() override;
 
 protected:
-    virtual void updateLayout();
+    virtual void layoutChildren();
     //! The child elements raw, for the layout's own passes (K8).
     virtual QList<QCPLayoutElement*> elementsRaw(bool recursive) const override;
     //! elementAt() raw, for the layout's own passes (K8). The default converts elementAt().
@@ -301,7 +301,7 @@ public:
     void setFillOrder(FillOrder order, bool rearrange = true);
 
     // reimplemented virtual methods:
-    virtual void updateLayout() override;
+    virtual void layoutChildren() override;
 
     virtual int elementCount() const override { return rowCount() * columnCount(); }
 
@@ -385,7 +385,7 @@ public:
     void setInsetRect(int index, const QRectF& rect);
 
     // reimplemented virtual methods:
-    virtual void updateLayout() override;
+    virtual void layoutChildren() override;
     virtual int elementCount() const override;
     virtual QCPHandle<QCPLayoutElement> elementAt(int index) const override;
     virtual QCPLayoutElement* takeAt(int index) override;

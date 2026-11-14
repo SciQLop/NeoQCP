@@ -288,7 +288,7 @@ void QCPFinancial::setData(QSharedPointer<QCPFinancialDataContainer> data)
 {
     if (mDataContainer == data)
         return;
-    markDirty();
+    update();
     mDataContainer = data;
 }
 
@@ -318,7 +318,7 @@ void QCPFinancial::setChartStyle(QCPFinancial::ChartStyle style)
 {
     if (mChartStyle == style)
         return;
-    markDirty();
+    update();
     mChartStyle = style;
     qcpEmit(this, mParentPlot, &QCPFinancial::chartStyleChanged, chartStyle());
 }
@@ -332,7 +332,7 @@ void QCPFinancial::setWidth(double width)
 {
     if (mWidth == width)
         return;
-    markDirty();
+    update();
     mWidth = width;
     qcpEmit(this, mParentPlot, &QCPFinancial::widthChanged, this->width());
 }
@@ -349,7 +349,7 @@ void QCPFinancial::setWidthType(QCPFinancial::WidthType widthType)
 {
     if (mWidthType == widthType)
         return;
-    markDirty();
+    update();
     mWidthType = widthType;
     qcpEmit(this, mParentPlot, &QCPFinancial::widthTypeChanged, this->widthType());
 }
@@ -367,7 +367,7 @@ void QCPFinancial::setTwoColored(bool twoColored)
 {
     if (mTwoColored == twoColored)
         return;
-    markDirty();
+    update();
     mTwoColored = twoColored;
     qcpEmit(this, mParentPlot, &QCPFinancial::twoColoredChanged, this->twoColored());
 }
@@ -385,7 +385,7 @@ void QCPFinancial::setBrushPositive(const QBrush& brush)
 {
     if (mBrushPositive == brush)
         return;
-    markDirty();
+    update();
     mBrushPositive = brush;
     qcpEmit(this, mParentPlot, &QCPFinancial::brushPositiveChanged, brushPositive());
 }
@@ -403,7 +403,7 @@ void QCPFinancial::setBrushNegative(const QBrush& brush)
 {
     if (mBrushNegative == brush)
         return;
-    markDirty();
+    update();
     mBrushNegative = brush;
     qcpEmit(this, mParentPlot, &QCPFinancial::brushNegativeChanged, brushNegative());
 }
@@ -421,7 +421,7 @@ void QCPFinancial::setPenPositive(const QPen& pen)
 {
     if (mPenPositive == pen)
         return;
-    markDirty();
+    update();
     mPenPositive = pen;
     qcpEmit(this, mParentPlot, &QCPFinancial::penPositiveChanged, penPositive());
 }
@@ -439,7 +439,7 @@ void QCPFinancial::setPenNegative(const QPen& pen)
 {
     if (mPenNegative == pen)
         return;
-    markDirty();
+    update();
     mPenNegative = pen;
     qcpEmit(this, mParentPlot, &QCPFinancial::penNegativeChanged, penNegative());
 }
