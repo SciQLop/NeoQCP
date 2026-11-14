@@ -191,16 +191,13 @@ user would see and where the code is. Fixed items are deleted, not ticked.
   step sends a stretch-factor signal with the value of that moment: `[]`, `[1]`, `[1, 1]`, ... up to the final
   list. The last one is right. Fix: sample the lists when `setFillOrder` starts and signal once at the end.
   Only a listener pays today (E-4c).
-- **Layout-sensitive bench rows.** `QCPItems_Add10k` and `QCPItems_RestyleAll10k` move by 5-30 % with code
-  placement alone (ruling R-19). Judge them on several linker layouts (mold `--shuffle-sections`) or on an
+- **Layout-sensitive bench rows.** `QCPItems_Add10k`, `QCPItems_RestyleAll10k` and
+  `QCPDrawContext_ReplayMarkers100k` move by 5-30 % with code placement alone (rulings R-19, R-23). Judge them on several linker layouts (mold `--shuffle-sections`) or on an
   external harness, not on one A/B.
 - **A setter's scope costs something when nothing listens.** `setTickLength(in, out)` and the polar two-length
   setters open an emission scope around their two setters: +3-4 % on `QCPAxis_SetTickLength10kItems`
   (ruling R-17). The scopes of `setTheme`, the legend, plottable removal and legend selection are unbenched
   (R-18). Upgrade: open the scope only when one of the signals has a receiver.
-- **`QCPDrawContext_ReplayMarkers100k` +10.2 % at the end of 5e.** 9 pairs; 5e changed nothing on the replay
-  path. The base build is bimodal (35.4 or 39.5 M ticks), the new one sits at 39.0. Check it on several linker
-  layouts before looking for code (`baseline.md`, "End of milestone 5e").
 - **No bench row adds or removes plottables, or touches the legend or the theme.** The final fix batch's
   removal and selection scopes are unmeasured.
 - **`QCPHitAction` is not registered.** It is a global `enum class`, outside any meta-object scope; moving it

@@ -2310,8 +2310,29 @@ median of the two series: 0.15, 0.61, 0.13, 0.40 and 38 ms.
   - `QCPDrawContext_ReplayMarkers100k` +10.2 % (+9.6 % over the 5 pairs). No ruling covers it. 5e changed nothing
     on its path: it replays 100k dot markers with a `QCPPainter` into an image, and the only painting changes are a
     deleted metatype line and `QCPScatterStyle::operator==`, which the replay does not call. The base is bimodal
-    (35.4 or 39.5 in the 9 pairs); the new build sits at 39.0 in every pair. That looks like code placement, but it
-    is not shown. Open finding.
+    (35.4 or 39.5 in the 9 pairs); the new build sits at 39.0 in every pair.
+  - Before the push, this row was run on several linker layouts. It is code layout, not a cost:
+    1. Each binary was relinked with mold `--shuffle-sections=<seed>`, seeds 1 to 6, base and new. The default link
+       is seed 0. Each of the 14 binaries ran 5 rounds, base and new interleaved, under one Xvfb.
+    2. Every binary lands in one of two modes: about 36.6 or about 40.8 M ticks. Which mode depends on the layout,
+       not the version. Base is slow on 1 layout of 7, new on 2 of 7 (one of them the default link).
+    3. In the fast mode, base and new are equal (36.60 and 36.62). In the slow mode, too (40.7 and 40.8-40.9).
+    4. Averaged over the six shuffled layouts, new is +0.2 % (37.24 base, 37.32 new). Over all seven, +1.8 %.
+  - The base's fast runs are not a lucky case for base: the fast mode is the usual one for both versions, 11 of 14
+    layouts. The new default link happens to fall in the slow mode. A binary can also flip mode between runs: the
+    base default link did in the 9 pairs, and here one base and one new layout flipped once in 5 rounds.
+
+| layout | base | new | new vs base |
+|---|---|---|---|
+| default | 36.85 | 40.92 | +11.0 % |
+| shuffle 1 | 36.50 | 36.64 | +0.4 % |
+| shuffle 2 | 36.52 | 40.84 | +11.8 % |
+| shuffle 3 | 36.46 | 36.28 | -0.5 % |
+| shuffle 4 | 36.43 | 36.83 | +1.1 % |
+| shuffle 5 | 36.83 | 36.47 | -1.0 % |
+| shuffle 6 | 40.68 | 36.87 | -9.4 % |
+
+  Medians over 5 rounds, millions of ticks.
 - Back inside the gate after 9 pairs: `QCPAxisRects_Stack8_Replot` (+5.8 % -> +1.8 %), `QCPBars_Zoom10k`
   (+11.3 % -> -3.9 %), `QCPGpu_HistogramPan` (+8.5 % -> -6.2 %), `QCPGraph_RenderFloat`, `QCPItems_AddRemove10k`,
   `QCPItems_DeletePlot10k` (+3.7 %), `QCPPlottables_Zoom200`, `QCPStatisticalBox_Pan1k`.
@@ -2340,7 +2361,7 @@ median of the two series: 0.15, 0.61, 0.13, 0.40 and 38 ms.
 | QCPColorScale_Rescale8 | 5 | 0.0026 | 0.0025 | -3.8% | +3.4% | 15% |
 | QCPCoords_CoordToPixel1M | 5 | 24.26 | 24.08 | -0.7% | -0.1% | 15% |
 | QCPDrawContext_ReplayData1M | 5 | 9.156 | 9.134 | -0.2% | +2.8% | 5% |
-| QCPDrawContext_ReplayMarkers100k | 9 | 35.43 | 39.02 | +10.2% | +6.3% | 5% over |
+| QCPDrawContext_ReplayMarkers100k | 9 | 35.43 | 39.02 | +10.2% | +6.3% | 5% over, layout (+0.2 % over 6 layouts) |
 | QCPDrawn_Pan10k | 5 | 2.468 | 2.397 | -2.9% | -1.5% | 5% |
 | QCPDrawn_Pan10kOneRecording | 5 | 6.447 | 6.611 | +2.5% | +1.3% | 5% |
 | QCPDrawn_Zoom10k | 5 | 3.094 | 2.987 | -3.4% | -2.3% | 5% |

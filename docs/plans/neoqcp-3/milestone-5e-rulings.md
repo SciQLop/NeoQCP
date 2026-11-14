@@ -18,16 +18,17 @@ workspace `neoqcp`.
 - Offscreen 4079 passed, 0 failed, 135 skipped. Xvfb 4214/0. The whole ASan + UBSan suite 4079/0/135, with no
   sanitizer report. All on the Coder workspace at 8977561. 5d ended at 2549 offscreen: most of the new rows are
   the generic test (`tests/auto/test-meta-surface`).
+- Before the push, at e5dcd84 (the error-bar fix): offscreen 4081 passed, 0 failed, 135 skipped; Xvfb 4216/0; ASan
+  `TestMetaSurface` 1526/0 with no sanitizer report; clang `-fsyntax-only` clean on all 101 files in `src/`.
 - clang `-fsyntax-only` clean on every file each task touched. `check-sources.py`: the file lists match.
 - Guide snippets green (`doc-snippets`, `doc-offscreen-export`), with two new binding snippets for `migrating.md`.
   Every example builds.
 - CI: not run yet. The milestone is not pushed.
-- Bench: each task's A/B stayed inside the gates, except the rows ruled below (R-17 to R-20). The whole-table
+- Bench: each task's A/B stayed inside the gates, except the rows ruled below (R-17 to R-20, R-23). The whole-table
   end-of-milestone A/B is in `baseline.md`, "End of milestone 5e": 110 rows, 5 pairs, then 9 for the ten rows
   over their gate. Two rows stay over after 9 pairs:
   - `QCPItems_RestyleAll10k` +7.8 %, a layout-sensitive row (R-19).
-  - `QCPDrawContext_ReplayMarkers100k` +10.2 %. No ruling covers it, and 5e changed nothing on its path. The base
-    is bimodal and the new build sits on its slow mode. Open finding, not fixed here.
+  - `QCPDrawContext_ReplayMarkers100k` +10.2 %. It is code layout (R-23): over six linker layouts it is +0.2 %.
 
 ## Rulings (what, why, cost if wrong)
 
@@ -93,6 +94,10 @@ workspace `neoqcp`.
 - R-22 (process): two review findings were declined. Task 3's M2 (a double selection-rect signal) is a false
   positive: the sequence needs a use-after-free in user code first. Task 3's M7 (the polar two-length scopes) is
   R-17.
+- R-23 (bench): `QCPDrawContext_ReplayMarkers100k` +10.2 % is code layout. Relinked with six mold section shuffles,
+  each binary runs in one of two modes, 36.6 or 40.8 M ticks, for base and new alike. The layout picks the mode;
+  the new default link picks the slow one. Averaged over the six layouts, new is +0.2 %. The row joins the
+  layout-sensitive rows in `baseline.md`. Cost: none.
 
 ## Found and fixed
 
@@ -136,9 +141,9 @@ workspace `neoqcp`.
 - `BINDABLE` storage (R-1).
 - A legend add or remove sends a burst of stretch-factor signals: one per intermediate grid shape, the last one
   final (final review M2).
-- `QCPItems_Add10k` and `QCPItems_RestyleAll10k` move with code layout (R-19).
+- `QCPItems_Add10k`, `QCPItems_RestyleAll10k` and `QCPDrawContext_ReplayMarkers100k` move with code layout
+  (R-19, R-23).
 - A setter's scope costs a `QPointer` and a flush even when nothing listens (R-17, R-18).
-- `QCPDrawContext_ReplayMarkers100k` +10.2 % at the end of the milestone, unexplained (see Results).
 - No bench row adds or removes plottables, or touches the legend or the theme.
 - `QCPHitAction` is a global `enum class`, outside any meta-object scope. It stays unregistered: moving it into
   `QCP` would break `hitsAt` callers.
