@@ -1,261 +1,220 @@
-# NeoQCP 3.0 — backlog
+# NeoQCP 3.0 — backlog dispositions
 
-Work that was deferred during the 3.0 milestones, to triage before 3.0 ships. Each item says what a
-user would see and where the code is. Fixed items are deleted, not ticked.
+Every item deferred during the 3.0 milestones, triaged in milestone 5f. One line per item.
 
-## From milestone 5a (the graph grows up)
+Outcomes:
 
-- **The data-space hit test maps every row on every click** (J-6): `QCPMultiGraph::nearestMappedPoint`
-  and `selectTestRect` (`plottable-multigraph.cpp`) allocate and map the whole source per call, so a
-  1M-row graph pays that on every hover. Upgrade: the J-6 box query, or decimate in data space by
-  `keyWindow()`.
-- **No dense error band on a user system**: the data-space `recordErrorBars` branch records one bar
-  per row (`plottable-multigraph.cpp`), where the cartesian path bins crowded bars into a band. A
-  100k-row user-system graph with error bars records 100k bars per frame. The band decision needs a
-  key pixel; upgrade: decide it on a batch mapped once.
-- **A cartesian fill to zero on a negative log range uses the far bound** (B1): `QCPMultiGraph::fillValue`
-  returns `range().lower` for every non-positive value; on an all-negative log range the bound nearer
-  zero is `upper`. The data-space `dataSpaceFillValue` is sign-aware. Deferred in 5a; the user sees a
-  fill cross the whole rect instead of stopping at the near edge.
-- **A tracer cannot follow a curve or a polar graph**: `QCPItemTracer::setLineGraph` takes a
-  `QCPMultiGraph`, and the classic `setGraph` takes a `QCPGraph`. A curve or polar graph has no tracer
-  target yet.
-- **Qt `QThreadPool` noise in TSan runs**: the 5a TSan scenarios report races in Qt's
-  `QRunnable`/`QThreadPool` publication path (and `QArrayData::reallocateUnaligned`) around the
-  parallel resampler. They reproduce on the base and are not NeoQCP data races; a TSan gate for this
-  tree needs a suppression for Qt's pool, or a pool wrapper with an explicit publication edge.
+- **fixed** — the commit(s) that fixed it, each with a failing test first.
+- **project 3 / project 4** — scheduled for that project.
+- **limit** — a known 3.0 limit, written down for users in `docs/limits.md` (the anchor names the section).
+- **dev note** — a limit no user meets (bench, test or code-shape note). It stays here only.
+- **stale** — already fixed, or no longer true of the code.
 
-## From milestone 4j (coordinate systems of the user's own)
+`#` is the row of the triage table the item came from (`a`: this file's milestone 4b-5e lists; `b`: the
+deferred lists of the milestone 1, 2, item-scaling, 3 and 4a rulings files). Paths are under `src/` unless they
+say otherwise.
 
-- **Culling and decimation on a user system** (J-6): every point is mapped on every repaint and every
-  click scans every point. `QCPDrawnCore::hitTest`'s box gate (`drawable.cpp:902`) and the item index
-  (`item.cpp:1860`) stay cartesian-only. Upgrade: a system virtual mapping a pixel rect to a data box,
-  then decimate in data space by `keyWindow()`.
-- **The bracket selection decorator on a user system**: `QCPSelectionDecoratorBracket::drawDecoration`
-  bails without `keyAxis()`, so a selected skew graph shows pen and brush but no brackets
-  (`selectiondecorator-bracket.cpp`). Map through `system()` or report the misuse once.
-- **A tracer on a polar graph**: `QCPItemTracer::setGraph` still takes a `QCPGraph*`; a tracer on a
-  polar graph stays unsupported. A tracer on a user system follows its graph (4j).
-- **`area->add<Item>()`**: items are still built by the plot and bound with `setSystem()`; J-8 keeps
-  the area factory out. Additive later.
-- **A position whose frame goes away is inert without a report**: `QCPItemPosition` has no
-  lost-system report (a plottable has one). A pixel read returns `(0, 0)` and draw-time placement is
-  refused quietly. If a user needs a diagnostic, add one report per position.
-- **A curve's colour scale on a user system**: `QCPCurve` no longer requires `capColourScale`, but
-  `followKeyAxisRectScale()` reads `mKeyAxis`, so it does not follow the rect's scale on a user system.
-  Give it one with `setColorScale()`, or map the scale through the system.
-- **`QCPDrawn_*` A/B rows under Xvfb are bimodal** on this machine (repeated five-pair runs of one
-  pair read +7 % then -26 %, QRhi software stack). Do not decide a 5 % gate on those rows alone.
+## Milestones 4b to 5e
 
-## From milestone 4h (the polar graph is a plottable)
+| # | From | Item | Outcome | Where |
+|---|---|---|---|---|
+| a1 | 5a | Data-space hit test maps every row per click/hover | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a2 | 5a | No dense error band on a user system | limit → [limits.md#coordinate-systems](../../limits.md#coordinate-systems) | coordinate-systems.md |
+| a3 | 5a | Cartesian fill to zero on negative log range uses the far bound (B1) | stale | `plottables/plottable-graph.cpp` |
+| a4 | 5a | Tracer cannot follow a curve or a polar graph | limit → [limits.md#items](../../limits.md#items) | items.md |
+| a5 | 5a | Qt QThreadPool noise in TSan runs | dev note | - |
+| a6 | 4j | No culling/decimation on a user system | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a7 | 4j | Bracket decorator draws nothing on a user system | fixed ca11384 | `selectiondecorator-bracket.cpp` |
+| a8 | 4j | Tracer on a polar graph | limit → [limits.md#items](../../limits.md#items) | items.md |
+| a9 | 4j | `area->add<Item>()` missing | project 4 | additive API, J-8 |
+| a10 | 4j | Position whose frame went away is inert without a report | stale | `drawable.cpp` |
+| a11 | 4j | Curve colour scale does not follow the rect on a user system | stale | `plottables/plottable-colormapped.cpp` |
+| a12 | 4j | `QCPDrawn_*` A/B rows bimodal under Xvfb | dev note | - |
+| a13 | 4h | `QCPPolarArea::add<T>` lacks the friendly static_assert, builds before refusing, needs a polar ctor | project 4 | `construct.h` |
+| a14 | 4h | `QCPDrawnCore::hitTest` has no box cull for non-cartesian frames | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a15 | 4g | `QCPMultiGraph` requires `capColourScale` | stale | `plottables/plottable-graph.h` |
+| a16 | 4g | Polar rubber-band selects through the disc; rescaleAxes moves polar radial axes | limit → [limits.md#polar-plots](../../limits.md#polar-plots) | polar.md |
+| a17 | 4g | Listener connected+disconnected within one setter takes the direct path | dev note | `axis/axis-base.cpp` |
+| a18 | 4g | `defersEmissions()` O(systems of the area) | dev note | `layoutelements/area.cpp` |
+| a19 | 4g | Item position resolved outside drawing needs the `report` flag | dev note | `painting/draw-commands.h` |
+| a20 | 4g | Colour-scale relationship check (map using another rect's scale) | limit → [limits.md#colormaps](../../limits.md#colormaps) | colormaps.md |
+| a21 | 4f | Polar tick-label hit boxes are recomputed, not the drawn rect | fixed 7505159 | `polar/angularaxis.cpp` |
+| a22 | 4f | `QCPCustomMapping::inverse` is pure; polar inverse modulo; wrong-sign log radius is NaN | limit → [limits.md#coordinate-systems](../../limits.md#coordinate-systems) | coordinate-systems.md |
+| a23 | 4f | Axis hot block may straddle a cache line | dev note | - |
+| a24 | 4f | `QCPAxis_SetRange10k` +5 % (gate 15 %) | dev note | - |
+| a25 | 4f | `pixelAnchoredShapeIsHittable` failed once | dev note | - |
+| a26 | 4e | A recording made again allocates fresh buffers | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a27 | 4e | Per-item replay overhead | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a28 | 4e | Span edge in pixels / on an anchor re-records every frame | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a29 | 4e | `QCPLineEnding::draw` builds a QPainterPath per call | dev note | - |
+| a30 | 4e | Unclipped tracer crosshair spans the axis rect, not the widget | limit → [limits.md#items](../../limits.md#items) | items.md |
+| a31 | 4e | Rect/ellipse keep a positions-based `dataExtent` | dev note | `items/item-rect.cpp` |
+| a32 | 4e | Layer index pads an error-bar command by its pen only | fixed 45dfc64 | `painting/draw-context.cpp` |
+| a33 | 4e | Two-colour OHLC strokes grouped per colour | limit → [limits.md#other-plottables](../../limits.md#other-plottables) | plottables.md |
+| a34 | 4e | Painter-only plottable records an empty list when hit-tested; a subclass that forgets `draw(QCPDrawContext&)` draws nothing silently | fixed b1d7e69, a8f8b6d | `plottables/plottable.h` |
+| a35 | 4d | Log linked axis re-clamped late | fixed 239fd90 | `axis/axis-base.cpp` |
+| a36 | 4d | Colour scale asks its rect for drag/zoom axes twice | dev note | - |
+| a37 | 4d | Alignment group hears the plot's own move, not an ancestor's | fixed c0e1195, cc92479 | `core.cpp` |
+| a38 | 4c | Visible colour bar costs ~0.07 ms per pan frame | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a39 | 4c | Contour labels are a raster tile in PDF/SVG | limit → [limits.md#export](../../limits.md#export) | export.md |
+| a40 | 4c | Images in a recording never culled by the view | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a41 | 4c | A 2.x program shows a colour bar it never asked for | limit → [limits.md#migrating-from-qcustomplot](../../limits.md#migrating-from-qcustomplot) | migrating.md |
+| a42 | 4c | Colour-map legend icon stretches to the icon rect | limit → [limits.md#colormaps](../../limits.md#colormaps) | colormaps.md |
+| a43 | 4c | Export reference compare skips outer row/column | dev note | - |
+| a44 | 4c | Zero-height histogram bin draws no base hairline | limit → [limits.md#other-plottables](../../limits.md#other-plottables) | plottables.md |
+| a45 | 4c | Step histogram legend icon is a box, not a line | limit → [limits.md#other-plottables](../../limits.md#other-plottables) | plottables.md |
+| a46 | 4c | Curve given data of another size keeps colour values: bar shown, curve uncoloured | fixed d9192c5, 3596de6 | `plottables/plottable-curve.cpp` |
+| a47 | 4c | Moving a plottable to another rect's axes keeps the old rect's scale | fixed 61640ed, ce2817b | `plottables/plottable.cpp` |
+| a48 | 4c | 1000-text zoom 5 % slower on llvmpipe | dev note | - |
+| a49 | 5b | Handle hash changes when its object dies | limit → [limits.md#api-reference](../../limits.md#api-reference) | api.md |
+| a50 | 5b | `Q_FUNC_INFO` strings show the handle type | dev note | - |
+| a51 | 5b | `QCPArea::allAxesRaw()` new protected virtual | limit → [limits.md#coordinate-systems](../../limits.md#coordinate-systems) | coordinate-systems.md |
+| a52 | 5b | Graph family still raw | stale | `core.h` |
+| a53 | 5b | Margin groups still raw | stale | `alignment-group.h` |
+| a54 | 5b | A few render paths build a handle per call | dev note | - |
+| a55 | 5b | `QCPLayoutElement::layout()` builds a handle per call | dev note | `layout.cpp` |
+| a56 | 5b | `QCPItems_RestyleAll10k` noisy | dev note | - |
+| a57 | 5b | `QCPAxisRect::add<T>` ignores an axis as first data argument | dev note | `layoutelements/layoutelement-axisrect.h` |
+| a58 | 5b | `QPointer<T> p = handle` does not compile | limit → [limits.md#api-reference](../../limits.md#api-reference) | api.md |
+| a59 | 4b | No test that marker colours reach the GPU | dev note | - |
+| a60 | 4b | Error-bar caps lopsided on a log key axis | limit → [limits.md#line-and-scatter-graphs](../../limits.md#line-and-scatter-graphs) | graphs.md |
+| a61 | 4b | Gap inside a filled curve puts a NaN vertex in the fill polygon | fixed d0a4a10 | `plottables/plottable-curve.cpp` |
+| a62 | 4b | Clicking near a curve maps every point | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a63 | 4b | 1M multigraph zoom 0.69 ms vs 0.61 limit | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a64 | 4b | Big graph blank edges during a pan until the 150 ms settle | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a65 | 4b | Data sources still carry the old pixel line API | stale | - |
+| a66 | 5e | No `BINDABLE` storage | limit → [limits.md#api-reference](../../limits.md#api-reference) | api.md |
+| a67 | 5e | Stretch-factor bursts on legend add/remove | fixed 8b0ce9e | `layout.cpp` |
+| a68 | 5e | Layout-sensitive bench rows | dev note | - |
+| a69 | 5e | A setter's scope costs something when nothing listens | dev note | - |
+| a70 | 5e | No bench row adds/removes plottables or touches legend/theme | dev note | - |
+| a71 | 5e | `QCPHitAction` not registered | project 4 | `core.h` |
+| a72 | 5d | Financial/error-bar legend icons assume a plain fit transform | limit → [limits.md#export](../../limits.md#export) | export.md |
+| a73 | 5d | Mixed line widths on HiDPI without the GPU | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a74 | 5d | 19 tests assume device ratio 1 | dev note | - |
+| a75 | 5d | `QCPAlignmentGroup.png` rendered with workspace fonts | dev note | - |
+| a76 | 5c | Pan on a log key axis re-records the graph | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a77 | 5c | "User set a decorator" is a heuristic | limit → [limits.md#styling](../../limits.md#styling) | styling.md |
+| a78 | 5c | `QCPGraphComponent` shared with the curve (name) | project 4 | rename |
+| a79 | 5c | MSVC has not seen the component struct order | stale | - |
+| a80 | 5c | Removing the points of a NaN key removes nothing, unreported | fixed 3d38d44 | `plottables/plottable-graph.cpp` |
+| a81 | 5c | Remove-data bench rows time the busy clone | dev note | - |
+| a82 | 5c | Default component name comparison heuristic | limit → [limits.md#line-and-scatter-graphs](../../limits.md#line-and-scatter-graphs) | graphs.md |
+| a83 | 5c | `setBrush` replaces fills to a constant or between columns | fixed bbd6a3c | `plottables/plottable-graph.cpp` |
+| a84 | 5c | No `QCPGraph::scatterStyle()` getter | project 4 | API shape |
+| a85 | 5c | Selected error bars use the selected pen for all bars | limit → [limits.md#line-and-scatter-graphs](../../limits.md#line-and-scatter-graphs) | graphs.md |
+| a86 | 5c | `setScatterMaxPoints` removed; scatter-only 1M+ unchecked | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| a87 | 5c | Out-of-date architecture pages | fixed bef9d99 | `docs/architecture/` |
+| a88 | 5c | Names kept from the rename (TestMultiGraph, test-multigraph dir, ...) | project 4 | rename |
 
-- **`QCPPolarArea::add<T>`** lacks the axis-rect form's friendly `static_assert`, builds the object before a
-  capability refusal, and only builds types with a polar-axes constructor.
-- **`QCPDrawnCore::hitTest` has no box cull for non-cartesian frames**: every command is scanned.
+## Milestones 1 to 4a (rulings files)
 
-## From milestone 4g (coordinate systems and the plottables on them)
+| # | From | Item | Outcome | Where |
+|---|---|---|---|---|
+| b1 | M1 T1 | QCPItems_Replot10k mostly measures culling/clipping (items over [0,100], view [0,1]) | dev note | `tests/benchmark/benchmark.cpp` |
+| b2 | M1 T1 | single-shot bench rows are noise-level | dev note | `docs/plans/neoqcp-3/baseline.md` |
+| b3 | M1 T1 | baseline.md names "0040618 plus Task 1" not 5ec70fa | dev note | `baseline.md` |
+| b4 | M1 T1 | Stack8 benches differ in widget geometry | dev note | `benchmark.cpp` |
+| b5 | M1 T1 | sineKeys returns a ramp | dev note | `benchmark.cpp` |
+| b6 | M1 T2 | measuring program not kept, doc should say so | stale | `docs/plans/neoqcp-3/multi-axisrect-perf.md` |
+| b7 | M1 T2 | "idle frame 3x a small widget" unfair comparison | dev note | `multi-axisrect-perf.md` |
+| b8 | M1 T3 | Q_UNLIKELY / cold attribute on misuse branch | dev note | `src/misuse.h` |
+| b9 | M1 T3 | misuse.h in moc header list without Q_OBJECT | dev note | `meson.build` |
+| b10 | M1 T3 | setMisuseHandler(nullptr) restore path untested | dev note | `tests/auto/test-misuse/test-misuse.cpp` |
+| b11 | M1 T4 | QCPGroupLegendItem::mMultiGraph / QCPIntervalsLegendItem::mIntervals raw | stale | `layoutelement-legend.h` |
+| b12 | M1 T4 | mParentLegend set only by QCPLegend::addItem / ctor, not raw addElement: null deref | fixed afff2d9, 4f17527 | `layoutelement-legend.cpp` |
+| b13 | M1 T4 | mGraphs.removeIf compares QCPGraph* with base pointer in ~QCPAbstractPlottable (UB on paper) | dev note: base at offset 0, no observable effect | `src/core.cpp` |
+| b14 | M1 T4 | QCPIntervals::requestRepaint calls replot unguarded | stale | `plottable-intervals.cpp` |
+| b15 | M1 T5 | items a destroyed() slot adds during clearItems survive | limit → [limits.md#items](../../limits.md#items) | items.md |
+| b16 | M1 T5 | plain anchors reset children's pixel position when their item dies | stale | `items/item.cpp` |
+| b17 | M1 T5 | unused `second` in clearItemsWhileASlotDeletesAnother | stale | `tests/auto/test-ownership/test-ownership.cpp` |
+| b18 | M1 T5 | destroyed() slots see itemCount()==0 during clearItems | limit → [limits.md#items](../../limits.md#items) | items.md |
+| b19 | M1 T6 | deleting the last layer leaves zero layers, untested | stale | `test-ownership.cpp` |
+| b20 | M1 T6 | "report once" is once per loss | dev note | `plottable.cpp` |
+| b21 | M1 T6 | debug builds now abort at the next draw when a plottable's axis goes | limit → [limits.md#migrating-from-qcustomplot](../../limits.md#migrating-from-qcustomplot) | migrating.md |
+| b22 | M1 T6 | deleteLayerLeavesLists cannot see GPU-map entries | dev note | - |
+| b23 | M1 T6 | re-created grid starts hidden, document on grid() | stale | `axis/axis.cpp` |
+| b24 | M1 T6 | stray double blank line axis.cpp:52 | dev note | `axis.cpp` |
+| b25 | M1 T6b | deleting an angular axis with live polar graphs untested | stale | `tests/auto/test-polar/test-polar.cpp` |
+| b26 | M1 T6b | intervals inert test asserts gMisuses>=1 | dev note | `test-ownership.cpp` |
+| b27 | M1 T6b | mid-drag tests check gestureActive() only after release | dev note | `test-ownership.cpp` |
+| b28 | M1 T6b | deleteTracedGraph does not check selectTest == -1 | dev note | `test-ownership.cpp` |
+| b29 | M1 T6b | pixelOf returns x=0 / y=-1 without axis or layout, undocumented | limit → [limits.md#other-plottables](../../limits.md#other-plottables) | plottables.md |
+| b30 | M1 T6b | misuse messages name the guard (Q_FUNC_INFO), not the public method | dev note: message text names the failing call | `misuse.h` |
+| b31 | M1 T7 | colour scale detects teardown via "axis rect has no axes" | dev note | `layoutelement-colorscale.cpp` |
+| b32 | M1 T7 | setSelectionRect unguarded during teardown | dev note | `core.cpp` |
+| b33 | M1 T7 | GPU-layer getters null-during-teardown untested | dev note | - |
+| b34 | M1 T7 | releaseResources frees GPU layers without std::exchange | dev note | `core.cpp` |
+| b35 | M1 T8 | no converting ctor QCPHandle<Derived> -> QCPHandle<Base>; misuse shows checkAlive | stale | `handle.h` |
+| b36 | M1 T9 | replots/flushes inside Qt handlers; index walks in QCPLegend::clearItems / QCPLayout::clear can skip | stale | `layout.cpp` |
+| b37 | M1 T9 | Qt CUPS print plugin LSan leak | stale | `tests/lsan.supp` |
+| b38 | M1 T10 | axis-rect dirty marking calls the creating GPU grid-layer accessor | dev note | `layoutelement-axisrect.cpp` |
+| b39 | M1 T10 | plan doc lists deliver as public | stale | `core.h` |
+| b40 | M2 | polar/graph scatter setters lack equality guard | stale | `scatterstyle.h` |
+| b41 | M2 | setColorValues, setComponentFillBrush, moveAbove/Below mark before no-op | dev note: spurious repaint only | `plottable-graph.cpp` |
+| b42 | M2 | duplicate include in test-repaint.cpp | stale | - |
+| b43 | M2 | QCPAxisRect null-plot guard in markLayoutAppearanceDirty untested | stale | `layoutelement-axisrect.cpp` |
+| b44 | M2 | tracer on another layer than its graph shows old position | stale | `item-tracer.cpp` |
+| b45 | M2 | item ops repeat a setPen already in QCPItemOps | project 4 | ops surface cleanup |
+| b46 | M2 | graph2 scatter-colour handle test checks pixels only | stale | - |
+| b47 | M2 | polar add<T> rollback untested | dev note | `polar-area.h` |
+| b48 | M2 | three of four remove() routing tests pin the contract only | dev note | - |
+| b49 | M2 | with() marks even when the lambda only reads | dev note: one spurious repaint per chain | `handle-ops.h` |
+| b50 | M2 | three detach functions repeat the unparenting block | dev note | `core.cpp` |
+| b51 | M2 | most repaint tests check a repaint is queued, not the pixels | dev note | - |
+| b52 | IS def | markItemsUsingAxisDirty marks once per item | dev note | `axis.cpp` |
+| b53 | IS def | QCPItemBracket::dataExtent pads by 1.5 x length | dev note | `items/item-bracket.cpp` |
+| b54 | IS idx ruling | packed STR R-tree; dragging hundreds of items rebuilds often | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| b55 | IS idx ruling | boxes in data coordinates; scale-type change rebuilds every tree | dev note | `spatial-index.cpp` |
+| b56 | IS idx ruling | every "may have moved" goes through the repaint mark | stale | - |
+| b57 | IS idx ruling | layers under 64 items keep moved items on the side list | dev note | `spatial-index.cpp` |
+| b58 | IS idx ruling | clicks: three passes over children; plot-wide selected set is the upgrade | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| b59 | IS idx ruling | selectionChanged slot selecting a not-yet-visited item during deselect | stale | `core.cpp` |
+| b60 | IS idx ruling | scaleTypeChangeRebuildsTheIndex checks a counter, not pixels | dev note | - |
+| b61 | IS idx ruling | add() of a taken item resets positions to default axes | limit → [limits.md#items](../../limits.md#items) | items.md |
+| b62 | IS idx ruling | QCPItems_RemoveEach10k 25->32 ms code placement | dev note | - |
+| b63 | IS idx fixed | box covering only first point when other is pinned to the rect | stale | - |
+| b64 | IS idx fixed | click queried whole view | stale | - |
+| b65 | IS idx fixed | label anchored to item on another layer kept old pixels | stale | `item.cpp` |
+| b66 | IS idx fixed | anchor cycles accepted, stack overflow | stale | - |
+| b67 | IS idx fixed | self-following position recursed forever | stale | - |
+| b68 | IS idx fixed | parallel resampling returned before tasks finished | stale | - |
+| b69 | IS idx false | "remaining zoom cost is the cast" | stale | - |
+| b70 | IS idx false | "click costs 0.24 ms because of per-child loop" | stale | - |
+| b71 | M3 | setupPaintBuffers ~157 us per GPU replot | dev note | `core.h` |
+| b72 | M3 | per-frame allocations on pan cache hits | dev note | - |
+| b73 | M3 | per-position frames for an item mixing axis pairs | stale | `items/item.h` |
+| b74 | M3 | data+pixel-offset position type | limit → [limits.md#items](../../limits.md#items) | items.md |
+| b75 | M3 | raster images cut at viewport: one-frame band during pan | dev note | - |
+| b76 | M3 | 5th+ raster style per layer falls back to QPainter | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| b77 | M3 | free-form polygon with solid brush stays on QPainter | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| b78 | M3 | src/ size sweep stopped at -214 lines | dev note | - |
+| b79 | M3 | QCPAxis_SetRange10k crept 1.2 -> 1.5 ms | dev note | - |
+| b80 | M3 | port Graph2/Multigraph/ColorMap2/Histogram2D to drawing API, fold QCPDrawn | stale | `plottable-colormap2.cpp` |
+| b81 | M3 | strong-type inventory (raw double/int/QPointF/QString) | project 4 | `strong-type-candidates.md` |
+| b82 | M3 | bar stack staleness check O(N^2) in depth | dev note | - |
+| b83 | M3 fmt | R1, R7, R2 done | stale | - |
+| b84 | M3 fmt | R3 typed batch commands to decide | stale | `milestone-4b-rulings.md` |
+| b85 | M3 fmt | R4 instanced marks with GPU data transform | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| b86 | M3 fmt | R5 cull by data range per command | limit → [limits.md#performance](../../limits.md#performance) | performance.md |
+| b87 | M3 fmt | R6 bounded look-back merge across pipelines | dev note | - |
+| b88 | M3 next | milestone 4: port plottables, decide R3, fold adapter | stale | - |
+| b89 | M4a | plot deleted from a nested delivery drops queued teardown signals silently | limit → [limits.md#interactions](../../limits.md#interactions) | interactions.md |
+| b90 | M4a | six "slot deletes the plot" tests cannot fail on counters | dev note | - |
+| b91 | M4a | item/legend-row clicks check the object lives but emit on the plot | dev note | `core.cpp` |
+| b92 | M4a | no test for partial-selection refusal on legend row / text element, nor the NOTIFY fix | dev note | `layoutelement-legend.cpp` |
+| b93 | M4a | examples/ not built by meson | stale | `meson_options.txt` |
 
-- **`QCPMultiGraph` requires `capColourScale`** (it is a `QCPAbstractLine`) besides `capLanes`.
-- **Polar rubber-band selection selects through the disc**; `rescaleAxes` moves the radial axes of polar
-  plottables with data (both follow the contract).
-- **A listener connected and disconnected within one setter** lets that emission take the direct path.
-- **`defersEmissions()` is O(systems of the area)** per mapping change.
-- **Resolving an item position outside the drawing path** needs the `report` flag to stay quiet.
-- **Colour-scale relationship check** (a colour map using another rect's scale) deferred with design 2.10.
+## Found and deferred in 5f
 
-## From milestone 4f (areas, the axis base, the polar area, the frame variant)
-
-- **Polar tick-label hit boxes** are the upright extent around the anchor: offset at 0 and 180 degrees on
-  the angular axis, generous at the corners of rotated radial labels, hittable only after the first draw.
-  Fix: the label painter returns the rect it drew.
-- **`QCPCustomMapping::inverse` is pure**: a one-way mapping cannot be built. Polar `inverse` returns the
-  angle modulo the angular range; a wrong-sign log radius maps to NaN.
-- **The axis hot block can straddle a cache line**: 36 bytes in a 16-byte aligned object.
-- **`QCPAxis_SetRange10k` is +5 %** (gate 15 %): look again if `setRange`'s path changes.
-- **`TestDrawable::pixelAnchoredShapeIsHittable`** failed once in one full run, never again.
-
-## From milestone 4e (the remaining plottables and items record; one span class)
-
-- **A recording made again allocates fresh buffers** (command list, context, pens): a click that
-  selects an item is +23 % (about 3.5 us). Upgrade: recycle the previous recording's buffers through
-  `QCPDrawContext`.
-- **Per-item replay overhead** (view, staleness check, frame; `qcpDrawnViewOf`,
-  `QCPDrawnCore::ensureRecording`) is the rest of the item rows' cost (mixed kinds +4..6 %). A layer
-  whose items all move with the data could shift its texture on a pan
-  (`QCPLayer::canTranslateInsteadOfRepaint`).
-- **A span edge in pixels or on an anchor records every frame** (`QCPItemSpan::draw`).
-- **`QCPLineEnding::draw` builds a `QPainterPath` per call** for its painter users (axes).
-- **An unclipped tracer's crosshair spans the axis rect**, not the widget (2.x spanned the viewport).
-- **Rect and ellipse keep a positions-based `dataExtent`**: `asPosition()` gives pixels for a position
-  mixing plot and absolute coordinates.
-- **The layer index pads an error-bar command by its pen only**, not the whisker half-width; a click on
-  a whisker tip just outside the data box can miss through the index (`selectTest` is exact).
-- **Two-colour OHLC strokes are grouped per colour**: overlapping entries of different colours no
-  longer interleave in entry order.
-- **A painter-only plottable records an empty list when hit-tested**, so its `recordingCount()` counts
-  hit tests; a subclass that forgets `draw(QCPDrawContext&)` draws nothing, silently.
-
-## From milestone 4d (axes, linked axes, alignment groups)
-
-- **A log linked axis is re-clamped late.** After `setScaleType(stLogarithmic)` on a linked axis whose
-  source range crosses 0, the axis shows no ticks until the source's range next changes
-  (`QCPAxis::refreshFromLink`, `src/axis/axis.cpp`). No drag or zoom reads that range.
-- **The colour scale asks its rect for the drag and zoom axis twice per event**, building two short
-  lists (`QCPColorScale::rangeDrag()`/`rangeZoom()`, `layoutelement-colorscale.cpp`). Negligible.
-
-## From milestone 4c (colour maps and the colour scale)
-
-- **A visible colour bar costs about 0.07 ms per pan frame.** The bar sits on the axes layer, which a
-  pan repaints for its ticks. A layer of its own that a pan leaves alone would remove the cost
-  (rulings T4, T5, T8). `QCPAxisRect::colorScale()`.
-- **Contour labels are a picture in PDF and SVG exports.** They are one raster tile over the visible
-  grid, not text (ruling T6). `QCPContourOverlay::recordLabels`.
-- **Images in a recording are never culled by the view.** Each one keeps a texture even off screen,
-  at most 16 (ruling T2). `src/painting/command-replay-rhi.cpp`.
-- **A 2.x program now shows a colour bar it never asked for.** Each axis rect shows its own scale as
-  soon as a colour map or a coloured line uses it. A 2.x program that made its own scale is
-  unchanged. Release notes must say it.
-- **A legend icon of a colour map stretches to the icon rect.** It used to keep its aspect ratio;
-  only visible with non-default icon sizes (Task 5).
-- **The export reference compare skips the plot's outer row and column.** The image clip differs by
-  half a pixel from the old drawImage (Task 5). `tests/auto/test-colormap`.
-- **A zero-height histogram bin draws no hairline at the base** on a linear axis (Task 7).
-- **A step histogram's legend icon is a filled box**, not a line sample (Task 7).
-- **A curve given data of another size keeps its colour values** and so stays on its scale: the
-  bar stays visible while the curve draws uncoloured (Task 8). `QCPCurve`.
-- **Moving a plottable to another rect's axis keeps the old rect's scale** (F10d).
-  `setKeyAxis` does not re-run the join a fresh plottable does.
-- **A 1000-text zoom is 5 % slower on llvmpipe** (ruling R-21): 1.04 -> 1.09 ms, with the same CPU
-  work on the plot's thread. Check the row on a real GPU before chasing it.
-
-## From milestone 5b (handles)
-
-- **A handle's hash changes when its object dies.** `qHash` and `std::hash` use the held pointer, which
-  reads null once the object is gone. A `QSet` or `unordered_set` of handles must not outlive its
-  objects. Nothing in the tree keeps one. A stable id would need a second pointer in the handle.
-  `src/handle.h`.
-- **`Q_FUNC_INFO` strings show the handle return type.** The getters' signatures in misuse reports and
-  logs now read `QCPHandle<...>`. No test matches them.
-- **`QCPArea::allAxesRaw()` is a new protected virtual.** Its default converts `allAxes()`; a user area
-  with hot axis lookups should override it. It adds an entry to `QCPArea`'s virtual table.
-  `src/layoutelements/area.h`.
-- **The graph family is still raw** (`graph(i)`, `addGraph`, `selectedGraphs`, `graphs`,
-  `channelFillGraph`, the tracer's graph, `QCPGroupLegendItem::multiGraph()`). Milestone 5c renames the
-  graph classes; make them handles then.
-- **Margin groups are still raw** (`marginGroup`, `marginGroups`, `QCPMarginGroup::elements`,
-  `alignmentGroup`). The class changes in 5d.
-- **A few render paths still build a handle per call:** `viewport-offset.h` (`keyAxis->axisRect()`),
-  `QCPGraph::getLines` (`valueAxisBase()`), the multigraph fill row (`keyAxisBase()`). They are not
-  per-point and the benchmarks stay within the gate; hoist them if a row moves.
-- **`QCPLayoutElement::layout()` builds a handle per call.** The hit-test walks use it, once per element
-  per mouse event. Add a raw accessor if a click row moves.
-- **`QCPItems_RestyleAll10k` is noisy.** It measures about 0.2 ms; base-first runs showed up to +46 %
-  and swapped-order runs showed none. Read it with alternating pairs.
-- **`QCPAxisRect::add<T>` ignores an axis as first argument** (the `FirstArgumentIsNotAnAxis` rule). A
-  data-first pack whose first argument converts to `QCPAxis*` is the one ambiguous shape; it never existed.
-- **`QPointer<T> p = handle` does not compile.** Direct initialisation does. Adding a converting
-  `QPointer` constructor is not possible from our side.
-
-## From milestone 4b (the line family)
-
-- **No test checks that marker colours reach the GPU.** Coloured markers go through the markers
-  command into the scatter layer, and only the CPU replay is tested for colours.
-  `src/painting/command-replay-rhi.cpp` (the markers branch).
-- **Error-bar caps are slightly lopsided on a log key axis.** The cap half-width is converted from
-  pixels to a symmetric width in data, so the left and right halves differ on screen.
-  `QCPMultiGraph::recordErrorBars`.
-- **A gap inside a filled curve goes into the fill polygon as is.** The polygon then has a vertex at
-  NaN; 2.x did the same. `QCPCurve::draw`.
-- **Clicking near a curve converts every point to pixels on each mouse move.** 2.x did the same.
-  A cache keyed on the transform would make hover cheap on big curves. `QCPCurve::pointDistance`.
-- **Zooming a 1M-point multigraph costs 0.69 ms against a 0.61 limit** (ruling R-8). The data-space
-  envelope keeps about 2 150 points per column against 1 907 before; the extruder pays for them.
-- **A big graph shows blank edges during a pan until the 150 ms settle** (ruling R-16). The reduced
-  data covers the view while the recording claims three views. Reducing the whole window on the
-  settle would fix it for three times the GUI-thread cost.
-- **The data sources still carry the old pixel line API** (ruling R-17): `getLinesAll`,
-  `getOptimizedLineDataAll` and the indexed forms are only used by tests. Remove them with the
-  data-source work that retires QCPGraph2.
-
-## From milestone 5e (the meta-object surface)
-
-- **No `BINDABLE` storage** (E-0, ruling R-1). Properties are plain `NOTIFY` ones; a binding goes through Qt's
-  adaptor, `QBindable<T>(obj, "name")`. The storage form was dropped because Qt's
-  `QObjectBindableProperty::notify` runs the observers first and then the owner's handler, with no liveness
-  check: an observer that deletes the object makes Qt run the handler on freed memory. Revisit if Qt adds the
-  check, or if lazy bindings become a real need.
-- **Stretch-factor bursts.** A legend add or remove re-wraps its grid (`setFillOrder(order, true)`), and each
-  step sends a stretch-factor signal with the value of that moment: `[]`, `[1]`, `[1, 1]`, ... up to the final
-  list. The last one is right. Fix: sample the lists when `setFillOrder` starts and signal once at the end.
-  Only a listener pays today (E-4c).
-- **Layout-sensitive bench rows.** `QCPItems_Add10k`, `QCPItems_RestyleAll10k` and
-  `QCPDrawContext_ReplayMarkers100k` move by 5-30 % with code placement alone (rulings R-19, R-23). Judge them on several linker layouts (mold `--shuffle-sections`) or on an
-  external harness, not on one A/B.
-- **A setter's scope costs something when nothing listens.** `setTickLength(in, out)` and the polar two-length
-  setters open an emission scope around their two setters: +3-4 % on `QCPAxis_SetTickLength10kItems`
-  (ruling R-17). The scopes of `setTheme`, the legend, plottable removal and legend selection are unbenched
-  (R-18). Upgrade: open the scope only when one of the signals has a receiver.
-- **No bench row adds or removes plottables, or touches the legend or the theme.** The final fix batch's
-  removal and selection scopes are unmeasured.
-- **`QCPHitAction` is not registered.** It is a global `enum class`, outside any meta-object scope; moving it
-  into `QCP` breaks `hitsAt` callers.
-
-## From milestone 5d (the rest of the old API)
-
-- **Financial and error-bar legend icons assume a plain fit transform.** Their painter callbacks take the icon
-  rect from the replay and draw in pixels; a legend row drawn under another transform (scaled export of a
-  rotated layout) would misplace them. Native recording needs clip and per-command antialiasing commands.
-- **Mixed line widths on HiDPI without the GPU.** Plottables, grids and plottable painter callbacks keep
-  1-device-pixel lines in the painter fallback at ratio > 1 (ruling R-10): one logical pixel there costs 5x on
-  dense polylines. Upgrade: a faster wide-line path for the fallback.
-- **19 tests assume device ratio 1** (fail under `QT_SCALE_FACTOR=2`); CI only runs at ratio 1.
-- **`QCPAlignmentGroup.png`** in documentation/images was rendered with the workspace's fonts; regenerate with
-  the other guide pictures at release triage.
-
-## From milestone 5c (one graph)
-
-- **A pan on a log key axis re-records the graph.** The recording is not translated, because a translation
-  in pixels is not one in log keys. Panning a big graph on a log axis costs a record per frame.
-  `logKeyAxisPanStaysCovered` only checks that the new recording covers the view. `QCPGraph::draw` (S1).
-- **"The user set a decorator" is a heuristic.** A decorator subclass, or a default decorator whose pen,
-  brush or marker differs from a fresh one, counts as set. One restyled back to the exact default looks
-  untouched, and the graph draws it the 3.0 way. `simplify:` note in the selection code (S2). Upgrade: a
-  flag set by every decorator write.
-- **`QCPGraphComponent` is shared with the curve.** `QCPAbstractLine` holds the struct, so the curve's one
-  line is a `QCPGraphComponent` too. A neutral name (`QCPLineComponent`) would fit both; ruling S5 kept the
-  name users know. Cost of the rename later: one scripted rename.
-- **MSVC has not seen the component struct order.** The struct is defined after `QCPAbstractLine`, which
-  holds a `QList` of it. The class has an out-of-line destructor and inline accessors after the struct.
-  GCC and clang accept it, MSVC is unverified. The Windows CI must be green before 5c is pushed.
-- **Removing the points of a NaN key removes nothing and is not reported.** 2.x did not check either.
-  `QCPGraph::removeData*` (S5). Add a misuse report if a user trips on it.
-- **The remove-data bench rows time the busy clone.** `QCPGraph_RemoveData*` usually pay a 1M-point copy,
-  because setData's level-1 job is still running. Wait for the pipeline before timing to measure the
-  in-place cost.
-- **Default component name comparison.** A column named by hand "Component 0" reads as unnamed, so a
-  one-column legend row shows the graph's name. `simplify:` note in `QCPGroupLegendItem::headerName`; upgrade:
-  a flag set by every name write (fix-a).
-- **`setBrush` replaces fills to a constant or between columns.** Only fills to another graph survive and
-  take the new brush. 2.x had no such fills, so nothing breaks; a flag on the fill would keep them.
-- **No `QCPGraph::scatterStyle()` getter.** Callers read `component(i).scatterStyle` (review M1).
-- **Selected error bars use the selected pen for all bars.** Unchanged since 5a; a per-bar selection pen
-  would follow the selected segments.
-- **`setScatterMaxPoints` went with QCPGraph2.** A scatter-only graph of millions of points drew a capped
-  stratified subset; the new graph has no such cap, and the docs for it were removed. Check how a
-  scatter-only graph behaves on 1M+ points, and restore a cap if it is slow.
-- **Out-of-date architecture pages.** `docs/architecture/adaptive-sampling.md` and `gap-detection.md` still
-  describe the algorithms as two functions; they are one, `linesInData()`, in data space. Names were fixed
-  in 5c, the walkthroughs were not rewritten.
-- **Names kept from the rename.** The test class `TestMultiGraph`, test slots with "multiGraph", the
-  directory `tests/auto/test-multigraph`, `tests/perf/multigraph-perf.cpp`, `tests/manual/massive_graph2`
-  and the `user-system-multigraph.png` picture keep the old name.
-
-## From earlier milestones
-
-Each rulings file keeps its own list; they are not copied here so they cannot drift.
-
-- Milestone 1: `milestone-1-rulings.md`, "Deferred minors".
-- Milestone 2: `milestone-2-rulings.md`, "Deferred minors (for the final triage)".
-- Item scaling and item index: `item-scaling-rulings.md`, "Deferred minors".
-- Milestone 3: `milestone-3-rulings.md`, "Deferred (for milestone 4 and the final triage)".
-- Milestone 4a: `milestone-4a-rulings.md`, "Deferred minors".
+| # | From | Item | Outcome | Where |
+|---|---|---|---|---|
+| f1 | 5f pictures | Step histogram drew one box per bin, not a stepped outline | fixed 79acf66 | `plottables/plottable-histogram.cpp` |
+| f2 | 5f pictures | Gradients example: 19 maps on one rect share one scale, all show one gradient | fixed 49a257f (docs) | `docs/snippets/colormaps.cpp` |
+| f3 | 5f probe | Unity build: `unitBoxPixels` defined twice in one chunk | fixed 589886e, 06b416f | `plottables/plottable-errorbar.cpp` |
+| f4 | 5f | No unity build in CI: a duplicate-helper clash can come back unnoticed | dev note | CI workflow |
+| f5 | 5f | Old data containers' `remove*` on a NaN key do nothing, unreported (2.x) | limit → [limits.md#other-plottables](../../limits.md#other-plottables) | `datacontainer.h` |
+| f6 | 5f | Rotated radial tick label: the click box is the upright bounding box, empty corners hit | limit → [limits.md#polar-plots](../../limits.md#polar-plots) | `polar/radialaxis.cpp` |
+| f7 | 5f | Error-bar hit test builds the backbone and whisker list per bar on every click | dev note | `plottables/plottable-errorbar.cpp` |
+| f8 | 5f | Curve fill records one polygon per NaN run (GPU: one raster per run) | dev note | `plottables/plottable-curve.cpp` |
+| f9 | 5f | Bracket user-system test checks strokes near the skewed ends only, not their absence elsewhere | dev note | `tests/auto/` |
