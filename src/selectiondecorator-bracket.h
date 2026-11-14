@@ -115,6 +115,7 @@ protected:
     double getTangentAngle(const QCPPlottableInterface1D* interface1d, int dataIndex,
                            int direction) const;
     QPointF getPixelCoordinates(const QCPPlottableInterface1D* interface1d, int dataIndex) const;
+    int openDirection() const;
 };
 
 #endif // QCP_SELECTIONDECORATOR_BRACKET_H

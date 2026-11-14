@@ -223,9 +223,7 @@ QList<QPolygonF> QCPSelectionDecoratorBracket::bracketOutline(int direction) con
 */
 void QCPSelectionDecoratorBracket::drawDecoration(QCPPainter* painter, QCPDataSelection selection)
 {
-    // A bracket faces a key axis: without one there is no direction to face, and a bracket
-    // pinned to the origin of the image is worse than none.
-    if (!mPlottable || selection.isEmpty() || !mPlottable->keyAxis())
+    if (!mPlottable || selection.isEmpty() || !openDirection())
         return;
 
     if (QCPPlottableInterface1D* interface1d = mPlottable->interface1D())
@@ -233,8 +231,7 @@ void QCPSelectionDecoratorBracket::drawDecoration(QCPPainter* painter, QCPDataSe
         for (const QCPDataRange& dataRange : selection.dataRanges())
         {
             // determine position and (if tangent mode is enabled) angle of brackets:
-            int openBracketDir
-                = (mPlottable->keyAxis() && !mPlottable->keyAxis()->rangeReversed()) ? 1 : -1;
+            int openBracketDir = openDirection();
             int closeBracketDir = -openBracketDir;
             QPointF openBracketPos = getPixelCoordinates(interface1d, dataRange.begin());
             QPointF closeBracketPos = getPixelCoordinates(interface1d, dataRange.end() - 1);
@@ -274,14 +271,13 @@ void QCPSelectionDecoratorBracket::drawDecoration(QCPPainter* painter, QCPDataSe
 bool QCPSelectionDecoratorBracket::recordDecoration(QCPDrawContext& context,
                                                     QCPDataSelection selection) const
 {
-    if (!mPlottable || !mPlottable->keyAxis() || !mPlottable->interface1D()
-        || selection.isEmpty() || bracketOutline(1).isEmpty())
+    if (!mPlottable || !openDirection() || !mPlottable->interface1D() || selection.isEmpty()
+        || bracketOutline(1).isEmpty())
         return false;
     // The brackets are pixel-sized around a pixel anchor: the recording follows the transform, as
     // any other baked pixel does.
     (void)context.transform();
-    QCPAxis* keyAxis = mPlottable->keyAxis();
-    const int openDirection = (keyAxis && !keyAxis->rangeReversed()) ? 1 : -1;
+    const int openDirection = this->openDirection();
     const auto recordBracket = [&](int dataIndex, int direction)
     {
         const QPointF at = getPixelCoordinates(mPlottable->interface1D(), dataIndex);
@@ -377,15 +373,20 @@ QPointF
 QCPSelectionDecoratorBracket::getPixelCoordinates(const QCPPlottableInterface1D* interface1d,
                                                   int dataIndex) const
 {
-    QCPAxis* keyAxis = mPlottable->keyAxis();
-    QCPAxis* valueAxis = mPlottable->valueAxis();
-    if (!keyAxis || !valueAxis)
-        return { 0, 0 };
+    // Through the plottable's system, so a user system places the bracket on its own mapping.
+    return mPlottable->coordsToPixels(interface1d->dataMainKey(dataIndex),
+                                      interface1d->dataMainValue(dataIndex));
+}
 
-    if (keyAxis->orientation() == Qt::Horizontal)
-        return { keyAxis->coordToPixel(interface1d->dataMainKey(dataIndex)),
-                 valueAxis->coordToPixel(interface1d->dataMainValue(dataIndex)) };
-    else
-        return { valueAxis->coordToPixel(interface1d->dataMainValue(dataIndex)),
-                 keyAxis->coordToPixel(interface1d->dataMainKey(dataIndex)) };
+/*! \internal
+
+  The direction an opening bracket faces: 1 along an increasing key axis, -1 along a reversed one,
+  0 when the plottable's system has no straight key axis (a polar angle), so no bracket is drawn.
+*/
+int QCPSelectionDecoratorBracket::openDirection() const
+{
+    const auto* keyAxis = qobject_cast<const QCPAxis*>(mPlottable->keyAxisBase().get());
+    if (!keyAxis)
+        return 0;
+    return keyAxis->rangeReversed() ? -1 : 1;
 }

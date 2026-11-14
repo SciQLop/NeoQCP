@@ -13,6 +13,7 @@
 #include <QImage>
 #include <QMouseEvent>
 #include <QPen>
+#include <QPicture>
 #include <QtTest/QtTest>
 #include <algorithm>
 #include <cmath>
@@ -2525,4 +2526,50 @@ void TestUserSystem::aDecoratedMultiGraphJoinsASkewRect()
     QVERIFY2(sawFill, "the skew frame recorded no fill");
     QVERIFY2(sawBars, "the skew frame recorded no error bars");
     QVERIFY2(sawColours, "the skew frame recorded no coloured vertices");
+}
+
+namespace
+{
+bool redNear(const QImage& image, QPointF at, int radius)
+{
+    for (int dy = -radius; dy <= radius; ++dy)
+        for (int dx = -radius; dx <= radius; ++dx)
+        {
+            const QPoint p = at.toPoint() + QPoint(dx, dy);
+            if (image.rect().contains(p) && isRed(image, p))
+                return true;
+        }
+    return false;
+}
+} // namespace
+
+// A bracket faces the key axis: a skew system has one, so a selected range shows its brackets at
+// the mapped ends, recorded or painted.
+void TestUserSystem::aSelectedSkewGraphDrawsItsBrackets()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setData(QVector<double> { 1, 2, 3 },
+                   std::vector<QVector<double>> { QVector<double> { 1, 3, 1 } });
+    auto* bracket = new QCPSelectionDecoratorBracket;
+    bracket->setBracketPen(QPen(Qt::red, 3));
+    graph->setSelectionDecorator(bracket);
+    graph->setSelectable(QCP::stDataRange);
+    graph->setSelection(QCPDataSelection(QCPDataRange(0, 3)));
+    settle(plot);
+
+    const QPointF first = pixelOf(system->pixelOf(1, 1));
+    const QPointF last = pixelOf(system->pixelOf(3, 1));
+    QVERIFY(rect->rect().contains(first.toPoint()) && rect->rect().contains(last.toPoint()));
+    const QImage image = render(plot);
+    QVERIFY2(redNear(image, first, 12), "no opening bracket on the skew rect");
+    QVERIFY2(redNear(image, last, 12), "no closing bracket on the skew rect");
+
+    QPicture picture;
+    QCPPainter painter(&picture);
+    bracket->drawDecoration(&painter, graph->selection());
+    painter.end();
+    QVERIFY2(!picture.boundingRect().isEmpty(), "the painter path draws no bracket on the skew rect");
 }

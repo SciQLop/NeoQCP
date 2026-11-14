@@ -2178,6 +2178,7 @@ void QCPGraph::drawInDataSpace(QCPDrawContext& context) const
         recordComponent(context, c, std::move(line), sourceIndices, ds, coloured, baseline,
                         logKeyAxis);
     }
+    recordSelectionDecoration(context);
 }
 
 namespace

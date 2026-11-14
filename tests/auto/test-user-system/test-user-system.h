@@ -91,4 +91,5 @@ private slots:
     void setColorScaleOnTheBaseIsRefused();
     void aMultiGraphColourWithoutAScaleIsRefused();
     void aDecoratedMultiGraphJoinsASkewRect();
+    void aSelectedSkewGraphDrawsItsBrackets();
 };
