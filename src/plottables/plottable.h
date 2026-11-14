@@ -390,9 +390,6 @@ protected:
     //! Replays the icon recording. Final, so that a 2.x override fails to compile instead of being
     //! hidden: a plottable draws its icon through drawLegendIcon(QCPDrawContext&).
     virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const final;
-    //! The icon rect a unit-box recording is replayed into: the frame maps the box's corners onto
-    //! it. For an icon a painter draws inside the rect a unit rect was fitted to.
-    [[nodiscard]] static QRectF unitBoxPixels(const QCPTransform& transform);
 
     //! What the core reads from this plottable this frame.
     [[nodiscard]] QCPDrawnView view() const;

@@ -30,6 +30,7 @@
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../painting/draw-context.h"
 #include "../painting/painter.h"
+#include "plottable-draw-utils.h"
 #include <array>
 #include <limits>
 #include <span>
@@ -690,7 +691,7 @@ void QCPFinancial::drawLegendIcon(QCPDrawContext& icon) const
     // box was fitted to.
     icon.rect(QCP::Data { 0.0, 0.0 }, QCP::Data { 1.0, 1.0 }, QPen(Qt::NoPen), QBrush(Qt::NoBrush));
     icon.painter([this](QCPPainter& painter, const QCPTransform& transform)
-                 { paintLegendIcon(&painter, unitBoxPixels(transform)); });
+                 { paintLegendIcon(&painter, qcp::unitBoxPixels(transform)); });
 }
 
 //! The icon's painter code, in \a rect.

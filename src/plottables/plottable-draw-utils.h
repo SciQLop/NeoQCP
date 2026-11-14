@@ -6,6 +6,7 @@
 #include <QPen>
 #include <QPointF>
 #include <QRect>
+#include <QRectF>
 #include <QVector>
 #include <cstddef>
 #include <span>
@@ -15,9 +16,14 @@ class QCustomPlot;
 class QCPPainter;
 class QCPLayer;
 class QCPPlottableRhiLayer;
+class QCPTransform;
 
 namespace qcp
 {
+
+/// The icon rect a unit-box recording is replayed into: \a transform maps the box's corners onto
+/// it. For an icon a painter draws inside the rect a unit rect was fitted to.
+QRectF unitBoxPixels(const QCPTransform& transform);
 
 /// The colour of the index-th component or column when none is set (cycles after 10).
 QColor defaultPlottableColor(int index);

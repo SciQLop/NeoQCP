@@ -1,5 +1,6 @@
 #include "plottable-draw-utils.h"
 
+#include "../coords.h"
 #include "../core.h"
 #include "../painting/line-extruder.h"
 #include "../painting/painter.h"
@@ -10,6 +11,13 @@
 
 namespace qcp
 {
+
+QRectF unitBoxPixels(const QCPTransform& transform)
+{
+    const QCP::Pixels topLeft = transform.map(QCP::Data { 0.0, 1.0 });
+    const QCP::Pixels bottomRight = transform.map(QCP::Data { 1.0, 0.0 });
+    return QRectF(QPointF(topLeft.x, topLeft.y), QPointF(bottomRight.x, bottomRight.y));
+}
 
 QColor defaultPlottableColor(int index)
 {
