@@ -764,6 +764,7 @@ void MainWindow::genQCPColorMap()
   customPlot->yAxis->ticker()->setTickCount(6);
   
   QCPColorMap *colorMap = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
+  colorMap->setColorScale(nullptr); // the class picture shows the map alone, as in 2.x
   int nx = 200;
   int ny = 100;
   colorMap->data()->setSize(nx, ny);
@@ -1116,6 +1117,8 @@ void MainWindow::genQCPColorMap_Interpolate()
   customPlot->plotLayout()->addElement(0, 1, ar2);
   QCPColorMap *cm1 = new QCPColorMap(ar1->axis(QCPAxis::atBottom), ar1->axis(QCPAxis::atLeft));
   QCPColorMap *cm2 = new QCPColorMap(ar2->axis(QCPAxis::atBottom), ar2->axis(QCPAxis::atLeft));
+  cm1->setColorScale(nullptr); // this picture is about interpolation, not the colour bar
+  cm2->setColorScale(nullptr);
   cm1->data()->setSize(10, 10);
   cm1->data()->setRange(cm1->keyAxis()->range(), cm1->valueAxis()->range());
   for (int x=0; x<10; ++x)
@@ -1166,6 +1169,8 @@ void MainWindow::genQCPColorMap_TightBoundary()
   customPlot->plotLayout()->addElement(0, 1, ar2);
   QCPColorMap *cm1 = new QCPColorMap(ar1->axis(QCPAxis::atBottom), ar1->axis(QCPAxis::atLeft));
   QCPColorMap *cm2 = new QCPColorMap(ar2->axis(QCPAxis::atBottom), ar2->axis(QCPAxis::atLeft));
+  cm1->setColorScale(nullptr); // this picture is about the cell edges, not the colour bar
+  cm2->setColorScale(nullptr);
   cm1->data()->setSize(7, 7);
   cm1->data()->setRange(QCPRange(-2, 2), QCPRange(-2, 2));
   for (int x=0; x<7; ++x)
