@@ -366,3 +366,14 @@ signal. Nothing that compiled stops compiling; the rows below are the behaviour 
 - The polar axes' `setTickLabelRotation` compares the clamped angle, like `QCPAxis`'s.
 - The polar axes' `numberFormatChanged` fires only when `numberFormat()` moves. The angular axis reads its
   multiplication sign from its label painter, so a write can move the members without moving the getter.
+- The plot: `creationModeEnabled`, `creationModifier`, `bufferDevicePixelRatio`, `antialiasedElements`,
+  `notAntialiasedElements`, `interactions`, `plottingHints`, `selectionRectMode`, `selectionRect`, `theme`
+  (through the existing `themeChanged()`), `skipReplotsWhenHidden`, `itemIndexing`, `dataSwapDebounceMs`,
+  `dataSwapMaxWaitMs` and `currentLayer`. `itemCreator` and `itemPositioner` stay off (`std::function`).
+- The plot's `setInteractions`, `setPlottingHints`, `setCreationModifier`, `setSkipReplotsWhenHidden`,
+  `setDataSwapDebounceMs`, `setDataSwapMaxWaitMs` and `setCurrentLayer` return on an equal value (the clamped one
+  for the two data-swap times). `setInteraction` goes through `setInteractions`.
+- `setAntialiasedElement(s)` and `setNotAntialiasedElement(s)` can move both sets; each set that moved signals.
+- `currentLayerChanged` also fires when `removeLayer` (or deleting the layer) moves the current layer to its
+  neighbour. The `QString` overload of `setCurrentLayer` signals through the pointer one.
+- `core.h` includes `theme.h`: the `theme` property needs the complete type.

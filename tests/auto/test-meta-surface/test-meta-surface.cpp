@@ -191,9 +191,13 @@ void writeMaybeDeferred(QCustomPlot* plot, QObject* object, const char* name,
     write(object, name, value);
 }
 
+// \a property names a property, whose NOTIFY fires the trigger, or a signal ("changed()").
 void connectTrigger(QObject* sender, const char* property, MetaTrigger* trigger)
 {
-    const QMetaMethod notify = metaProperty(sender, property).notifySignal();
+    const QMetaObject* meta = sender->metaObject();
+    const QMetaMethod notify = meta->indexOfProperty(property) >= 0
+        ? metaProperty(sender, property).notifySignal()
+        : meta->method(meta->indexOfSignal(QMetaObject::normalizedSignature(property)));
     const QMetaMethod fire =
         trigger->metaObject()->method(trigger->metaObject()->indexOfSlot("fire()"));
     QVERIFY(QObject::connect(sender, notify, trigger, fire));
@@ -717,6 +721,17 @@ const QVector<std::pair<QMetaType, Different>>& differentValues()
                 QCPPolarAxisRadial* first = area->radialAxis().get();
                 return v == first ? area->addRadialAxis().get() : first;
             }),
+        differentFor<QCPSelectionRect*>(
+            [](QCPSelectionRect* const&, QObject* object) -> QCPSelectionRect*
+            { return new QCPSelectionRect(plotOf(object)); }),
+        differentFor<QCPTheme*>(
+            [](QCPTheme* const& v, QObject*) -> QCPTheme*
+            {
+                // Outlive every plot of the run: a plot reading a theme does not own it.
+                static QCPTheme* const first = new QCPTheme;
+                static QCPTheme* const second = new QCPTheme;
+                return v == first ? second : first;
+            }),
         differentFor<QCPAxis*>(
             [](QCPAxis* const& v, QObject* object) -> QCPAxis*
             {
@@ -831,6 +846,20 @@ const QVector<Exception>& exceptions()
         { &QCPPolarAxisRadial::staticMetaObject, "tickLabelRotation", Rule::Clamps,
           [](QObject*) { return QVariant(45.0); }, [](QObject*) { return QVariant(120.0); },
           "the label painter clamps to [-90, 90]" },
+        { &QCustomPlot::staticMetaObject, "dataSwapDebounceMs", Rule::Clamps,
+          [](QObject*) { return QVariant(250); }, [](QObject*) { return QVariant(-5); },
+          "a negative window is none (core.cpp)" },
+        { &QCustomPlot::staticMetaObject, "dataSwapMaxWaitMs", Rule::Clamps,
+          [](QObject*) { return QVariant(1500); }, [](QObject*) { return QVariant(-5); },
+          "a negative wait is none (core.cpp)" },
+        { &QCustomPlot::staticMetaObject, "currentLayer", Rule::Refuses,
+          [](QObject* object)
+          {
+              return QVariant::fromValue(
+                  qobject_cast<QCustomPlot*>(object)->layer(QStringLiteral("grid")).get());
+          },
+          [](QObject*) { return QVariant::fromValue(static_cast<QCPLayer*>(nullptr)); },
+          "takes only a layer of this plot (core.cpp)" },
         { &QCPPolarAxisAngular::staticMetaObject, "scaleType", Rule::Refuses, nullptr,
           [](QObject*) { return QVariant::fromValue(QCPAxisBase::stLogarithmic); },
           "the ring has no logarithmic scale (angularaxis.cpp:938)", true },
@@ -989,6 +1018,60 @@ const QVector<Writer>& writers()
           [](QObject* o) { qobject_cast<QCPPolarAxisRadial*>(o)->setSubTickLength(9, 8); },
           { "subTickLengthIn", "subTickLengthOut" },
           { "tickLengthIn" } },
+        { "QCustomPlot::setAntialiasedElements moving both sets",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              plot.setAntialiasedElements(QCP::aeNone);
+              plot.setNotAntialiasedElements(QCP::aeAxes);
+              return &plot;
+          },
+          [](QObject* o) { qobject_cast<QCustomPlot*>(o)->setAntialiasedElements(QCP::aeAxes); },
+          { "antialiasedElements", "notAntialiasedElements" },
+          { } },
+        { "QCustomPlot::setAntialiasedElement",
+          [](QCustomPlot& plot) -> QObject* { return &plot; },
+          [](QObject* o)
+          { qobject_cast<QCustomPlot*>(o)->setAntialiasedElement(QCP::aeAxes, false); },
+          { "antialiasedElements" },
+          { "notAntialiasedElements" } },
+        { "QCustomPlot::setNotAntialiasedElement",
+          [](QCustomPlot& plot) -> QObject* { return &plot; },
+          [](QObject* o)
+          { qobject_cast<QCustomPlot*>(o)->setNotAntialiasedElement(QCP::aeGrid, true); },
+          { "notAntialiasedElements" },
+          { } },
+        { "QCustomPlot::setInteraction",
+          [](QCustomPlot& plot) -> QObject* { return &plot; },
+          [](QObject* o) { qobject_cast<QCustomPlot*>(o)->setInteraction(QCP::iRangeDrag, true); },
+          { "interactions" },
+          { "plottingHints" } },
+        { "QCustomPlot::setPlottingHint",
+          [](QCustomPlot& plot) -> QObject* { return &plot; },
+          [](QObject* o)
+          { qobject_cast<QCustomPlot*>(o)->setPlottingHint(QCP::phFastPolylines, true); },
+          { "plottingHints" },
+          { "interactions" } },
+        { "QCustomPlot::setCurrentLayer(name)",
+          [](QCustomPlot& plot) -> QObject* { return &plot; },
+          [](QObject* o)
+          { qobject_cast<QCustomPlot*>(o)->setCurrentLayer(QStringLiteral("grid")); },
+          { "currentLayer" },
+          { } },
+        { "QCustomPlot::removeLayer of the current layer",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              (void)plot.addLayer(QStringLiteral("doomed")); // the next line fails without it
+              plot.setCurrentLayer(QStringLiteral("doomed"));
+              return &plot;
+          },
+          [](QObject* o)
+          {
+              auto* plot = qobject_cast<QCustomPlot*>(o);
+              if (QCPLayer* doomed = plot->layer(QStringLiteral("doomed")))
+                  (void)plot->removeLayer(doomed); // the moved layer shows the removal
+          },
+          { "currentLayer" },
+          { } },
         { "QCPAxisBase::setRangeLower",
           [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
           [](QObject* o) { qobject_cast<QCPAxis*>(o)->setRangeLower(-3); },
@@ -1522,6 +1605,31 @@ const QVector<Deleting>& deletingWriters()
           },
           [](QCustomPlot& plot)
           { plot.findChild<QCPPolarArea*>()->radialAxis()->setSubTickLength(9, 8); } },
+        { "QCustomPlot::setAntialiasedElements moving both sets",
+          [](QCustomPlot& plot)
+          {
+              plot.setAntialiasedElements(QCP::aeNone);
+              plot.setNotAntialiasedElements(QCP::aeAxes);
+              return std::pair<QObject*, const char*>(&plot, "antialiasedElements");
+          },
+          [](QCustomPlot& plot) { plot.setAntialiasedElements(QCP::aeAxes); } },
+        { "QCustomPlot::setCreationModeEnabled while drawing",
+          [](QCustomPlot& plot)
+          {
+              plot.setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*)
+                                  { return new QCPItemSpan(p, Qt::Vertical); });
+              plot.setCreationModeEnabled(true);
+              plot.replot();
+              const QPoint center = plot.axisRect()->rect().center();
+              QMouseEvent press(QEvent::MouseButtonPress, center, plot.mapToGlobal(center),
+                                Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+              QMouseEvent release(QEvent::MouseButtonRelease, center, plot.mapToGlobal(center),
+                                  Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+              QApplication::sendEvent(&plot, &press);
+              QApplication::sendEvent(&plot, &release);
+              return std::pair<QObject*, const char*>(&plot, "itemCanceled()");
+          },
+          [](QCustomPlot& plot) { plot.setCreationModeEnabled(false); } },
         { "QCPAxisRect::setupFullAxesBox", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(plot.xAxis2.get(), "visible"); },
           [](QCustomPlot& plot) { plot.axisRect()->setupFullAxesBox(); } },
@@ -1644,6 +1752,15 @@ const QVector<FormRow>& formRows()
         r += plainRows(&QCPPolarGraph::staticMetaObject,
                        { "periodic", "lineStyle", "scatterStyle" });
         r += { { &QCPPolarGraph::staticMetaObject, "data", Form::Off } };
+        r += plainRows(&QCustomPlot::staticMetaObject,
+                       { "creationModeEnabled", "creationModifier", "bufferDevicePixelRatio",
+                         "antialiasedElements", "notAntialiasedElements", "interactions",
+                         "plottingHints", "selectionRectMode", "selectionRect",
+                         "skipReplotsWhenHidden", "itemIndexing", "dataSwapDebounceMs",
+                         "dataSwapMaxWaitMs", "currentLayer" });
+        r += { { &QCustomPlot::staticMetaObject, "theme", Form::Plain, "themeChanged" },
+               { &QCustomPlot::staticMetaObject, "itemCreator", Form::Off },
+               { &QCustomPlot::staticMetaObject, "itemPositioner", Form::Off } };
         r += plainRows(&QCPPolarGrid::staticMetaObject,
                        { "radialAxis", "type", "subGridType", "antialiasedSubGrid",
                          "antialiasedZeroLine", "angularPen", "angularSubGridPen", "radialPen",

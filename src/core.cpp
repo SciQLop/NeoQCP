@@ -484,6 +484,91 @@ using qcp::guarded;
 
 /* end of documentation of public members */
 
+/*! \fn void QCustomPlot::creationModeEnabledChanged(bool creationModeEnabled)
+
+  This signal is emitted when \ref creationModeEnabled changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::creationModifierChanged(Qt::KeyboardModifier creationModifier)
+
+  This signal is emitted when \ref creationModifier changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::bufferDevicePixelRatioChanged(double bufferDevicePixelRatio)
+
+  This signal is emitted when \ref bufferDevicePixelRatio changes, after the plot delivers its
+  deferred signals.
+*/
+
+/*! \fn void QCustomPlot::antialiasedElementsChanged(QCP::AntialiasedElements antialiasedElements)
+
+  This signal is emitted when \ref antialiasedElements changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::notAntialiasedElementsChanged(QCP::AntialiasedElements
+  notAntialiasedElements)
+
+  This signal is emitted when \ref notAntialiasedElements changes, after the plot delivers its
+  deferred signals.
+*/
+
+/*! \fn void QCustomPlot::interactionsChanged(QCP::Interactions interactions)
+
+  This signal is emitted when \ref interactions changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::plottingHintsChanged(QCP::PlottingHints plottingHints)
+
+  This signal is emitted when \ref plottingHints changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::selectionRectModeChanged(QCP::SelectionRectMode selectionRectMode)
+
+  This signal is emitted when \ref selectionRectMode changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::selectionRectChanged(QCPSelectionRect* selectionRect)
+
+  This signal is emitted when \ref selectionRect changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::skipReplotsWhenHiddenChanged(bool skipReplotsWhenHidden)
+
+  This signal is emitted when \ref skipReplotsWhenHidden changes, after the plot delivers its
+  deferred signals.
+*/
+
+/*! \fn void QCustomPlot::itemIndexingChanged(bool itemIndexing)
+
+  This signal is emitted when \ref itemIndexing changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::dataSwapDebounceMsChanged(int dataSwapDebounceMs)
+
+  This signal is emitted when \ref dataSwapDebounceMs changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::dataSwapMaxWaitMsChanged(int dataSwapMaxWaitMs)
+
+  This signal is emitted when \ref dataSwapMaxWaitMs changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCustomPlot::currentLayerChanged(QCPLayer* currentLayer)
+
+  This signal is emitted when \ref currentLayer changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Constructs a QCustomPlot and sets reasonable default values.
 */
@@ -902,7 +987,10 @@ bool QCustomPlot::gridLayerDraws(const QCPAxis* axis)
 
 void QCustomPlot::setSkipReplotsWhenHidden(bool skip)
 {
+    if (skip == mSkipReplotsWhenHidden)
+        return;
     mSkipReplotsWhenHidden = skip;
+    qcpEmit(this, this, &QCustomPlot::skipReplotsWhenHiddenChanged, mSkipReplotsWhenHidden);
 }
 
 bool QCustomPlot::skipReplotsWhenHidden() const
@@ -918,6 +1006,7 @@ void QCustomPlot::setItemIndexing(bool on)
     for (QCPLayer* layer : std::as_const(mLayers))
         layer->invalidateItemIndex();
     requestRepaint();
+    qcpEmit(this, this, &QCustomPlot::itemIndexingChanged, itemIndexing());
 }
 
 /*!
@@ -940,11 +1029,13 @@ void QCustomPlot::setItemIndexing(bool on)
 */
 void QCustomPlot::setAntialiasedElements(const QCP::AntialiasedElements& antialiasedElements)
 {
+    const AntialiasingState before { mAntialiasedElements, mNotAntialiasedElements };
     mAntialiasedElements = antialiasedElements;
 
     // make sure elements aren't in mNotAntialiasedElements and mAntialiasedElements simultaneously:
     if ((mNotAntialiasedElements & mAntialiasedElements) != 0)
         mNotAntialiasedElements |= ~mAntialiasedElements;
+    notifyAntialiasing(before);
 }
 
 /*!
@@ -956,6 +1047,7 @@ void QCustomPlot::setAntialiasedElements(const QCP::AntialiasedElements& antiali
 */
 void QCustomPlot::setAntialiasedElement(QCP::AntialiasedElement antialiasedElement, bool enabled)
 {
+    const AntialiasingState before { mAntialiasedElements, mNotAntialiasedElements };
     if (!enabled && mAntialiasedElements.testFlag(antialiasedElement))
         mAntialiasedElements &= ~antialiasedElement;
     else if (enabled && !mAntialiasedElements.testFlag(antialiasedElement))
@@ -964,6 +1056,7 @@ void QCustomPlot::setAntialiasedElement(QCP::AntialiasedElement antialiasedEleme
     // make sure elements aren't in mNotAntialiasedElements and mAntialiasedElements simultaneously:
     if ((mNotAntialiasedElements & mAntialiasedElements) != 0)
         mNotAntialiasedElements |= ~mAntialiasedElements;
+    notifyAntialiasing(before);
 }
 
 /*!
@@ -986,11 +1079,13 @@ void QCustomPlot::setAntialiasedElement(QCP::AntialiasedElement antialiasedEleme
 */
 void QCustomPlot::setNotAntialiasedElements(const QCP::AntialiasedElements& notAntialiasedElements)
 {
+    const AntialiasingState before { mAntialiasedElements, mNotAntialiasedElements };
     mNotAntialiasedElements = notAntialiasedElements;
 
     // make sure elements aren't in mNotAntialiasedElements and mAntialiasedElements simultaneously:
     if ((mNotAntialiasedElements & mAntialiasedElements) != 0)
         mAntialiasedElements |= ~mNotAntialiasedElements;
+    notifyAntialiasing(before);
 }
 
 /*!
@@ -1003,6 +1098,7 @@ void QCustomPlot::setNotAntialiasedElements(const QCP::AntialiasedElements& notA
 void QCustomPlot::setNotAntialiasedElement(QCP::AntialiasedElement notAntialiasedElement,
                                            bool enabled)
 {
+    const AntialiasingState before { mAntialiasedElements, mNotAntialiasedElements };
     if (!enabled && mNotAntialiasedElements.testFlag(notAntialiasedElement))
         mNotAntialiasedElements &= ~notAntialiasedElement;
     else if (enabled && !mNotAntialiasedElements.testFlag(notAntialiasedElement))
@@ -1011,6 +1107,25 @@ void QCustomPlot::setNotAntialiasedElement(QCP::AntialiasedElement notAntialiase
     // make sure elements aren't in mNotAntialiasedElements and mAntialiasedElements simultaneously:
     if ((mNotAntialiasedElements & mAntialiasedElements) != 0)
         mAntialiasedElements |= ~mNotAntialiasedElements;
+    notifyAntialiasing(before);
+}
+
+/*! \internal
+
+  Signals each of the two antialiasing sets that moved since \a before. Both can move in one call;
+  the scope holds the first signal back while the second is queued, as its slot may delete the plot.
+*/
+void QCustomPlot::notifyAntialiasing(const AntialiasingState& before)
+{
+    const bool aaMoved = mAntialiasedElements != before.antialiased;
+    const bool notAaMoved = mNotAntialiasedElements != before.notAntialiased;
+    if (!aaMoved && !notAaMoved)
+        return;
+    const QCPEmissionScope scope(this);
+    if (aaMoved)
+        qcpEmit(this, this, &QCustomPlot::antialiasedElementsChanged, mAntialiasedElements);
+    if (notAaMoved)
+        qcpEmit(this, this, &QCustomPlot::notAntialiasedElementsChanged, mNotAntialiasedElements);
 }
 
 /*!
@@ -1085,8 +1200,11 @@ void QCustomPlot::setAutoAddPlottableToLegend(bool on)
 */
 void QCustomPlot::setInteractions(const QCP::Interactions& interactions)
 {
+    if (interactions == mInteractions)
+        return;
     mInteractions = interactions;
     updateGestureInput();
+    qcpEmit(this, this, &QCustomPlot::interactionsChanged, mInteractions);
 }
 
 /*!
@@ -1098,11 +1216,7 @@ void QCustomPlot::setInteractions(const QCP::Interactions& interactions)
 */
 void QCustomPlot::setInteraction(const QCP::Interaction& interaction, bool enabled)
 {
-    if (!enabled && mInteractions.testFlag(interaction))
-        mInteractions &= ~interaction;
-    else if (enabled && !mInteractions.testFlag(interaction))
-        mInteractions |= interaction;
-    updateGestureInput();
+    setInteractions(enabled ? mInteractions | interaction : mInteractions & ~interaction);
 }
 
 /*! \internal
@@ -1160,7 +1274,10 @@ void QCustomPlot::setNoAntialiasingOnDrag(bool enabled)
 */
 void QCustomPlot::setPlottingHints(const QCP::PlottingHints& hints)
 {
+    if (hints == mPlottingHints)
+        return;
     mPlottingHints = hints;
+    qcpEmit(this, this, &QCustomPlot::plottingHintsChanged, mPlottingHints);
 }
 
 /*!
@@ -1225,7 +1342,7 @@ void QCustomPlot::setSelectionRectMode(QCP::SelectionRectMode mode)
     const QPointer<QCustomPlot> alive(this);
     if (mSelectionRect && mode == QCP::srmNone)
         mSelectionRect->cancel();
-    if (!alive)
+    if (!alive || mode == mSelectionRectMode)
         return;
     if (mSelectionRect)
     {
@@ -1243,6 +1360,7 @@ void QCustomPlot::setSelectionRectMode(QCP::SelectionRectMode mode)
     }
 
     mSelectionRectMode = mode;
+    qcpEmit(this, this, &QCustomPlot::selectionRectModeChanged, mSelectionRectMode);
 }
 
 /*!
@@ -1283,6 +1401,9 @@ void QCustomPlot::setSelectionRect(QCPSelectionRect* selectionRect)
         previous->cancel();
     if (alive && previous && previous != mSelectionRect)
         delete previous.data();
+    // A canceled slot that installed another rect signaled it itself.
+    if (alive && mSelectionRect == selectionRect)
+        qcpEmit(this, this, &QCustomPlot::selectionRectChanged, selectionRect);
 }
 
 void QCustomPlot::setItemCreator(ItemCreator creator)
@@ -1302,6 +1423,8 @@ void QCustomPlot::setItemCreator(ItemCreator creator)
 void QCustomPlot::setCreationModeEnabled(bool enabled)
 {
     if (mCreationModeEnabled == enabled) return;
+    // A slot of the cancel below may delete the plot before the replot and the signal.
+    const QCPEmissionScope scope(this);
     mCreationModeEnabled = enabled;
     if (enabled)
         setCursor(Qt::CrossCursor);
@@ -1311,11 +1434,15 @@ void QCustomPlot::setCreationModeEnabled(bool enabled)
             mCreationState->cancel();
     }
     replot(rpQueuedReplot);
+    qcpEmit(this, this, &QCustomPlot::creationModeEnabledChanged, mCreationModeEnabled);
 }
 
 void QCustomPlot::setCreationModifier(Qt::KeyboardModifier mod)
 {
+    if (mod == mCreationModifier)
+        return;
     mCreationModifier = mod;
+    qcpEmit(this, this, &QCustomPlot::creationModifierChanged, mCreationModifier);
 }
 
 void QCustomPlot::setItemPositioner(ItemPositioner positioner)
@@ -1388,6 +1515,7 @@ void QCustomPlot::setBufferDevicePixelRatio(double ratio)
         {
             buffer->setDevicePixelRatio(mBufferDevicePixelRatio);
         }
+        qcpEmit(this, this, &QCustomPlot::bufferDevicePixelRatioChanged, bufferDevicePixelRatio());
     }
 }
 
@@ -2362,7 +2490,10 @@ bool QCustomPlot::setCurrentLayer(QCPLayer* layer)
         return false;
     }
 
+    if (layer == mCurrentLayer)
+        return true;
     mCurrentLayer = layer;
+    qcpEmit(this, this, &QCustomPlot::currentLayerChanged, layer);
     return true;
 }
 
@@ -2466,7 +2597,10 @@ void QCustomPlot::unlistLayer(QCPLayer* layer)
     }
 
     if (layer == mCurrentLayer)
+    {
         mCurrentLayer = targetLayer;
+        qcpEmit(this, this, &QCustomPlot::currentLayerChanged, targetLayer);
+    }
 
     if (QSharedPointer<QCPAbstractPaintBuffer> pb = layer->mPaintBuffer.toStrongRef())
         pb->setInvalidated();
@@ -2908,12 +3042,18 @@ void QCustomPlot::requestDataSwap()
 
 void QCustomPlot::setDataSwapDebounceMs(int ms)
 {
+    if (qMax(0, ms) == mDataSwapDebounceMs)
+        return;
     mDataSwapDebounceMs = qMax(0, ms);
+    qcpEmit(this, this, &QCustomPlot::dataSwapDebounceMsChanged, mDataSwapDebounceMs);
 }
 
 void QCustomPlot::setDataSwapMaxWaitMs(int ms)
 {
+    if (qMax(0, ms) == mDataSwapMaxWaitMs)
+        return;
     mDataSwapMaxWaitMs = qMax(0, ms);
+    qcpEmit(this, this, &QCustomPlot::dataSwapMaxWaitMsChanged, mDataSwapMaxWaitMs);
 }
 
 void QCustomPlot::commitPendingData()

@@ -34,6 +34,7 @@
 #include "plottables/plottable.h"
 #include "selectionrect.h"
 #include "signal-delivery.h"
+#include "theme.h"
 
 #include <QElapsedTimer>
 #include <QPointer>
@@ -66,7 +67,6 @@ class QRhiShaderResourceBindings;
 class QCPPlottableRhiLayer;
 class QCPGridRhiLayer;
 class QCPScatterRhiLayer;
-class QCPTheme;
 class QCPPipelineScheduler;
 class QCPOverlay;
 class QCPItemCreationState;
@@ -133,6 +133,34 @@ class QCP_LIB_DECL QCustomPlot : public QRhiWidget
                    setThemeLegendBackground NOTIFY themeChanged)
     Q_PROPERTY(QColor themeLegendBorder READ themeLegendBorder WRITE setThemeLegendBorder NOTIFY
                    themeChanged)
+    Q_PROPERTY(bool creationModeEnabled READ creationModeEnabled WRITE setCreationModeEnabled NOTIFY
+                   creationModeEnabledChanged)
+    Q_PROPERTY(Qt::KeyboardModifier creationModifier READ creationModifier WRITE setCreationModifier
+                   NOTIFY creationModifierChanged)
+    Q_PROPERTY(double bufferDevicePixelRatio READ bufferDevicePixelRatio WRITE
+                   setBufferDevicePixelRatio NOTIFY bufferDevicePixelRatioChanged)
+    Q_PROPERTY(QCP::AntialiasedElements antialiasedElements READ antialiasedElements WRITE
+                   setAntialiasedElements NOTIFY antialiasedElementsChanged)
+    Q_PROPERTY(QCP::AntialiasedElements notAntialiasedElements READ notAntialiasedElements WRITE
+                   setNotAntialiasedElements NOTIFY notAntialiasedElementsChanged)
+    Q_PROPERTY(QCP::Interactions interactions READ interactions WRITE setInteractions NOTIFY
+                   interactionsChanged)
+    Q_PROPERTY(QCP::PlottingHints plottingHints READ plottingHints WRITE setPlottingHints NOTIFY
+                   plottingHintsChanged)
+    Q_PROPERTY(QCP::SelectionRectMode selectionRectMode READ selectionRectMode WRITE
+                   setSelectionRectMode NOTIFY selectionRectModeChanged)
+    Q_PROPERTY(QCPSelectionRect* selectionRect READ selectionRect WRITE setSelectionRect NOTIFY
+                   selectionRectChanged)
+    Q_PROPERTY(QCPTheme* theme READ theme WRITE setTheme NOTIFY themeChanged)
+    Q_PROPERTY(bool skipReplotsWhenHidden READ skipReplotsWhenHidden WRITE setSkipReplotsWhenHidden
+                   NOTIFY skipReplotsWhenHiddenChanged)
+    Q_PROPERTY(bool itemIndexing READ itemIndexing WRITE setItemIndexing NOTIFY itemIndexingChanged)
+    Q_PROPERTY(int dataSwapDebounceMs READ dataSwapDebounceMs WRITE setDataSwapDebounceMs NOTIFY
+                   dataSwapDebounceMsChanged)
+    Q_PROPERTY(int dataSwapMaxWaitMs READ dataSwapMaxWaitMs WRITE setDataSwapMaxWaitMs NOTIFY
+                   dataSwapMaxWaitMsChanged)
+    Q_PROPERTY(
+        QCPLayer* currentLayer READ currentLayer WRITE setCurrentLayer NOTIFY currentLayerChanged)
     /// \endcond
 
 public:
@@ -534,6 +562,20 @@ signals:
 
     void itemCreated(QCPAbstractItem* item);
     void itemCanceled();
+    void creationModeEnabledChanged(bool creationModeEnabled);
+    void creationModifierChanged(Qt::KeyboardModifier creationModifier);
+    void bufferDevicePixelRatioChanged(double bufferDevicePixelRatio);
+    void antialiasedElementsChanged(QCP::AntialiasedElements antialiasedElements);
+    void notAntialiasedElementsChanged(QCP::AntialiasedElements notAntialiasedElements);
+    void interactionsChanged(QCP::Interactions interactions);
+    void plottingHintsChanged(QCP::PlottingHints plottingHints);
+    void selectionRectModeChanged(QCP::SelectionRectMode selectionRectMode);
+    void selectionRectChanged(QCPSelectionRect* selectionRect);
+    void skipReplotsWhenHiddenChanged(bool skipReplotsWhenHidden);
+    void itemIndexingChanged(bool itemIndexing);
+    void dataSwapDebounceMsChanged(int dataSwapDebounceMs);
+    void dataSwapMaxWaitMsChanged(int dataSwapMaxWaitMs);
+    void currentLayerChanged(QCPLayer* currentLayer);
 
 private:
     template <typename T>
@@ -679,6 +721,12 @@ protected:
     bool handleEvent(QEvent* event);
 
     // introduced methods:
+    struct AntialiasingState
+    {
+        QCP::AntialiasedElements antialiased, notAntialiased;
+    };
+
+    void notifyAntialiasing(const AntialiasingState& before);
     void updateGestureInput();
     bool touchEvent(QTouchEvent* event);
     void forwardTouchAsMouse(QEvent::Type type, const QEventPoint& point, const QTouchEvent* touch);
