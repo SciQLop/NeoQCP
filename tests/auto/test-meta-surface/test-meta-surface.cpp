@@ -2428,6 +2428,38 @@ void TestMetaSurface::everyGadgetPropertyReadsWhatItWrites()
     QVERIFY(same(meta.readOnGadget(value.constData()), other));
 }
 
+// A slot of a span's range signal that moves an edge in turn signals again: the writer's quiet
+// guard covers its own edge writes only.
+void TestMetaSurface::spanSlotMovingAnEdgeIsHeard()
+{
+    auto plot = newPlot();
+    QCPItemRSpan* rspan = plot->add<QCPItemRSpan>().get();
+    QList<QCPRange> keyRanges;
+    QObject::connect(rspan, &QCPItemRSpan::keyRangeChanged, rspan,
+                     [&](const QCPRange& range)
+                     {
+                         keyRanges.append(range);
+                         if (keyRanges.size() == 1)
+                             rspan->rightEdge->setCoords(50, 0);
+                     });
+    rspan->setKeyRange(QCPRange(2, 3));
+    QCOMPARE(keyRanges.size(), 2);
+    QCOMPARE(keyRanges.last(), QCPRange(2, 50));
+
+    QCPItemSpan* span = plot->add<QCPItemSpan>(Qt::Vertical).get();
+    QList<QCPRange> ranges;
+    QObject::connect(span, &QCPItemSpan::rangeChanged, span,
+                     [&](const QCPRange& range)
+                     {
+                         ranges.append(range);
+                         if (ranges.size() == 1)
+                             span->upperEdge->setCoords(40, 1);
+                     });
+    span->setRange(QCPRange(2, 3));
+    QCOMPARE(ranges.size(), 2);
+    QCOMPARE(ranges.last(), QCPRange(2, 40));
+}
+
 // A gadget write goes through the setter, so its rules hold: a gradient keeps two levels at least.
 void TestMetaSurface::gadgetSettersKeepTheirRules()
 {

@@ -35,7 +35,6 @@ QCPItemRSpan::QCPItemRSpan(QCustomPlot* parentPlot)
     setSelectedBrush(QBrush(QColor(0, 0, 255, 80)));
     setBorderPen(QPen(Qt::black, 2));
     setSelectedBorderPen(QPen(Qt::blue, 2));
-
 }
 
 QCPRange QCPItemRSpan::keyRange() const
@@ -52,10 +51,13 @@ void QCPItemRSpan::setKeyRange(const QCPRange& range)
 {
     if (keyRange() == range)
         return;
-    const QScopedValueRollback quiet(mEdgesQuiet, true);
     markDirty();
-    leftEdge->setCoords(range.lower, leftEdge->coords().y());
-    rightEdge->setCoords(range.upper, rightEdge->coords().y());
+    {
+        // Quiet only while it writes: a slot of the signal below that moves an edge is heard.
+        const QScopedValueRollback quiet(mEdgesQuiet, true);
+        leftEdge->setCoords(range.lower, leftEdge->coords().y());
+        rightEdge->setCoords(range.upper, rightEdge->coords().y());
+    }
     // Emit last: a slot may delete this span.
     qcpEmit(this, mParentPlot, &QCPItemRSpan::keyRangeChanged, range);
 }
@@ -64,10 +66,13 @@ void QCPItemRSpan::setValueRange(const QCPRange& range)
 {
     if (valueRange() == range)
         return;
-    const QScopedValueRollback quiet(mEdgesQuiet, true);
     markDirty();
-    bottomEdge->setCoords(bottomEdge->coords().x(), range.lower);
-    topEdge->setCoords(topEdge->coords().x(), range.upper);
+    {
+        // Quiet only while it writes: a slot of the signal below that moves an edge is heard.
+        const QScopedValueRollback quiet(mEdgesQuiet, true);
+        bottomEdge->setCoords(bottomEdge->coords().x(), range.lower);
+        topEdge->setCoords(topEdge->coords().x(), range.upper);
+    }
     // Emit last: a slot may delete this span.
     qcpEmit(this, mParentPlot, &QCPItemRSpan::valueRangeChanged, range);
 }
@@ -237,7 +242,7 @@ void QCPItemRSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
     if (mDragPart == hpNone)
         return;
     // The drag signals both ranges itself, once, below.
-    QScopedValueRollback quiet(mEdgesQuiet, true);
+    mEdgesQuiet = true;
 
     const double dx = event->pos().x() - startPos.x();
     const double dy = event->pos().y() - startPos.y();
@@ -266,6 +271,7 @@ void QCPItemRSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
             break;
     }
 
+    mEdgesQuiet = false; // a slot of the signal below that moves an edge is heard
     if (mParentPlot)
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     emitDraggedRanges();

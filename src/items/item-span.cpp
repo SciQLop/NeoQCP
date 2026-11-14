@@ -81,11 +81,14 @@ void QCPItemSpan::setRange(const QCPRange& range)
 {
     if (range == this->range())
         return;
-    const QScopedValueRollback quiet(mEdgesQuiet, true);
     markDirty();
-    const bool vertical = mOrientation == Qt::Vertical;
-    lowerEdge->setCoords(vertical ? range.lower : 0, vertical ? 0 : range.lower);
-    upperEdge->setCoords(vertical ? range.upper : 1, vertical ? 1 : range.upper);
+    {
+        // Quiet only while it writes: a slot of the signal below that moves an edge is heard.
+        const QScopedValueRollback quiet(mEdgesQuiet, true);
+        const bool vertical = mOrientation == Qt::Vertical;
+        lowerEdge->setCoords(vertical ? range.lower : 0, vertical ? 0 : range.lower);
+        upperEdge->setCoords(vertical ? range.upper : 1, vertical ? 1 : range.upper);
+    }
     // Emit last: a slot may delete this span.
     qcpEmit(this, mParentPlot, &QCPItemSpan::rangeChanged, range);
 }
@@ -196,7 +199,7 @@ void QCPItemSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
     if (mDragPart == hpNone)
         return;
     // The drag signals the range itself, once, below.
-    QScopedValueRollback quiet(mEdgesQuiet, true);
+    mEdgesQuiet = true;
 
     const bool vertical = mOrientation == Qt::Vertical;
     const Qt::Orientation edgeAxis = vertical ? Qt::Horizontal : Qt::Vertical;
@@ -218,6 +221,7 @@ void QCPItemSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
         default:
             break;
     }
+    mEdgesQuiet = false; // a slot of the signal below that moves an edge is heard
     // Emit last: a slot may delete this span.
     if (mParentPlot)
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
