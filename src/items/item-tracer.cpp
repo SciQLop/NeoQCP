@@ -122,6 +122,12 @@
   signals.
 */
 
+/*! \fn void QCPItemTracer::componentChanged(int component)
+
+  This signal is emitted when \ref component changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates a tracer item and sets default values.
 
@@ -251,7 +257,10 @@ void QCPItemTracer::setGraph(QCPGraph* graph, int component)
                             "the component is outside the graph's columns");
     if (!graph && !mGraph && !mFollowsGraph)
         return;
+    // Two signals: a slot of the first may delete the tracer.
+    const QCPEmissionScope scope(mParentPlot);
     const QCPGraph* before = mGraph.data();
+    const int componentBefore = mComponent;
     if (mGraph)
         mGraph->removeDependent(this);
     markDirty();
@@ -276,6 +285,8 @@ void QCPItemTracer::setGraph(QCPGraph* graph, int component)
     }
     if (mGraph != before)
         qcpEmit(this, mParentPlot, &QCPItemTracer::graphChanged, mGraph.data());
+    if (mComponent != componentBefore)
+        qcpEmit(this, mParentPlot, &QCPItemTracer::componentChanged, mComponent);
 }
 
 void QCPItemTracer::setComponent(int component)
@@ -289,6 +300,7 @@ void QCPItemTracer::setComponent(int component)
     markDirty();
     mComponent = component;
     updatePosition();
+    qcpEmit(this, mParentPlot, &QCPItemTracer::componentChanged, mComponent);
 }
 
 /*!

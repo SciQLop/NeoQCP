@@ -52,6 +52,7 @@ class QCP_LIB_DECL QCPItemTracer : public QCPAbstractItem
     Q_PROPERTY(double graphKey READ graphKey WRITE setGraphKey NOTIFY graphKeyChanged)
     Q_PROPERTY(
         bool interpolating READ interpolating WRITE setInterpolating NOTIFY interpolatingChanged)
+    Q_PROPERTY(int component READ component WRITE setComponent NOTIFY componentChanged)
     /// \endcond
 
 public:
@@ -147,6 +148,7 @@ signals:
     void graphChanged(QCPGraph* graph);
     void graphKeyChanged(double graphKey);
     void interpolatingChanged(bool interpolating);
+    void componentChanged(int component);
 
 protected:
     // property members:

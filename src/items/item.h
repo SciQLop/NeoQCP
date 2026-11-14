@@ -267,6 +267,7 @@ class QCP_LIB_DECL QCPAbstractItem : public QCPLayerable, public QCPDrawable
     Q_PROPERTY(
         QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY selectableChanged)
     Q_PROPERTY(bool selected READ selected WRITE setSelected NOTIFY selectionChanged)
+    Q_PROPERTY(QCPArea* clipArea READ clipArea WRITE setClipArea NOTIFY clipAreaChanged)
     /// \endcond
 
 public:
@@ -367,6 +368,7 @@ signals:
     void deleteRequested();
     void clipToAxisRectChanged(bool clipToAxisRect);
     void clipAxisRectChanged(QCPAxisRect* clipAxisRect);
+    void clipAreaChanged(QCPArea* clipArea);
 
 protected:
     // property members:

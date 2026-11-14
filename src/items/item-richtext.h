@@ -12,6 +12,10 @@ class QCPItemRichTextOps;
 class QCP_LIB_DECL QCPItemRichText : public QCPItemText
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(
+        double cornerRadius READ cornerRadius WRITE setCornerRadius NOTIFY cornerRadiusChanged)
+    /// \endcond
     Q_PROPERTY(QString html READ html WRITE setHtml NOTIFY htmlChanged)
 
 public:
@@ -26,12 +30,14 @@ public:
     void clearHtml();
 
     double cornerRadius() const { return mCornerRadius; }
-    void setCornerRadius(double radius) { mCornerRadius = radius; }
+
+    void setCornerRadius(double radius);
 
     QSizeF contentSize() const { return mBoundingRect.size().grownBy(mPadding); }
 
 signals:
     void htmlChanged(const QString& html);
+    void cornerRadiusChanged(double cornerRadius);
 
 protected:
     void draw(QCPDrawContext& context) const override;

@@ -3,6 +3,12 @@
 #include "../core.h"
 #include "../painting/painter.h"
 
+/*! \fn void QCPItemRichText::cornerRadiusChanged(double cornerRadius)
+
+  This signal is emitted when \ref cornerRadius changes, after the plot delivers its deferred
+  signals.
+*/
+
 QCPItemRichText::QCPItemRichText(QCustomPlot* parentPlot)
         : QCPItemText(parentPlot)
 {
@@ -16,6 +22,18 @@ QCPItemRichText::~QCPItemRichText() { }
 
   This signal is emitted when \ref html changes, after the plot delivers its deferred signals.
 */
+
+/*!
+  Sets the radius of the rounded corners of the box.
+*/
+void QCPItemRichText::setCornerRadius(double radius)
+{
+    if (radius == mCornerRadius)
+        return;
+    markDirty();
+    mCornerRadius = radius;
+    qcpEmit(this, mParentPlot, &QCPItemRichText::cornerRadiusChanged, mCornerRadius);
+}
 
 void QCPItemRichText::setHtml(const QString& html)
 {

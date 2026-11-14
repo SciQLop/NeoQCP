@@ -12,13 +12,10 @@ class QCPItemRSpanOps;
 class QCP_LIB_DECL QCPItemRSpan : public QCPAbstractSpanItem
 {
     Q_OBJECT
-    Q_PROPERTY(QBrush brush READ brush WRITE setBrush NOTIFY brushChanged)
-    Q_PROPERTY(
-        QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush NOTIFY selectedBrushChanged)
-    Q_PROPERTY(QPen borderPen READ borderPen WRITE setBorderPen NOTIFY borderPenChanged)
-    Q_PROPERTY(QPen selectedBorderPen READ selectedBorderPen WRITE setSelectedBorderPen NOTIFY
-                   selectedBorderPenChanged)
-    Q_PROPERTY(bool movable READ movable WRITE setMovable NOTIFY movableChanged)
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(QCPRange keyRange READ keyRange WRITE setKeyRange NOTIFY keyRangeChanged)
+    Q_PROPERTY(QCPRange valueRange READ valueRange WRITE setValueRange NOTIFY valueRangeChanged)
+    /// \endcond
 
 public:
     template <typename T>

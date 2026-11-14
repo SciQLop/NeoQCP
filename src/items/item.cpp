@@ -1477,6 +1477,12 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 
 /* end documentation of signals */
 
+/*! \fn void QCPAbstractItem::clipAreaChanged(QCPArea* clipArea)
+
+  This signal is emitted when \ref clipArea changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Base class constructor which initializes base class members.
 */
@@ -1643,6 +1649,8 @@ void QCPAbstractItem::setClipArea(QCPArea* area)
 {
     if (mClipArea == area)
         return;
+    // Two signals: a slot of the first may delete the item.
+    const QCPEmissionScope scope(mParentPlot);
     const QCPAxisRect* rectBefore = clipAxisRectRaw();
     markDirty();
     mClipArea = area;
@@ -1650,6 +1658,7 @@ void QCPAbstractItem::setClipArea(QCPArea* area)
         setParentLayerable(mClipArea.data());
     noteFramesChanged();
     // clipAxisRect is the clip area when that is an axis rect.
+    qcpEmit(this, mParentPlot, &QCPAbstractItem::clipAreaChanged, mClipArea.data());
     if (clipAxisRectRaw() != rectBefore)
         qcpEmit(this, mParentPlot, &QCPAbstractItem::clipAxisRectChanged, clipAxisRectRaw());
 }

@@ -377,3 +377,9 @@ signal. Nothing that compiled stops compiling; the rows below are the behaviour 
 - `currentLayerChanged` also fires when `removeLayer` (or deleting the layer) moves the current layer to its
   neighbour. The `QString` overload of `setCurrentLayer` signals through the pointer one.
 - `core.h` includes `theme.h`: the `theme` property needs the complete type.
+- Items: `QCPItemRichText::cornerRadius`, `QCPItemRSpan::keyRange` / `valueRange` and `QCPItemSpan::range`
+  (through their existing signals), `QCPItemTracer::component` and `QCPAbstractItem::clipArea`.
+- The span pen, brush and movable properties are declared once, on `QCPAbstractSpanItem`, instead of on each span.
+  Name lookups are unchanged.
+- `QCPItemRichText::setCornerRadius` moved out of line, returns on an equal value and repaints.
+- `QCPItemTracer::componentChanged` also fires when `setGraph(graph, component)` moves the component.

@@ -10,6 +10,15 @@ class QCustomPlot;
 class QCP_LIB_DECL QCPAbstractSpanItem : public QCPAbstractItem
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(QBrush brush READ brush WRITE setBrush NOTIFY brushChanged)
+    Q_PROPERTY(
+        QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush NOTIFY selectedBrushChanged)
+    Q_PROPERTY(QPen borderPen READ borderPen WRITE setBorderPen NOTIFY borderPenChanged)
+    Q_PROPERTY(QPen selectedBorderPen READ selectedBorderPen WRITE setSelectedBorderPen NOTIFY
+                   selectedBorderPenChanged)
+    Q_PROPERTY(bool movable READ movable WRITE setMovable NOTIFY movableChanged)
+    /// \endcond
 
 public:
     using QCPAbstractItem::QCPAbstractItem;

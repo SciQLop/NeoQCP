@@ -32,6 +32,14 @@ QCPGraph* graphOn(QCustomPlot& plot)
     return graph;
 }
 
+QCPGraph* twoColumnGraphOn(QCustomPlot& plot)
+{
+    QCPGraph* graph = plot.addGraph();
+    graph->setData(QVector<double> { 0, 5, 10 },
+                   std::vector<QVector<double>> { { 1, 6, 2 }, { 3, 2, 5 } });
+    return graph;
+}
+
 QCPCurve* curveOn(QCustomPlot& plot)
 {
     auto* curve = new QCPCurve(plot.xAxis, plot.yAxis);
@@ -721,6 +729,8 @@ const QVector<std::pair<QMetaType, Different>>& differentValues()
                 QCPPolarAxisRadial* first = area->radialAxis().get();
                 return v == first ? area->addRadialAxis().get() : first;
             }),
+        differentFor<QCPArea*>([](QCPArea* const&, QObject* object) -> QCPArea*
+                               { return axisRectOn(*plotOf(object)); }),
         differentFor<QCPSelectionRect*>(
             [](QCPSelectionRect* const&, QObject* object) -> QCPSelectionRect*
             { return new QCPSelectionRect(plotOf(object)); }),
@@ -860,6 +870,15 @@ const QVector<Exception>& exceptions()
           },
           [](QObject*) { return QVariant::fromValue(static_cast<QCPLayer*>(nullptr)); },
           "takes only a layer of this plot (core.cpp)" },
+        { &QCPItemTracer::staticMetaObject, "component", Rule::Refuses,
+          [](QObject* object)
+          {
+              auto* tracer = qobject_cast<QCPItemTracer*>(object);
+              tracer->setGraph(twoColumnGraphOn(*tracer->parentPlot()));
+              return QVariant(1);
+          },
+          [](QObject*) { return QVariant(1); },
+          "selects a column of its graph: none without a graph (item-tracer.cpp)" },
         { &QCPPolarAxisAngular::staticMetaObject, "scaleType", Rule::Refuses, nullptr,
           [](QObject*) { return QVariant::fromValue(QCPAxisBase::stLogarithmic); },
           "the ring has no logarithmic scale (angularaxis.cpp:938)", true },
@@ -1072,6 +1091,16 @@ const QVector<Writer>& writers()
           },
           { "currentLayer" },
           { } },
+        { "QCPItemTracer::setGraph with a component",
+          [](QCustomPlot& plot) -> QObject* { return plot.add<QCPItemTracer>().get(); },
+          [](QObject* o)
+          {
+              auto* tracer = qobject_cast<QCPItemTracer*>(o);
+              if (!tracer->graph())
+                  tracer->setGraph(twoColumnGraphOn(*tracer->parentPlot()), 1);
+          },
+          { "graph", "component" },
+          { "graphKey" } },
         { "QCPAxisBase::setRangeLower",
           [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
           [](QObject* o) { qobject_cast<QCPAxis*>(o)->setRangeLower(-3); },
@@ -1630,6 +1659,20 @@ const QVector<Deleting>& deletingWriters()
               return std::pair<QObject*, const char*>(&plot, "itemCanceled()");
           },
           [](QCustomPlot& plot) { plot.setCreationModeEnabled(false); } },
+        { "QCPItemTracer::setGraph with a component", [](QCustomPlot& plot)
+          { return std::pair<QObject*, const char*>(plot.add<QCPItemTracer>().get(), "graph"); },
+          [](QCustomPlot& plot)
+          {
+              auto* tracer = plot.findChild<QCPItemTracer*>();
+              tracer->setGraph(twoColumnGraphOn(plot), 1);
+          } },
+        { "QCPAbstractItem::setClipArea", [](QCustomPlot& plot)
+          { return std::pair<QObject*, const char*>(plot.add<QCPItemLine>().get(), "clipArea"); },
+          [](QCustomPlot& plot)
+          {
+              QCPAxisRect* rect = axisRectOn(plot);
+              plot.findChild<QCPItemLine*>()->setClipArea(rect);
+          } },
         { "QCPAxisRect::setupFullAxesBox", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(plot.xAxis2.get(), "visible"); },
           [](QCustomPlot& plot) { plot.axisRect()->setupFullAxesBox(); } },
@@ -1758,6 +1801,16 @@ const QVector<FormRow>& formRows()
                          "plottingHints", "selectionRectMode", "selectionRect",
                          "skipReplotsWhenHidden", "itemIndexing", "dataSwapDebounceMs",
                          "dataSwapMaxWaitMs", "currentLayer" });
+        r += plainRows(&QCPItemRichText::staticMetaObject, { "cornerRadius" });
+        r += plainRows(&QCPItemRSpan::staticMetaObject, { "keyRange", "valueRange" });
+        r += plainRows(&QCPItemSpan::staticMetaObject, { "range" });
+        r += plainRows(&QCPAbstractSpanItem::staticMetaObject,
+                       { "brush", "selectedBrush", "borderPen", "selectedBorderPen", "movable" });
+        r += plainRows(&QCPItemTracer::staticMetaObject, { "component" });
+        r += plainRows(&QCPAbstractItem::staticMetaObject, { "clipArea" });
+        for (const char* name :
+             { "type", "typeX", "typeY", "coords", "axisRect", "system", "area", "pixelPosition" })
+            r += { { &QCPItemPosition::staticMetaObject, name, Form::Off } };
         r += { { &QCustomPlot::staticMetaObject, "theme", Form::Plain, "themeChanged" },
                { &QCustomPlot::staticMetaObject, "itemCreator", Form::Off },
                { &QCustomPlot::staticMetaObject, "itemPositioner", Form::Off } };
