@@ -2045,8 +2045,10 @@ const QVector<FormRow>& formRows()
         for (const char* name :
              { "type", "typeX", "typeY", "coords", "axisRect", "system", "area", "pixelPosition" })
             r += { { &QCPItemPosition::staticMetaObject, name, Form::Off } };
-        for (const auto& [meta, names] : std::initializer_list<
-                 std::pair<const QMetaObject*, std::initializer_list<const char*>>> {
+        // A QVector, not a nested initializer_list: the inner lists' arrays would end with the
+        // full expression that builds the outer one, before the loop reads them.
+        for (const auto& [meta, names] :
+             QVector<std::pair<const QMetaObject*, QVector<const char*>>> {
                  { &QCPColorGradient::staticMetaObject,
                    { "levelCount", "colorStops", "colorInterpolation", "nanHandling", "nanColor",
                      "periodic" } },
@@ -2055,8 +2057,8 @@ const QVector<FormRow>& formRows()
                    { "size", "shape", "pen", "brush", "pixmap", "customPath" } } })
             for (const char* name : names)
                 r += { { meta, name, Form::Gadget } };
-        for (const auto& [meta, names] : std::initializer_list<
-                 std::pair<const QMetaObject*, std::initializer_list<const char*>>> {
+        for (const auto& [meta, names] :
+             QVector<std::pair<const QMetaObject*, QVector<const char*>>> {
                  { &QCPSelectionDecorator::staticMetaObject,
                    { "pen", "brush", "usedScatterProperties" } },
                  { &QCPSelectionDecoratorBracket::staticMetaObject,
