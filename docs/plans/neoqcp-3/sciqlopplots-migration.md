@@ -337,8 +337,9 @@ it instead of `property("name")`.
 - `QCPAbstractLine::scatterStyleChanged` also fires on `setComponentScatterStyle(0, ...)`: `scatterStyle()` is
   component 0's.
 - `QCPErrorBars::dataPlottableChanged(nullptr)` fires when a refused `setDataPlottable` detaches the old one.
-- `QCPScatterStyle` has an `operator==`. Equal writes of an outlier style, an error bars' data plottable, a
-  selection decorator or an axis no longer repaint or re-register.
+- `QCPScatterStyle` has an `operator==`. Equal writes of an outlier style, an error bars' data plottable or an
+  axis no longer repaint or re-register. An equal selection decorator is refused, as before, and signals
+  nothing.
 - The span signals (`brushChanged`, `borderPenChanged`, `movableChanged` and the selected ones) are declared on
   `QCPAbstractSpanItem`, where the setters are; `QCPAbstractSpanItem::setMovable` moved out of line.
 - `QCPAbstractItem::clipAxisRectChanged` also fires on `setClipArea` when the clip axis rect moves.

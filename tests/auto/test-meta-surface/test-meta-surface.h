@@ -41,6 +41,8 @@ private slots:
     void layoutPassSignalsAfterTheReplot();
     void themeSlotDeletingThePlot_data();
     void themeSlotDeletingThePlot();
+    void slotDeletingThePlotDuringAWriter_data();
+    void slotDeletingThePlotDuringAWriter();
     void exceptionsNameRealProperties();
     void everyNotifyPropertyNotifiesOncePerChange_data();
     void everyNotifyPropertyNotifiesOncePerChange();

@@ -453,6 +453,8 @@ QCPHandle<QCPAxis> QCPAxisRect::addAxis(QCPAxis::AxisType type, QCPAxis* axis)
             return { };
         }
     }
+    // A user-made axis may have listeners: its ending signals wait until it is listed.
+    const QCPEmissionScope scope(mParentPlot);
     if (!mAxes[type].isEmpty()) // multiple axes on one side, add half-bar axis ending to additional
                                 // axes with offset
     {
@@ -528,6 +530,9 @@ QList<QCPHandle<QCPAxis>> QCPAxisRect::addAxes(QCPAxis::AxisTypes types)
 */
 bool QCPAxisRect::removeAxis(QCPAxis* axis)
 {
+    // The next axis's offsetChanged waits until this one is deleted: a slot may delete the plot,
+    // and with it this rect.
+    const QCPEmissionScope scope(mParentPlot);
     // Unlisted first, so the state is the one a plain delete leaves, and a slot on destroyed()
     // finds it gone.
     if (!unlistAxis(axis))
@@ -727,6 +732,8 @@ void QCPAxisRect::zoom(const QRectF& pixelRect, const QList<QCPAxis*>& affectedA
 void QCPAxisRect::setupFullAxesBox(bool connectRanges)
 {
     QCP_CHECK_OR_RETURN(!beingDestroyed(mParentPlot), "the plot is being destroyed");
+    // Four axes get a dozen setters: their signals wait for the scope, a slot may delete one.
+    const QCPEmissionScope scope(mParentPlot);
     QCPAxis *xAxis, *yAxis, *xAxis2, *yAxis2;
     if (axisCount(QCPAxis::atBottom) == 0)
         xAxis = addAxis(QCPAxis::atBottom);

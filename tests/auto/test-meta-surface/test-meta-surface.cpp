@@ -1071,6 +1071,22 @@ const QVector<Writer>& writers()
           },
           { "clipAxisRect" },
           { "clipToAxisRect" } },
+        { "QCPLegend::setIconSize(int, int)",
+          [](QCustomPlot& plot) -> QObject* { return plot.legend.get(); },
+          [](QObject* o) { qobject_cast<QCPLegend*>(o)->setIconSize(41, 17); },
+          { "iconSize" },
+          { "iconTextPadding" } },
+        { "QCPColorScale::setType moving rangeDrag",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              QCPColorScale* scale = colorScaleOn(plot);
+              scale->setRangeDrag(false);
+              scale->setRangeDrag(true); // the vertical orientation only
+              return scale;
+          },
+          [](QObject* o) { qobject_cast<QCPColorScale*>(o)->setType(QCPAxis::atBottom); },
+          { "type", "rangeDrag" },
+          { } },
         { "QCPColorScale's axis label",
           [](QCustomPlot& plot) -> QObject* { return colorScaleOn(plot); },
           [](QObject* o)
@@ -1294,6 +1310,137 @@ void TestMetaSurface::themeSlotDeletingThePlot()
     QVERIFY(doomed.isNull());
     QCOMPARE(later, shared ? 1 : 0); // the plot's own theme died with it, mid-emission
     QCOMPARE(survivorTheme.count(), shared ? 1 : 0);
+}
+
+namespace
+{
+// A function that calls emitting setters and then keeps using its objects holds their signals in
+// one scope (review I1, I2). Each row's slot deletes the plot, from the first signal the function
+// emits, outside any scope; under ASan a missing scope is a use-after-free.
+struct Deleting
+{
+    const char* name;
+    // Builds the scene and returns the object and the signal whose slot deletes the plot.
+    std::function<std::pair<QObject*, const char*>(QCustomPlot&)> arm;
+    std::function<void(QCustomPlot&)> write;
+};
+
+QCPAxis* unlistedAxis = nullptr; // made by one row's arm, listed by its write
+
+const QVector<Deleting>& deletingWriters()
+{
+    static const QVector<Deleting> list {
+        { "QCustomPlot::setTheme", [](QCustomPlot& plot)
+          { return std::pair<QObject*, const char*>(plot.xAxis.get(), "basePen"); },
+          [](QCustomPlot& plot)
+          {
+              static QCPTheme* dark = QCPTheme::dark(); // outlives the plots of the run
+              plot.setTheme(dark);
+          } },
+        { "QCustomPlot::setViewport", [](QCustomPlot& plot)
+          { return std::pair<QObject*, const char*>(plot.plotLayout().get(), "outerRect"); },
+          [](QCustomPlot& plot) { plot.setViewport(QRect(0, 0, 123, 45)); } },
+        { "QCPBarsGroup::insert",
+          [](QCustomPlot& plot)
+          {
+              QCPBars* bars = barsOn(plot);
+              new QCPBarsGroup(&plot);
+              return std::pair<QObject*, const char*>(bars, "barsGroup");
+          },
+          [](QCustomPlot& plot)
+          {
+              auto* group = plot.findChild<QCPBarsGroup*>();
+              group->insert(0, qobject_cast<QCPBars*>(plot.plottable(0).get()));
+          } },
+        { "QCPLegend::addItem",
+          [](QCustomPlot& plot)
+          {
+              plot.setAutoAddPlottableToLegend(false);
+              graphOn(plot);
+              return std::pair<QObject*, const char*>(plot.legend.get(), "rowStretchFactors");
+          },
+          [](QCustomPlot& plot) { plot.plottable(0)->addToLegend(); } },
+        { "QCPLegend::removeItem",
+          [](QCustomPlot& plot)
+          {
+              graphOn(plot);
+              graphOn(plot);
+              return std::pair<QObject*, const char*>(plot.legend.get(), "rowStretchFactors");
+          },
+          [](QCustomPlot& plot) { plot.legend->removeItem(0); } },
+        { "QCustomPlot::detach(plottable)",
+          [](QCustomPlot& plot)
+          {
+              QCPGraph* graph = graphOn(plot);
+              auto* tracer = plot.add<QCPItemTracer>().get();
+              tracer->setGraph(graph);
+              return std::pair<QObject*, const char*>(tracer, "graph");
+          },
+          [](QCustomPlot& plot)
+          {
+              static std::unique_ptr<QCPGraph> taken; // the taken graph outlives the plot
+              taken = plot.take(plot.graph(0));
+          } },
+        { "QCustomPlot::detach(item)",
+          [](QCustomPlot& plot)
+          {
+              auto* line = plot.add<QCPItemLine>().get();
+              return std::pair<QObject*, const char*>(line, "clipAxisRect");
+          },
+          [](QCustomPlot& plot)
+          {
+              static std::unique_ptr<QCPItemLine> taken;
+              taken = plot.take(
+                  QCPHandle<QCPItemLine>(qobject_cast<QCPItemLine*>(plot.item(0).get())));
+          } },
+        { "QCPAxisRect::addAxis(an existing axis)",
+          [](QCustomPlot& plot)
+          {
+              unlistedAxis = new QCPAxis(plot.axisRect().get(), QCPAxis::atBottom);
+              return std::pair<QObject*, const char*>(unlistedAxis, "lowerEnding");
+          },
+          [](QCustomPlot& plot) { plot.axisRect()->addAxis(QCPAxis::atBottom, unlistedAxis); } },
+        { "QCPAxisRect::removeAxis",
+          [](QCustomPlot& plot)
+          {
+              QCPAxis* second = plot.axisRect()->addAxis(QCPAxis::atBottom).get();
+              plot.xAxis->setOffset(7);
+              return std::pair<QObject*, const char*>(second, "offset");
+          },
+          [](QCustomPlot& plot) { plot.axisRect()->removeAxis(plot.xAxis.get()); } },
+        { "QCPAxisRect::setupFullAxesBox", [](QCustomPlot& plot)
+          { return std::pair<QObject*, const char*>(plot.xAxis2.get(), "visible"); },
+          [](QCustomPlot& plot) { plot.axisRect()->setupFullAxesBox(); } },
+    };
+    return list;
+}
+} // namespace
+
+void TestMetaSurface::slotDeletingThePlotDuringAWriter_data()
+{
+    QTest::addColumn<int>("writer");
+    for (int i = 0; i < deletingWriters().size(); ++i)
+        QTest::newRow(deletingWriters()[i].name) << i;
+}
+
+void TestMetaSurface::slotDeletingThePlotDuringAWriter()
+{
+    QFETCH(int, writer);
+    const Deleting& d = deletingWriters()[writer];
+    QPointer<QCustomPlot> plot(newPlot().release());
+    const auto [sender, property] = d.arm(*plot);
+    MetaTrigger trigger;
+    // Once: the plot's teardown sends more signals, and a QPointer is cleared only by ~QObject.
+    bool fired = false;
+    trigger.action = [&plot, &fired]
+    {
+        if (std::exchange(fired, true))
+            return;
+        delete plot.data();
+    };
+    connectTrigger(sender, property, &trigger);
+    d.write(*plot);
+    QVERIFY2(plot.isNull(), "the signal never fired");
 }
 
 void TestMetaSurface::exceptionsNameRealProperties()

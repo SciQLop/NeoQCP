@@ -324,6 +324,9 @@ using qcp::guarded;
 
   This signal is emitted when \ref viewport changes, after the plot delivers its deferred
   signals.
+
+  An export (\ref toPixmap, \ref savePdf, \ref toPainter) lays the plot out at the export size and
+  back: a listener gets the export value, then the screen value, both after the export is done.
 */
 
 /*! \fn void QCustomPlot::backgroundChanged(const QPixmap& background)
@@ -374,6 +377,10 @@ using qcp::guarded;
   installs another one, or the theme changes a value (QCPTheme::changed, also through the
   forwarders such as \ref setThemeBackground). It carries no value: a slot reads the property it
   cares about. Delivered after the plot's deferred signals.
+
+  It is one signal for the whole theme (E-5b): it also fires for a theme value no \c theme*
+  property reads (the tooltip, crosshair and busy fields), and on \ref setTheme to a theme with the
+  same colours.
 */
 
 /* end of documentation of signals */
@@ -700,6 +707,9 @@ void QCustomPlot::setTheme(QCPTheme* theme)
     QCPTheme* resolved = theme ? theme : ownedTheme();
     if (mTheme == resolved)
         return;
+    // Re-theming walks every axis, element and item and calls their emitting setters: their
+    // signals and themeChanged wait for the scope, as a slot may delete any of them or the plot.
+    const QCPEmissionScope scope(this);
     if (mTheme)
         disconnect(mTheme, &QCPTheme::changed, this, nullptr);
     mTheme = resolved;
@@ -751,6 +761,8 @@ void QCustomPlot::applyThemeToAxis(QCPAxis* axis)
 
 void QCustomPlot::applyTheme()
 {
+    // The walk over the axes, elements and items must outlive every setter's signal (see setTheme).
+    const QCPEmissionScope scope(this);
     if (!mTheme || mBeingDestroyed)
         return;
 
@@ -1344,6 +1356,8 @@ void QCustomPlot::syncViewportToWidgetSize()
 
 void QCustomPlot::setViewport(const QRect& rect)
 {
+    // The layout's outerRectChanged waits for the scope: its slot may delete the plot.
+    const QCPEmissionScope scope(this);
     ++mViewEpoch;
     const bool moved = rect != mViewport;
     mViewport = rect;
@@ -1581,6 +1595,9 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     QCP_CHECK_OR_RETURN(mPlottables.contains(plottable), "the object is not in this plot", false);
+    // Its setters emit: every signal waits for the scope, so a slot that deletes the plottable or
+    // the plot runs once this call is done with it.
+    const QCPEmissionScope scope(this);
     leaveSiblings(plottable);
     plottable->setPipelineScheduler(nullptr);
     for (QCPLegend* legend : findChildren<QCPLegend*>())
@@ -1644,6 +1661,9 @@ bool QCustomPlot::adoptPlottable(QCPAbstractPlottable* plottable, QCPCoordinateS
                                  QCPArea* area)
 {
     QCP_CHECK_OR_RETURN(system && area, "the object has no coordinate system to join", false);
+    // Its setters emit: every signal waits for the scope, so a slot that deletes the plottable or
+    // the plot runs once this call is done with it.
+    const QCPEmissionScope scope(this);
     plottable->setParent(this);
     plottable->initializeParentPlot(this);
     // It joins the frame of the area it arrives in, like a plottable built there, through setSystem
@@ -1694,6 +1714,9 @@ bool QCustomPlot::detach(QCPAbstractItem* item)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     QCP_CHECK_OR_RETURN(mItems.contains(item), "the object is not in this plot", false);
+    // Its setters emit: every signal waits for the scope, so a slot that deletes the item or the
+    // plot runs once this call is done with it.
+    const QCPEmissionScope scope(this);
     cutAnchorLinks(item);
     mItems.removeOne(item);
     item->mRegisteredPlot = nullptr;

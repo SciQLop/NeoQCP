@@ -64,6 +64,10 @@
 
   This signal is emitted when \ref outerRect changes, after the plot delivers its deferred
   signals.
+
+  An export (QCustomPlot::toPixmap, QCustomPlot::savePdf, QCustomPlot::toPainter) lays the plot out
+  at the export size and back: a listener gets the export rect, then the screen rect, both after
+  the export is done.
 */
 
 /*! \fn void QCPLayoutElement::marginsChanged(const QMargins& margins)

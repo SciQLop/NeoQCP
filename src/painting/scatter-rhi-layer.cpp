@@ -7,6 +7,8 @@
 #include <cstring>
 
 namespace {
+// The texture cache's key, kept as it was: fuzzy on the size and blind to isPenDefined() (the pen
+// itself is compared). QCPScatterStyle::operator== is exact on both, for the property setters.
 bool sameMarker(const QCPScatterStyle& a, const QCPScatterStyle& b)
 {
     return a.shape() == b.shape() && qFuzzyCompare(a.size(), b.size()) && a.pen() == b.pen()

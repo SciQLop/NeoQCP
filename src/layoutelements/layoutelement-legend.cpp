@@ -744,11 +744,7 @@ void QCPLegend::setIconSize(const QSize& size)
  */
 void QCPLegend::setIconSize(int width, int height)
 {
-    if (QSize(width, height) == mIconSize)
-        return;
-    markDirty();
-    mIconSize.setWidth(width);
-    mIconSize.setHeight(height);
+    setIconSize(QSize(width, height));
 }
 
 /*!
@@ -1053,6 +1049,9 @@ bool QCPLegend::hasItemWithPlottable(const QCPAbstractPlottable* plottable) cons
 */
 bool QCPLegend::addItem(QCPAbstractLegendItem* item)
 {
+    // The grid's signals wait until the item knows its legend: a slot sees it whole, and may
+    // delete the legend.
+    const QCPEmissionScope scope(mParentPlot);
     if (!addElement(item))
         return false;
     item->mParentLegend = this;

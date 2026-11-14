@@ -198,9 +198,11 @@ void QCPBarsGroup::clear()
 {
     // Every member's barsGroupChanged waits for the loop: a slot may delete a member or the group.
     const QCPEmissionScope scope(mParentPlot);
-    const QList<QCPBars*> oldBars = mBars;
-    for (QCPBars* bars : oldBars)
-        bars->setBarsGroup(nullptr); // removes itself from mBars via removeBars
+    // Guarded: during the plot's teardown the scope is inert and a slot runs at once.
+    const QList<QPointer<QCPBars>> oldBars(mBars.cbegin(), mBars.cend());
+    for (const QPointer<QCPBars>& bars : oldBars)
+        if (bars)
+            bars->setBarsGroup(nullptr); // removes itself from mBars via removeBars
 }
 
 /*!
@@ -241,6 +243,8 @@ void QCPBarsGroup::insert(int i, QCPBars* bars)
         return;
     }
 
+    // barsGroupChanged waits for the scope: its slot may delete the bars or this group.
+    const QCPEmissionScope scope(mParentPlot);
     // first append to bars list normally:
     if (!mBars.contains(bars))
     {
