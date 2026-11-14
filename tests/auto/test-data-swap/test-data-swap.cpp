@@ -46,6 +46,7 @@ public:
     void notifyBusy() { updateEffectiveBusy(); }
     QPointF stallPixelOffset() const override { return stall; }
 
+    void draw(QCPDrawContext&) const override { } // only the swap is under test: records nothing
     double selectTest(const QPointF&, bool, QVariant* = nullptr) const override { return -1; }
     QCPRange getKeyRange(bool& found, QCP::SignDomain = QCP::sdBoth) const override
     { found = false; return {}; }

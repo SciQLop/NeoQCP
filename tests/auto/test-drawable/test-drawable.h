@@ -89,4 +89,5 @@ private slots:
     void aPlottableRecordsWithoutTheAdapter();
     void anItemRecordsWithoutTheAdapter();
     void aStyleSetterReRecords();
+    void aPlottableWithoutARecordingIsAbstract();
 };

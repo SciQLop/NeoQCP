@@ -94,6 +94,7 @@ public:
         return true;
     }
 
+    void draw(QCPDrawContext&) const override { } // only the commit is under test: records nothing
     double selectTest(const QPointF&, bool, QVariant* = nullptr) const override { return -1; }
 
     QCPRange getKeyRange(bool& found, QCP::SignDomain = QCP::sdBoth) const override
@@ -120,6 +121,7 @@ public:
     {
     }
 
+    void draw(QCPDrawContext&) const override { } // only its layer is under test: records nothing
     double selectTest(const QPointF&, bool, QVariant* = nullptr) const override { return -1; }
 
     QCPRange getKeyRange(bool& found, QCP::SignDomain = QCP::sdBoth) const override

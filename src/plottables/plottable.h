@@ -205,8 +205,9 @@ public:
     void setSelectionDecorator(QCPSelectionDecorator* decorator);
 
     // introduced virtual methods:
-    //! The recording: append what this plottable draws to \a context. The default records nothing.
-    virtual void draw(QCPDrawContext& context) const { Q_UNUSED(context) }
+    //! The recording: append what this plottable draws to \a context. Pure: a subclass that
+    //! forgot it would otherwise compile and draw nothing; one that draws nothing says so.
+    virtual void draw(QCPDrawContext& context) const = 0;
 
     //! The flags a system must offer for this plottable to join it. Decided once, at construction:
     //! a class passes its own mask to the constructor instead of overriding this.

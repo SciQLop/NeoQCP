@@ -2361,3 +2361,15 @@ void TestDrawable::aStyleSetterReRecords()
     f.plot->replot();
     QCOMPARE(bars->recordings(), before + 1);
 }
+
+//! A plottable that forgets its recording: it must not compile into something that draws nothing.
+class NoRecordingStub : public QCPAbstractPlottable
+{
+public:
+    using QCPAbstractPlottable::QCPAbstractPlottable;
+};
+
+void TestDrawable::aPlottableWithoutARecordingIsAbstract()
+{
+    QVERIFY(std::is_abstract_v<NoRecordingStub>);
+}
