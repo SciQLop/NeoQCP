@@ -10,9 +10,11 @@
 class QCPPipelineScheduler : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPPipelineScheduler)
 
 public:
     enum Priority { Fast, Heavy };
+    Q_ENUM(Priority)
 
     explicit QCPPipelineScheduler(int maxThreads = 0, QObject* parent = nullptr);
     //! Runs jobs on \a pool, which other schedulers may share; it must outlive this one.

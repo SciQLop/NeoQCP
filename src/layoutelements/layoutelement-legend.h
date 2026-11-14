@@ -117,7 +117,7 @@ protected:
     virtual void deselectEvent(bool* selectionStateChanged) override;
 
 private:
-    Q_DISABLE_COPY(QCPAbstractLegendItem)
+    Q_DISABLE_COPY_MOVE(QCPAbstractLegendItem)
 
     friend class QCPLegend;
 };
@@ -125,6 +125,7 @@ private:
 class QCP_LIB_DECL QCPPlottableLegendItem : public QCPAbstractLegendItem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPPlottableLegendItem)
 
 public:
     QCPPlottableLegendItem(QCPLegend* parent, QCPAbstractPlottable* plottable);
@@ -272,10 +273,10 @@ public:
     int itemCount() const;
     bool hasItem(QCPAbstractLegendItem* item) const;
     bool hasItemWithPlottable(const QCPAbstractPlottable* plottable) const;
-    bool addItem(QCPAbstractLegendItem* item);
-    bool removeItem(int index);
+    Q_INVOKABLE bool addItem(QCPAbstractLegendItem* item);
+    Q_INVOKABLE bool removeItem(int index);
     bool removeItem(QCPAbstractLegendItem* item);
-    void clearItems();
+    Q_INVOKABLE void clearItems();
     QList<QCPHandle<QCPAbstractLegendItem>> selectedItems() const;
 
 signals:
@@ -323,7 +324,7 @@ protected:
     QBrush getBrush() const;
 
 private:
-    Q_DISABLE_COPY(QCPLegend)
+    Q_DISABLE_COPY_MOVE(QCPLegend)
 
     // The rows raw: the legend's own setters and selection passes loop over them (K8).
     QCPAbstractLegendItem* itemRaw(int index) const;
@@ -333,7 +334,6 @@ private:
     friend class QCPAbstractPlottable; // walks the rows raw when a name change marks them
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPLegend::SelectableParts)
-Q_DECLARE_METATYPE(QCPLegend::SelectablePart)
 
 // The handle of a legend; the plot's default one is wrapped with qcp::makeHandle<QCPLegendOps<QCPLegend>>(plot.legend).
 template <typename T, typename Self>

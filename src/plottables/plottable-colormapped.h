@@ -8,6 +8,7 @@
 class QCP_LIB_DECL QCPAbstractColorMapped : public QCPAbstractPlottable
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPAbstractColorMapped)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QCPRange dataRange READ dataRange WRITE setDataRange NOTIFY dataRangeChanged)
     Q_PROPERTY(QCPAxis::ScaleType dataScaleType READ dataScaleType WRITE setDataScaleType NOTIFY

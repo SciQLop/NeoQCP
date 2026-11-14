@@ -12,6 +12,7 @@ class QCPItemRichTextOps;
 class QCP_LIB_DECL QCPItemRichText : public QCPItemText
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPItemRichText)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(
         double cornerRadius READ cornerRadius WRITE setCornerRadius NOTIFY cornerRadiusChanged)

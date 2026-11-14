@@ -81,6 +81,5 @@ protected:
     // non-virtual methods:
     void replaceUnit(QString& text, TimeUnit unit, int value) const;
 };
-Q_DECLARE_METATYPE(QCPAxisTickerTime::TimeUnit)
 
 #endif // QCP_AXISTICKERTIME_H

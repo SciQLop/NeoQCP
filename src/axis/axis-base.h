@@ -162,21 +162,21 @@ public:
     virtual QCP::Interaction selectionCategory() const override;
 
     // non-property methods:
-    void moveRange(double diff);
-    void scaleRange(double factor);
+    Q_INVOKABLE void moveRange(double diff);
+    Q_INVOKABLE void scaleRange(double factor);
     void scaleRange(double factor, double center);
 
     // Changes the range so what the plottables of the systems using this axis draw is visible: their
     // drawn data ranges, in this axis' own dimension. A cartesian axis refines this with the data
     // ranges it always used, and the angular axis keeps its full turn.
-    virtual void rescale(bool onlyVisiblePlottables = false);
+    Q_INVOKABLE virtual void rescale(bool onlyVisiblePlottables = false);
     //! The plottables of every system that maps through this axis, in the plot's own order.
     virtual QList<QCPHandle<QCPAbstractPlottable>> plottables() const;
 
     // A link makes this axis follow source: its range is forward(source's range), and a range set
     // here is written back through the inverse. Only cartesian axes may take part.
     void linkTo(QCPAxisBase* source, QCPAxisFunction forward = { }, QCPAxisFunction inverse = { });
-    void unlink();
+    Q_INVOKABLE void unlink();
     virtual QCPAxisBase* linkSource() const;
 
     std::shared_ptr<const QCPAxisLink> link() const { return mLink; }
@@ -275,7 +275,7 @@ protected:
     void refreshLinkedAxes();
 
 private:
-    Q_DISABLE_COPY(QCPAxisBase)
+    Q_DISABLE_COPY_MOVE(QCPAxisBase)
 
     // Tells the area its axis maps differently: the systems that use it are stale from now on.
     void notifyMappingChanged();
@@ -298,7 +298,5 @@ struct QCP_LIB_DECL QCPAxisLink
     bool decreasing = false;
 };
 
-Q_DECLARE_METATYPE(QCPAxisBase::ScaleType)
-Q_DECLARE_METATYPE(QCPAxisBase::SelectablePart)
 
 #endif // QCP_AXIS_AXISBASE_H

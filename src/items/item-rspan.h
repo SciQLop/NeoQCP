@@ -12,6 +12,7 @@ class QCPItemRSpanOps;
 class QCP_LIB_DECL QCPItemRSpan : public QCPAbstractSpanItem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPItemRSpan)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QCPRange keyRange READ keyRange WRITE setKeyRange NOTIFY keyRangeChanged)
     Q_PROPERTY(QCPRange valueRange READ valueRange WRITE setValueRange NOTIFY valueRangeChanged)
@@ -43,6 +44,7 @@ public:
     QCPItemAnchor* const center;
 
     enum HitPart { hpNone = -2, hpFill = -1, hpLeft = 0, hpRight = 1, hpTop = 2, hpBottom = 3 };
+    Q_ENUM(HitPart)
 
 signals:
     void keyRangeChanged(const QCPRange& newRange);

@@ -40,6 +40,7 @@ class QCPItemTextOps;
 class QCP_LIB_DECL QCPItemText : public QCPAbstractItem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPItemText)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QColor color READ color WRITE setColor NOTIFY colorChanged)
     Q_PROPERTY(

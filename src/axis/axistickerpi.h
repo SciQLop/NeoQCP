@@ -91,6 +91,5 @@ protected:
     QString unicodeSuperscript(int number) const;
     QString unicodeSubscript(int number) const;
 };
-Q_DECLARE_METATYPE(QCPAxisTickerPi::FractionStyle)
 
 #endif // QCP_AXISTICKERPI_H

@@ -17,6 +17,7 @@ struct QCPGraphComponent;
 class QCP_LIB_DECL QCPAbstractLine : public QCPAbstractColorMapped
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPAbstractLine)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(LineStyle lineStyle READ lineStyle WRITE setLineStyle NOTIFY lineStyleChanged)
     Q_PROPERTY(QCPScatterStyle scatterStyle READ scatterStyle WRITE setScatterStyle NOTIFY

@@ -40,6 +40,7 @@ class QCPItemTracerOps;
 class QCP_LIB_DECL QCPItemTracer : public QCPAbstractItem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPItemTracer)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
     Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen NOTIFY selectedPenChanged)
@@ -182,7 +183,6 @@ private:
 
     friend class QCustomPlot;
 };
-Q_DECLARE_METATYPE(QCPItemTracer::TracerStyle)
 
 // The fluent handle of a QCPItemTracer; see QCPItemOps for the subclass contract.
 template <typename T, typename Self>

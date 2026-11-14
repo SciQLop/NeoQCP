@@ -25,6 +25,7 @@ class QCPPlottableGroupOps;
 class QCP_LIB_DECL QCPPlottableGroup : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPPlottableGroup)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QString name READ name WRITE setName NOTIFY nameChanged)
     Q_PROPERTY(bool visible READ visible WRITE setVisible NOTIFY visibleChanged)
@@ -84,6 +85,7 @@ private:
 class QCP_LIB_DECL QCPPlottableGroupLegendItem : public QCPAbstractLegendItem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPPlottableGroupLegendItem)
 
 public:
     QCPPlottableGroupLegendItem(QCPLegend* parent, QCPPlottableGroup* group);

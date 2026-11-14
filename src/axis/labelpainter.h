@@ -201,8 +201,6 @@ protected:
     AnchorSide rotationCorrectedSide(AnchorSide side, double rotation) const;
     void analyzeFontMetrics();
 };
-Q_DECLARE_METATYPE(QCPLabelPainterPrivate::AnchorMode)
-Q_DECLARE_METATYPE(QCPLabelPainterPrivate::AnchorSide)
 
 
 #endif // QCP_LABELPAINTER_H

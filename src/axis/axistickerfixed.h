@@ -72,6 +72,5 @@ protected:
     // reimplemented virtual methods:
     virtual double getTickStep(const QCPRange& range) override;
 };
-Q_DECLARE_METATYPE(QCPAxisTickerFixed::ScaleStrategy)
 
 #endif // QCP_AXISTICKERFIXED_H

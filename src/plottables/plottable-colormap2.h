@@ -22,6 +22,7 @@ class QCPColorMap2Ops;
 class QCP_LIB_DECL QCPColorMap2 : public QCPAbstractColorMapped
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPColorMap2)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(
         double gapThreshold READ gapThreshold WRITE setGapThreshold NOTIFY gapThresholdChanged)

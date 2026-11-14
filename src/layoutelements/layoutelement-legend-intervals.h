@@ -8,6 +8,7 @@ class QCPIntervals;
 class QCP_LIB_DECL QCPIntervalsLegendItem : public QCPAbstractLegendItem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPIntervalsLegendItem)
 public:
     QCPIntervalsLegendItem(QCPLegend* parent, QCPIntervals* intervals);
 

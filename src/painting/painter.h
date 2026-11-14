@@ -100,6 +100,5 @@ private:
     bool drawAlignedLineAsRect(const QLine& line);
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPPainter::PainterModes)
-Q_DECLARE_METATYPE(QCPPainter::PainterMode)
 
 #endif // QCP_PAINTER_H

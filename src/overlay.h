@@ -78,7 +78,7 @@ private:
     void redraw();
     QRect collapseHandleRect() const;
 
-    Q_DISABLE_COPY(QCPOverlay)
+    Q_DISABLE_COPY_MOVE(QCPOverlay)
 };
 
 #endif // QCP_OVERLAY_H

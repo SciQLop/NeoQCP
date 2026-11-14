@@ -227,7 +227,7 @@ private:
     friend class QCPCoordinateSystem; // a system's own parameters move without an axis
     friend class TestItemIndex;
 
-    Q_DISABLE_COPY(QCPLayer)
+    Q_DISABLE_COPY_MOVE(QCPLayer)
 
     friend class QCustomPlot;
     friend class QCPLayerable;
@@ -240,7 +240,6 @@ private:
     friend class TestPipeline;
     friend class TestRepaint;
 };
-Q_DECLARE_METATYPE(QCPLayer::LayerMode)
 
 class QCP_LIB_DECL QCPLayerable : public QObject
 {
@@ -350,7 +349,7 @@ private:
     //! The plot's theme raw, for the per-object view builders (K8). Defined in layer.cpp.
     [[nodiscard]] QCPTheme* themeRaw() const;
 
-    Q_DISABLE_COPY(QCPLayerable)
+    Q_DISABLE_COPY_MOVE(QCPLayerable)
 
     friend class QCustomPlot;
     friend class QCPLayer;

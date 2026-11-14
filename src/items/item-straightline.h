@@ -38,6 +38,7 @@ class QCPItemStraightLineOps;
 class QCP_LIB_DECL QCPItemStraightLine : public QCPAbstractItem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPItemStraightLine)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
     Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen NOTIFY selectedPenChanged)

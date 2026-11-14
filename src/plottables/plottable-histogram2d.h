@@ -23,6 +23,7 @@ class QCPHistogram2DOps;
 class QCP_LIB_DECL QCPHistogram2D : public QCPAbstractColorMapped
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPHistogram2D)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QCP::HistogramNormalization normalization READ normalization WRITE setNormalization
                    NOTIFY normalizationChanged)

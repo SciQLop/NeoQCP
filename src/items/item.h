@@ -255,7 +255,6 @@ private:
     // draw itself would dirty the layer and the plot would never settle.
     void assignCoords(double key, double value);
 };
-Q_DECLARE_METATYPE(QCPItemPosition::PositionType)
 
 // What an item occupies, for the layer's spatial index, is QCPItemExtent (drawable.h): the data box
 // of its recording on one axis pair, plus the pixels its drawing may add around it. A side that
@@ -434,7 +433,7 @@ protected:
     QCPItemAnchor* createAnchor(const QString& name, int anchorId);
 
 private:
-    Q_DISABLE_COPY(QCPAbstractItem)
+    Q_DISABLE_COPY_MOVE(QCPAbstractItem)
 
     QPointer<QCustomPlot> mRegisteredPlot; // the plot whose item list holds this one
     //! True while the destructor detaches the anchors: their item has lost its virtuals.

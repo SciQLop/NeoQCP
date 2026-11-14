@@ -184,7 +184,5 @@ protected:
 
 Q_DECLARE_TYPEINFO(QCPScatterStyle, Q_MOVABLE_TYPE);
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPScatterStyle::ScatterProperties)
-Q_DECLARE_METATYPE(QCPScatterStyle::ScatterProperty)
-Q_DECLARE_METATYPE(QCPScatterStyle::ScatterShape)
 
 #endif // QCP_SCATTERSTYLE_H

@@ -52,6 +52,7 @@ class QCPWaterfallGraphOps;
 
 class QCP_LIB_DECL QCPWaterfallGraph : public QCPGraph {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPWaterfallGraph)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(OffsetMode offsetMode READ offsetMode WRITE setOffsetMode NOTIFY offsetModeChanged)
     Q_PROPERTY(double uniformSpacing READ uniformSpacing WRITE setUniformSpacing NOTIFY

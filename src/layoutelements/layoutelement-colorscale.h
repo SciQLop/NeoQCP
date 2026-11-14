@@ -41,6 +41,7 @@ class QCPAbstractColorMapped;
 class QCPColorScaleAxisRectPrivate : public QCPAxisRect
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPColorScaleAxisRectPrivate)
 
 public:
     explicit QCPColorScaleAxisRectPrivate(QCPColorScale* parentColorScale);
@@ -164,7 +165,7 @@ protected:
     virtual void wheelEvent(QWheelEvent* event) override;
 
 private:
-    Q_DISABLE_COPY(QCPColorScale)
+    Q_DISABLE_COPY_MOVE(QCPColorScale)
 
     // The owner reports a user or size change, which moves the margin the scale sits in.
     void usersChanged();

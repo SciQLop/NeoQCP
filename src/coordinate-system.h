@@ -157,7 +157,7 @@ private:
     friend class QCPAbstractItem; // its index box reads the axes raw, once per item and rebuild
     friend class QCPItemPosition; // binding a system reads its frame raw, once per position
     friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip);
-    Q_DISABLE_COPY(QCPCoordinateSystem)
+    Q_DISABLE_COPY_MOVE(QCPCoordinateSystem)
 };
 
 /*! \brief The cartesian system: today's two-axis frame of an axis rect.
@@ -169,6 +169,7 @@ private:
 class QCP_LIB_DECL QCPCartesianSystem : public QCPCoordinateSystem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPCartesianSystem)
 
 public:
     QCPTransform transform() const override;

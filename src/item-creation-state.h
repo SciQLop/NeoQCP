@@ -9,8 +9,10 @@ class QCPPainter;
 
 class QCPItemCreationState : public QCPLayerable {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPItemCreationState)
 public:
     enum State { Idle, Drawing };
+    Q_ENUM(State)
 
     explicit QCPItemCreationState(QCustomPlot* plot);
 

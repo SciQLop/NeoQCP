@@ -11,6 +11,7 @@ class QCustomPlot;
 class QCP_LIB_DECL QCPAbstractSpanItem : public QCPAbstractItem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPAbstractSpanItem)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QBrush brush READ brush WRITE setBrush NOTIFY brushChanged)
     Q_PROPERTY(

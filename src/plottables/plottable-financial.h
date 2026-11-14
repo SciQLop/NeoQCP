@@ -82,6 +82,7 @@ class QCPFinancialOps;
 class QCP_LIB_DECL QCPFinancial : public QCPAbstractPlottable1D<QCPFinancialData>
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPFinancial)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(ChartStyle chartStyle READ chartStyle WRITE setChartStyle NOTIFY chartStyleChanged)
     Q_PROPERTY(double width READ width WRITE setWidth NOTIFY widthChanged)
@@ -227,7 +228,6 @@ protected:
     friend class QCustomPlot;
     friend class QCPLegend;
 };
-Q_DECLARE_METATYPE(QCPFinancial::ChartStyle)
 
 // The fluent handle of a financial plottable; see QCPPlottableOps for the subclass contract.
 template <typename T, typename Self>

@@ -165,7 +165,7 @@ private:
     friend class QCPAxisBase;
     friend QCPCoordinateSystem* qcpSystemOfAxes(QCPAxis*, QCPAxis*);
 
-    Q_DISABLE_COPY(QCPArea)
+    Q_DISABLE_COPY_MOVE(QCPArea)
 };
 
 // The system of \a keyAxis and \a valueAxis when they are the two axes of one area, in their map

@@ -34,6 +34,7 @@ enum class TransformKind { ViewportIndependent, ViewportDependent };
 class QCPAsyncPipelineBase : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPAsyncPipelineBase)
 
 public:
     explicit QCPAsyncPipelineBase(QCPPipelineScheduler* scheduler,

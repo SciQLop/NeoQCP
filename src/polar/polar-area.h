@@ -161,7 +161,7 @@ protected:
     virtual void wheelEvent(QWheelEvent* event) override;
 
 private:
-    Q_DISABLE_COPY(QCPPolarArea)
+    Q_DISABLE_COPY_MOVE(QCPPolarArea)
 
     friend class QCustomPlot;
     friend class QCPPolarAxisAngular;

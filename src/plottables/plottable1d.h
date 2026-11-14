@@ -106,7 +106,7 @@ protected:
     }
 
 private:
-    Q_DISABLE_COPY(QCPAbstractPlottable1D)
+    Q_DISABLE_COPY_MOVE(QCPAbstractPlottable1D)
 };
 
 // include implementation in header since it is a class template:

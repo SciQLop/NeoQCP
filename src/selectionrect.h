@@ -35,6 +35,7 @@ class QCPAxis;
 class QCP_LIB_DECL QCPSelectionRect : public QCPLayerable
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPSelectionRect)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
     Q_PROPERTY(QBrush brush READ brush WRITE setBrush NOTIFY brushChanged)

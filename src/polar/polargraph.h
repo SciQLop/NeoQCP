@@ -61,6 +61,7 @@ class QCPPolarGraphOps;
 class QCP_LIB_DECL QCPPolarGraph : public QCPAbstractPlottable1D<QCPGraphData>
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPPolarGraph)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(bool periodic READ periodic WRITE setPeriodic NOTIFY periodicChanged)
     Q_PROPERTY(LineStyle lineStyle READ lineStyle WRITE setLineStyle NOTIFY lineStyleChanged)

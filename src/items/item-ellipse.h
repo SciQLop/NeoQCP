@@ -38,6 +38,7 @@ class QCPItemEllipseOps;
 class QCP_LIB_DECL QCPItemEllipse : public QCPAbstractItem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPItemEllipse)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
     Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen NOTIFY selectedPenChanged)

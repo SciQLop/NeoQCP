@@ -20,6 +20,7 @@ class QCPItemSpanOps;
 class QCP_LIB_DECL QCPItemSpan : public QCPAbstractSpanItem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPItemSpan)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QCPRange range READ range WRITE setRange NOTIFY rangeChanged)
     /// \endcond
@@ -49,6 +50,7 @@ public:
         hpLowerEdge = 0,
         hpUpperEdge = 1
     };
+    Q_ENUM(HitPart)
 
 signals:
     void rangeChanged(const QCPRange& newRange);

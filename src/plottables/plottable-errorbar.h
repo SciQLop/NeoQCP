@@ -70,6 +70,7 @@ class QCPErrorBarsOps;
 class QCP_LIB_DECL QCPErrorBars : public QCPAbstractPlottable, public QCPPlottableInterface1D
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPErrorBars)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QCPAbstractPlottable* dataPlottable READ dataPlottable WRITE setDataPlottable NOTIFY
                    dataPlottableChanged)

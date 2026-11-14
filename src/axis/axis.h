@@ -63,6 +63,7 @@ struct QCPAxisLink;
 class QCP_LIB_DECL QCPGrid : public QCPLayerable
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPGrid)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(bool subGridVisible READ subGridVisible WRITE setSubGridVisible NOTIFY
                    subGridVisibleChanged)
@@ -487,7 +488,7 @@ protected:
     QColor getLabelColor() const;
 
 private:
-    Q_DISABLE_COPY(QCPAxis)
+    Q_DISABLE_COPY_MOVE(QCPAxis)
     double linkedCoordToPixel(double value) const;
     double linkedPixelToCoord(double value) const;
 
@@ -506,8 +507,6 @@ private:
     friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip);
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPAxis::AxisTypes)
-Q_DECLARE_METATYPE(QCPAxis::AxisType)
-Q_DECLARE_METATYPE(QCPAxis::LabelSide)
 
 class QCPAxisPainterPrivate
 {

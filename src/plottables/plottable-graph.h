@@ -39,6 +39,7 @@ class QCPGraphOps;
 class QCP_LIB_DECL QCPGraph : public QCPAbstractLine, public QCPPlottableInterface1D
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPGraph)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(bool adaptiveSampling READ adaptiveSampling WRITE setAdaptiveSampling NOTIFY
                    adaptiveSamplingChanged)

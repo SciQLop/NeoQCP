@@ -8,6 +8,7 @@
 class QCP_LIB_DECL QCPTheme : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPTheme)
     Q_PROPERTY(QColor background READ background WRITE setBackground NOTIFY changed)
     Q_PROPERTY(QColor foreground READ foreground WRITE setForeground NOTIFY changed)
     Q_PROPERTY(QColor grid READ grid WRITE setGrid NOTIFY changed)

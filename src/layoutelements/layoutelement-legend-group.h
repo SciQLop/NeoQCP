@@ -10,6 +10,7 @@ class QCPGraph;
 class QCP_LIB_DECL QCPGroupLegendItem : public QCPPlottableLegendItem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPGroupLegendItem)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(bool expanded READ expanded WRITE setExpanded NOTIFY expandedChanged)
     Q_PROPERTY(int selectedComponent READ selectedComponent WRITE setSelectedComponent NOTIFY

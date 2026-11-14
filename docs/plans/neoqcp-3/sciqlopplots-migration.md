@@ -428,3 +428,29 @@ rows are the behaviour that moved with the new properties.
 - **Fixed:** the antialiasing setters kept the two sets apart with `|= ~` (2.x). Forcing an element on put every
   other element into the never-antialiased set. Now forcing an element on takes only that element out of the
   other set.
+
+### Macros (Task 4)
+
+- New `Q_ENUM`: `QCPIntervals::HitPart`, `EditMode`, `SnapMode`; `QCPItemSpan::HitPart`; `QCPItemRSpan::HitPart`;
+  `QCPPipelineScheduler::Priority`; `QCPItemCreationState::State`. `QCPIntervals::EditModes` was already a `Q_FLAG`
+  (Task 3). Registering an enum gives it a `QMetaEnum` and the name `Class::Enum`; nothing is renamed.
+- **Out, unchanged:** `QCPHitAction` (global `enum class`, not in a meta-object scope; moving it into `QCP` would break
+  `hitsAt` callers, and no property or invokable takes it), `QCPTransform::Kind`, the protected
+  `QCPAxisTickerDateTime::DateStrategy`, `QCPRawColumn::Type`.
+- **Deleted `Q_DECLARE_METATYPE` lines (32):** the enums moc registers through a `Q_ENUM` in the same class
+  (`QCPAxis::AxisType`, `LabelSide`; `QCPAxisBase::ScaleType`, `SelectablePart`; `QCPLayer::LayerMode`;
+  `QCustomPlot::LayerInsertMode`, `RefreshPriority`; the layout enums; the tickers, label painter, gradient, scatter
+  style, line ending, item, painter, bars, financial, legend and polar grid enums; see the Task 4 report for the list).
+  The registered type name is the same scoped name, so `QMetaType::fromName("QCPAxis::AxisType")` and queued
+  connections by name keep working. Code that relied on the line itself, such as `qMetaTypeId<QCPAxis::AxisType>()`
+  through the removed specialisation, still compiles: Qt 6 builds the id from the moc registration.
+- **Kept:** `QCPCurve::LineStyle` (an alias of `QCPAbstractLine::LineStyle`: deleting the line would rename the
+  registered type), and the four non-enums `QCPDataSelection`, `QSharedPointer<QCPAxisTicker>`,
+  `QCPSelectionDecorator*`, `QCPIntervalEdit`.
+- `Q_INVOKABLE` on the named actions of `QCustomPlot`, `QCPAxisBase`, `QCPLayout`, `QCPLayoutGrid`, `QCPLayoutInset`
+  and `QCPLegend` (one overload each; list in the Task 4 report). Python or QML can now call them by name through
+  `QMetaObject::invokeMethod`. No signature changed.
+- `Q_DISABLE_COPY` became `Q_DISABLE_COPY_MOVE` on every `QObject` class (a `QObject` was never copyable, so no
+  caller changes). The tickers, `QCPItemAnchor`/`QCPItemPosition` and `QCPSelectionDecorator` are not `QObject`s and
+  keep `Q_DISABLE_COPY`.
+- The 11 `Q_DECLARE_TYPEINFO` lines were re-checked and stay as they are.

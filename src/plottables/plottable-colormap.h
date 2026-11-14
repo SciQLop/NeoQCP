@@ -115,6 +115,7 @@ class QCPColorMapOps;
 class QCP_LIB_DECL QCPColorMap : public QCPAbstractColorMapped
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPColorMap)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(bool interpolate READ interpolate WRITE setInterpolate NOTIFY interpolateChanged)
     Q_PROPERTY(

@@ -3,6 +3,7 @@
 #include "datasource/async-pipeline.h"
 #include "datasource/graph-resampler.h"
 #include "datasource/pipeline-scheduler.h"
+#include "item-creation-state.h"
 #include <QBindable>
 #include <QProperty>
 #include <memory>
@@ -2702,4 +2703,186 @@ void TestMetaSurface::exceptionRulesHold()
             break;
         }
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// E-12..E-14: the enums, the flag and the invokables of the surface. A property whose type is an
+// enumeration names a registered QMetaEnum; the public enums of section 6.1 are registered under
+// their scoped names (E-13: dropping a Q_DECLARE_METATYPE must not rename them); each invokable
+// is found by signature.
+// ---------------------------------------------------------------------------------------------
+namespace
+{
+// QCPCurve::LineStyle is an alias of the enum QCPAbstractLine registers (E-13 keeps its metatype line).
+const QMetaObject* enumScope(const QMetaObject* meta, const QMetaProperty& property)
+{
+    return qstrcmp(property.typeName(), "QCPCurve::LineStyle") == 0 ? &QCPAbstractLine::staticMetaObject
+                                                                     : meta;
+}
+
+struct EnumRow
+{
+    const QMetaObject* scope;
+    const char* name;
+    bool isFlag;
+};
+
+const QVector<EnumRow>& publicEnums()
+{
+    static const QVector<EnumRow> list {
+        { &QCPIntervals::staticMetaObject, "HitPart", false },
+        { &QCPIntervals::staticMetaObject, "EditMode", false },
+        { &QCPIntervals::staticMetaObject, "EditModes", true },
+        { &QCPIntervals::staticMetaObject, "SnapMode", false },
+        { &QCPIntervals::staticMetaObject, "Style", false },
+        { &QCPIntervals::staticMetaObject, "StackMode", false },
+        { &QCPItemSpan::staticMetaObject, "HitPart", false },
+        { &QCPItemRSpan::staticMetaObject, "HitPart", false },
+        { &QCPPipelineScheduler::staticMetaObject, "Priority", false },
+        { &QCPItemCreationState::staticMetaObject, "State", false },
+        { &QCPAxis::staticMetaObject, "AxisType", false },
+        { &QCPAxis::staticMetaObject, "AxisTypes", true },
+        { &QCPLayer::staticMetaObject, "LayerMode", false },
+        { &QCustomPlot::staticMetaObject, "LayerInsertMode", false },
+        { &QCustomPlot::staticMetaObject, "RefreshPriority", false },
+        { &QCPLayoutElement::staticMetaObject, "UpdatePhase", false },
+        { &QCPLayoutGrid::staticMetaObject, "FillOrder", false },
+        { &QCPLayoutInset::staticMetaObject, "InsetPlacement", false },
+        { &QCPScatterStyle::staticMetaObject, "ScatterShape", false },
+        { &QCPColorGradient::staticMetaObject, "NanHandling", false },
+        { &QCPAbstractLine::staticMetaObject, "LineStyle", false },
+        { &QCPBars::staticMetaObject, "WidthType", false },
+        { &QCPFinancial::staticMetaObject, "ChartStyle", false },
+    };
+    return list;
+}
+} // namespace
+
+void TestMetaSurface::everyEnumPropertyNamesARegisteredEnum_data()
+{
+    QTest::addColumn<int>("fixture");
+    QTest::addColumn<QByteArray>("className");
+    for (const Declared& d : declaredClasses())
+        QTest::newRow(d.meta->className()) << d.fixture << QByteArray(d.meta->className());
+}
+
+void TestMetaSurface::everyEnumPropertyNamesARegisteredEnum()
+{
+    QFETCH(int, fixture);
+    QFETCH(QByteArray, className);
+    auto plot = newPlot();
+    const QMetaObject* meta = fixtures()[fixture].make(*plot)->metaObject();
+    for (int i = QObject::staticMetaObject.propertyCount(); i < meta->propertyCount(); ++i)
+    {
+        const QMetaProperty property = meta->property(i);
+        if (declaringClass(meta, i)->className() != className
+            || !property.metaType().flags().testFlag(QMetaType::IsEnumeration))
+            continue;
+        const QMetaObject* scope = enumScope(meta, property);
+        const QByteArray bare = QByteArray(property.typeName()).split(':').last();
+        const bool registered
+            = property.isEnumType() || scope->indexOfEnumerator(bare.constData()) >= 0;
+        QVERIFY2(registered,
+                 qPrintable(QStringLiteral("%1::%2 is an enum type no Q_ENUM registers")
+                                .arg(QLatin1String(className), QLatin1String(property.name()))));
+    }
+}
+
+void TestMetaSurface::publicEnumsAreRegistered_data()
+{
+    QTest::addColumn<int>("row");
+    for (int i = 0; i < publicEnums().size(); ++i)
+        QTest::addRow("%s::%s", publicEnums()[i].scope->className(), publicEnums()[i].name) << i;
+}
+
+void TestMetaSurface::publicEnumsAreRegistered()
+{
+    QFETCH(int, row);
+    const EnumRow& e = publicEnums()[row];
+    const int index = e.scope->indexOfEnumerator(e.name);
+    QVERIFY2(index >= 0, e.name);
+    const QMetaEnum meta = e.scope->enumerator(index);
+    QVERIFY(meta.isValid());
+    QCOMPARE(meta.isFlag(), e.isFlag);
+    QVERIFY(meta.keyCount() > 0);
+    const QByteArray scoped = QByteArray(e.scope->className()) + "::" + e.name;
+    const QMetaType type = QMetaType::fromName(scoped);
+    if (!e.isFlag && type.isValid()) // a flag type registers as QFlags<Enum>
+        QCOMPARE(QByteArray(type.name()), scoped);
+}
+
+namespace
+{
+struct InvokableRow
+{
+    const QMetaObject* scope;
+    const char* signature;
+};
+
+const QVector<InvokableRow>& invokables()
+{
+    static const QVector<InvokableRow> list {
+        { &QCPAxisBase::staticMetaObject, "moveRange(double)" },
+        { &QCPAxisBase::staticMetaObject, "scaleRange(double)" },
+        { &QCPAxisBase::staticMetaObject, "rescale(bool)" },
+        { &QCPAxisBase::staticMetaObject, "unlink()" },
+        { &QCustomPlot::staticMetaObject, "requestRepaint()" },
+        { &QCustomPlot::staticMetaObject, "settle()" },
+        { &QCustomPlot::staticMetaObject, "requestDataSwap()" },
+        { &QCustomPlot::staticMetaObject, "removePlottable(int)" },
+        { &QCustomPlot::staticMetaObject, "clearPlottables()" },
+        { &QCustomPlot::staticMetaObject, "removePlottableGroup(QCPPlottableGroup*)" },
+        { &QCustomPlot::staticMetaObject, "removeGraph(int)" },
+        { &QCustomPlot::staticMetaObject, "clearGraphs()" },
+        { &QCustomPlot::staticMetaObject, "removeItem(int)" },
+        { &QCustomPlot::staticMetaObject, "clearItems()" },
+        { &QCustomPlot::staticMetaObject, "addLayer(QString,QCPLayer*,QCustomPlot::LayerInsertMode)" },
+        { &QCustomPlot::staticMetaObject, "removeLayer(QCPLayer*)" },
+        { &QCustomPlot::staticMetaObject,
+          "moveLayer(QCPLayer*,QCPLayer*,QCustomPlot::LayerInsertMode)" },
+        { &QCustomPlot::staticMetaObject,
+          "savePdf(QString,int,int,QCP::ExportPen,QString,QString)" },
+        { &QCustomPlot::staticMetaObject,
+          "savePng(QString,int,int,double,int,int,QCP::ResolutionUnit)" },
+        { &QCustomPlot::staticMetaObject,
+          "saveJpg(QString,int,int,double,int,int,QCP::ResolutionUnit)" },
+        { &QCustomPlot::staticMetaObject, "saveBmp(QString,int,int,double,int,QCP::ResolutionUnit)" },
+        { &QCustomPlot::staticMetaObject,
+          "saveRastered(QString,int,int,double,const char*,int,int,QCP::ResolutionUnit)" },
+        { &QCPLayout::staticMetaObject, "takeAt(int)" },
+        { &QCPLayout::staticMetaObject, "take(QCPLayoutElement*)" },
+        { &QCPLayout::staticMetaObject, "simplify()" },
+        { &QCPLayout::staticMetaObject, "removeAt(int)" },
+        { &QCPLayout::staticMetaObject, "remove(QCPLayoutElement*)" },
+        { &QCPLayout::staticMetaObject, "clear()" },
+        { &QCPLayoutGrid::staticMetaObject, "addElement(int,int,QCPLayoutElement*)" },
+        { &QCPLayoutGrid::staticMetaObject, "expandTo(int,int)" },
+        { &QCPLayoutGrid::staticMetaObject, "insertRow(int)" },
+        { &QCPLayoutGrid::staticMetaObject, "insertColumn(int)" },
+        { &QCPLayoutInset::staticMetaObject, "addElement(QCPLayoutElement*,Qt::Alignment)" },
+        { &QCPLegend::staticMetaObject, "addItem(QCPAbstractLegendItem*)" },
+        { &QCPLegend::staticMetaObject, "removeItem(int)" },
+        { &QCPLegend::staticMetaObject, "clearItems()" },
+    };
+    return list;
+}
+} // namespace
+
+void TestMetaSurface::invokablesAreFound_data()
+{
+    QTest::addColumn<int>("row");
+    for (int i = 0; i < invokables().size(); ++i)
+        QTest::addRow("%s::%s", invokables()[i].scope->className(), invokables()[i].signature) << i;
+}
+
+// E-14: found by signature, as a method of its own class (not a slot, not a signal).
+void TestMetaSurface::invokablesAreFound()
+{
+    QFETCH(int, row);
+    const InvokableRow& r = invokables()[row];
+    const int index = r.scope->indexOfMethod(r.signature);
+    QVERIFY2(index >= 0, r.signature);
+    const QMetaMethod method = r.scope->method(index);
+    QCOMPARE(method.methodType(), QMetaMethod::Method);
+    QCOMPARE(method.access(), QMetaMethod::Public);
 }

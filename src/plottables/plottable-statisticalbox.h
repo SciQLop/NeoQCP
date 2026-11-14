@@ -90,6 +90,7 @@ class QCPStatisticalBoxOps;
 class QCP_LIB_DECL QCPStatisticalBox : public QCPAbstractPlottable1D<QCPStatisticalBoxData>
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPStatisticalBox)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(double width READ width WRITE setWidth NOTIFY widthChanged)
     Q_PROPERTY(

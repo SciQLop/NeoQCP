@@ -19,6 +19,7 @@ struct QCPLaneBand
 class QCP_LIB_DECL QCPLaneLayout : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPLaneLayout)
 public:
     enum Placement { plStrip, plLanes };
     Q_ENUM(Placement)

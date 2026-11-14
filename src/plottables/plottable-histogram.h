@@ -20,6 +20,7 @@ class QCPHistogramOps;
 class QCP_LIB_DECL QCPHistogram : public QCPAbstractPlottable
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPHistogram)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(int bins READ bins WRITE setBins NOTIFY binsChanged)
     Q_PROPERTY(QCP::HistogramNormalization normalization READ normalization WRITE setNormalization

@@ -155,11 +155,10 @@ protected:
                          const QVector<QPointF>& ticksCosSin, const QPen& pen);
 
 private:
-    Q_DISABLE_COPY(QCPPolarGrid)
+    Q_DISABLE_COPY_MOVE(QCPPolarGrid)
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPPolarGrid::GridTypes)
-Q_DECLARE_METATYPE(QCPPolarGrid::GridType)
 
 
 // The handle of QCPPolarGrid: what add<T>() returns for it.

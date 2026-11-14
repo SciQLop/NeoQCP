@@ -223,7 +223,7 @@ protected:
     void markLayoutAppearanceDirty() override;
 
 private:
-    Q_DISABLE_COPY(QCPAxisRect)
+    Q_DISABLE_COPY_MOVE(QCPAxisRect)
 
     // The rect's own scale while it has at least one user, otherwise null.
     QCPColorScale* usedColorScale() const;

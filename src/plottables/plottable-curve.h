@@ -87,6 +87,7 @@ class QCPCurveOps;
 class QCP_LIB_DECL QCPCurve : public QCPAbstractPlottable1D<QCPCurveData, QCPAbstractLine>
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPCurve)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QCPScatterStyle scatterStyle READ scatterStyle WRITE setScatterStyle NOTIFY
                    scatterStyleChanged)

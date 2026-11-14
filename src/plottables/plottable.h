@@ -413,7 +413,7 @@ protected:
     void dropSystem();
 
 private:
-    Q_DISABLE_COPY(QCPAbstractPlottable)
+    Q_DISABLE_COPY_MOVE(QCPAbstractPlottable)
 
     // K8: the bars group reads the projection raw, once per bar; a layer does so per plottable.
     friend class QCPBarsGroup;

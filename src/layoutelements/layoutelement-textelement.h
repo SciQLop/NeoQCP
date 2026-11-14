@@ -136,7 +136,7 @@ protected:
     QColor mainTextColor() const;
 
 private:
-    Q_DISABLE_COPY(QCPTextElement)
+    Q_DISABLE_COPY_MOVE(QCPTextElement)
 };
 
 

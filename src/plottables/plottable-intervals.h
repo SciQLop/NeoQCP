@@ -21,6 +21,7 @@ class QCPIntervalsOps;
 class QCP_LIB_DECL QCPIntervals : public QCPAbstractPlottable, public QCPPlottableInterface1D
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPIntervals)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(StackMode stackMode READ stackMode WRITE setStackMode NOTIFY stackModeChanged)
     Q_PROPERTY(
@@ -70,6 +71,7 @@ public:
     [[nodiscard]] quint64 dependencyRevision() const override;
 
     enum HitPart { hpNone, hpEmpty, hpBody, hpLeftEdge, hpRightEdge };
+    Q_ENUM(HitPart)
 
     struct Hit
     {
@@ -79,10 +81,12 @@ public:
     };
 
     enum EditMode { emMove = 0x01, emResize = 0x02, emChangeLane = 0x04, emCreate = 0x08, emDelete = 0x10 };
+    Q_ENUM(EditMode)
     Q_DECLARE_FLAGS(EditModes, EditMode)
     Q_FLAG(EditModes)
 
     enum SnapMode { snNone, snEdges, snStep, snTimes };
+    Q_ENUM(SnapMode)
     //! stBars: plain coloured bars. stWave: a logic-analyzer look, with angled bus-value ends,
     //! an idle line through each lane and every other lane shaded.
     enum Style { stBars, stWave };

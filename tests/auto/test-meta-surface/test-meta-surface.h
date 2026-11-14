@@ -59,6 +59,13 @@ private slots:
     void everyNotifyPropertyNotifiesOncePerChange();
     void exceptionRulesHold_data();
     void exceptionRulesHold();
+
+    void everyEnumPropertyNamesARegisteredEnum_data();
+    void everyEnumPropertyNamesARegisteredEnum();
+    void publicEnumsAreRegistered_data();
+    void publicEnumsAreRegistered();
+    void invokablesAreFound_data();
+    void invokablesAreFound();
 };
 
 // Runs its action when a signal it is connected to through QMetaMethod fires.

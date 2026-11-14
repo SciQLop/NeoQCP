@@ -33,6 +33,7 @@
 class QCP_LIB_DECL QCPAlignmentGroup : public QObject
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPAlignmentGroup)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QCP::MarginSides sides READ sides CONSTANT)
     /// \endcond

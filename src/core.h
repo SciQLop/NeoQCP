@@ -106,6 +106,7 @@ struct QCPHit
 class QCP_LIB_DECL QCustomPlot : public QRhiWidget
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCustomPlot)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QRect viewport READ viewport WRITE setViewport NOTIFY viewportChanged)
     Q_PROPERTY(QPixmap background READ background WRITE setBackground NOTIFY backgroundChanged)
@@ -334,14 +335,14 @@ public:
     [[nodiscard]] bool isReplotting() const { return mReplotting; }
     // Schedules one queued replot for the next event-loop turn; requests and layer marks coalesce
     // into it. Asked during a replot, it runs in the turn after that replot. GUI thread only.
-    void requestRepaint();
+    Q_INVOKABLE void requestRepaint();
     // False also while a hidden plot owes a change: it is drawn when the plot shows again, and
     // nothing is queued meanwhile (setSkipReplotsWhenHidden).
     [[nodiscard]] bool isRepaintQueued() const { return mReplotQueued; }
     // The export barrier, run first by every export: commits pending data swaps that are ready, so
     // the export shows the newest data. Does not wait for worker-thread pipelines, and does not
     // repaint the screen (that follows next turn).
-    void settle();
+    Q_INVOKABLE void settle();
     // overlay:
     QCPHandle<QCPOverlay> overlay();
     // grid GPU layer:
@@ -381,7 +382,7 @@ public:
     // deferred by another window — but never later than dataSwapMaxWaitMs after
     // the original request, so a continuously panning/auto-scrolling plot still
     // gets its data.
-    void requestDataSwap();
+    Q_INVOKABLE void requestDataSwap();
     void setDataSwapDebounceMs(int ms);
     [[nodiscard]] int dataSwapDebounceMs() const { return mDataSwapDebounceMs; }
     void setDataSwapMaxWaitMs(int ms);
@@ -397,12 +398,12 @@ public:
     [[nodiscard]] QCPHandle<QCPAbstractPlottable> plottable(int index);
     [[nodiscard]] QCPHandle<QCPAbstractPlottable> plottable();
     [[nodiscard]] bool removePlottable(QCPAbstractPlottable* plottable);
-    [[nodiscard]] bool removePlottable(int index);
-    int clearPlottables();
+    Q_INVOKABLE [[nodiscard]] bool removePlottable(int index);
+    Q_INVOKABLE int clearPlottables();
     [[nodiscard]] int plottableCount() const;
     // plottable groups: one legend row for several plottables (QCPPlottableGroup)
     QCPHandle<QCPPlottableGroup> addPlottableGroup(const QString& name);
-    bool removePlottableGroup(QCPPlottableGroup* group);
+    Q_INVOKABLE bool removePlottableGroup(QCPPlottableGroup* group);
     [[nodiscard]] QList<QCPHandle<QCPPlottableGroup>> plottableGroups() const;
     [[nodiscard]] QList<QCPHandle<QCPAbstractPlottable>> selectedPlottables() const;
     template <class PlottableType>
@@ -458,8 +459,8 @@ public:
     QCPGraphOps<QCPGraph, void> addGraph(QCPAxis* keyAxis = nullptr,
                                                    QCPAxis* valueAxis = nullptr);
     [[nodiscard]] bool removeGraph(QCPGraph* graph);
-    [[nodiscard]] bool removeGraph(int index);
-    int clearGraphs();
+    Q_INVOKABLE [[nodiscard]] bool removeGraph(int index);
+    Q_INVOKABLE int clearGraphs();
     [[nodiscard]] int graphCount() const;
     [[nodiscard]] QList<QCPHandle<QCPGraph>> selectedGraphs() const;
 
@@ -467,8 +468,8 @@ public:
     [[nodiscard]] QCPHandle<QCPAbstractItem> item(int index) const;
     [[nodiscard]] QCPHandle<QCPAbstractItem> item() const;
     [[nodiscard]] bool removeItem(QCPAbstractItem* item);
-    [[nodiscard]] bool removeItem(int index);
-    int clearItems();
+    Q_INVOKABLE [[nodiscard]] bool removeItem(int index);
+    Q_INVOKABLE int clearItems();
     [[nodiscard]] int itemCount() const;
     [[nodiscard]] QList<QCPHandle<QCPAbstractItem>> selectedItems() const;
     template <class ItemType>
@@ -484,10 +485,10 @@ public:
     bool setCurrentLayer(const QString& name);
     bool setCurrentLayer(QCPLayer* layer);
     [[nodiscard]] int layerCount() const;
-    [[nodiscard]] bool addLayer(const QString& name, QCPLayer* otherLayer = nullptr,
+    Q_INVOKABLE [[nodiscard]] bool addLayer(const QString& name, QCPLayer* otherLayer = nullptr,
                   LayerInsertMode insertMode = limAbove);
-    [[nodiscard]] bool removeLayer(QCPLayer* layer);
-    [[nodiscard]] bool moveLayer(QCPLayer* layer, QCPLayer* otherLayer, LayerInsertMode insertMode = limAbove);
+    Q_INVOKABLE [[nodiscard]] bool removeLayer(QCPLayer* layer);
+    Q_INVOKABLE [[nodiscard]] bool moveLayer(QCPLayer* layer, QCPLayer* otherLayer, LayerInsertMode insertMode = limAbove);
 
     // axis rect/layout interface:
     [[nodiscard]] int axisRectCount() const;
@@ -505,18 +506,18 @@ public:
     [[nodiscard]] QList<QCPHandle<QCPLegend>> selectedLegends() const;
     Q_SLOT void deselectAll();
 
-    [[nodiscard]] bool savePdf(const QString& fileName, int width = 0, int height = 0,
+    Q_INVOKABLE [[nodiscard]] bool savePdf(const QString& fileName, int width = 0, int height = 0,
                  QCP::ExportPen exportPen = QCP::epAllowCosmetic,
                  const QString& pdfCreator = QString(), const QString& pdfTitle = QString());
-    [[nodiscard]] bool savePng(const QString& fileName, int width = 0, int height = 0, double scale = 1.0,
+    Q_INVOKABLE [[nodiscard]] bool savePng(const QString& fileName, int width = 0, int height = 0, double scale = 1.0,
                  int quality = -1, int resolution = 96,
                  QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
-    [[nodiscard]] bool saveJpg(const QString& fileName, int width = 0, int height = 0, double scale = 1.0,
+    Q_INVOKABLE [[nodiscard]] bool saveJpg(const QString& fileName, int width = 0, int height = 0, double scale = 1.0,
                  int quality = -1, int resolution = 96,
                  QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
-    [[nodiscard]] bool saveBmp(const QString& fileName, int width = 0, int height = 0, double scale = 1.0,
+    Q_INVOKABLE [[nodiscard]] bool saveBmp(const QString& fileName, int width = 0, int height = 0, double scale = 1.0,
                  int resolution = 96, QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
-    [[nodiscard]] bool saveRastered(const QString& fileName, int width, int height, double scale,
+    Q_INVOKABLE [[nodiscard]] bool saveRastered(const QString& fileName, int width, int height, double scale,
                       const char* format, int quality = -1, int resolution = 96,
                       QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
     [[nodiscard]] QPixmap toPixmap(int width = 0, int height = 0, double scale = 1.0);
@@ -848,8 +849,6 @@ protected:
     friend class TestItemIndex;
     friend class TestHitRule;
 };
-Q_DECLARE_METATYPE(QCustomPlot::LayerInsertMode)
-Q_DECLARE_METATYPE(QCustomPlot::RefreshPriority)
 
 /*!
   qcpEmit for a sender that counts the receivers of \a signal itself (connectNotify) and calls

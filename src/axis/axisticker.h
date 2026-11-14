@@ -95,7 +95,6 @@ protected:
 private:
     Q_DISABLE_COPY(QCPAxisTicker)
 };
-Q_DECLARE_METATYPE(QCPAxisTicker::TickStepStrategy)
 Q_DECLARE_METATYPE(QSharedPointer<QCPAxisTicker>)
 
 #endif // QCPAXISTICKER_H

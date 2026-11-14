@@ -128,11 +128,10 @@ protected:
     double getPixelSpacing(const QCPBars* bars, double keyCoord);
 
 private:
-    Q_DISABLE_COPY(QCPBarsGroup)
+    Q_DISABLE_COPY_MOVE(QCPBarsGroup)
 
     friend class QCPBars;
 };
-Q_DECLARE_METATYPE(QCPBarsGroup::SpacingType)
 
 class QCP_LIB_DECL QCPBarsData
 {
@@ -179,6 +178,7 @@ class QCPBarsOps;
 class QCP_LIB_DECL QCPBars : public QCPAbstractPlottable1D<QCPBarsData>
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPBars)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(double width READ width WRITE setWidth NOTIFY widthChanged)
     Q_PROPERTY(WidthType widthType READ widthType WRITE setWidthType NOTIFY widthTypeChanged)
@@ -315,7 +315,6 @@ private:
     friend class QCPLegend;
     friend class QCPBarsGroup;
 };
-Q_DECLARE_METATYPE(QCPBars::WidthType)
 
 // The fluent handle of a bar plottable; see QCPPlottableOps for the subclass contract.
 template <typename T, typename Self>

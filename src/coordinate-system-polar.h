@@ -27,6 +27,7 @@ class QCPPolarAxisRadial;
 class QCP_LIB_DECL QCPPolarSystem : public QCPCoordinateSystem
 {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(QCPPolarSystem)
 
 public:
     QCPTransform transform() const override;

@@ -172,7 +172,7 @@ protected:
     virtual void parentPlotInitialized(QCustomPlot* parentPlot) override;
 
 private:
-    Q_DISABLE_COPY(QCPLayoutElement)
+    Q_DISABLE_COPY_MOVE(QCPLayoutElement)
 
     //! The index of \a side in mAlignmentGroups, or -1 for anything but one of the four sides.
     static int alignmentSlot(QCP::MarginSide side);
@@ -183,7 +183,6 @@ private:
     friend class QCPAlignmentGroup;
     friend class QCPAbstractPlottable; // walks the layout for the legend rows a name change touches
 };
-Q_DECLARE_METATYPE(QCPLayoutElement::UpdatePhase)
 
 class QCP_LIB_DECL QCPLayout : public QCPLayoutElement
 {
@@ -199,14 +198,14 @@ public:
     // introduced virtual methods:
     virtual int elementCount() const = 0;
     virtual QCPHandle<QCPLayoutElement> elementAt(int index) const = 0;
-    virtual QCPLayoutElement* takeAt(int index) = 0;
-    virtual bool take(QCPLayoutElement* element) = 0;
-    virtual void simplify();
+    Q_INVOKABLE virtual QCPLayoutElement* takeAt(int index) = 0;
+    Q_INVOKABLE virtual bool take(QCPLayoutElement* element) = 0;
+    Q_INVOKABLE virtual void simplify();
 
     // non-virtual methods:
-    bool removeAt(int index);
-    bool remove(QCPLayoutElement* element);
-    void clear();
+    Q_INVOKABLE bool removeAt(int index);
+    Q_INVOKABLE bool remove(QCPLayoutElement* element);
+    Q_INVOKABLE void clear();
 
     // introduced virtual methods:
     void markLayoutAppearanceDirty() override;
@@ -231,7 +230,7 @@ protected:
     static QSize getFinalMaximumOuterSize(const QCPLayoutElement* el);
 
 private:
-    Q_DISABLE_COPY(QCPLayout)
+    Q_DISABLE_COPY_MOVE(QCPLayout)
     friend class QCPLayoutElement;
     friend class QCustomPlot; // its own walks read the children raw (K8)
 };
@@ -313,12 +312,12 @@ public:
 
     // non-virtual methods:
     QCPHandle<QCPLayoutElement> element(int row, int column) const;
-    bool addElement(int row, int column, QCPLayoutElement* element);
+    Q_INVOKABLE bool addElement(int row, int column, QCPLayoutElement* element);
     bool addElement(QCPLayoutElement* element);
     bool hasElement(int row, int column);
-    void expandTo(int newRowCount, int newColumnCount);
-    void insertRow(int newIndex);
-    void insertColumn(int newIndex);
+    Q_INVOKABLE void expandTo(int newRowCount, int newColumnCount);
+    Q_INVOKABLE void insertRow(int newIndex);
+    Q_INVOKABLE void insertColumn(int newIndex);
     int rowColToIndex(int row, int column) const;
     void indexToRowCol(int index, int& row, int& column) const;
 
@@ -348,9 +347,8 @@ protected:
 private:
     void stretchFactorsMoved(const QList<double>& columns, const QList<double>& rows);
 
-    Q_DISABLE_COPY(QCPLayoutGrid)
+    Q_DISABLE_COPY_MOVE(QCPLayoutGrid)
 };
-Q_DECLARE_METATYPE(QCPLayoutGrid::FillOrder)
 
 class QCP_LIB_DECL QCPLayoutInset : public QCPLayout
 {
@@ -395,7 +393,7 @@ public:
                               QVariant* details = nullptr) const override;
 
     // non-virtual methods:
-    void addElement(QCPLayoutElement* element, Qt::Alignment alignment);
+    Q_INVOKABLE void addElement(QCPLayoutElement* element, Qt::Alignment alignment);
     void addElement(QCPLayoutElement* element, const QRectF& rect);
 
 protected:
@@ -408,8 +406,7 @@ protected:
     QList<QRectF> mInsetRect;
 
 private:
-    Q_DISABLE_COPY(QCPLayoutInset)
+    Q_DISABLE_COPY_MOVE(QCPLayoutInset)
 };
-Q_DECLARE_METATYPE(QCPLayoutInset::InsetPlacement)
 
 #endif // QCP_LAYOUT_H

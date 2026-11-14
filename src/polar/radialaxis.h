@@ -325,7 +325,7 @@ protected:
     QColor getLabelColor() const;
 
 private:
-    Q_DISABLE_COPY(QCPPolarAxisRadial)
+    Q_DISABLE_COPY_MOVE(QCPPolarAxisRadial)
 
     friend class QCustomPlot;
     friend class QCPPolarArea;
