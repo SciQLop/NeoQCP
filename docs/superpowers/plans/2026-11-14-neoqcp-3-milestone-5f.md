@@ -70,10 +70,11 @@ the limits on one page, replace the backlog by the disposition table.
 - [ ] Regenerate every guide picture locally (`doc-shots <dir>`), look at each changed one, commit them;
   `documentation/images/QCPAlignmentGroup.png` too.
 
-### Task 5: Migration file complete
+### Task 5: Migration file (light)
 
-- [ ] Compile SciQLopPlots main against this branch (probe on the `sciqlopplots` workspace); every distinct break is
-  in `sciqlopplots-migration.md` or is added.
+The goal is a clean NeoQCP API; SciQLopPlots is rebuilt on it later, not ported line by line (maintainer,
+2026-11-14). A one-round compile probe (`.superpowers/m5f/sqp-compile-errors.md`) found three unlisted breaks
+(`QCP::HistogramNormalization`, `mScatterStyle`); add them. No further probing.
 
 ### Task 6: Review and finish
 
