@@ -4,7 +4,7 @@ Items are annotations: text, arrows, shapes, markers, highlighted ranges.
 They are not data, so they never appear in the legend and `rescaleAxes()` ignores them.
 This page shows each item type, how to position items and tie them together, and the NeoQCP additions: spans, the message overlay, and interactive item creation.
 
-Every item derives from <a href="api/classQCPAbstractItem.html">QCPAbstractItem</a>.
+Every item derives from <a href="api/classQCPItem.html">QCPItem</a>.
 Create it with `new` and the plot pointer. The plot owns it.
 Remove it with `customPlot->removeItem(item)`, or all of them with `clearItems()`.
 

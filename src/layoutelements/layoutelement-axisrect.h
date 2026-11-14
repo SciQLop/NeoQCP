@@ -45,9 +45,9 @@ concept FirstArgumentIsNotAnAxis
 class QCPPainter;
 class QCustomPlot;
 class QCPAxis;
-class QCPAbstractPlottable;
+class QCPPlottable;
 class QCPGraph;
-class QCPAbstractItem;
+class QCPItem;
 class QCPColorScale;
 
 template <typename T, typename Self = void>
@@ -118,12 +118,12 @@ public:
     // in the system of its bottom and left axes, or of \a key and \a value; args go to the handle's
     // setData. Defined in construct.h, where the construction rules live.
     template <typename T, typename... Args>
-        requires std::derived_from<T, QCPAbstractPlottable>
+        requires std::derived_from<T, QCPPlottable>
               && qcp::FirstArgumentIsNotAnAxis<Args...>
     qcp::HandleFor<T> add(Args&&... args);
 
     template <typename T, typename... Args>
-        requires std::derived_from<T, QCPAbstractPlottable>
+        requires std::derived_from<T, QCPPlottable>
     qcp::HandleFor<T> add(QCPAxis* key, QCPAxis* value, Args&&... args);
 
     QCPHandle<QCPAxis> addAxis(QCPAxis::AxisType type, QCPAxis* axis = nullptr);
@@ -137,9 +137,9 @@ public:
     // Scales the range zoom axes by factor (< 1 zooms in) around the pixel pos.
     void zoomAt(const QPointF& pos, double factor);
     void setupFullAxesBox(bool connectRanges = false);
-    QList<QCPHandle<QCPAbstractPlottable>> plottables() const;
+    QList<QCPHandle<QCPPlottable>> plottables() const;
     QList<QCPHandle<QCPGraph>> graphs() const;
-    QList<QCPHandle<QCPAbstractItem>> items() const;
+    QList<QCPHandle<QCPItem>> items() const;
     //! The colour scale this rect owns and places in its margin, made on first call. It is visible
     //! exactly while a plottable colours through it. A plottable given its own scale, or none,
     //! with setColorScale() never joins it.
@@ -253,7 +253,7 @@ private:
 
     friend class QCPAxis; // rangeDidChange() -> markAffectedLayersDirty(), ~QCPAxis -> unlistAxis()
     friend class QCPColorScale; // it reports user and size changes that move this rect's margin
-    friend class QCPAbstractColorMapped; // it seeds the scale it causes this rect to make
+    friend class QCPColorMapped; // it seeds the scale it causes this rect to make
 
     friend class QCustomPlot;
     friend class TestPaintBuffer;

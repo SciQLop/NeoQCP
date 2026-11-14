@@ -87,7 +87,7 @@ using QCPStatisticalBoxDataContainer = QCPDataContainer<QCPStatisticalBoxData>;
 template <typename T, typename Self = void>
 class QCPStatisticalBoxOps;
 
-class QCP_LIB_DECL QCPStatisticalBox : public QCPAbstractPlottable1D<QCPStatisticalBoxData>
+class QCP_LIB_DECL QCPStatisticalBox : public QCPPlottable1D<QCPStatisticalBoxData>
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPStatisticalBox)

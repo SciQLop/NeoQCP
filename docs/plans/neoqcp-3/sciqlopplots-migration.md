@@ -528,3 +528,4 @@ that no section above lists, and the behaviour changes of 5f.
 - `QCPAbstractColorMapped::showsColorScale()` is private, and the protected `mFollowsRectScale` and
   `mJoiningKeyAxisRectScale` are gone. `QCPPlottableLegendItem::getIconBorderPen()` is gone: use
   `legendIconBorderPen()`. `QCustomPlot`'s ancestor watch (`isAligned`, `watchAncestors`, ...) is private.
+- Base classes drop "Abstract" (QCPAbstractPlottable -> QCPPlottable, QCPAbstractItem -> QCPItem, QCPAbstractLegendItem -> QCPLegendItem, QCPAbstractLine -> QCPLine, QCPAbstractColorMapped -> QCPColorMapped, QCPAbstractSpanItem -> QCPSpanItem, QCPAbstract{,2D,Multi}DataSource -> QCP{,2D,Multi}DataSource, QCPAbstractPlottable1D -> QCPPlottable1D): rename every use in SciQLopPlots.

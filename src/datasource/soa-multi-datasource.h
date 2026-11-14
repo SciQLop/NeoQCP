@@ -6,7 +6,7 @@
 #include <vector>
 
 template <IndexableNumericRange KeyContainer, IndexableNumericRange ValueContainer>
-class QCPSoAMultiDataSource final : public QCPAbstractMultiDataSource {
+class QCPSoAMultiDataSource final : public QCPMultiDataSource {
 public:
     using K = std::ranges::range_value_t<KeyContainer>;
     using V = std::ranges::range_value_t<ValueContainer>;

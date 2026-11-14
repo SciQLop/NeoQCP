@@ -154,7 +154,7 @@ void QCPItemCreationState::commitItem()
     mPlot->replot(QCustomPlot::rpQueuedReplot);
     if (item)
         qcpEmitIf(this, mPlot, &QCPItemCreationState::itemCreated,
-                  [alive = QPointer<QCPAbstractItem>(item)] { return !alive.isNull(); }, item);
+                  [alive = QPointer<QCPItem>(item)] { return !alive.isNull(); }, item);
 }
 
 void QCPItemCreationState::cancelItem()
@@ -180,7 +180,7 @@ void QCPItemCreationState::updateItemPosition(const QPointF& pixelPos)
     applyPositioner(data.x, data.y);
 }
 
-void QCPItemCreationState::rebindPositions(QCPAbstractItem* item, QCPAxis* keyAxis,
+void QCPItemCreationState::rebindPositions(QCPItem* item, QCPAxis* keyAxis,
                                             QCPAxis* valueAxis, QCPAxisRect* axisRect)
 {
     const auto positions = item->positions();

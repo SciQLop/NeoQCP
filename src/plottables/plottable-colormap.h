@@ -112,7 +112,7 @@ protected:
 template <typename T, typename Self = void>
 class QCPColorMapOps;
 
-class QCP_LIB_DECL QCPColorMap : public QCPAbstractColorMapped
+class QCP_LIB_DECL QCPColorMap : public QCPColorMapped
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPColorMap)

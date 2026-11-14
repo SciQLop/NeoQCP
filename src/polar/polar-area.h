@@ -33,7 +33,7 @@
 #include <QPointer>
 
 class QCustomPlot;
-class QCPAbstractPlottable;
+class QCPPlottable;
 class QCPPolarAxisAngular;
 class QCPPolarAxisRadial;
 class QCPPolarGrid;
@@ -102,14 +102,14 @@ public:
       system provides none.
     */
     template <class T, typename... Args>
-        requires std::derived_from<T, QCPAbstractPlottable>
+        requires std::derived_from<T, QCPPlottable>
     qcp::HandleFor<T> add(Args&&... args);
 
     /*! The handle form of readding an object that was taken out of another area: it joins this
       area's system. Mirrors QCustomPlot::add(std::unique_ptr<T>).
     */
     template <class T>
-        requires std::derived_from<T, QCPAbstractPlottable>
+        requires std::derived_from<T, QCPPlottable>
     qcp::HandleFor<T> add(std::unique_ptr<T> plottable);
 
     // reimplemented virtual methods:
@@ -193,7 +193,7 @@ public:
     // The handle form of a plottable constructor: the plottable belongs to this area and draws
     // through its system. args go to the handle's setData, as the area's own add.
     template <class Graph, typename... Args>
-        requires std::derived_from<Graph, QCPAbstractPlottable>
+        requires std::derived_from<Graph, QCPPlottable>
     qcp::HandleFor<Graph> add(Args&&... args)
     {
         auto* area = this->get();
@@ -203,7 +203,7 @@ public:
 
     // The handle form of readding an object taken out of another area, as the area's own add.
     template <class Graph>
-        requires std::derived_from<Graph, QCPAbstractPlottable>
+        requires std::derived_from<Graph, QCPPlottable>
     qcp::HandleFor<Graph> add(std::unique_ptr<Graph> plottable)
     {
         auto* area = this->get();

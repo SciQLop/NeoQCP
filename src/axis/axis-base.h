@@ -36,7 +36,7 @@
 #include <functional>
 #include <memory>
 
-class QCPAbstractPlottable;
+class QCPPlottable;
 class QCPArea;
 class QCPAxisBase;
 struct QCPAxisLink;
@@ -171,7 +171,7 @@ public:
     // ranges it always used, and the angular axis keeps its full turn.
     Q_INVOKABLE virtual void rescale(bool onlyVisiblePlottables = false);
     //! The plottables of every system that maps through this axis, in the plot's own order.
-    virtual QList<QCPHandle<QCPAbstractPlottable>> plottables() const;
+    virtual QList<QCPHandle<QCPPlottable>> plottables() const;
 
     // A link makes this axis follow source: its range is forward(source's range), and a range set
     // here is written back through the inverse. Only cartesian axes may take part.
@@ -264,7 +264,7 @@ protected:
     void detachLinks();
 
     // The plottables raw: rescale() walks them per axis, so it reads this one (K8).
-    QList<QCPAbstractPlottable*> plottablesRaw() const;
+    QList<QCPPlottable*> plottablesRaw() const;
 
     // The tail of rescale(): stores \a range, or, when it is not usable (a constant plottable has a
     // zero-size range), recentres the current range on it. Shared with subclasses that rescale.

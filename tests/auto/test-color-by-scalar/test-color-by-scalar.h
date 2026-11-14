@@ -4,7 +4,7 @@
 #include <vector>
 
 class QCustomPlot;
-class QCPAbstractMultiDataSource;
+class QCPMultiDataSource;
 
 class TestColorByScalar : public QObject
 {
@@ -85,6 +85,6 @@ private slots:
 
 private:
     QCustomPlot* mPlot = nullptr;
-    static std::shared_ptr<QCPAbstractMultiDataSource> makeSource(
+    static std::shared_ptr<QCPMultiDataSource> makeSource(
         std::vector<double> keys, std::vector<std::vector<double>> columns);
 };

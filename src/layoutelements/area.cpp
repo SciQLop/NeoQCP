@@ -71,7 +71,7 @@ void QCPArea::detachFromSystem(QCPCoordinateSystem* system)
 {
     // Dropping a system tells the plottable so, and a hook may delete another plottable of the same
     // system: the pass walks a guarded snapshot and skips the ones a hook took.
-    for (const QPointer<QCPAbstractPlottable>& plottable : qcp::guarded(system->plottablesRaw()))
+    for (const QPointer<QCPPlottable>& plottable : qcp::guarded(system->plottablesRaw()))
         if (plottable)
             plottable->dropSystem();
 }

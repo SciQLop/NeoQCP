@@ -92,7 +92,7 @@ When both edges are columns of one graph, use `setComponentFillBetween()` instea
 The `QVector<double>` form copies your points into the graph.
 `QCPGraph` can also read keys and values from arrays of any arithmetic type: `double`, `float`, `int16_t`, `int64_t`...
 Keys and values can have different types. Values are converted to `double` one at a time, when they are drawn.
-The data goes through a data source, <a href="api/classQCPAbstractMultiDataSource.html">QCPAbstractMultiDataSource</a>: one key column and any number of value columns.
+The data goes through a data source, <a href="api/classQCPMultiDataSource.html">QCPMultiDataSource</a>: one key column and any number of value columns.
 Keys must be sorted in increasing order. The graph sorts them for you only when you pass `double` keys and `double` columns to `setData()`.
 
 ### Give it the data

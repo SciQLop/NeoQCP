@@ -50,10 +50,10 @@ void countAxisMessages(QtMsgType type, const QMessageLogContext& context, const 
 }
 
 //! A drawn item: one polygon and, when asked, a text or a painter() escape hatch.
-class TestShape : public QCPAbstractItem
+class TestShape : public QCPItem
 {
 public:
-    explicit TestShape(QCustomPlot* plot) : QCPAbstractItem(plot)
+    explicit TestShape(QCustomPlot* plot) : QCPItem(plot)
     {
         mAnchor = createPosition(QStringLiteral("anchor"));
         mAnchor->setCoords(3, 3);
@@ -90,7 +90,7 @@ public:
     void markDirty() override
     {
         ++dirtyCalls;
-        QCPAbstractItem::markDirty();
+        QCPItem::markDirty();
     }
 
     void draw(QCPDrawContext& context) const override
@@ -322,15 +322,15 @@ public:
 };
 
 //! A drawn plottable: one data-space line, so the default icon has something to fit.
-class TestLine : public QCPAbstractPlottable
+class TestLine : public QCPPlottable
 {
 public:
     TestLine(QCPAxis* keyAxis, QCPAxis* valueAxis)
-            : QCPAbstractPlottable(keyAxis, valueAxis)
+            : QCPPlottable(keyAxis, valueAxis)
     {
     }
 
-    using QCPAbstractPlottable::drawLegendIcon; // the painter overload stays reachable
+    using QCPPlottable::drawLegendIcon; // the painter overload stays reachable
 
     void draw(QCPDrawContext& context) const override
     {
@@ -381,15 +381,15 @@ public:
 };
 
 //! A drawn plottable whose legend icon calls a setter: a misuse, like contentChanged() in draw().
-class TestIconSetter : public QCPAbstractPlottable
+class TestIconSetter : public QCPPlottable
 {
 public:
     TestIconSetter(QCPAxis* keyAxis, QCPAxis* valueAxis)
-            : QCPAbstractPlottable(keyAxis, valueAxis)
+            : QCPPlottable(keyAxis, valueAxis)
     {
     }
 
-    using QCPAbstractPlottable::drawLegendIcon; // the painter overload stays reachable
+    using QCPPlottable::drawLegendIcon; // the painter overload stays reachable
 
     void draw(QCPDrawContext& context) const override
     {
@@ -415,11 +415,11 @@ public:
 };
 
 //! A plottable with nothing but a recording: the base answers every old virtual from it.
-class BareLine : public QCPAbstractPlottable1D<QCPGraphData>
+class BareLine : public QCPPlottable1D<QCPGraphData>
 {
 public:
     BareLine(QCPAxis* keyAxis, QCPAxis* valueAxis)
-            : QCPAbstractPlottable1D<QCPGraphData>(keyAxis, valueAxis)
+            : QCPPlottable1D<QCPGraphData>(keyAxis, valueAxis)
     {
     }
 
@@ -443,10 +443,10 @@ public:
 };
 
 //! An item with nothing but a recording: the base owns the recording the same way.
-class BareShape : public QCPAbstractItem
+class BareShape : public QCPItem
 {
 public:
-    explicit BareShape(QCustomPlot* plot) : QCPAbstractItem(plot)
+    explicit BareShape(QCustomPlot* plot) : QCPItem(plot)
     {
         mAnchor = createPosition(QStringLiteral("anchor"));
         mAnchor->setCoords(5, 5);
@@ -1514,7 +1514,7 @@ void TestDrawable::twoRectsOneLayerDrawInTheirOwnFrames()
     QCPItemLine* b = lineOn(second);
     plot.replot();
 
-    const std::pair<QCPAbstractItem*, QCPAxisRect*> ends[] = { { a, first }, { b, second } };
+    const std::pair<QCPItem*, QCPAxisRect*> ends[] = { { a, first }, { b, second } };
     for (const auto& [line, rect] : ends)
     {
         const QCP::Pixels end { rect->axis(QCPAxis::atBottom)->coordToPixel(9),
@@ -1680,7 +1680,7 @@ void TestDrawable::setCoordsMovesTheItem()
     QCOMPARE(before->keyLower, 3.0);
     QCOMPARE(before->valueLower, 3.0);
 
-    shape->mAnchor->setCoords(5, 6); // an old-base setter, through QCPAbstractItem::markDirty
+    shape->mAnchor->setCoords(5, 6); // an old-base setter, through QCPItem::markDirty
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 2);
     const std::optional<QCPDataBox> after = shape->drawnDataRange();
@@ -1696,7 +1696,7 @@ void TestDrawable::selectionChangeReRecords()
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
 
-    shape->setSelected(true); // QCPAbstractItem::setSelected marks the layer, not the recording
+    shape->setSelected(true); // QCPItem::setSelected marks the layer, not the recording
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 2);
 }
@@ -1967,7 +1967,7 @@ void TestDrawable::rangeBandExampleDraws()
 
 void TestDrawable::adapterExposesThePublicSelectAndRanges()
 {
-    // I6: QCPAbstractPlottable declares selectTest, getKeyRange and getValueRange public. The
+    // I6: QCPPlottable declares selectTest, getKeyRange and getValueRange public. The
     // adapter's overrides may not narrow that: a user's `bars->selectTest(...)` and
     // `band->getKeyRange(...)` must keep compiling.
     Fixture f;
@@ -2363,10 +2363,10 @@ void TestDrawable::aStyleSetterReRecords()
 }
 
 //! A plottable that forgets its recording: it must not compile into something that draws nothing.
-class NoRecordingStub : public QCPAbstractPlottable
+class NoRecordingStub : public QCPPlottable
 {
 public:
-    using QCPAbstractPlottable::QCPAbstractPlottable;
+    using QCPPlottable::QCPPlottable;
 };
 
 void TestDrawable::aPlottableWithoutARecordingIsAbstract()
@@ -2375,10 +2375,10 @@ void TestDrawable::aPlottableWithoutARecordingIsAbstract()
 }
 
 //! The same for an item: forgetting the recording must not compile into an item that draws nothing.
-class NoRecordingItem : public QCPAbstractItem
+class NoRecordingItem : public QCPItem
 {
 public:
-    using QCPAbstractItem::QCPAbstractItem;
+    using QCPItem::QCPItem;
 };
 
 void TestDrawable::anItemWithoutARecordingIsAbstract()

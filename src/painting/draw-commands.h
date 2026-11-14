@@ -395,7 +395,7 @@ inline quint64 qcpNextDrawListId()
   live at an anchor - a text at a data position is data, but its box never shrinks the index.
 
   A log axis makes a non-positive lower bound unmappable, exactly as it does for an item's extent
-  (QCPAbstractItem::positionsExtent drops that side). QCPDrawnCore::dataRange applies that rule when
+  (QCPItem::positionsExtent drops that side). QCPDrawnCore::dataRange applies that rule when
   the box describes an item; a plottable's range is data, so its getters ask for the bounds without
   the rule and let the sign domain decide.
 */

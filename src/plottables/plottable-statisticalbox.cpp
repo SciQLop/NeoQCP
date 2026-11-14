@@ -201,7 +201,7 @@ QCPStatisticalBoxData::QCPStatisticalBoxData(double key, double minimum, double 
   \section qcpstatisticalbox-usage Usage
 
   Like all data representing objects in QCustomPlot, the QCPStatisticalBox is a plottable
-  (QCPAbstractPlottable). So the plottable-interface of QCustomPlot applies
+  (QCPPlottable). So the plottable-interface of QCustomPlot applies
   (QCustomPlot::plottable, QCustomPlot::removePlottable, etc.)
 
   Usually, you first create an instance:
@@ -276,7 +276,7 @@ QCPStatisticalBoxData::QCPStatisticalBoxData(double key, double minimum, double 
   delete it manually but use QCustomPlot::removePlottable() instead.
 */
 QCPStatisticalBox::QCPStatisticalBox(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractPlottable1D<QCPStatisticalBoxData>(keyAxis, valueAxis)
+        : QCPPlottable1D<QCPStatisticalBoxData>(keyAxis, valueAxis)
         , mWidth(0.5)
         , mWhiskerWidth(0.2)
         , mWhiskerPen(Qt::black, 0, Qt::DashLine, Qt::FlatCap)
@@ -540,7 +540,7 @@ QCPDataSelection QCPStatisticalBox::selectTestRect(const QRectF& rect, bool only
   If \a details is not 0, it will be set to a \ref QCPDataSelection, describing the closest data
   point to \a pos.
 
-  \seebaseclassmethod \ref QCPAbstractPlottable::selectTest
+  \seebaseclassmethod \ref QCPPlottable::selectTest
 */
 double QCPStatisticalBox::selectTest(const QPointF& pos, bool onlySelectable,
                                      [[maybe_unused]] QVariant* details) const

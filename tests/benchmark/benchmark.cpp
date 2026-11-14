@@ -594,9 +594,9 @@ namespace
 {
 // A shuffled order, so neither "delete the newest first" nor "delete the oldest first" can hide in
 // an index pattern. Seeded, so two runs measure the same sequence.
-QVector<QCPAbstractItem*> itemsInOrder(QCustomPlot* plot)
+QVector<QCPItem*> itemsInOrder(QCustomPlot* plot)
 {
-    QVector<QCPAbstractItem*> items;
+    QVector<QCPItem*> items;
     items.reserve(plot->itemCount());
     for (int i = 0; i < plot->itemCount(); ++i)
         items.append(plot->item(i));
@@ -634,7 +634,7 @@ void Benchmark::QCPItems_DeleteEach10k()
 {
     // The user path: `delete item`, or a handle's remove(), in a shuffled order.
     addLineItems(mPlot, 10000, 100);
-    QVector<QCPAbstractItem*> items = itemsInOrder(mPlot);
+    QVector<QCPItem*> items = itemsInOrder(mPlot);
     const QVector<int> order = shuffledIndices(items.size());
     QBENCHMARK_ONCE
     {
@@ -647,7 +647,7 @@ void Benchmark::QCPItems_RemoveEach10k()
 {
     // The same shuffled order through the plot API, which looks the item up before deleting it.
     addLineItems(mPlot, 10000, 100);
-    QVector<QCPAbstractItem*> items = itemsInOrder(mPlot);
+    QVector<QCPItem*> items = itemsInOrder(mPlot);
     const QVector<int> order = shuffledIndices(items.size());
     QBENCHMARK_ONCE
     {
@@ -2485,10 +2485,10 @@ void Benchmark::QCPDrawContext_ReplayMarkers100k()
 namespace
 {
 //! A drawn item the benchmarks own: one bar, recorded through the new contract only.
-class BenchDrawnBar : public QCPAbstractItem
+class BenchDrawnBar : public QCPItem
 {
 public:
-    BenchDrawnBar(QCustomPlot* plot, double key, double width) : QCPAbstractItem(plot)
+    BenchDrawnBar(QCustomPlot* plot, double key, double width) : QCPItem(plot)
     {
         mAnchor = createPosition(QStringLiteral("anchor")); // the axes the replay maps through
         mAnchor->setCoords(key, 0);
@@ -2516,10 +2516,10 @@ void addDrawnBars(QCustomPlot* plot, int count, double xMax)
 }
 
 //! The same bars, but all of them recorded by ONE object: one recording, \a count commands.
-class BenchDrawnBarSet : public QCPAbstractItem
+class BenchDrawnBarSet : public QCPItem
 {
 public:
-    BenchDrawnBarSet(QCustomPlot* plot, int count, double xMax) : QCPAbstractItem(plot)
+    BenchDrawnBarSet(QCustomPlot* plot, int count, double xMax) : QCPItem(plot)
     {
         auto* anchor = createPosition(QStringLiteral("anchor"));
         anchor->setCoords(xMax / 2, 0);

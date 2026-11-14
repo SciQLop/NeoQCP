@@ -4,27 +4,27 @@
 #include "../misuse.h"
 #include <algorithm>
 
-/*! \fn void QCPAbstractLine::lineStyleChanged(QCPAbstractLine::LineStyle lineStyle)
+/*! \fn void QCPLine::lineStyleChanged(QCPLine::LineStyle lineStyle)
 
   This signal is emitted when \ref setLineStyle changes \ref lineStyle, after the plot delivers its
   deferred signals. A call that only restyles components that drifted emits nothing.
 */
 
-/*! \fn void QCPAbstractLine::scatterStyleChanged(const QCPScatterStyle& scatterStyle)
+/*! \fn void QCPLine::scatterStyleChanged(const QCPScatterStyle& scatterStyle)
 
   This signal is emitted when \ref scatterStyle changes, by \ref setScatterStyle or by \ref
   setComponentScatterStyle on component 0, after the plot delivers its deferred signals.
 */
 
-/*! \fn void QCPAbstractLine::scatterSkipChanged(int scatterSkip)
+/*! \fn void QCPLine::scatterSkipChanged(int scatterSkip)
 
   This signal is emitted when \ref scatterSkip changes, after the plot delivers its deferred
   signals.
 */
 
-QCPAbstractLine::QCPAbstractLine(QCPAxis* keyAxis, QCPAxis* valueAxis,
+QCPLine::QCPLine(QCPAxis* keyAxis, QCPAxis* valueAxis,
                                  QCP::Capabilities required)
-    : QCPAbstractColorMapped(keyAxis, valueAxis, false, required)
+    : QCPColorMapped(keyAxis, valueAxis, false, required)
 {
     // A coloured line on a fresh rect keeps what the mapper had: gpJet over 0..1. Written through
     // the members, not the setters: the subclasses are not constructed yet.
@@ -32,16 +32,16 @@ QCPAbstractLine::QCPAbstractLine(QCPAxis* keyAxis, QCPAxis* valueAxis,
     mDataRange = QCPRange(0, 1);
 }
 
-QCPAbstractLine::~QCPAbstractLine() = default;
+QCPLine::~QCPLine() = default;
 
-QCPScatterStyle QCPAbstractLine::markerStyle(QCPScatterStyle style, const QPen& pen)
+QCPScatterStyle QCPLine::markerStyle(QCPScatterStyle style, const QPen& pen)
 {
     if (!style.isPenDefined())
         style.setPen(pen);
     return style;
 }
 
-QPen QCPAbstractLine::defaultSelectedPen(const QPen& pen)
+QPen QCPLine::defaultSelectedPen(const QPen& pen)
 {
     QPen sel = pen;
     sel.setWidthF(pen.widthF() + 1.5);
@@ -53,7 +53,7 @@ QPen QCPAbstractLine::defaultSelectedPen(const QPen& pen)
 
 // --- Component API ---
 
-void QCPAbstractLine::setComponentNames(const QStringList& names)
+void QCPLine::setComponentNames(const QStringList& names)
 {
     int n = qMin(names.size(), mComponents.size());
     if (std::equal(names.cbegin(), names.cbegin() + n, mComponents.cbegin(),
@@ -64,7 +64,7 @@ void QCPAbstractLine::setComponentNames(const QStringList& names)
         mComponents[i].name = names[i];
 }
 
-void QCPAbstractLine::setComponentColors(const QList<QColor>& colors)
+void QCPLine::setComponentColors(const QList<QColor>& colors)
 {
     int n = qMin(colors.size(), mComponents.size());
     if (std::equal(colors.cbegin(), colors.cbegin() + n, mComponents.cbegin(),
@@ -77,14 +77,14 @@ void QCPAbstractLine::setComponentColors(const QList<QColor>& colors)
     }
 }
 
-QCPScatterStyle QCPAbstractLine::scatterStyle() const
+QCPScatterStyle QCPLine::scatterStyle() const
 {
     if (!mComponents.isEmpty())
         return mComponents.first().scatterStyle;
     return mExplicitScatterStyle.value_or(QCPScatterStyle());
 }
 
-void QCPAbstractLine::setComponentPens(const QList<QPen>& pens)
+void QCPLine::setComponentPens(const QList<QPen>& pens)
 {
     int n = qMin(pens.size(), mComponents.size());
     if (std::equal(pens.cbegin(), pens.cbegin() + n, mComponents.cbegin(),
@@ -99,7 +99,7 @@ void QCPAbstractLine::setComponentPens(const QList<QPen>& pens)
 
 // The early return compares every component, not mPen alone: the components can have been given
 // another pen since the last call (setComponentPens, setComponentColors, component(i).pen).
-void QCPAbstractLine::setPen(const QPen& pen)
+void QCPLine::setPen(const QPen& pen)
 {
     // An equal pen everywhere draws nothing new (2.x's setPen did not repaint either).
     const QPen selected = defaultSelectedPen(pen);
@@ -117,13 +117,13 @@ void QCPAbstractLine::setPen(const QPen& pen)
     }
     lineChanged();
     if (penMoved)
-        qcpEmit(static_cast<QCPAbstractPlottable*>(this), mParentPlot,
-                &QCPAbstractPlottable::penChanged, mPen);
+        qcpEmit(static_cast<QCPPlottable*>(this), mParentPlot,
+                &QCPPlottable::penChanged, mPen);
 }
 
 // Same for the brush: setComponentFill()/clearComponentFill() can have replaced a component's
 // fill since the last call.
-void QCPAbstractLine::setBrush(const QBrush& brush)
+void QCPLine::setBrush(const QBrush& brush)
 {
     // brush() is mBrush: re-filling components that drifted repaints without a brushChanged.
     const bool brushMoved = mBrush != brush;
@@ -133,11 +133,11 @@ void QCPAbstractLine::setBrush(const QBrush& brush)
         applyBrushToComponent(i, brush);
     lineChanged();
     if (brushMoved)
-        qcpEmit(static_cast<QCPAbstractPlottable*>(this), mParentPlot,
-                &QCPAbstractPlottable::brushChanged, mBrush);
+        qcpEmit(static_cast<QCPPlottable*>(this), mParentPlot,
+                &QCPPlottable::brushChanged, mBrush);
 }
 
-void QCPAbstractLine::applyRememberedStyle(int index)
+void QCPLine::applyRememberedStyle(int index)
 {
     if (index < 0 || index >= mComponents.size())
         return;
@@ -152,7 +152,7 @@ void QCPAbstractLine::applyRememberedStyle(int index)
         applyBrushToComponent(index, *mExplicitBrush);
 }
 
-void QCPAbstractLine::setComponentInLegend(int index, bool inLegend)
+void QCPLine::setComponentInLegend(int index, bool inLegend)
 {
     if (index < 0 || index >= mComponents.size())
         return;
@@ -164,11 +164,11 @@ void QCPAbstractLine::setComponentInLegend(int index, bool inLegend)
     if (mComponents[index].inLegend != inLegend)
     {
         mComponents[index].inLegend = inLegend;
-        qcpEmit(this, mParentPlot, &QCPAbstractLine::componentVisibilityChanged);
+        qcpEmit(this, mParentPlot, &QCPLine::componentVisibilityChanged);
     }
 }
 
-QVector<int> QCPAbstractLine::legendComponents() const
+QVector<int> QCPLine::legendComponents() const
 {
     QVector<int> shown;
     for (int i = 0; i < mComponents.size(); ++i)
@@ -177,16 +177,16 @@ QVector<int> QCPAbstractLine::legendComponents() const
     return shown;
 }
 
-void QCPAbstractLine::setComponentVisible(int index, bool visible)
+void QCPLine::setComponentVisible(int index, bool visible)
 {
     if (index < 0 || index >= mComponents.size() || mComponents[index].visible == visible)
         return;
     mComponents[index].visible = visible;
     componentVisibilityToggled();
-    qcpEmit(this, mParentPlot, &QCPAbstractLine::componentVisibilityChanged);
+    qcpEmit(this, mParentPlot, &QCPLine::componentVisibilityChanged);
 }
 
-void QCPAbstractLine::setLineStyle(LineStyle style)
+void QCPLine::setLineStyle(LineStyle style)
 {
     if (!acceptsLineStyle(style))
         return;
@@ -201,10 +201,10 @@ void QCPAbstractLine::setLineStyle(LineStyle style)
         c.lineStyle = style;
     lineChanged();
     if (moved)
-        qcpEmit(this, mParentPlot, &QCPAbstractLine::lineStyleChanged, mLineStyle);
+        qcpEmit(this, mParentPlot, &QCPLine::lineStyleChanged, mLineStyle);
 }
 
-void QCPAbstractLine::setComponentLineStyle(int index, LineStyle style)
+void QCPLine::setComponentLineStyle(int index, LineStyle style)
 {
     if (!acceptsLineStyle(style))
         return;
@@ -214,7 +214,7 @@ void QCPAbstractLine::setComponentLineStyle(int index, LineStyle style)
     lineChanged();
 }
 
-void QCPAbstractLine::setScatterStyle(const QCPScatterStyle& style)
+void QCPLine::setScatterStyle(const QCPScatterStyle& style)
 {
     const QCPScatterStyle before = scatterStyle();
     mExplicitScatterStyle = style;
@@ -224,7 +224,7 @@ void QCPAbstractLine::setScatterStyle(const QCPScatterStyle& style)
     scatterStyleMoved(before);
 }
 
-void QCPAbstractLine::setComponentScatterStyle(int index, const QCPScatterStyle& style)
+void QCPLine::setComponentScatterStyle(int index, const QCPScatterStyle& style)
 {
     if (index < 0 || index >= mComponents.size())
         return;
@@ -234,25 +234,25 @@ void QCPAbstractLine::setComponentScatterStyle(int index, const QCPScatterStyle&
     scatterStyleMoved(before); // scatterStyle() is component 0's
 }
 
-void QCPAbstractLine::scatterStyleMoved(const QCPScatterStyle& before)
+void QCPLine::scatterStyleMoved(const QCPScatterStyle& before)
 {
     if (scatterStyle() != before)
-        qcpEmit(this, mParentPlot, &QCPAbstractLine::scatterStyleChanged, scatterStyle());
+        qcpEmit(this, mParentPlot, &QCPLine::scatterStyleChanged, scatterStyle());
 }
 
-void QCPAbstractLine::setScatterSkip(int skip)
+void QCPLine::setScatterSkip(int skip)
 {
     skip = qMax(0, skip);
     if (skip == mScatterSkip)
         return;
     mScatterSkip = skip;
     lineChanged();
-    qcpEmit(this, mParentPlot, &QCPAbstractLine::scatterSkipChanged, mScatterSkip);
+    qcpEmit(this, mParentPlot, &QCPLine::scatterSkipChanged, mScatterSkip);
 }
 
 // --- Colour by scalar ---
 
-void QCPAbstractLine::setColorValues(std::shared_ptr<const std::vector<double>> values)
+void QCPLine::setColorValues(std::shared_ptr<const std::vector<double>> values)
 {
     // Joining or leaving a scale signals colorScaleChanged: deliver it once this line is done,
     // so a slot may delete it.
@@ -286,7 +286,7 @@ void QCPAbstractLine::setColorValues(std::shared_ptr<const std::vector<double>> 
         startColouring();
 }
 
-void QCPAbstractLine::startColouring()
+void QCPLine::startColouring()
 {
     // A line is a user of a scale only while it is coloured: joining on the first colouring
     // keeps a plain line from showing the rect's colour bar.
@@ -296,12 +296,12 @@ void QCPAbstractLine::startColouring()
     colorValuesStarted();
 }
 
-void QCPAbstractLine::setColorValues(std::vector<double> values)
+void QCPLine::setColorValues(std::vector<double> values)
 {
     setColorValues(std::make_shared<const std::vector<double>>(std::move(values)));
 }
 
-void QCPAbstractLine::clearColorValues()
+void QCPLine::clearColorValues()
 {
     const QCPEmissionScope scope(mParentPlot);
     // Every "uncolour" route (wrong length, an empty vector, or an explicit call) must
@@ -317,9 +317,9 @@ void QCPAbstractLine::clearColorValues()
         lineChanged();
 }
 
-bool QCPAbstractLine::hasColorValues() const { return mColor.hasValues(); }
+bool QCPLine::hasColorValues() const { return mColor.hasValues(); }
 
-QCPRange QCPAbstractLine::colorDataBounds(bool& found) const
+QCPRange QCPLine::colorDataBounds(bool& found) const
 {
     found = false;
     if (!mColor.values())
@@ -339,7 +339,7 @@ QCPRange QCPAbstractLine::colorDataBounds(bool& found) const
     return bounds;
 }
 
-void QCPAbstractLine::colorMappingChanged()
+void QCPLine::colorMappingChanged()
 {
     mColor.setGradient(gradient());
     mColor.setRange(dataRange());

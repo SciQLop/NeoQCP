@@ -121,7 +121,7 @@ void TestMultiGraph::setDataSourceShared()
 void TestMultiGraph::setDataSourceUnique()
 {
     auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
-    std::unique_ptr<QCPAbstractMultiDataSource> src =
+    std::unique_ptr<QCPMultiDataSource> src =
         std::make_unique<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
             std::vector<double>{1.0, 2.0},
             std::vector<std::vector<double>>{{10.0, 20.0}});
@@ -1169,7 +1169,7 @@ void TestMultiGraph::anExplicitComponentNameWins()
 
 // Width the collapsed row needs left of its text, mirroring the layout in
 // QCPGroupLegendItem::draw(): the component-icon column and the gap after it.
-static int collapsedChromeWidth(const QCPAbstractLegendItem* item)
+static int collapsedChromeWidth(const QCPLegendItem* item)
 {
     constexpr int iconWidth = 20;
     constexpr int iconTextGap = 6;
@@ -2632,7 +2632,7 @@ void TestMultiGraph::anEmptySourceKeepsFillsAndErrorBars()
     QVERIFY(mg->setComponentErrorBars(0, 1, 2));
     mg->setData(std::vector<double>{}, std::vector<std::vector<double>>{{}});
     QCOMPARE(mg->componentCount(), 3);
-    mg->setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>());
+    mg->setDataSource(std::shared_ptr<QCPMultiDataSource>());
     mg->setData(std::vector<double>{1, 2, 3},
                 std::vector<std::vector<double>>{{1, 2, 3}, {0, 1, 2}, {2, 3, 4}});
     QVERIFY(mg->componentFill(2).has_value());
@@ -2807,7 +2807,7 @@ void TestMultiGraph::anInLegendIndexPastTheEndIsIgnored()
 void TestMultiGraph::aNullSourceClearsTheComponents()
 {
     auto* mg = threeColumnGraph(mPlot);
-    mg->setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>());
+    mg->setDataSource(std::shared_ptr<QCPMultiDataSource>());
     QCOMPARE(mg->componentCount(), 0);
 }
 
@@ -4635,7 +4635,7 @@ void TestMultiGraph::itemWithPlottableFindsAGraphRow()
     QCOMPARE(mPlot->legend->itemCount(), 1);
 
     QVERIFY(mPlot->legend->hasItemWithPlottable(mg));
-    QCPAbstractLegendItem* row = mPlot->legend->itemWithPlottable(mg);
+    QCPLegendItem* row = mPlot->legend->itemWithPlottable(mg);
     QVERIFY(row != nullptr);
     QCOMPARE(row, mPlot->legend->item(0).get());
     QVERIFY(qobject_cast<QCPGroupLegendItem*>(row) != nullptr);
@@ -4648,7 +4648,7 @@ void TestMultiGraph::aGraphRowCastsToAPlottableRow()
     mg->setData(std::vector<double> { 1.0, 2.0 }, std::vector<double> { 10.0, 20.0 });
     auto* row = qobject_cast<QCPPlottableLegendItem*>(mPlot->legend->item(0));
     QVERIFY(row != nullptr);
-    QCOMPARE(row->plottable().get(), static_cast<QCPAbstractPlottable*>(mg));
+    QCOMPARE(row->plottable().get(), static_cast<QCPPlottable*>(mg));
 }
 
 // 2.x order: setBrush, then the channel fill, then the data. The remembered brush reaching the new

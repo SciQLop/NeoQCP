@@ -79,7 +79,7 @@ using QCPFinancialDataContainer = QCPDataContainer<QCPFinancialData>;
 template <typename T, typename Self = void>
 class QCPFinancialOps;
 
-class QCP_LIB_DECL QCPFinancial : public QCPAbstractPlottable1D<QCPFinancialData>
+class QCP_LIB_DECL QCPFinancial : public QCPPlottable1D<QCPFinancialData>
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPFinancial)

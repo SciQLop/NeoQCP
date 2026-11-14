@@ -80,7 +80,7 @@
   ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
 */
 QCPItemPixmap::QCPItemPixmap(QCustomPlot* parentPlot)
-        : QCPAbstractItem(parentPlot)
+        : QCPItem(parentPlot)
         , topLeft(createPosition(QLatin1String("topLeft")))
         , bottomRight(createPosition(QLatin1String("bottomRight")))
         , top(createAnchor(QLatin1String("top"), aiTop))

@@ -106,7 +106,7 @@ void TestPlottableGroup::removedPlottableLeavesTheGroup()
 
     QVERIFY(mPlot->removePlottable(a));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QCOMPARE(qcp::pointers(group->members()), (QList<QCPAbstractPlottable*> { b, c }));
+    QCOMPARE(qcp::pointers(group->members()), (QList<QCPPlottable*> { b, c }));
     QCOMPARE(mPlot->legend->itemCount(), 1);
 }
 
@@ -184,7 +184,7 @@ void TestPlottableGroup::memberMovesToItsNewGroup()
 
     second->addMember(a);
     QVERIFY(first->members().isEmpty());
-    QCOMPARE(qcp::pointers(second->members()), QList<QCPAbstractPlottable*> { a });
+    QCOMPARE(qcp::pointers(second->members()), QList<QCPPlottable*> { a });
     QCOMPARE(a->group(), second);
     QCOMPARE(mPlot->legend->itemCount(), 1);
 }
@@ -282,7 +282,7 @@ void TestPlottableGroup::membersChangedSlotMayRemoveAgain()
 
     QVERIFY(mPlot->removePlottable(a));
     QCOMPARE(mPlot->plottableCount(), 1);
-    QCOMPARE(qcp::pointers(group->members()), QList<QCPAbstractPlottable*> { b });
+    QCOMPARE(qcp::pointers(group->members()), QList<QCPPlottable*> { b });
 }
 
 void TestPlottableGroup::visibilitySlotMayRemoveALaterMember()
@@ -295,7 +295,7 @@ void TestPlottableGroup::visibilitySlotMayRemoveALaterMember()
     connect(a, &QCPLayerable::visibleChanged, this, [this, b] { (void)mPlot->removePlottable(b); });
 
     group->setVisible(false); // must not touch the deleted b
-    QCOMPARE(qcp::pointers(group->members()), QList<QCPAbstractPlottable*> { a });
+    QCOMPARE(qcp::pointers(group->members()), QList<QCPPlottable*> { a });
 }
 
 void TestPlottableGroup::moveSurvivesASlotRemovingTheMember()
@@ -429,14 +429,14 @@ void TestPlottableGroup::anEmptyGraphsIconIsItsPen()
 // the same pixels as the plottable's own row.
 void TestPlottableGroup::financialAndErrorBarIconsShowInTheGroupRow()
 {
-    const QList<std::function<QCPAbstractPlottable*(QCustomPlot&)>> makers {
-        [](QCustomPlot& plot) -> QCPAbstractPlottable* {
+    const QList<std::function<QCPPlottable*(QCustomPlot&)>> makers {
+        [](QCustomPlot& plot) -> QCPPlottable* {
             auto* financial = new QCPFinancial(plot.xAxis, plot.yAxis);
             financial->setChartStyle(QCPFinancial::csOhlc);
             financial->setPen(QPen(Qt::darkGreen, 2));
             return financial;
         },
-        [](QCustomPlot& plot) -> QCPAbstractPlottable* {
+        [](QCustomPlot& plot) -> QCPPlottable* {
             auto* bars = new QCPErrorBars(plot.xAxis, plot.yAxis);
             bars->setPen(QPen(Qt::darkRed, 2));
             return bars;
@@ -446,7 +446,7 @@ void TestPlottableGroup::financialAndErrorBarIconsShowInTheGroupRow()
     {
         QCustomPlot plot;
         plot.legend->setVisible(true);
-        QCPAbstractPlottable* plottable = make(plot);
+        QCPPlottable* plottable = make(plot);
         plottable->setName("member");
         const QSize iconSize = plot.legend->iconSize();
         const auto iconAt = [&](const QCPLayoutElement* row) {

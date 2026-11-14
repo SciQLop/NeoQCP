@@ -87,7 +87,7 @@ inline std::vector<double> binWidths(const QCPRange& range, int bins, bool log)
     return widths;
 }
 
-inline QCPColorMapData* bin2d(const QCPAbstractDataSource& src, int keyBins, int valueBins,
+inline QCPColorMapData* bin2d(const QCPDataSource& src, int keyBins, int valueBins,
                               bool keyLog = false, bool valueLog = false)
 {
     const int n = src.size();

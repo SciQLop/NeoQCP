@@ -84,7 +84,7 @@
   ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
 */
 QCPItemBracket::QCPItemBracket(QCustomPlot* parentPlot)
-        : QCPAbstractItem(parentPlot)
+        : QCPItem(parentPlot)
         , left(createPosition(QLatin1String("left")))
         , right(createPosition(QLatin1String("right")))
         , center(createAnchor(QLatin1String("center"), aiCenter))

@@ -8,7 +8,7 @@ namespace {
 struct ColumnWindow {
     std::vector<double> keys;
     std::vector<double> values;
-    ColumnWindow(const QCPAbstractMultiDataSource& src, int column, int begin, int end)
+    ColumnWindow(const QCPMultiDataSource& src, int column, int begin, int end)
     {
         keys.reserve(end - begin);
         values.reserve(end - begin);
@@ -34,7 +34,7 @@ inline void shiftIndices(std::vector<int>& indices, int begin)
 
 } // namespace
 
-std::vector<QPointF> QCPAbstractMultiDataSource::linesInData(
+std::vector<QPointF> QCPMultiDataSource::linesInData(
     int column, int begin, int end, double pixelsPerKey, std::vector<int>* sourceIndices,
     bool logKeys, bool /*cacheGaps*/) const
 {

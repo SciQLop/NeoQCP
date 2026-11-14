@@ -183,7 +183,7 @@ QCPCurveData::QCPCurveData(double t, double key, double value) : t(t), key(key),
   \section qcpcurve-usage Usage
 
   Like all data representing objects in QCustomPlot, the QCPCurve is a plottable
-  (QCPAbstractPlottable). So the plottable-interface of QCustomPlot applies
+  (QCPPlottable). So the plottable-interface of QCustomPlot applies
   (QCustomPlot::plottable, QCustomPlot::removePlottable, etc.)
 
   Usually, you first create an instance:
@@ -217,7 +217,7 @@ QCPCurveData::QCPCurveData(double t, double key, double value) : t(t), key(key),
 */
 QCPCurve::QCPCurve(QCPAxis* keyAxis, QCPAxis* valueAxis)
         // A curve needs a straight segment and nothing else: no rectangle, no straight key axis.
-        : QCPAbstractPlottable1D<QCPCurveData, QCPAbstractLine>(keyAxis, valueAxis,
+        : QCPPlottable1D<QCPCurveData, QCPLine>(keyAxis, valueAxis,
                                                                 QCP::capStraightSegments)
 {
     // One component: the whole curve is one line, with one pen and one marker style.
@@ -225,12 +225,12 @@ QCPCurve::QCPCurve(QCPAxis* keyAxis, QCPAxis* valueAxis)
     mComponents[0].name = QStringLiteral("curve");
 
     // modify inherited properties from abstract plottable:
-    QCPAbstractLine::setPen(QPen(Qt::blue, 0));
-    QCPAbstractLine::setBrush(Qt::NoBrush);
+    QCPLine::setPen(QPen(Qt::blue, 0));
+    QCPLine::setBrush(Qt::NoBrush);
 
-    QCPAbstractLine::setScatterStyle(QCPScatterStyle());
-    QCPAbstractLine::setLineStyle(lsLine);
-    QCPAbstractLine::setScatterSkip(0);
+    QCPLine::setScatterStyle(QCPScatterStyle());
+    QCPLine::setLineStyle(lsLine);
+    QCPLine::setScatterSkip(0);
 }
 
 QCPCurve::~QCPCurve() { }
@@ -302,9 +302,9 @@ void QCPCurve::setData(const QVector<double>& keys, const QVector<double>& value
 void QCPCurve::setPen(const QPen& pen)
 {
     if (mPen == pen && component(0).pen == pen
-        && component(0).selectedPen == QCPAbstractLine::defaultSelectedPen(pen))
+        && component(0).selectedPen == QCPLine::defaultSelectedPen(pen))
         return;
-    QCPAbstractLine::setPen(pen);
+    QCPLine::setPen(pen);
 }
 
 /*! \overload
@@ -426,7 +426,7 @@ void QCPCurve::dropColoursOfAnotherSize()
   If \a details is not 0, it will be set to a \ref QCPDataSelection, describing the closest data
   point to \a pos.
 
-  \seebaseclassmethod \ref QCPAbstractPlottable::selectTest
+  \seebaseclassmethod \ref QCPPlottable::selectTest
 */
 double QCPCurve::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {

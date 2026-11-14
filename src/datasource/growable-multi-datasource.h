@@ -18,7 +18,7 @@
 //! whose keys fall below the last one is merged in order, and a block appended with
 //! alreadySorted = false is sorted first. Keys must be finite and every column must have one value
 //! per key: both are refused with a misuse before anything is sorted or indexed.
-class QCPGrowableMultiDataSource final : public QCPAbstractMultiDataSource
+class QCPGrowableMultiDataSource final : public QCPMultiDataSource
 {
 public:
     QCPGrowableMultiDataSource() = default;

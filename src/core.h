@@ -48,7 +48,7 @@
 
 class QCPPainter;
 class QCPLayer;
-class QCPAbstractItem;
+class QCPItem;
 class QCPAxis;
 class QCPArea;
 class QCPAxisRect;
@@ -56,7 +56,7 @@ class QCPGraph;
 template <typename T, typename Self>
 class QCPGraphOps;
 class QCPLegend;
-class QCPAbstractLegendItem;
+class QCPLegendItem;
 class QCPPlottableGroup;
 class QRhi;
 class QRhiCommandBuffer;
@@ -73,8 +73,8 @@ class QCPOverlay;
 class QCPItemCreationState;
 class QCustomPlot;
 
-using ItemCreator = std::function<QCPAbstractItem*(QCustomPlot* plot, QCPAxis* keyAxis, QCPAxis* valueAxis)>;
-using ItemPositioner = std::function<void(QCPAbstractItem* item, double anchorKey, double anchorValue, double currentKey, double currentValue)>;
+using ItemCreator = std::function<QCPItem*(QCustomPlot* plot, QCPAxis* keyAxis, QCPAxis* valueAxis)>;
+using ItemPositioner = std::function<void(QCPItem* item, double anchorKey, double anchorValue, double currentKey, double currentValue)>;
 
 namespace qcp
 {
@@ -365,7 +365,7 @@ public:
     // Whether a layer culls its items through its spatial index (default true). Off: every item is
     // drawn and hit tested, which is what the randomized tests compare against. Items opt out
     // themselves by returning no data extent.
-    /*! Sets whether layers use the item index (see QCPAbstractItem::dataExtent()).
+    /*! Sets whether layers use the item index (see QCPItem::dataExtent()).
 
   On (the default) each layer keeps a packed R-tree of its items' data boxes and skips the ones whose
   extents miss the queried pixel area, for drawing and for hit testing. Off, every item is drawn and
@@ -396,9 +396,9 @@ public:
 
     // non-property methods:
     // plottable interface:
-    [[nodiscard]] QCPHandle<QCPAbstractPlottable> plottable(int index);
-    [[nodiscard]] QCPHandle<QCPAbstractPlottable> plottable();
-    [[nodiscard]] bool removePlottable(QCPAbstractPlottable* plottable);
+    [[nodiscard]] QCPHandle<QCPPlottable> plottable(int index);
+    [[nodiscard]] QCPHandle<QCPPlottable> plottable();
+    [[nodiscard]] bool removePlottable(QCPPlottable* plottable);
     Q_INVOKABLE [[nodiscard]] bool removePlottable(int index);
     Q_INVOKABLE int clearPlottables();
     [[nodiscard]] int plottableCount() const;
@@ -406,15 +406,15 @@ public:
     QCPHandle<QCPPlottableGroup> addPlottableGroup(const QString& name);
     Q_INVOKABLE bool removePlottableGroup(QCPPlottableGroup* group);
     [[nodiscard]] QList<QCPHandle<QCPPlottableGroup>> plottableGroups() const;
-    [[nodiscard]] QList<QCPHandle<QCPAbstractPlottable>> selectedPlottables() const;
+    [[nodiscard]] QList<QCPHandle<QCPPlottable>> selectedPlottables() const;
     template <class PlottableType>
     [[nodiscard]] QCPHandle<PlottableType> plottableAt(const QPointF& pos,
                                                       bool onlySelectable = false,
                                                       int* dataIndex = nullptr) const;
-    [[nodiscard]] QCPHandle<QCPAbstractPlottable> plottableAt(const QPointF& pos,
+    [[nodiscard]] QCPHandle<QCPPlottable> plottableAt(const QPointF& pos,
                                                              bool onlySelectable = false,
                                                              int* dataIndex = nullptr) const;
-    [[nodiscard]] bool hasPlottable(QCPAbstractPlottable* plottable) const;
+    [[nodiscard]] bool hasPlottable(QCPPlottable* plottable) const;
 
     // Creates a T the plot owns and returns its fluent handle (qcp::HandleFor<T>). What args mean
     // depends on T's family (qcp::Construct<T>, construct.h):
@@ -466,18 +466,18 @@ public:
     [[nodiscard]] QList<QCPHandle<QCPGraph>> selectedGraphs() const;
 
     // item interface:
-    [[nodiscard]] QCPHandle<QCPAbstractItem> item(int index) const;
-    [[nodiscard]] QCPHandle<QCPAbstractItem> item() const;
-    [[nodiscard]] bool removeItem(QCPAbstractItem* item);
+    [[nodiscard]] QCPHandle<QCPItem> item(int index) const;
+    [[nodiscard]] QCPHandle<QCPItem> item() const;
+    [[nodiscard]] bool removeItem(QCPItem* item);
     Q_INVOKABLE [[nodiscard]] bool removeItem(int index);
     Q_INVOKABLE int clearItems();
     [[nodiscard]] int itemCount() const;
-    [[nodiscard]] QList<QCPHandle<QCPAbstractItem>> selectedItems() const;
+    [[nodiscard]] QList<QCPHandle<QCPItem>> selectedItems() const;
     template <class ItemType>
     [[nodiscard]] QCPHandle<ItemType> itemAt(const QPointF& pos, bool onlySelectable = false) const;
-    [[nodiscard]] QCPHandle<QCPAbstractItem> itemAt(const QPointF& pos,
+    [[nodiscard]] QCPHandle<QCPItem> itemAt(const QPointF& pos,
                                                    bool onlySelectable = false) const;
-    [[nodiscard]] bool hasItem(QCPAbstractItem* item) const;
+    [[nodiscard]] bool hasItem(QCPItem* item) const;
 
     // layer interface:
     [[nodiscard]] QCPHandle<QCPLayer> layer(const QString& name) const;
@@ -548,21 +548,21 @@ signals:
     void multiSelectModifierChanged(Qt::KeyboardModifier multiSelectModifier);
     void themeChanged();
 
-    void plottableClick(QCPAbstractPlottable* plottable, int dataIndex, QMouseEvent* event);
-    void plottableDoubleClick(QCPAbstractPlottable* plottable, int dataIndex, QMouseEvent* event);
-    void itemClick(QCPAbstractItem* item, QMouseEvent* event);
-    void itemDoubleClick(QCPAbstractItem* item, QMouseEvent* event);
+    void plottableClick(QCPPlottable* plottable, int dataIndex, QMouseEvent* event);
+    void plottableDoubleClick(QCPPlottable* plottable, int dataIndex, QMouseEvent* event);
+    void itemClick(QCPItem* item, QMouseEvent* event);
+    void itemDoubleClick(QCPItem* item, QMouseEvent* event);
     void axisClick(QCPAxis* axis, QCPAxis::SelectablePart part, QMouseEvent* event);
     void axisDoubleClick(QCPAxis* axis, QCPAxis::SelectablePart part, QMouseEvent* event);
-    void legendClick(QCPLegend* legend, QCPAbstractLegendItem* item, QMouseEvent* event);
-    void legendDoubleClick(QCPLegend* legend, QCPAbstractLegendItem* item, QMouseEvent* event);
+    void legendClick(QCPLegend* legend, QCPLegendItem* item, QMouseEvent* event);
+    void legendDoubleClick(QCPLegend* legend, QCPLegendItem* item, QMouseEvent* event);
 
     void selectionChangedByUser();
     void beforeReplot();
     void afterLayout();
     void afterReplot();
 
-    void itemCreated(QCPAbstractItem* item);
+    void itemCreated(QCPItem* item);
     void itemCanceled();
     void creationModeEnabledChanged(bool creationModeEnabled);
     void creationModifierChanged(Qt::KeyboardModifier creationModifier);
@@ -584,15 +584,15 @@ private:
     friend struct qcp::Construct;
     // The axes add<T>() puts a new plottable on; both null (one misuse) when it must refuse.
     [[nodiscard]] std::pair<QCPAxis*, QCPAxis*> axesForAdd() const;
-    bool detach(QCPAbstractPlottable* plottable);
-    void forgetSystemOf(QCPAbstractPlottable* plottable);
-    bool detach(QCPAbstractItem* item);
-    bool adopt(QCPAbstractPlottable* plottable);
-    bool adopt(QCPAbstractItem* item);
+    bool detach(QCPPlottable* plottable);
+    void forgetSystemOf(QCPPlottable* plottable);
+    bool detach(QCPItem* item);
+    bool adopt(QCPPlottable* plottable);
+    bool adopt(QCPItem* item);
     // The part of adopt() after the default axes are known: a plottable joins this plot in the given
     // system, owned by the given area. What an area uses to readd an object of its own kind.
-    bool adoptPlottable(QCPAbstractPlottable* plottable, QCPCoordinateSystem* system, QCPArea* area);
-    void cutAnchorLinks(QCPAbstractItem* item);
+    bool adoptPlottable(QCPPlottable* plottable, QCPCoordinateSystem* system, QCPArea* area);
+    void cutAnchorLinks(QCPItem* item);
     // Also themes a rect's own colour scale, which QCPAxisRect makes after the theme was set.
     void applyThemeToAxis(QCPAxis* axis);
     // The ancestor watch of an aligned plot; QCPAlignmentGroup and QCPLayout call in as friends.
@@ -613,10 +613,10 @@ protected:
     double mBufferDevicePixelRatio;
     QPointer<QCPLayoutGrid> mPlotLayout;
     bool mAutoAddPlottableToLegend;
-    QList<QCPAbstractPlottable*> mPlottables;
+    QList<QCPPlottable*> mPlottables;
     QList<QCPPlottableGroup*> mPlottableGroups;
     QList<QCPGraph*> mGraphs; // the graphs of mPlottables, in creation order
-    QList<QCPAbstractItem*> mItems;
+    QList<QCPItem*> mItems;
     QList<QCPLayer*> mLayers;
     QCP::AntialiasedElements mAntialiasedElements, mNotAntialiasedElements;
     QCP::Interactions mInteractions;
@@ -772,18 +772,18 @@ protected:
     Q_SLOT virtual void processPointSelection(QMouseEvent* event);
 
     // non-virtual methods:
-    bool registerPlottable(QCPAbstractPlottable* plottable);
+    bool registerPlottable(QCPPlottable* plottable);
     bool registerGraph(QCPGraph* graph);
     //! Registers a plottable that joins a frame after construction (a refused one that setSystem()
     //! accepts later, or an adopted one): the one path both go through.
-    bool registerJoinedPlottable(QCPAbstractPlottable* plottable);
+    bool registerJoinedPlottable(QCPPlottable* plottable);
     //! Takes \a plottable out of every list, its group and the legend; safe to call twice.
-    QPointer<QCPPlottableGroup> unlistPlottable(QCPAbstractPlottable* plottable);
-    void plottableDestroyed(QCPAbstractPlottable* plottable);
-    void deletePlottable(QCPAbstractPlottable* plottable);
+    QPointer<QCPPlottableGroup> unlistPlottable(QCPPlottable* plottable);
+    void plottableDestroyed(QCPPlottable* plottable);
+    void deletePlottable(QCPPlottable* plottable);
     int deleteAllItems();
     void releaseCompositeResources();
-    bool registerItem(QCPAbstractItem* item);
+    bool registerItem(QCPItem* item);
     // The first of axisRects() in layout order, without building the list (it is called per item).
     [[nodiscard]] QCPAxisRect* firstAxisRect() const;
     // Raw views for the library's hot paths: the public getters hand out handles, and a QPointer per
@@ -794,8 +794,8 @@ protected:
     [[nodiscard]] QCPLayoutElement* layoutElementAtRaw(const QPointF& pos) const;
     [[nodiscard]] QCPArea* areaAtRaw(const QPointF& pos) const;
     [[nodiscard]] QCPAxisRect* axisRectAtRaw(const QPointF& pos) const;
-    [[nodiscard]] const QList<QCPAbstractPlottable*>& plottablesRaw() const { return mPlottables; }
-    void itemDestroyed(QCPAbstractItem* item);
+    [[nodiscard]] const QList<QCPPlottable*>& plottablesRaw() const { return mPlottables; }
+    void itemDestroyed(QCPItem* item);
     //! Moves the layer's children to the layer below (above for the bottom one) and drops every
     //! reference to the layer, without deleting it. Called by removeLayer and ~QCPLayer.
     void unlistLayer(QCPLayer* layer);
@@ -835,9 +835,9 @@ protected:
     friend class TestPaintBuffer;
     friend class QCPAxisRect;
     friend class QCPPolarArea;
-    friend class QCPAbstractPlottable;
+    friend class QCPPlottable;
     friend class QCPGraph;
-    friend class QCPAbstractItem;
+    friend class QCPItem;
     friend class QCPLayerable;
     friend class QCPAlignmentGroup; // a member joining or leaving changes what the plot watches
     friend class QCPLayout; // an element put back in the tree may be aligned
@@ -986,7 +986,7 @@ qcp::HandleFor<T> QCustomPlot::add(Args&&... args)
 template <typename T>
 qcp::HandleFor<T> QCustomPlot::add(std::unique_ptr<T> object)
 {
-    static_assert(std::derived_from<T, QCPAbstractPlottable> || std::derived_from<T, QCPAbstractItem>,
+    static_assert(std::derived_from<T, QCPPlottable> || std::derived_from<T, QCPItem>,
                   "add(std::unique_ptr<T>) takes plottables and items");
     using Handle = qcp::HandleFor<T>;
     QCP_CHECK_OR_RETURN(object, "the pointer is empty", Handle{});
@@ -1003,7 +1003,7 @@ qcp::HandleFor<T> QCustomPlot::add(std::unique_ptr<T> object)
 template <typename T>
 std::unique_ptr<T> QCustomPlot::take(QCPHandle<T> handle)
 {
-    static_assert(std::derived_from<T, QCPAbstractPlottable> || std::derived_from<T, QCPAbstractItem>,
+    static_assert(std::derived_from<T, QCPPlottable> || std::derived_from<T, QCPItem>,
                   "take(handle) works on plottables and items");
     QCP_CHECK_OR_RETURN(handle, "the handle is dead", nullptr);
     T* object = handle.get();
@@ -1011,7 +1011,7 @@ std::unique_ptr<T> QCustomPlot::take(QCPHandle<T> handle)
 }
 
 /*!
-  Returns the plottable at the pixel position \a pos. The plottable type (a QCPAbstractPlottable
+  Returns the plottable at the pixel position \a pos. The plottable type (a QCPPlottable
   subclass) that shall be taken into consideration can be specified via the template parameter.
 
   Plottables that only consist of single lines (like graphs) have a tolerance band around them, see
@@ -1019,7 +1019,7 @@ std::unique_ptr<T> QCustomPlot::take(QCPHandle<T> handle)
   pos is returned.
 
   If \a onlySelectable is true, only plottables that are selectable
-  (QCPAbstractPlottable::setSelectable) are considered.
+  (QCPPlottable::setSelectable) are considered.
 
   if \a dataIndex is non-null, it is set to the index of the plottable's data point that is closest
   to \a pos.
@@ -1038,7 +1038,7 @@ QCPHandle<PlottableType> QCustomPlot::plottableAt(const QPointF& pos, bool onlyS
         = mSelectionTolerance; // only regard clicks with distances smaller than mSelectionTolerance
                                // as selections, so initialize with that value
 
-    for (QCPAbstractPlottable* plottable : mPlottables)
+    for (QCPPlottable* plottable : mPlottables)
     {
         PlottableType* currentPlottable = qobject_cast<PlottableType*>(plottable);
         if (!currentPlottable
@@ -1047,7 +1047,7 @@ QCPHandle<PlottableType> QCustomPlot::plottableAt(const QPointF& pos, bool onlyS
                        == QCP::stNone)) // we could have also passed onlySelectable to
                                                      // the selectTest function, but checking here
                                                      // is faster, because we have access to
-                                                     // QCPAbstractPlottable::selectable
+                                                     // QCPPlottable::selectable
             continue;
         if (currentPlottable->clipRect().contains(
                 pos.toPoint())) // only consider clicks where the plottable is actually visible
@@ -1073,13 +1073,13 @@ QCPHandle<PlottableType> QCustomPlot::plottableAt(const QPointF& pos, bool onlyS
 }
 
 /*!
-  Returns the item at the pixel position \a pos. The item type (a QCPAbstractItem subclass) that
+  Returns the item at the pixel position \a pos. The item type (a QCPItem subclass) that
   shall be taken into consideration can be specified via the template parameter. Items that only
   consist of single lines (e.g. \ref QCPItemLine or \ref QCPItemCurve) have a tolerance band around
   them, see \ref setSelectionTolerance. If multiple items come into consideration, the one closest
   to \a pos is returned.
 
-  If \a onlySelectable is true, only items that are selectable (QCPAbstractItem::setSelectable) are
+  If \a onlySelectable is true, only items that are selectable (QCPItem::setSelectable) are
   considered.
 
   If there is no item at \a pos, returns \c nullptr.
@@ -1094,7 +1094,7 @@ QCPHandle<ItemType> QCustomPlot::itemAt(const QPointF& pos, bool onlySelectable)
         = mSelectionTolerance; // only regard clicks with distances smaller than mSelectionTolerance
                                // as selections, so initialize with that value
 
-    for (QCPAbstractItem* item : mItems)
+    for (QCPItem* item : mItems)
     {
         ItemType* currentItem = qobject_cast<ItemType*>(item);
         if (!currentItem
@@ -1102,7 +1102,7 @@ QCPHandle<ItemType> QCustomPlot::itemAt(const QPointF& pos, bool onlySelectable)
                 && currentItem->selectable()
                        == QCP::stNone)) // we could have also passed onlySelectable to the
                                          // selectTest function, but checking here is faster,
-                                         // because we have access to QCPAbstractItem::selectable
+                                         // because we have access to QCPItem::selectable
             continue;
         if (!currentItem->clipToAxisRect()
             || currentItem->clipRect().contains(

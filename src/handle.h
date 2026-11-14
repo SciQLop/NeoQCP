@@ -14,8 +14,8 @@
 #include <type_traits>
 #include <utility>
 
-class QCPAbstractItem;
-class QCPAbstractPlottable;
+class QCPItem;
+class QCPPlottable;
 class QCPAxis;
 class QCPBarsGroup;
 class QCPLayer;
@@ -27,8 +27,8 @@ namespace qcp::detail
 // The owner of each family removes its member: a plottable, an item or a group unlists itself
 // when it is deleted, an axis asks its rect, a layer asks its plot (which keeps
 // one), a layout element leaves its layout first. Defined in core.cpp.
-QCP_LIB_DECL void removeObject(QCPAbstractPlottable& plottable);
-QCP_LIB_DECL void removeObject(QCPAbstractItem& item);
+QCP_LIB_DECL void removeObject(QCPPlottable& plottable);
+QCP_LIB_DECL void removeObject(QCPItem& item);
 QCP_LIB_DECL void removeObject(QCPAxis& axis);
 QCP_LIB_DECL void removeObject(QCPLayer& layer);
 QCP_LIB_DECL void removeObject(QCPLayoutElement& element);

@@ -1371,7 +1371,7 @@ void MainWindow::check(bool saved, const QString &fileName)
   }
 }
 
-void MainWindow::labelItemAnchors(QCPAbstractItem *item, double fontSize, bool circle, bool labelBelow)
+void MainWindow::labelItemAnchors(QCPItem *item, double fontSize, bool circle, bool labelBelow)
 {
   QList<QCPItemAnchor*> anchors = item->anchors();
   for (int i=0; i<anchors.size(); ++i)

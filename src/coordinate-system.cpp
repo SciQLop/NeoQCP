@@ -112,10 +112,10 @@ QCPHandle<QCPAxisBase> QCPCoordinateSystem::valueAxis() const
   A system answers with the plottables that joined it: the cartesian projection of its axes is the
   frame they draw through, so no other rule can disagree.
 */
-QList<QCPHandle<QCPAbstractPlottable>> QCPCoordinateSystem::plottables() const
-{    QList<QCPHandle<QCPAbstractPlottable>> result;
-    for (QCPAbstractPlottable* plottable : plottablesRaw())
-        result << QCPHandle<QCPAbstractPlottable>(plottable);
+QList<QCPHandle<QCPPlottable>> QCPCoordinateSystem::plottables() const
+{    QList<QCPHandle<QCPPlottable>> result;
+    for (QCPPlottable* plottable : plottablesRaw())
+        result << QCPHandle<QCPPlottable>(plottable);
     return result;
 }
 
@@ -123,15 +123,15 @@ QList<QCPHandle<QCPAbstractPlottable>> QCPCoordinateSystem::plottables() const
 
   The plottables raw: QCPAxisBase::plottables collects them per axis (K8).
 */
-QList<QCPAbstractPlottable*> QCPCoordinateSystem::plottablesRaw() const
+QList<QCPPlottable*> QCPCoordinateSystem::plottablesRaw() const
 {
-    QList<QCPAbstractPlottable*> result;
+    QList<QCPPlottable*> result;
     QCustomPlot* plot = mArea ? mArea->parentPlot() : nullptr;
     if (!plot)
         return result;
     // simplify: one scan of the plot's plottables per call, as keyAxis()/valueAxis() would need:
     // an index on the system when a plot holds enough of them.
-    for (QCPAbstractPlottable* plottable : plot->plottablesRaw())
+    for (QCPPlottable* plottable : plot->plottablesRaw())
         if (plottable->systemRaw() == this)
             result << plottable;
     return result;

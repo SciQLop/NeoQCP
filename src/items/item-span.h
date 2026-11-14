@@ -17,7 +17,7 @@ class QCPItemSpanOps;
   position types are the vertical or the horizontal pair, and an orientation setter would have to
   rewrite them.
 */
-class QCP_LIB_DECL QCPItemSpan : public QCPAbstractSpanItem
+class QCP_LIB_DECL QCPItemSpan : public QCPSpanItem
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPItemSpan)

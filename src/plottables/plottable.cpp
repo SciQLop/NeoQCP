@@ -44,8 +44,8 @@
 /*! \class QCPSelectionDecorator
   \brief Controls how a plottable's data selection is drawn
 
-  Each \ref QCPAbstractPlottable instance has one \ref QCPSelectionDecorator (accessible via \ref
-  QCPAbstractPlottable::selectionDecorator) and uses it when drawing selected segments of its data.
+  Each \ref QCPPlottable instance has one \ref QCPSelectionDecorator (accessible via \ref
+  QCPPlottable::selectionDecorator) and uses it when drawing selected segments of its data.
 
   The selection decorator controls both pen (\ref setPen) and brush (\ref setBrush), as well as the
   scatter style (\ref setScatterStyle) if the plottable draws scatters. Since a \ref
@@ -54,7 +54,7 @@
   point, via \ref setUsedScatterProperties.
 
   A \ref QCPSelectionDecorator subclass instance can be passed to a plottable via \ref
-  QCPAbstractPlottable::setSelectionDecorator, allowing greater customizability of the appearance
+  QCPPlottable::setSelectionDecorator, allowing greater customizability of the appearance
   of selected segments.
 
   Use \ref copyFrom to easily transfer the settings of one decorator to another one. This is
@@ -181,14 +181,14 @@ void QCPSelectionDecorator::drawDecoration([[maybe_unused]] QCPPainter* painter,
 /*! \internal
 
   This method is called as soon as a selection decorator is associated with a plottable, by a call
-  to \ref QCPAbstractPlottable::setSelectionDecorator. This way the selection decorator can obtain a
+  to \ref QCPPlottable::setSelectionDecorator. This way the selection decorator can obtain a
   pointer to the plottable that uses it (e.g. to access data points via the \ref
-  QCPAbstractPlottable::interface1D interface).
+  QCPPlottable::interface1D interface).
 
   If the selection decorator was already added to a different plottable before, this method aborts
   the registration and returns false.
 */
-bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottable)
+bool QCPSelectionDecorator::registerWithPlottable(QCPPlottable* plottable)
 {
     if (!mPlottable)
     {
@@ -204,17 +204,17 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////// QCPAbstractPlottable
+//////////////////// QCPPlottable
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*! \class QCPAbstractPlottable
+/*! \class QCPPlottable
   \brief The abstract base class for all data representing objects in a plot.
 
   It defines a very basic interface like name, pen, brush, visibility etc. Since this class is
   abstract, it can't be instantiated. Use one of the subclasses or create a subclass yourself to
   create new ways of displaying data (see "Creating own plottables" below). Plottables that display
   one-dimensional data (i.e. data points have a single key dimension and one or multiple values at
-  each key) are based off of the template subclass \ref QCPAbstractPlottable1D, see details
+  each key) are based off of the template subclass \ref QCPPlottable1D, see details
   there.
 
   All further specifics are in the subclasses, for example:
@@ -228,12 +228,12 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 
   \section plottables-subclassing Creating own plottables
 
-  Subclassing directly from QCPAbstractPlottable is only recommended if you wish to display
+  Subclassing directly from QCPPlottable is only recommended if you wish to display
   two-dimensional data like \ref QCPColorMap, i.e. two logical key dimensions and one (or more)
   data dimensions. If you want to display data with only one logical key dimension, you should
-  rather derive from \ref QCPAbstractPlottable1D.
+  rather derive from \ref QCPPlottable1D.
 
-  If subclassing QCPAbstractPlottable directly, these are the virtual functions you implement:
+  If subclassing QCPPlottable directly, these are the virtual functions you implement:
   \li \ref draw(QCPDrawContext&), which records what the plottable draws
   \li \ref drawLegendIcon(QCPDrawContext&), optionally, to record an icon of its own
   \li \ref selectTest, optionally: the base answers a click from the recording
@@ -244,7 +244,7 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 
   Record positions as \c QCP::Data: the frame maps them to pixels, a vertical key axis included.
 
-  Here are some important members you inherit from QCPAbstractPlottable:
+  Here are some important members you inherit from QCPPlottable:
   <table>
   <tr>
     <td>QCustomPlot *\b mParentPlot</td>
@@ -280,7 +280,7 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   </tr><tr>
     <td>\ref QCP::SelectionType \b mSelectable</td>
     <td>In which composition, if at all, this plottable's data may be selected. Enforcing this
-  setting on the data selection is done by QCPAbstractPlottable automatically.</td>
+  setting on the data selection is done by QCPPlottable automatically.</td>
   </tr><tr>
     <td>\ref QCPDataSelection \b mSelection</td>
     <td>Holds the current selection state of the plottable's data, i.e. the selected data ranges
@@ -291,7 +291,7 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 
 /* start of documentation of inline functions */
 
-/*! \fn QCPSelectionDecorator *QCPAbstractPlottable::selectionDecorator() const
+/*! \fn QCPSelectionDecorator *QCPPlottable::selectionDecorator() const
 
   Provides access to the selection decorator of this plottable. The selection decorator controls
   how selected data ranges are drawn (e.g. their pen color and fill), see \ref
@@ -301,13 +301,13 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   setSelectionDecorator.
 */
 
-/*! \fn bool QCPAbstractPlottable::selected() const
+/*! \fn bool QCPPlottable::selected() const
 
   Returns true if there are any data points of the plottable currently selected. Use \ref selection
   to retrieve the current \ref QCPDataSelection.
 */
 
-/*! \fn QCPDataSelection QCPAbstractPlottable::selection() const
+/*! \fn QCPDataSelection QCPPlottable::selection() const
 
   Returns a \ref QCPDataSelection encompassing all the data points that are currently selected on
   this plottable.
@@ -315,7 +315,7 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   \see selected, setSelection, setSelectable
 */
 
-/*! \fn virtual QCPPlottableInterface1D *QCPAbstractPlottable::interface1D()
+/*! \fn virtual QCPPlottableInterface1D *QCPPlottable::interface1D()
 
   If this plottable is a one-dimensional plottable, i.e. it implements the \ref
   QCPPlottableInterface1D, returns the \a this pointer with that type. Otherwise (e.g. in the case
@@ -328,7 +328,7 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 /* end of documentation of inline functions */
 /* start of documentation of the drawing virtuals */
 
-/*! \fn void QCPAbstractPlottable::drawLegendIcon(QCPPainter *painter, const QRectF &rect) const
+/*! \fn void QCPPlottable::drawLegendIcon(QCPPainter *painter, const QRectF &rect) const
   \internal
 
   called by QCPLegend::draw (via QCPPlottableLegendItem::draw) to create a graphical representation
@@ -341,7 +341,7 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   summary a class records through \ref drawLegendIcon(QCPDrawContext&).
 */
 
-/*! \fn QCPRange QCPAbstractPlottable::getKeyRange(bool &foundRange, QCP::SignDomain inSignDomain)
+/*! \fn QCPRange QCPPlottable::getKeyRange(bool &foundRange, QCP::SignDomain inSignDomain)
   const
 
   Returns the coordinate range that all data in this plottable span in the key axis dimension. For
@@ -363,7 +363,7 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   \see rescaleAxes, getValueRange
 */
 
-/*! \fn QCPRange QCPAbstractPlottable::getValueRange(bool &foundRange, QCP::SignDomain inSignDomain,
+/*! \fn QCPRange QCPPlottable::getValueRange(bool &foundRange, QCP::SignDomain inSignDomain,
   const QCPRange &inKeyRange) const
 
   Returns the coordinate range that the data points in the specified key range (\a inKeyRange) span
@@ -393,13 +393,13 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 /* end of documentation of the drawing virtuals */
 /* start of documentation of signals */
 
-/*! \fn void QCPAbstractPlottable::penChanged(const QPen& pen)
+/*! \fn void QCPPlottable::penChanged(const QPen& pen)
 
   This signal is emitted when \ref setPen changes \ref pen, after the plot delivers its deferred
   signals. A call that only re-pens the components of a line repaints and emits nothing.
 */
 
-/*! \fn void QCPAbstractPlottable::selectionChanged()
+/*! \fn void QCPPlottable::selectionChanged()
 
   This signal is emitted when the selection state of this plottable has changed, either by user
   interaction or by a direct call to \ref setSelection. The slot reads \ref selected to learn
@@ -408,7 +408,7 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   \see setSelection
 */
 
-/*! \fn void QCPAbstractPlottable::selectableChanged()
+/*! \fn void QCPPlottable::selectableChanged()
 
   This signal is emitted when the selectability of this plottable has changed. The slot reads
   \ref selectable.
@@ -416,43 +416,43 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   \see setSelectable
 */
 
-/*! \fn void QCPAbstractPlottable::nameChanged(const QString& name)
+/*! \fn void QCPPlottable::nameChanged(const QString& name)
 
   This signal is emitted when \ref name changes, after the plot delivers its deferred
   signals.
 */
 
-/*! \fn void QCPAbstractPlottable::antialiasedFillChanged(bool antialiasedFill)
+/*! \fn void QCPPlottable::antialiasedFillChanged(bool antialiasedFill)
 
   This signal is emitted when \ref antialiasedFill changes, after the plot delivers its deferred
   signals.
 */
 
-/*! \fn void QCPAbstractPlottable::antialiasedScattersChanged(bool antialiasedScatters)
+/*! \fn void QCPPlottable::antialiasedScattersChanged(bool antialiasedScatters)
 
   This signal is emitted when \ref antialiasedScatters changes, after the plot delivers its deferred
   signals.
 */
 
-/*! \fn void QCPAbstractPlottable::brushChanged(const QBrush& brush)
+/*! \fn void QCPPlottable::brushChanged(const QBrush& brush)
 
   This signal is emitted when \ref brush changes, after the plot delivers its deferred
   signals.
 */
 
-/*! \fn void QCPAbstractPlottable::keyAxisChanged(QCPAxis* keyAxis)
+/*! \fn void QCPPlottable::keyAxisChanged(QCPAxis* keyAxis)
 
   This signal is emitted when \ref keyAxis changes, after the plot delivers its deferred
   signals.
 */
 
-/*! \fn void QCPAbstractPlottable::valueAxisChanged(QCPAxis* valueAxis)
+/*! \fn void QCPPlottable::valueAxisChanged(QCPAxis* valueAxis)
 
   This signal is emitted when \ref valueAxis changes, after the plot delivers its deferred
   signals.
 */
 
-/*! \fn void QCPAbstractPlottable::selectionDecoratorChanged(QCPSelectionDecorator*
+/*! \fn void QCPPlottable::selectionDecoratorChanged(QCPSelectionDecorator*
   selectionDecorator)
 
   This signal is emitted when \ref selectionDecorator changes, after the plot delivers its deferred
@@ -470,7 +470,7 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   A null \a keyAxis or \a valueAxis is a misuse (see \ref qcp::setMisuseHandler): the plottable is
   then built but inert, in no plot and never drawn, and deleting it is up to the caller.
 
-  Since QCPAbstractPlottable is an abstract class that defines the basic interface to plottables,
+  Since QCPPlottable is an abstract class that defines the basic interface to plottables,
   it can't be directly instantiated.
 
   You probably want one of the subclasses like \ref QCPGraph or \ref QCPCurve instead.
@@ -490,11 +490,11 @@ QCPCoordinateSystem* admits(QCPCoordinateSystem* system, QCP::Capabilities requi
 {
     if (!system)
         return nullptr;
-    return QCPAbstractPlottable::systemAdmits(system, required) ? system : nullptr;
+    return QCPPlottable::systemAdmits(system, required) ? system : nullptr;
 }
 } // namespace
 
-bool QCPAbstractPlottable::systemAdmits(const QCPCoordinateSystem* system,
+bool QCPPlottable::systemAdmits(const QCPCoordinateSystem* system,
                                         QCP::Capabilities required)
 {
     if (!system)
@@ -516,19 +516,19 @@ bool QCPAbstractPlottable::systemAdmits(const QCPCoordinateSystem* system,
     return true;
 }
 
-/*! \fn void QCPAbstractPlottable::systemChanged(QCPCoordinateSystem* system)
+/*! \fn void QCPPlottable::systemChanged(QCPCoordinateSystem* system)
 
   This signal is emitted when \ref system changes, after the plot delivers its deferred
   signals.
 */
 
-/*! \fn void QCPAbstractPlottable::wantsLegendChanged(bool wantsLegend)
+/*! \fn void QCPPlottable::wantsLegendChanged(bool wantsLegend)
 
   This signal is emitted when \ref wantsLegend changes, after the plot delivers its deferred
   signals.
 */
 
-QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system, QCP::Capabilities required)
+QCPPlottable::QCPPlottable(QCPCoordinateSystem* system, QCP::Capabilities required)
         : QCPLayerable(system && system->area() ? system->area()->parentPlot() : nullptr, QString(),
                        system ? static_cast<QCPLayerable*>(system->area()) : nullptr)
         , mName()
@@ -548,7 +548,7 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system, QCP::Cap
 {
     setSelectionDecorator(new QCPSelectionDecorator);
     mBusyDebounceTimer.setSingleShot(true);
-    connect(&mBusyDebounceTimer, &QTimer::timeout, this, &QCPAbstractPlottable::onDebounceTimeout);
+    connect(&mBusyDebounceTimer, &QTimer::timeout, this, &QCPPlottable::onDebounceTimeout);
 
     if (!mSystem)
     {
@@ -567,9 +567,9 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system, QCP::Cap
         mRegisteredPlot = mParentPlot;
 }
 
-QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis,
+QCPPlottable::QCPPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis,
                                            QCP::Capabilities required)
-        : QCPAbstractPlottable(qcpSystemOfAxes(keyAxis, valueAxis), required)
+        : QCPPlottable(qcpSystemOfAxes(keyAxis, valueAxis), required)
 {
     // A frame that refused the pair has already said so and left this object inert: the 2.x axes
     // are not a second chance to join it.
@@ -617,22 +617,22 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis,
 
   dependentLayers() raw: the default converts the public list (K8).
 */
-QList<QCPLayer*> QCPAbstractPlottable::dependentLayersRaw() const
+QList<QCPLayer*> QCPPlottable::dependentLayersRaw() const
 {
     return qcp::pointers(dependentLayers());
 }
 
-QCPAxisRect* QCPAbstractPlottable::axisRectOf(const QCPAxis* axis)
+QCPAxisRect* QCPPlottable::axisRectOf(const QCPAxis* axis)
 {
     return axis ? static_cast<QCPAxisRect*>(axis->area()) : nullptr;
 }
 
-QCPHandle<QCPArea> QCPAbstractPlottable::area() const
+QCPHandle<QCPArea> QCPPlottable::area() const
 {
     return QCPHandle<QCPArea>(mSystem ? mSystem->area().get() : nullptr);
 }
 
-QCPAbstractPlottable::~QCPAbstractPlottable()
+QCPPlottable::~QCPPlottable()
 {
     if (mRegisteredPlot)
         leavePlotOnDestruction();
@@ -646,25 +646,25 @@ QCPAbstractPlottable::~QCPAbstractPlottable()
 /*!
   Replays the recording that \ref draw(QCPDrawContext&) made.
 */
-void QCPAbstractPlottable::draw(QCPPainter* painter)
+void QCPPlottable::draw(QCPPainter* painter)
 {
     mCore.paint(*this, *painter, view());
 }
 
 //! What the core reads from this plottable this frame.
-QCPDrawnView QCPAbstractPlottable::view() const
+QCPDrawnView QCPPlottable::view() const
 {
     return qcpDrawnViewOf(*this, clipRect());
 }
 
 //! What the recording occupies in data coordinates.
-std::optional<QCPDataBox> QCPAbstractPlottable::drawnDataRange() const
+std::optional<QCPDataBox> QCPPlottable::drawnDataRange() const
 {
     return mCore.dataRange(*this, view());
 }
 
 //! The pixel distance from \a at to the recording, or none when it missed.
-std::optional<double> QCPAbstractPlottable::hitTest(QCP::Pixels at, QVariant* details) const
+std::optional<double> QCPPlottable::hitTest(QCP::Pixels at, QVariant* details) const
 {
     return mCore.hitTest(*this, at, details, view());
 }
@@ -674,7 +674,7 @@ std::optional<double> QCPAbstractPlottable::hitTest(QCP::Pixels at, QVariant* de
   data selection: the recording keeps no per-point index to hand out, and an empty selection would
   make the click select nothing.
 */
-double QCPAbstractPlottable::selectTest(const QPointF& pos, bool onlySelectable,
+double QCPPlottable::selectTest(const QPointF& pos, bool onlySelectable,
                                         QVariant* details) const
 {
     // Built-in plottables miss outside the axis rect unless the plot opts in: their geometry may
@@ -687,14 +687,14 @@ double QCPAbstractPlottable::selectTest(const QPointF& pos, bool onlySelectable,
         return hit;
     if (details->isValid() && !details->value<QCPDataSelection>().isEmpty())
         return hit;
-    const QCPPlottableInterface1D* iface = const_cast<QCPAbstractPlottable*>(this)->interface1D();
+    const QCPPlottableInterface1D* iface = const_cast<QCPPlottable*>(this)->interface1D();
     const int count = iface ? iface->dataCount() : 1;
     *details = QVariant::fromValue(QCPDataSelection(QCPDataRange(0, count)));
     return hit;
 }
 
 //! The pixels a pan may shift this plottable's layer by instead of repainting it.
-QPointF QCPAbstractPlottable::stallPixelOffset() const
+QPointF QCPPlottable::stallPixelOffset() const
 {
     return mCore.stallOffset(*this, view());
 }
@@ -704,7 +704,7 @@ QPointF QCPAbstractPlottable::stallPixelOffset() const
   that draw this plottable's data. A pan or a zoom never reaches it, so a range change still reuses
   the recording.
 */
-void QCPAbstractPlottable::markDirty()
+void QCPPlottable::markDirty()
 {
     if (!mCore.contentChanged())
         return;
@@ -716,7 +716,7 @@ void QCPAbstractPlottable::markDirty()
   Registers \a dependent, a layerable whose drawing follows this plottable's data, so a content
   change repaints it wherever its own layer is. A null or already registered layerable is ignored.
 */
-void QCPAbstractPlottable::addDependent(QCPLayerable* dependent)
+void QCPPlottable::addDependent(QCPLayerable* dependent)
 {
     if (dependent && !mDependents.contains(dependent))
         mDependents.append(dependent);
@@ -726,7 +726,7 @@ void QCPAbstractPlottable::addDependent(QCPLayerable* dependent)
   Unregisters \a dependent. A dependent that dies without calling this is forgotten on the next
   content change.
 */
-void QCPAbstractPlottable::removeDependent(QCPLayerable* dependent)
+void QCPPlottable::removeDependent(QCPLayerable* dependent)
 {
     mDependents.removeAll(dependent);
 }
@@ -737,19 +737,19 @@ void QCPAbstractPlottable::removeDependent(QCPLayerable* dependent)
   cycle marks each object once. A dependent that is not itself a plottable (a tracer, an item) ends
   its own branch.
 */
-void QCPAbstractPlottable::markDependentsDirty()
+void QCPPlottable::markDependentsDirty()
 {
     // Nearly every plottable has no dependent, and this runs on every setter: no set work then.
     if (mDependents.isEmpty())
         return;
-    static thread_local QSet<const QCPAbstractPlottable*> beingMarked;
+    static thread_local QSet<const QCPPlottable*> beingMarked;
     if (beingMarked.contains(this))
         return;
     beingMarked.insert(this);
     struct RemoveOnExit
     {
-        QSet<const QCPAbstractPlottable*>& set;
-        const QCPAbstractPlottable* self;
+        QSet<const QCPPlottable*>& set;
+        const QCPPlottable* self;
         ~RemoveOnExit() { set.remove(self); }
     } removeOnExit { beingMarked, this };
 
@@ -763,13 +763,13 @@ void QCPAbstractPlottable::markDependentsDirty()
     }
 }
 
-QCPRange QCPAbstractPlottable::getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const
+QCPRange QCPPlottable::getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const
 {
     return qcpDrawnRange(mCore.dataRange(*this, view(), false), QCPDrawnSide::Key, foundRange,
                          inSignDomain);
 }
 
-QCPRange QCPAbstractPlottable::getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
+QCPRange QCPPlottable::getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
                                              const QCPRange& inKeyRange) const
 {
     Q_UNUSED(inKeyRange) // simplify: a box keeps no per-key values, so it cannot be narrowed
@@ -779,7 +779,7 @@ QCPRange QCPAbstractPlottable::getValueRange(bool& foundRange, QCP::SignDomain i
 
 //! Replays the icon recording, fitted to \a rect, with this plottable's antialiasing: the replay
 //! keeps the painter's, which is the legend row's.
-void QCPAbstractPlottable::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
+void QCPPlottable::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
 {
     applyDefaultAntialiasingHint(painter);
     mCore.paintIcon(*this, *painter, rect, view());
@@ -795,7 +795,7 @@ void QCPAbstractPlottable::drawLegendIcon(QCPPainter* painter, const QRectF& rec
   legend sits in an axis rect's inset layout, so the walk descends the whole element tree. Raw, so a
   name change pays no handle per legend row (K8).
 */
-void QCPAbstractPlottable::markLegendRows(QCPLayoutElement* element, QCPAbstractPlottable* plottable)
+void QCPPlottable::markLegendRows(QCPLayoutElement* element, QCPPlottable* plottable)
 {
     if (!element)
         return;
@@ -803,7 +803,7 @@ void QCPAbstractPlottable::markLegendRows(QCPLayoutElement* element, QCPAbstract
     {
         for (int i = 0; i < legend->itemCount(); ++i)
         {
-            QCPAbstractLegendItem* item = legend->itemRaw(i);
+            QCPLegendItem* item = legend->itemRaw(i);
             auto* row = qobject_cast<QCPPlottableLegendItem*>(item);
             if (!row || row->plottableRaw() != plottable)
                 continue;
@@ -815,14 +815,14 @@ void QCPAbstractPlottable::markLegendRows(QCPLayoutElement* element, QCPAbstract
         markLegendRows(child, plottable);
 }
 
-void QCPAbstractPlottable::setName(const QString& name)
+void QCPPlottable::setName(const QString& name)
 {
     if (name == mName)
         return;
     if (mParentPlot) // an orphan plottable has no legend to mark, but still has a name
         markLegendRows(mParentPlot->plotLayout(), this);
     mName = name;
-    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::nameChanged, this->name());
+    qcpEmit(this, mParentPlot, &QCPPlottable::nameChanged, this->name());
 }
 
 /*!
@@ -831,13 +831,13 @@ void QCPAbstractPlottable::setName(const QString& name)
   Note that this setting may be overridden by \ref QCustomPlot::setAntialiasedElements and \ref
   QCustomPlot::setNotAntialiasedElements.
 */
-void QCPAbstractPlottable::setAntialiasedFill(bool enabled)
+void QCPPlottable::setAntialiasedFill(bool enabled)
 {
     if (mAntialiasedFill == enabled)
         return;
     markDirty();
     mAntialiasedFill = enabled;
-    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::antialiasedFillChanged, antialiasedFill());
+    qcpEmit(this, mParentPlot, &QCPPlottable::antialiasedFillChanged, antialiasedFill());
 }
 
 /*!
@@ -846,13 +846,13 @@ void QCPAbstractPlottable::setAntialiasedFill(bool enabled)
   Note that this setting may be overridden by \ref QCustomPlot::setAntialiasedElements and \ref
   QCustomPlot::setNotAntialiasedElements.
 */
-void QCPAbstractPlottable::setAntialiasedScatters(bool enabled)
+void QCPPlottable::setAntialiasedScatters(bool enabled)
 {
     if (mAntialiasedScatters == enabled)
         return;
     markDirty();
     mAntialiasedScatters = enabled;
-    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::antialiasedScattersChanged,
+    qcpEmit(this, mParentPlot, &QCPPlottable::antialiasedScattersChanged,
             antialiasedScatters());
 }
 
@@ -864,13 +864,13 @@ void QCPAbstractPlottable::setAntialiasedScatters(bool enabled)
 
   \see setBrush
 */
-void QCPAbstractPlottable::setPen(const QPen& pen)
+void QCPPlottable::setPen(const QPen& pen)
 {
     if (mPen == pen)
         return;
     markDirty();
     mPen = pen;
-    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::penChanged, mPen);
+    qcpEmit(this, mParentPlot, &QCPPlottable::penChanged, mPen);
 }
 
 /*!
@@ -882,13 +882,13 @@ void QCPAbstractPlottable::setPen(const QPen& pen)
 
   \see setPen
 */
-void QCPAbstractPlottable::setBrush(const QBrush& brush)
+void QCPPlottable::setBrush(const QBrush& brush)
 {
     if (mBrush == brush)
         return;
     markDirty();
     mBrush = brush;
-    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::brushChanged, this->brush());
+    qcpEmit(this, mParentPlot, &QCPPlottable::brushChanged, this->brush());
 }
 
 /*!
@@ -902,19 +902,19 @@ void QCPAbstractPlottable::setBrush(const QBrush& brush)
 
   \see setValueAxis
 */
-void QCPAbstractPlottable::setKeyAxis(QCPAxis* axis)
+void QCPPlottable::setKeyAxis(QCPAxis* axis)
 {
     resolveAxes(axis, valueAxisRaw());
 }
 
-void QCPAbstractPlottable::setValueAxis(QCPAxis* axis)
+void QCPPlottable::setValueAxis(QCPAxis* axis)
 {
     resolveAxes(keyAxisRaw(), axis);
 }
 
 //! The 2.x pair resolves to the system of that pair on the axes' area; the pair itself stays the
 //! projection a non-cartesian system cannot answer.
-void QCPAbstractPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
+void QCPPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
 {
     QCPCoordinateSystem* resolved = qcpSystemOfAxes(key, value);
     const QCPAxis* keyBefore = keyAxisRaw();
@@ -943,14 +943,14 @@ void QCPAbstractPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
         markDirty();
         systemDidChange();
         if (hadSystem)
-            qcpEmit(this, mParentPlot, &QCPAbstractPlottable::systemChanged,
+            qcpEmit(this, mParentPlot, &QCPPlottable::systemChanged,
                     static_cast<QCPCoordinateSystem*>(nullptr));
         return axesMoved(keyBefore, valueBefore);
     }
     setSystem(resolved);
 }
 
-void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
+void QCPPlottable::setSystem(QCPCoordinateSystem* system)
 {
     if (system == mSystem)
         return;
@@ -985,7 +985,7 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
         mParentPlot->registerJoinedPlottable(this);
     contentChanged(); // the new frame's recording, then whatever follows an axis pair
     systemDidChange();
-    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::systemChanged, mSystem.data());
+    qcpEmit(this, mParentPlot, &QCPPlottable::systemChanged, mSystem.data());
     axesMoved(keyBefore, valueBefore);
 }
 
@@ -995,7 +995,7 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
   setKeyAxis, setValueAxis and setSystem all move them. Both wait for one scope, as a slot of the
   first may delete this plottable.
 */
-void QCPAbstractPlottable::axesMoved(const QCPAxis* key, const QCPAxis* value)
+void QCPPlottable::axesMoved(const QCPAxis* key, const QCPAxis* value)
 {
     const bool keyMoved = keyAxisRaw() != key;
     const bool valueMoved = valueAxisRaw() != value;
@@ -1003,9 +1003,9 @@ void QCPAbstractPlottable::axesMoved(const QCPAxis* key, const QCPAxis* value)
         return;
     const QCPEmissionScope scope(mParentPlot);
     if (keyMoved)
-        qcpEmit(this, mParentPlot, &QCPAbstractPlottable::keyAxisChanged, keyAxisRaw());
+        qcpEmit(this, mParentPlot, &QCPPlottable::keyAxisChanged, keyAxisRaw());
     if (valueMoved)
-        qcpEmit(this, mParentPlot, &QCPAbstractPlottable::valueAxisChanged, valueAxisRaw());
+        qcpEmit(this, mParentPlot, &QCPPlottable::valueAxisChanged, valueAxisRaw());
 }
 
 /*!
@@ -1027,7 +1027,7 @@ void QCPAbstractPlottable::axesMoved(const QCPAxis* key, const QCPAxis* value)
 
   \see setSelectable, selectTest
 */
-void QCPAbstractPlottable::setSelection(QCPDataSelection selection)
+void QCPPlottable::setSelection(QCPDataSelection selection)
 {
     selection.enforceType(mSelectable);
     if (assignSelection(selection))
@@ -1037,7 +1037,7 @@ void QCPAbstractPlottable::setSelection(QCPDataSelection selection)
     }
 }
 
-bool QCPAbstractPlottable::assignSelection(const QCPDataSelection& selection)
+bool QCPPlottable::assignSelection(const QCPDataSelection& selection)
 {
     if (mSelection == selection)
         return false;
@@ -1050,9 +1050,9 @@ bool QCPAbstractPlottable::assignSelection(const QCPDataSelection& selection)
   Emits \ref selectionChanged, at the outermost call: a slot may delete this plottable, and the
   selection is read with \ref selection when the signal is delivered.
 */
-void QCPAbstractPlottable::emitSelectionChanged()
+void QCPPlottable::emitSelectionChanged()
 {
-    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::selectionChanged);
+    qcpEmit(this, mParentPlot, &QCPPlottable::selectionChanged);
 }
 
 /*!
@@ -1064,7 +1064,7 @@ void QCPAbstractPlottable::emitSelectionChanged()
 
   The currently set decorator can be accessed via \ref selectionDecorator.
 */
-void QCPAbstractPlottable::setSelectionDecorator(QCPSelectionDecorator* decorator)
+void QCPPlottable::setSelectionDecorator(QCPSelectionDecorator* decorator)
 {
     const QCPSelectionDecorator* before = mSelectionDecorator;
     if (decorator)
@@ -1083,7 +1083,7 @@ void QCPAbstractPlottable::setSelectionDecorator(QCPSelectionDecorator* decorato
         mSelectionDecorator = nullptr;
     }
     if (mSelectionDecorator != before)
-        qcpEmit(this, mParentPlot, &QCPAbstractPlottable::selectionDecoratorChanged,
+        qcpEmit(this, mParentPlot, &QCPPlottable::selectionDecoratorChanged,
                 mSelectionDecorator);
 }
 
@@ -1097,7 +1097,7 @@ void QCPAbstractPlottable::setSelectionDecorator(QCPSelectionDecorator* decorato
 
   \see setSelection, QCP::SelectionType
 */
-void QCPAbstractPlottable::setSelectable(QCP::SelectionType selectable)
+void QCPPlottable::setSelectable(QCP::SelectionType selectable)
 {
     if (mSelectable != selectable)
     {
@@ -1109,7 +1109,7 @@ void QCPAbstractPlottable::setSelectable(QCP::SelectionType selectable)
         if (selectionTrimmed)
             markDirty();
         const QCPEmissionScope scope(mParentPlot);
-        qcpEmit(this, mParentPlot, &QCPAbstractPlottable::selectableChanged);
+        qcpEmit(this, mParentPlot, &QCPPlottable::selectableChanged);
         if (selectionTrimmed)
             emitSelectionChanged();
     }
@@ -1124,7 +1124,7 @@ void QCPAbstractPlottable::setSelectable(QCP::SelectionType selectable)
 
   \see pixelsToCoords, QCPAxis::coordToPixel
 */
-void QCPAbstractPlottable::coordsToPixels(double key, double value, double& x, double& y) const
+void QCPPlottable::coordsToPixels(double key, double value, double& x, double& y) const
 {
     QCPAxis* keyAxis = keyAxisRaw();
     QCPAxis* valueAxis = valueAxisRaw();
@@ -1156,7 +1156,7 @@ void QCPAbstractPlottable::coordsToPixels(double key, double value, double& x, d
 
   Transforms the given \a key and \a value to pixel coordinates and returns them in a QPointF.
 */
-const QPointF QCPAbstractPlottable::coordsToPixels(double key, double value) const
+const QPointF QCPPlottable::coordsToPixels(double key, double value) const
 {
     QCPAxis* keyAxis = keyAxisRaw();
     QCPAxis* valueAxis = valueAxisRaw();
@@ -1185,7 +1185,7 @@ const QPointF QCPAbstractPlottable::coordsToPixels(double key, double value) con
 
   \see coordsToPixels, QCPAxis::coordToPixel
 */
-void QCPAbstractPlottable::pixelsToCoords(double x, double y, double& key, double& value) const
+void QCPPlottable::pixelsToCoords(double x, double y, double& key, double& value) const
 {
     QCPAxis* keyAxis = keyAxisRaw();
     QCPAxis* valueAxis = valueAxisRaw();
@@ -1217,7 +1217,7 @@ void QCPAbstractPlottable::pixelsToCoords(double x, double y, double& key, doubl
 
   Returns the pixel input \a pixelPos as plot coordinates \a key and \a value.
 */
-void QCPAbstractPlottable::pixelsToCoords(const QPointF& pixelPos, double& key, double& value) const
+void QCPPlottable::pixelsToCoords(const QPointF& pixelPos, double& key, double& value) const
 {
     pixelsToCoords(pixelPos.x(), pixelPos.y(), key, value);
 }
@@ -1235,7 +1235,7 @@ void QCPAbstractPlottable::pixelsToCoords(const QPointF& pixelPos, double& key, 
 
   \see rescaleKeyAxis, rescaleValueAxis, QCustomPlot::rescaleAxes, QCPAxis::rescale
 */
-void QCPAbstractPlottable::rescaleAxes(bool onlyEnlarge) const
+void QCPPlottable::rescaleAxes(bool onlyEnlarge) const
 {
     rescaleKeyAxis(onlyEnlarge);
     rescaleValueAxis(onlyEnlarge);
@@ -1246,7 +1246,7 @@ void QCPAbstractPlottable::rescaleAxes(bool onlyEnlarge) const
 
   See \ref rescaleAxes for detailed behaviour.
 */
-void QCPAbstractPlottable::rescaleKeyAxis(bool onlyEnlarge) const
+void QCPPlottable::rescaleKeyAxis(bool onlyEnlarge) const
 {
     // The system's own axis, whatever its kind: a user system on a QCPAxis rect has an ordinary
     // axis to fit. A polar system's axis is not a QCPAxis, so the cast answers null and the area
@@ -1297,7 +1297,7 @@ void QCPAbstractPlottable::rescaleKeyAxis(bool onlyEnlarge) const
 
   See \ref rescaleAxes for detailed behaviour.
 */
-void QCPAbstractPlottable::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) const
+void QCPPlottable::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) const
 {
     // Same side as rescaleKeyAxis: the system's own axes when they are ordinary QCPAxis objects,
     // null and silent on a polar frame.
@@ -1356,7 +1356,7 @@ void QCPAbstractPlottable::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) c
 
   \see removeFromLegend, QCPLegend::addItem
 */
-bool QCPAbstractPlottable::addToLegend(QCPLegend* legend)
+bool QCPPlottable::addToLegend(QCPLegend* legend)
 {
     if (!legendAllowed())
         return false;
@@ -1385,7 +1385,7 @@ bool QCPAbstractPlottable::addToLegend(QCPLegend* legend)
   legend, also when it leaves a \ref QCPPlottableGroup. True adds the row back, unless the
   plottable is grouped (its group's row stands for it).
 */
-void QCPAbstractPlottable::setWantsLegend(bool wants)
+void QCPPlottable::setWantsLegend(bool wants)
 {
     if (mWantsLegend == wants)
         return;
@@ -1399,7 +1399,7 @@ void QCPAbstractPlottable::setWantsLegend(bool wants)
         addToLegend();
     else
         removeFromLegend();
-    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::wantsLegendChanged, mWantsLegend);
+    qcpEmit(this, mParentPlot, &QCPPlottable::wantsLegendChanged, mWantsLegend);
 }
 
 /*! \overload
@@ -1408,7 +1408,7 @@ void QCPAbstractPlottable::setWantsLegend(bool wants)
 
   \see removeFromLegend
 */
-bool QCPAbstractPlottable::addToLegend()
+bool QCPPlottable::addToLegend()
 {
     if (!mParentPlot || !mParentPlot->legend)
         return false;
@@ -1426,7 +1426,7 @@ bool QCPAbstractPlottable::addToLegend()
 
   \see addToLegend, QCPLegend::removeItem
 */
-bool QCPAbstractPlottable::removeFromLegend(QCPLegend* legend) const
+bool QCPPlottable::removeFromLegend(QCPLegend* legend) const
 {
     if (!legend)
     {
@@ -1446,7 +1446,7 @@ bool QCPAbstractPlottable::removeFromLegend(QCPLegend* legend) const
 
   \see addToLegend
 */
-bool QCPAbstractPlottable::removeFromLegend() const
+bool QCPPlottable::removeFromLegend() const
 {
     if (!mParentPlot || !mParentPlot->legend)
         return false;
@@ -1459,7 +1459,7 @@ bool QCPAbstractPlottable::removeFromLegend() const
   drops it silently like setSystem(nullptr), but re-arms the one report the next draw gives, so the
   user learns why it stopped being drawn.
 */
-void QCPAbstractPlottable::dropSystem()
+void QCPPlottable::dropSystem()
 {
     // setSystem's signals wait for the write below: a slot may delete this plottable.
     const QCPEmissionScope scope(mParentPlot);
@@ -1474,7 +1474,7 @@ void QCPAbstractPlottable::dropSystem()
   rows, the group). A slot may delete the plot, so everything that reaches the plot happens before
   the scope delivers, and nothing after it does.
 */
-void QCPAbstractPlottable::leavePlotOnDestruction()
+void QCPPlottable::leavePlotOnDestruction()
 {
     QCustomPlot* plot = mRegisteredPlot;
     const QCPEmissionScope scope(plot);
@@ -1484,7 +1484,7 @@ void QCPAbstractPlottable::leavePlotOnDestruction()
     leaveLayerSilently();
 }
 
-bool QCPAbstractPlottable::drawableAxes() const
+bool QCPPlottable::drawableAxes() const
 {
     if (mSystem)
     {
@@ -1500,13 +1500,13 @@ bool QCPAbstractPlottable::drawableAxes() const
 }
 
 /* inherits documentation from base class */
-QRect QCPAbstractPlottable::clipRect() const
+QRect QCPPlottable::clipRect() const
 {
     return mSystem ? mSystem->clipRect() : QRect();
 }
 
 /* inherits documentation from base class */
-QCP::Interaction QCPAbstractPlottable::selectionCategory() const
+QCP::Interaction QCPPlottable::selectionCategory() const
 {
     return QCP::iSelectPlottables;
 }
@@ -1526,13 +1526,13 @@ QCP::Interaction QCPAbstractPlottable::selectionCategory() const
 
   \see setAntialiased
 */
-void QCPAbstractPlottable::applyDefaultAntialiasingHint(QCPPainter* painter) const
+void QCPPlottable::applyDefaultAntialiasingHint(QCPPainter* painter) const
 {
     applyAntialiasingHint(painter, mAntialiased, QCP::aePlottables);
 }
 
 /* inherits documentation from base class */
-void QCPAbstractPlottable::selectEvent([[maybe_unused]] QMouseEvent* event, bool additive,
+void QCPPlottable::selectEvent([[maybe_unused]] QMouseEvent* event, bool additive,
                                        const QVariant& details, bool* selectionStateChanged)
 {
 
@@ -1540,7 +1540,7 @@ void QCPAbstractPlottable::selectEvent([[maybe_unused]] QMouseEvent* event, bool
     {
         QCPDataSelection newSelection = details.value<QCPDataSelection>();
         QCPDataSelection selectionBefore = mSelection;
-        const QPointer<QCPAbstractPlottable> alive(this);
+        const QPointer<QCPPlottable> alive(this);
         if (additive)
         {
             if (mSelectable == QCP::stWhole) // in whole selection mode, we toggle to no selection
@@ -1570,12 +1570,12 @@ void QCPAbstractPlottable::selectEvent([[maybe_unused]] QMouseEvent* event, bool
 }
 
 /* inherits documentation from base class */
-void QCPAbstractPlottable::deselectEvent(bool* selectionStateChanged)
+void QCPPlottable::deselectEvent(bool* selectionStateChanged)
 {
     if (mSelectable != QCP::stNone)
     {
         QCPDataSelection selectionBefore = mSelection;
-        const QPointer<QCPAbstractPlottable> alive(this);
+        const QPointer<QCPPlottable> alive(this);
         setSelection(QCPDataSelection());
         if (selectionStateChanged)
             *selectionStateChanged = !alive || mSelection != selectionBefore;
@@ -1586,12 +1586,12 @@ void QCPAbstractPlottable::deselectEvent(bool* selectionStateChanged)
 //////////////////// Busy indicator
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool QCPAbstractPlottable::busy() const
+bool QCPPlottable::busy() const
 {
     return mEffectiveBusy;
 }
 
-void QCPAbstractPlottable::setBusy(bool busy)
+void QCPPlottable::setBusy(bool busy)
 {
     if (mExternalBusy != busy)
     {
@@ -1600,7 +1600,7 @@ void QCPAbstractPlottable::setBusy(bool busy)
     }
 }
 
-void QCPAbstractPlottable::updateEffectiveBusy()
+void QCPPlottable::updateEffectiveBusy()
 {
     const bool newBusy = mExternalBusy || pipelineBusy() || hasPendingData();
     if (newBusy == mEffectiveBusy)
@@ -1611,10 +1611,10 @@ void QCPAbstractPlottable::updateEffectiveBusy()
     const int delay = mEffectiveBusy ? effectiveBusyShowDelayMs() : effectiveBusyHideDelayMs();
     mBusyDebounceTimer.start(delay);
     // Last: a slot may delete this plottable.
-    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::busyChanged, mEffectiveBusy);
+    qcpEmit(this, mParentPlot, &QCPPlottable::busyChanged, mEffectiveBusy);
 }
 
-void QCPAbstractPlottable::onDebounceTimeout()
+void QCPPlottable::onDebounceTimeout()
 {
     if (mVisuallyBusy == mEffectiveBusy)
         return;
@@ -1625,54 +1625,54 @@ void QCPAbstractPlottable::onDebounceTimeout()
     if (mLayer)
         mLayer->invalidatePaintBuffer(); // invalidating schedules the repaint
     // Last: a slot may delete this plottable.
-    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::visuallyBusyChanged, mVisuallyBusy);
+    qcpEmit(this, mParentPlot, &QCPPlottable::visuallyBusyChanged, mVisuallyBusy);
 }
 
 // per-plottable overrides
 
-void QCPAbstractPlottable::setBusyIndicatorSymbol(const QString& symbol)
+void QCPPlottable::setBusyIndicatorSymbol(const QString& symbol)
 {
     mBusyIndicatorSymbol = symbol;
 }
 
-void QCPAbstractPlottable::resetBusyIndicatorSymbol()
+void QCPPlottable::resetBusyIndicatorSymbol()
 {
     mBusyIndicatorSymbol.reset();
 }
 
-void QCPAbstractPlottable::setBusyFadeAlpha(qreal alpha)
+void QCPPlottable::setBusyFadeAlpha(qreal alpha)
 {
     mBusyFadeAlpha = alpha;
 }
 
-void QCPAbstractPlottable::resetBusyFadeAlpha()
+void QCPPlottable::resetBusyFadeAlpha()
 {
     mBusyFadeAlpha.reset();
 }
 
-void QCPAbstractPlottable::setBusyShowDelayMs(int ms)
+void QCPPlottable::setBusyShowDelayMs(int ms)
 {
     mBusyShowDelayMs = ms;
 }
 
-void QCPAbstractPlottable::resetBusyShowDelayMs()
+void QCPPlottable::resetBusyShowDelayMs()
 {
     mBusyShowDelayMs.reset();
 }
 
-void QCPAbstractPlottable::setBusyHideDelayMs(int ms)
+void QCPPlottable::setBusyHideDelayMs(int ms)
 {
     mBusyHideDelayMs = ms;
 }
 
-void QCPAbstractPlottable::resetBusyHideDelayMs()
+void QCPPlottable::resetBusyHideDelayMs()
 {
     mBusyHideDelayMs.reset();
 }
 
 // effective values: per-plottable override, then theme, then hardcoded fallback
 
-QString QCPAbstractPlottable::effectiveBusyIndicatorSymbol() const
+QString QCPPlottable::effectiveBusyIndicatorSymbol() const
 {
     if (mBusyIndicatorSymbol)
         return *mBusyIndicatorSymbol;
@@ -1681,7 +1681,7 @@ QString QCPAbstractPlottable::effectiveBusyIndicatorSymbol() const
     return QStringLiteral("\u27F3");
 }
 
-qreal QCPAbstractPlottable::effectiveBusyFadeAlpha() const
+qreal QCPPlottable::effectiveBusyFadeAlpha() const
 {
     if (mBusyFadeAlpha)
         return *mBusyFadeAlpha;
@@ -1690,7 +1690,7 @@ qreal QCPAbstractPlottable::effectiveBusyFadeAlpha() const
     return 0.3;
 }
 
-int QCPAbstractPlottable::effectiveBusyShowDelayMs() const
+int QCPPlottable::effectiveBusyShowDelayMs() const
 {
     if (mBusyShowDelayMs)
         return *mBusyShowDelayMs;
@@ -1699,7 +1699,7 @@ int QCPAbstractPlottable::effectiveBusyShowDelayMs() const
     return 500;
 }
 
-int QCPAbstractPlottable::effectiveBusyHideDelayMs() const
+int QCPPlottable::effectiveBusyHideDelayMs() const
 {
     if (mBusyHideDelayMs)
         return *mBusyHideDelayMs;
@@ -1717,7 +1717,7 @@ void setLayer(QCPLayerable& layerable, const QString& layerName)
     layerable.setLayer(layerName);
 }
 
-void setAxes(QCPAbstractPlottable& plottable, QCPAxis* keyAxis, QCPAxis* valueAxis)
+void setAxes(QCPPlottable& plottable, QCPAxis* keyAxis, QCPAxis* valueAxis)
 {
     QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "a plottable needs a key axis and a value axis");
     QCP_CHECK_OR_RETURN(keyAxis->parentPlot() == plottable.parentPlot()
@@ -1738,7 +1738,7 @@ QCPAxis* firstAxis(const QCPAxisRect* rect, QCPAxis::AxisType type)
     return axes.isEmpty() ? nullptr : axes.first().get();
 }
 
-void setAxesOfRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect, QCPAxis::AxisType keyType,
+void setAxesOfRect(QCPPlottable& plottable, QCPAxisRect* rect, QCPAxis::AxisType keyType,
                    QCPAxis::AxisType valueType)
 {
     QCPAxis* keyAxis = firstAxis(rect, keyType);
@@ -1748,7 +1748,7 @@ void setAxesOfRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect, QCPAxis::
 }
 } // namespace
 
-void setAxes(QCPAbstractPlottable& plottable, QCPAxis::AxisType keyType,
+void setAxes(QCPPlottable& plottable, QCPAxis::AxisType keyType,
              QCPAxis::AxisType valueType)
 {
     QCPAxis* current = plottable.keyAxis();
@@ -1757,7 +1757,7 @@ void setAxes(QCPAbstractPlottable& plottable, QCPAxis::AxisType keyType,
                   valueType);
 }
 
-void setAxisRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect)
+void setAxisRect(QCPPlottable& plottable, QCPAxisRect* rect)
 {
     QCP_CHECK_OR_RETURN(rect && rect->parentPlot() == plottable.parentPlot(),
                         "the axis rect belongs to another plot");

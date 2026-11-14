@@ -35,10 +35,10 @@
 #include "../plottables/plottable.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////// QCPAbstractLegendItem
+//////////////////// QCPLegendItem
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*! \class QCPAbstractLegendItem
+/*! \class QCPLegendItem
   \brief The abstract base class for all entries in a QCPLegend.
 
   It defines a very basic interface for entries in a QCPLegend. For representing plottables in the
@@ -65,37 +65,37 @@
 
 /* start of documentation of signals */
 
-/*! \fn void QCPAbstractLegendItem::selectionChanged()
+/*! \fn void QCPLegendItem::selectionChanged()
 
   This signal is emitted when the selection state of this legend item has changed, either by user
   interaction or by a direct call to \ref setSelected. The slot reads \ref selected.
 */
 
-/*! \fn void QCPAbstractLegendItem::selectableChanged()
+/*! \fn void QCPLegendItem::selectableChanged()
 
   This signal is emitted when the selectability of this legend item has changed. The slot reads
   \ref selectable.
 */
 
-/*! \fn void QCPAbstractLegendItem::fontChanged(const QFont& font)
+/*! \fn void QCPLegendItem::fontChanged(const QFont& font)
 
   This signal is emitted when \ref font changes, after the plot delivers its deferred
   signals.
 */
 
-/*! \fn void QCPAbstractLegendItem::textColorChanged(const QColor& textColor)
+/*! \fn void QCPLegendItem::textColorChanged(const QColor& textColor)
 
   This signal is emitted when \ref textColor changes, after the plot delivers its deferred
   signals.
 */
 
-/*! \fn void QCPAbstractLegendItem::selectedFontChanged(const QFont& selectedFont)
+/*! \fn void QCPLegendItem::selectedFontChanged(const QFont& selectedFont)
 
   This signal is emitted when \ref selectedFont changes, after the plot delivers its deferred
   signals.
 */
 
-/*! \fn void QCPAbstractLegendItem::selectedTextColorChanged(const QColor& selectedTextColor)
+/*! \fn void QCPLegendItem::selectedTextColorChanged(const QColor& selectedTextColor)
 
   This signal is emitted when \ref selectedTextColor changes, after the plot delivers its deferred
   signals.
@@ -104,10 +104,10 @@
 /* end of documentation of signals */
 
 /*!
-  Constructs a QCPAbstractLegendItem and associates it with the QCPLegend \a parent. This does not
+  Constructs a QCPLegendItem and associates it with the QCPLegend \a parent. This does not
   cause the item to be added to \a parent, so \ref QCPLegend::addItem must be called separately.
 */
-QCPAbstractLegendItem::QCPAbstractLegendItem(QCPLegend* parent)
+QCPLegendItem::QCPLegendItem(QCPLegend* parent)
         : QCPLayoutElement(parent->parentPlot())
         , mFont(parent->font())
         , mTextColor(parent->textColor())
@@ -125,14 +125,14 @@ QCPAbstractLegendItem::QCPAbstractLegendItem(QCPLegend* parent)
 
   \see setTextColor, QCPLegend::setFont
 */
-void QCPAbstractLegendItem::setFont(const QFont& font)
+void QCPLegendItem::setFont(const QFont& font)
 {
     if (mFont == font)
         return;
     if (mLayer)
         mLayer->invalidatePaintBuffer(); // a font change invalidates the old glyphs
     mFont = font;
-    qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::fontChanged, this->font());
+    qcpEmit(this, mParentPlot, &QCPLegendItem::fontChanged, this->font());
 }
 
 /*!
@@ -140,14 +140,14 @@ void QCPAbstractLegendItem::setFont(const QFont& font)
 
   \see setFont, QCPLegend::setTextColor
 */
-void QCPAbstractLegendItem::setTextColor(const QColor& color)
+void QCPLegendItem::setTextColor(const QColor& color)
 {
     if (mTextColor == color)
         return;
     if (mLayer)
         mLayer->invalidatePaintBuffer(); // a font change invalidates the old glyphs
     mTextColor = color;
-    qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::textColorChanged, textColor());
+    qcpEmit(this, mParentPlot, &QCPLegendItem::textColorChanged, textColor());
 }
 
 /*!
@@ -156,14 +156,14 @@ void QCPAbstractLegendItem::setTextColor(const QColor& color)
 
   \see setFont, QCPLegend::setSelectedFont
 */
-void QCPAbstractLegendItem::setSelectedFont(const QFont& font)
+void QCPLegendItem::setSelectedFont(const QFont& font)
 {
     if (mSelectedFont == font)
         return;
     if (mLayer)
         mLayer->invalidatePaintBuffer(); // a font change invalidates the old glyphs
     mSelectedFont = font;
-    qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectedFontChanged, selectedFont());
+    qcpEmit(this, mParentPlot, &QCPLegendItem::selectedFontChanged, selectedFont());
 }
 
 /*!
@@ -172,14 +172,14 @@ void QCPAbstractLegendItem::setSelectedFont(const QFont& font)
 
   \see setTextColor, QCPLegend::setSelectedTextColor
 */
-void QCPAbstractLegendItem::setSelectedTextColor(const QColor& color)
+void QCPLegendItem::setSelectedTextColor(const QColor& color)
 {
     if (mSelectedTextColor == color)
         return;
     if (mLayer)
         mLayer->invalidatePaintBuffer(); // a font change invalidates the old glyphs
     mSelectedTextColor = color;
-    qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectedTextColorChanged,
+    qcpEmit(this, mParentPlot, &QCPLegendItem::selectedTextColorChanged,
             selectedTextColor());
 }
 
@@ -191,7 +191,7 @@ void QCPAbstractLegendItem::setSelectedTextColor(const QColor& color)
 
   \see setSelectedParts, QCustomPlot::setInteractions
 */
-void QCPAbstractLegendItem::setSelectable(QCP::SelectionType selectable)
+void QCPLegendItem::setSelectable(QCP::SelectionType selectable)
 {
     QCP_CHECK_OR_RETURN(selectable == QCP::stNone || selectable == QCP::stWhole,
                         "a legend item is either stNone or stWhole selectable");
@@ -199,7 +199,7 @@ void QCPAbstractLegendItem::setSelectable(QCP::SelectionType selectable)
     if (mSelectable != selectableWhole)
     {
         mSelectable = selectableWhole;
-        qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectableChanged);
+        qcpEmit(this, mParentPlot, &QCPLegendItem::selectableChanged);
     }
 }
 
@@ -211,7 +211,7 @@ void QCPAbstractLegendItem::setSelectable(QCP::SelectionType selectable)
 
   \see setSelectableParts, QCustomPlot::setInteractions
 */
-void QCPAbstractLegendItem::setSelected(bool selected)
+void QCPLegendItem::setSelected(bool selected)
 {
     if (mSelected == selected)
         return;
@@ -220,13 +220,13 @@ void QCPAbstractLegendItem::setSelected(bool selected)
     const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mSelected = selected;
-    qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectionChanged);
+    qcpEmit(this, mParentPlot, &QCPLegendItem::selectionChanged);
     if (QCPLegend* owner = legend())
         owner->noteItemSelection();
 }
 
 /* inherits documentation from base class */
-double QCPAbstractLegendItem::selectTest(const QPointF& pos, bool onlySelectable,
+double QCPLegendItem::selectTest(const QPointF& pos, bool onlySelectable,
                                          [[maybe_unused]] QVariant* details) const
 {
     if (!mParentPlot)
@@ -241,26 +241,26 @@ double QCPAbstractLegendItem::selectTest(const QPointF& pos, bool onlySelectable
 }
 
 /* inherits documentation from base class */
-void QCPAbstractLegendItem::applyDefaultAntialiasingHint(QCPPainter* painter) const
+void QCPLegendItem::applyDefaultAntialiasingHint(QCPPainter* painter) const
 {
     applyAntialiasingHint(painter, mAntialiased, QCP::aeLegendItems);
 }
 
 /* inherits documentation from base class */
-QRect QCPAbstractLegendItem::clipRect() const
+QRect QCPLegendItem::clipRect() const
 {
     return mOuterRect;
 }
 
 /* inherits documentation from base class */
-void QCPAbstractLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event, bool additive,
+void QCPLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event, bool additive,
                                         [[maybe_unused]] const QVariant& details,
                                         bool* selectionStateChanged)
 {
     if (selectableAsItem())
     {
         bool selBefore = mSelected;
-        const QPointer<QCPAbstractLegendItem> alive(this);
+        const QPointer<QCPLegendItem> alive(this);
         setSelected(additive ? !mSelected : true);
         if (selectionStateChanged)
             *selectionStateChanged = !alive || mSelected != selBefore;
@@ -268,12 +268,12 @@ void QCPAbstractLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event, boo
 }
 
 /* inherits documentation from base class */
-void QCPAbstractLegendItem::deselectEvent(bool* selectionStateChanged)
+void QCPLegendItem::deselectEvent(bool* selectionStateChanged)
 {
     if (selectableAsItem())
     {
         bool selBefore = mSelected;
-        const QPointer<QCPAbstractLegendItem> alive(this);
+        const QPointer<QCPLegendItem> alive(this);
         setSelected(false);
         if (selectionStateChanged)
             *selectionStateChanged = !alive || mSelected != selBefore;
@@ -289,7 +289,7 @@ void QCPAbstractLegendItem::deselectEvent(bool* selectionStateChanged)
 
   This is the standard legend item for plottables. It displays an icon of the plottable next to the
   plottable name. The icon is drawn by the respective plottable itself (\ref
-  QCPAbstractPlottable::drawLegendIcon), and tries to give an intuitive symbol for the plottable.
+  QCPPlottable::drawLegendIcon), and tries to give an intuitive symbol for the plottable.
   For example, the QCPGraph draws a centered horizontal line and/or a single scatter point in the
   middle.
 
@@ -298,7 +298,7 @@ void QCPAbstractLegendItem::deselectEvent(bool* selectionStateChanged)
   name with \ref setFont. Icon padding and border pen is taken from the parent QCPLegend, see \ref
   QCPLegend::setIconBorderPen and \ref QCPLegend::setIconTextPadding.
 
-  The function \ref QCPAbstractPlottable::addToLegend/\ref QCPAbstractPlottable::removeFromLegend
+  The function \ref QCPPlottable::addToLegend/\ref QCPPlottable::removeFromLegend
   creates/removes legend items of this type.
 
   Since QCPLegend is based on QCPLayoutGrid, a legend item itself is just a subclass of
@@ -313,39 +313,39 @@ void QCPAbstractLegendItem::deselectEvent(bool* selectionStateChanged)
   Once it's created, it can be added to the legend via \ref QCPLegend::addItem.
 
   A more convenient way of adding/removing a plottable to/from the legend is via the functions \ref
-  QCPAbstractPlottable::addToLegend and \ref QCPAbstractPlottable::removeFromLegend.
+  QCPPlottable::addToLegend and \ref QCPPlottable::removeFromLegend.
 */
-QCPPlottableLegendItem::QCPPlottableLegendItem(QCPLegend* parent, QCPAbstractPlottable* plottable)
-        : QCPAbstractLegendItem(parent), mPlottable(plottable)
+QCPPlottableLegendItem::QCPPlottableLegendItem(QCPLegend* parent, QCPPlottable* plottable)
+        : QCPLegendItem(parent), mPlottable(plottable)
 {
     setAntialiased(false);
     repaintWhenBusyChanges(plottable);
     leaveLegendWhenDestroyed(plottable);
 }
 
-QCPHandle<QCPLegend> QCPAbstractLegendItem::parentLegend() const
+QCPHandle<QCPLegend> QCPLegendItem::parentLegend() const
 {
     return QCPHandle<QCPLegend>(legend());
 }
 
-QCPLegend* QCPAbstractLegendItem::legend() const
+QCPLegend* QCPLegendItem::legend() const
 {
     return qobject_cast<QCPLegend*>(mParentLayout);
 }
 
-QSize QCPAbstractLegendItem::legendIconSize() const
+QSize QCPLegendItem::legendIconSize() const
 {
     const QCPLegend* owner = legend();
     return owner ? owner->iconSize() : QSize(0, 0);
 }
 
-int QCPAbstractLegendItem::legendIconTextPadding() const
+int QCPLegendItem::legendIconTextPadding() const
 {
     const QCPLegend* owner = legend();
     return owner ? owner->iconTextPadding() : 0;
 }
 
-QPen QCPAbstractLegendItem::legendIconBorderPen() const
+QPen QCPLegendItem::legendIconBorderPen() const
 {
     const QCPLegend* owner = legend();
     if (!owner)
@@ -353,13 +353,13 @@ QPen QCPAbstractLegendItem::legendIconBorderPen() const
     return mSelected ? owner->selectedIconBorderPen() : owner->iconBorderPen();
 }
 
-bool QCPAbstractLegendItem::selectableAsItem() const
+bool QCPLegendItem::selectableAsItem() const
 {
     const QCPLegend* owner = legend();
     return mSelectable && owner && owner->selectableParts().testFlag(QCPLegend::spItems);
 }
 
-void QCPAbstractLegendItem::leaveLegendWhenDestroyed(QObject* subject)
+void QCPLegendItem::leaveLegendWhenDestroyed(QObject* subject)
 {
     if (subject)
         connect(subject, &QObject::destroyed, this,
@@ -370,15 +370,15 @@ void QCPAbstractLegendItem::leaveLegendWhenDestroyed(QObject* subject)
                 });
 }
 
-QCPHandle<QCPAbstractPlottable> QCPPlottableLegendItem::plottable()
+QCPHandle<QCPPlottable> QCPPlottableLegendItem::plottable()
 {
-    return QCPHandle<QCPAbstractPlottable>(mPlottable.data());
+    return QCPHandle<QCPPlottable>(mPlottable.data());
 }
 
-void QCPAbstractLegendItem::repaintWhenBusyChanges(QCPAbstractPlottable* plottable)
+void QCPLegendItem::repaintWhenBusyChanges(QCPPlottable* plottable)
 {
     if (plottable)
-        connect(plottable, &QCPAbstractPlottable::visuallyBusyChanged, this,
+        connect(plottable, &QCPPlottable::visuallyBusyChanged, this,
                 [this](bool) { if (QCPLayer* legendLayer = layer()) legendLayer->markDirty(); });
 }
 
@@ -499,19 +499,19 @@ QSize QCPPlottableLegendItem::minimumOuterSizeHint() const
 
   A legend is a small box somewhere in the plot which lists plottables with their name and icon.
 
-  A legend is populated with legend items by calling \ref QCPAbstractPlottable::addToLegend on the
+  A legend is populated with legend items by calling \ref QCPPlottable::addToLegend on the
   plottable, for which a legend item shall be created. In the case of the main legend (\ref
   QCustomPlot::legend), simply adding plottables to the plot while \ref
   QCustomPlot::setAutoAddPlottableToLegend is set to true (the default) creates corresponding
   legend items. The legend item associated with a certain plottable can be removed with \ref
-  QCPAbstractPlottable::removeFromLegend. However, QCPLegend also offers an interface to add and
+  QCPPlottable::removeFromLegend. However, QCPLegend also offers an interface to add and
   manipulate legend items directly: \ref item, \ref itemWithPlottable, \ref itemCount, \ref
   addItem, \ref removeItem, etc.
 
   Since \ref QCPLegend derives from \ref QCPLayoutGrid, it can be placed in any position a \ref
   QCPLayoutElement may be positioned. The legend items are themselves \ref QCPLayoutElement
   "QCPLayoutElements" which are placed in the grid layout of the legend. \ref QCPLegend only adds
-  an interface specialized for handling child elements of type \ref QCPAbstractLegendItem, as
+  an interface specialized for handling child elements of type \ref QCPLegendItem, as
   mentioned above. In principle, any other layout elements may also be added to a legend via the
   normal \ref QCPLayoutGrid interface. See the special page about \link thelayoutsystem The Layout
   System\endlink for examples on how to add other elements to the legend and move it outside the
@@ -712,7 +712,7 @@ void QCPLegend::setBrush(const QBrush& brush)
 
   This function will also set \a font on all already existing legend items.
 
-  \see QCPAbstractLegendItem::setFont
+  \see QCPLegendItem::setFont
 */
 void QCPLegend::setFont(const QFont& font)
 {
@@ -737,7 +737,7 @@ void QCPLegend::setFont(const QFont& font)
 
   This function will also set \a color on all already existing legend items.
 
-  \see QCPAbstractLegendItem::setTextColor
+  \see QCPLegendItem::setTextColor
 */
 void QCPLegend::setTextColor(const QColor& color)
 {
@@ -840,7 +840,7 @@ void QCPLegend::setSelectableParts(const SelectableParts& selectable)
 
   Note that it doesn't make sense to set the selected state \ref spItems here when it wasn't set
   before, because there's no way to specify which exact items to newly select. Do this by calling
-  \ref QCPAbstractLegendItem::setSelected directly on the legend item you wish to select.
+  \ref QCPLegendItem::setSelected directly on the legend item you wish to select.
 
   \see SelectablePart, setSelectableParts, selectTest, setSelectedBorderPen,
   setSelectedIconBorderPen, setSelectedBrush, setSelectedFont
@@ -852,7 +852,7 @@ bool deselectItems(QCPLegend* legend)
 {
     const QPointer<QCPLegend> alive(legend);
     const auto selected = legend->selectedItems();
-    const QList<QPointer<QCPAbstractLegendItem>> items(selected.cbegin(), selected.cend());
+    const QList<QPointer<QCPLegendItem>> items(selected.cbegin(), selected.cend());
     for (const auto& item : items)
         if (item)
             item->setSelected(false);
@@ -937,7 +937,7 @@ void QCPLegend::setSelectedBrush(const QBrush& brush)
 
   This function will also set \a font on all already existing legend items.
 
-  \see setFont, QCPAbstractLegendItem::setSelectedFont
+  \see setFont, QCPLegendItem::setSelectedFont
 */
 void QCPLegend::setSelectedFont(const QFont& font)
 {
@@ -960,7 +960,7 @@ void QCPLegend::setSelectedFont(const QFont& font)
 
   This function will also set \a color on all already existing legend items.
 
-  \see setTextColor, QCPAbstractLegendItem::setSelectedTextColor
+  \see setTextColor, QCPLegendItem::setSelectedTextColor
 */
 void QCPLegend::setSelectedTextColor(const QColor& color)
 {
@@ -980,28 +980,28 @@ void QCPLegend::setSelectedTextColor(const QColor& color)
 
 /*!
   Returns the item with index \a i. If non-legend items were added to the legend, and the element
-  at the specified cell index is not a QCPAbstractLegendItem, returns \c nullptr.
+  at the specified cell index is not a QCPLegendItem, returns \c nullptr.
 
   Note that the linear index depends on the current fill order (\ref setFillOrder).
 
   \see itemCount, addItem, itemWithPlottable
 */
-QCPHandle<QCPAbstractLegendItem> QCPLegend::item(int index) const
+QCPHandle<QCPLegendItem> QCPLegend::item(int index) const
 {
-    return QCPHandle<QCPAbstractLegendItem>(itemRaw(index));
+    return QCPHandle<QCPLegendItem>(itemRaw(index));
 }
 
 /*! \internal
 
   The row raw: the legend's own loops (fonts, colours, selection) read this one (K8).
 */
-QCPAbstractLegendItem* QCPLegend::itemRaw(int index) const
+QCPLegendItem* QCPLegend::itemRaw(int index) const
 {
     if (index < 0 || index >= elementCount())
         return nullptr;
     int row, col;
     indexToRowCol(index, row, col);
-    return qobject_cast<QCPAbstractLegendItem*>(mElements.at(row).at(col));
+    return qobject_cast<QCPLegendItem*>(mElements.at(row).at(col));
 }
 
 /*!
@@ -1011,7 +1011,7 @@ QCPAbstractLegendItem* QCPLegend::itemRaw(int index) const
   \see hasItemWithPlottable
 */
 QCPHandle<QCPPlottableLegendItem>
-QCPLegend::itemWithPlottable(const QCPAbstractPlottable* plottable) const
+QCPLegend::itemWithPlottable(const QCPPlottable* plottable) const
 {
     for (int i = 0; i < itemCount(); ++i)
     {
@@ -1027,7 +1027,7 @@ QCPLegend::itemWithPlottable(const QCPAbstractPlottable* plottable) const
 /*!
   Returns the number of items currently in the legend. It is identical to the base class
   QCPLayoutGrid::elementCount(), and unlike the other "item" interface methods of QCPLegend,
-  doesn't only address elements which can be cast to QCPAbstractLegendItem.
+  doesn't only address elements which can be cast to QCPLegendItem.
 
   Note that if empty cells are in the legend (e.g. by calling methods of the \ref QCPLayoutGrid
   base class which allows creating empty cells), they are included in the returned count.
@@ -1044,7 +1044,7 @@ int QCPLegend::itemCount() const
 
   \see hasItemWithPlottable
 */
-bool QCPLegend::hasItem(QCPAbstractLegendItem* item) const
+bool QCPLegend::hasItem(QCPLegendItem* item) const
 {
     for (int i = 0; i < itemCount(); ++i)
     {
@@ -1060,7 +1060,7 @@ bool QCPLegend::hasItem(QCPAbstractLegendItem* item) const
 
   \see itemWithPlottable
 */
-bool QCPLegend::hasItemWithPlottable(const QCPAbstractPlottable* plottable) const
+bool QCPLegend::hasItemWithPlottable(const QCPPlottable* plottable) const
 {
     return itemWithPlottable(plottable);
 }
@@ -1076,7 +1076,7 @@ bool QCPLegend::hasItemWithPlottable(const QCPAbstractPlottable* plottable) cons
 
   \see removeItem, item, hasItem
 */
-bool QCPLegend::addItem(QCPAbstractLegendItem* item)
+bool QCPLegend::addItem(QCPLegendItem* item)
 {
     // The grid's signals wait until the item knows its legend: a slot sees it whole, and may
     // delete the legend.
@@ -1118,7 +1118,7 @@ void QCPLegend::noteItemSelection()
   was. If you don't want this, rather use the raw element interface of \ref QCPLayoutGrid.
 
   Returns true, if successful. Unlike \ref QCPLayoutGrid::removeAt, this method only removes
-  elements derived from \ref QCPAbstractLegendItem.
+  elements derived from \ref QCPLegendItem.
 
   \see itemCount, clearItems
 */
@@ -1126,7 +1126,7 @@ bool QCPLegend::removeItem(int index)
 {
     // The item's leaving may signal selectionChanged before the re-wrap: a slot runs at the end.
     const QCPEmissionScope scope(mParentPlot);
-    if (QCPAbstractLegendItem* ali = itemRaw(index))
+    if (QCPLegendItem* ali = itemRaw(index))
     {
         bool success = remove(ali);
         if (success)
@@ -1149,7 +1149,7 @@ bool QCPLegend::removeItem(int index)
 
   \see clearItems
 */
-bool QCPLegend::removeItem(QCPAbstractLegendItem* item)
+bool QCPLegend::removeItem(QCPLegendItem* item)
 {
     // The item's leaving may signal selectionChanged before the re-wrap: a slot runs at the end.
     const QCPEmissionScope scope(mParentPlot);
@@ -1179,17 +1179,17 @@ void QCPLegend::clearItems()
   Returns the legend items that are currently selected. If no items are selected,
   the list is empty.
 
-  \see QCPAbstractLegendItem::setSelected, setSelectable
+  \see QCPLegendItem::setSelected, setSelectable
 */
-QList<QCPHandle<QCPAbstractLegendItem>> QCPLegend::selectedItems() const
+QList<QCPHandle<QCPLegendItem>> QCPLegend::selectedItems() const
 {
-    QList<QCPHandle<QCPAbstractLegendItem>> result;
+    QList<QCPHandle<QCPLegendItem>> result;
     for (int i = 0; i < itemCount(); ++i)
     {
-        if (QCPAbstractLegendItem* ali = itemRaw(i))
+        if (QCPLegendItem* ali = itemRaw(i))
         {
             if (ali->selected())
-                result.append(QCPHandle<QCPAbstractLegendItem>(ali));
+                result.append(QCPHandle<QCPLegendItem>(ali));
         }
     }
     return result;
@@ -1306,7 +1306,7 @@ QCP::Interaction QCPLegend::selectionCategory() const
 }
 
 /* inherits documentation from base class */
-QCP::Interaction QCPAbstractLegendItem::selectionCategory() const
+QCP::Interaction QCPLegendItem::selectionCategory() const
 {
     return QCP::iSelectLegend;
 }

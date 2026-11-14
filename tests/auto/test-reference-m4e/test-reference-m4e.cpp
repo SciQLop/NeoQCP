@@ -702,7 +702,7 @@ QImage polarItemsScene()
                 position->setType(QCPItemPosition::ptAxisRectRatio);
                 position->setCoords(x, y);
             };
-            const auto clip = [&](QCPAbstractItem* item)
+            const auto clip = [&](QCPItem* item)
             {
                 item->setClipArea(area);
                 item->setClipToAxisRect(true);

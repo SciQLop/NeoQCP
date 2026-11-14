@@ -7,7 +7,7 @@
 #include <cmath>
 #include <span>
 
-class QCPResampledMultiDataSource final : public QCPAbstractMultiDataSource {
+class QCPResampledMultiDataSource final : public QCPMultiDataSource {
 public:
     explicit QCPResampledMultiDataSource(qcp::algo::MultiColumnBinResult bins)
         : mBins(std::move(bins)) {}
@@ -327,7 +327,7 @@ inline MultiColumnBinResult dropEmptyBins(const MultiColumnBinResult& in)
 }
 
 inline std::shared_ptr<QCPResampledMultiDataSource> binRawViewport(
-    const QCPAbstractMultiDataSource& raw, const ViewportParams& vp, bool withOrigin)
+    const QCPMultiDataSource& raw, const ViewportParams& vp, bool withOrigin)
 {
     const auto rows = rawRowsInView(raw, vp.keyRange);
     return std::make_shared<QCPResampledMultiDataSource>(orderColumnsByTrend(dropEmptyBins(
@@ -343,7 +343,7 @@ inline std::shared_ptr<QCPResampledMultiDataSource> binRawViewport(
 inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2Multi(
     const GraphResamplerCache& l1Cache,
     const ViewportParams& vp,
-    const QCPAbstractMultiDataSource& raw)
+    const QCPMultiDataSource& raw)
 {
     PROFILE_HERE_N("resampleL2Multi");
     const auto& l1 = l1Cache.level1;

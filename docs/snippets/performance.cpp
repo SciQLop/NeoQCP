@@ -143,7 +143,7 @@ DOC_CODE(performance_rescale_when_ready)
     std::vector<double> keys { 0, 10 }, values { -5, 5 };
     // [performance_rescale_when_ready]
     graph->setData(std::move(keys), std::move(values));
-    QObject::connect(graph.get(), &QCPAbstractPlottable::busyChanged, customPlot,
+    QObject::connect(graph.get(), &QCPPlottable::busyChanged, customPlot,
                      [customPlot](bool busy) {
                          if (!busy)
                          {

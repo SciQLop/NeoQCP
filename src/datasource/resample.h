@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <vector>
 
-class QCPAbstractDataSource2D;
+class QCPDataSource2D;
 class QCPColorMapData;
 class QCPRange;
 
@@ -43,7 +43,7 @@ struct ResampleCache
 // test-only knob to get a single-threaded reference for correctness
 // comparisons; production callers should leave it false.
 QCPColorMapData* resample(
-    const QCPAbstractDataSource2D& src,
+    const QCPDataSource2D& src,
     int xBegin, int xEnd,
     const QCPRange& xRange, const QCPRange& yRange,
     int targetWidth, int targetHeight,

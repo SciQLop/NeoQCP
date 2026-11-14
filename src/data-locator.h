@@ -6,16 +6,16 @@
 #include <QVector>
 #include <limits>
 
-class QCPAbstractPlottable;
+class QCPPlottable;
 
 class QCP_LIB_DECL QCPDataLocator
 {
 public:
     QCPDataLocator() = default;
 
-    void setPlottable(QCPAbstractPlottable* plottable);
+    void setPlottable(QCPPlottable* plottable);
     bool locate(const QPointF& pixelPos);
-    bool locateAtKey(QCPAbstractPlottable* plottable, double key,
+    bool locateAtKey(QCPPlottable* plottable, double key,
                      double value = std::numeric_limits<double>::quiet_NaN());
 
     bool isValid() const { return mValid; }
@@ -24,13 +24,13 @@ public:
     double data() const { return mData; }
     int dataIndex() const { return mDataIndex; }
     const QVector<double>& componentValues() const { return mComponentValues; }
-    //! Out of line: a handle of the forward-declared QCPAbstractPlottable needs its complete type.
-    QCPHandle<QCPAbstractPlottable> plottable() const;
-    QCPHandle<QCPAbstractPlottable> hitPlottable() const;
+    //! Out of line: a handle of the forward-declared QCPPlottable needs its complete type.
+    QCPHandle<QCPPlottable> plottable() const;
+    QCPHandle<QCPPlottable> hitPlottable() const;
 
 private:
-    QCPAbstractPlottable* mPlottable = nullptr;
-    QCPAbstractPlottable* mHitPlottable = nullptr;
+    QCPPlottable* mPlottable = nullptr;
+    QCPPlottable* mHitPlottable = nullptr;
     bool mValid = false;
     double mKey = 0;
     double mValue = 0;

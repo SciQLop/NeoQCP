@@ -79,10 +79,10 @@ protected:
 };
 
 // Pending data that counts commits, like a pipeline result waiting for its swap window.
-class PendingStub : public QCPAbstractPlottable
+class PendingStub : public QCPPlottable
 {
 public:
-    PendingStub(QCPAxis* k, QCPAxis* v) : QCPAbstractPlottable(k, v) { }
+    PendingStub(QCPAxis* k, QCPAxis* v) : QCPPlottable(k, v) { }
 
     int commits = 0;
 
@@ -113,11 +113,11 @@ public:
 
 // A plottable that joins any system: it needs no capability and draws nothing, so only the layer
 // it sits on is under test.
-class SystemStub : public QCPAbstractPlottable
+class SystemStub : public QCPPlottable
 {
 public:
     explicit SystemStub(QCPCoordinateSystem* system)
-        : QCPAbstractPlottable(system, QCP::Capabilities())
+        : QCPPlottable(system, QCP::Capabilities())
     {
     }
 
@@ -724,124 +724,124 @@ struct PlottableAppearanceCase
 {
     const char* name;
     // Creates the plottable; the test settles afterwards so only the setter's own dirty counts.
-    std::function<QCPAbstractPlottable*(QCustomPlot&)> prepare;
-    std::function<void(QCPAbstractPlottable*)> change;
+    std::function<QCPPlottable*(QCustomPlot&)> prepare;
+    std::function<void(QCPPlottable*)> change;
 };
 
 const QVector<PlottableAppearanceCase>& plottableAppearanceCases()
 {
     using Plot = QCustomPlot&;
     static const QVector<PlottableAppearanceCase> cases {
-        { "graph.setLineStyle", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
-          [](QCPAbstractPlottable* p)
+        { "graph.setLineStyle", [](Plot plot) -> QCPPlottable* { return plot.graph(0); },
+          [](QCPPlottable* p)
           { static_cast<QCPGraph*>(p)->setLineStyle(QCPGraph::lsStepLeft); } },
-        { "graph.setScatterSkip", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPGraph*>(p)->setScatterSkip(2); } },
+        { "graph.setScatterSkip", [](Plot plot) -> QCPPlottable* { return plot.graph(0); },
+          [](QCPPlottable* p) { static_cast<QCPGraph*>(p)->setScatterSkip(2); } },
         { "graph.setAdaptiveSampling",
-          [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPGraph*>(p)->setAdaptiveSampling(false); } },
-        { "graph.setPen", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
-          [](QCPAbstractPlottable* p) { p->setPen(QPen(Qt::darkGreen, 3)); } },
-        { "graph.setBrush", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
-          [](QCPAbstractPlottable* p) { p->setBrush(QBrush(Qt::yellow)); } },
-        { "graph.setName", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
-          [](QCPAbstractPlottable* p) { p->setName(QStringLiteral("renamed")); } },
+          [](Plot plot) -> QCPPlottable* { return plot.graph(0); },
+          [](QCPPlottable* p) { static_cast<QCPGraph*>(p)->setAdaptiveSampling(false); } },
+        { "graph.setPen", [](Plot plot) -> QCPPlottable* { return plot.graph(0); },
+          [](QCPPlottable* p) { p->setPen(QPen(Qt::darkGreen, 3)); } },
+        { "graph.setBrush", [](Plot plot) -> QCPPlottable* { return plot.graph(0); },
+          [](QCPPlottable* p) { p->setBrush(QBrush(Qt::yellow)); } },
+        { "graph.setName", [](Plot plot) -> QCPPlottable* { return plot.graph(0); },
+          [](QCPPlottable* p) { p->setName(QStringLiteral("renamed")); } },
         { "curve.setPen",
-          [](Plot plot) -> QCPAbstractPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { p->setPen(QPen(Qt::darkCyan, 3)); } },
+          [](Plot plot) -> QCPPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
+          [](QCPPlottable* p) { p->setPen(QPen(Qt::darkCyan, 3)); } },
         { "curve.setBrush",
-          [](Plot plot) -> QCPAbstractPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { p->setBrush(QBrush(Qt::cyan)); } },
+          [](Plot plot) -> QCPPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
+          [](QCPPlottable* p) { p->setBrush(QBrush(Qt::cyan)); } },
         { "curve.setScatterStyle",
-          [](Plot plot) -> QCPAbstractPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p)
+          [](Plot plot) -> QCPPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
+          [](QCPPlottable* p)
           {
               static_cast<QCPCurve*>(p)->setScatterStyle(
                   QCPScatterStyle(QCPScatterStyle::ssCircle, 6));
           } },
         { "bars.setWidth",
-          [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPBars*>(p)->setWidth(0.5); } },
-        { "bars.setWidthType", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPBars(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          [](Plot plot) -> QCPPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
+          [](QCPPlottable* p) { static_cast<QCPBars*>(p)->setWidth(0.5); } },
+        { "bars.setWidthType", [](Plot plot) -> QCPPlottable*
+          { return new QCPBars(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPBars*>(p)->setWidthType(QCPBars::wtAbsolute); } },
         { "bars.setBaseValue",
-          [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPBars*>(p)->setBaseValue(0.5); } },
+          [](Plot plot) -> QCPPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
+          [](QCPPlottable* p) { static_cast<QCPBars*>(p)->setBaseValue(0.5); } },
         { "bars.setStackingGap",
-          [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPBars*>(p)->setStackingGap(2); } },
-        { "financial.setWidth", [](Plot plot) -> QCPAbstractPlottable*
+          [](Plot plot) -> QCPPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
+          [](QCPPlottable* p) { static_cast<QCPBars*>(p)->setStackingGap(2); } },
+        { "financial.setWidth", [](Plot plot) -> QCPPlottable*
           { return new QCPFinancial(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPFinancial*>(p)->setWidth(0.3); } },
-        { "financial.setChartStyle", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPFinancial(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          [](QCPPlottable* p) { static_cast<QCPFinancial*>(p)->setWidth(0.3); } },
+        { "financial.setChartStyle", [](Plot plot) -> QCPPlottable*
+          { return new QCPFinancial(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPFinancial*>(p)->setChartStyle(QCPFinancial::csOhlc); } },
-        { "financial.setPenNegative", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPFinancial(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+        { "financial.setPenNegative", [](Plot plot) -> QCPPlottable*
+          { return new QCPFinancial(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPFinancial*>(p)->setPenNegative(QPen(Qt::magenta, 2)); } },
-        { "statisticalbox.setWidth", [](Plot plot) -> QCPAbstractPlottable*
+        { "statisticalbox.setWidth", [](Plot plot) -> QCPPlottable*
           { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPStatisticalBox*>(p)->setWidth(0.6); } },
-        { "statisticalbox.setWhiskerPen", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          [](QCPPlottable* p) { static_cast<QCPStatisticalBox*>(p)->setWidth(0.6); } },
+        { "statisticalbox.setWhiskerPen", [](Plot plot) -> QCPPlottable*
+          { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPStatisticalBox*>(p)->setWhiskerPen(QPen(Qt::magenta, 2)); } },
-        { "statisticalbox.setMedianPen", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+        { "statisticalbox.setMedianPen", [](Plot plot) -> QCPPlottable*
+          { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPStatisticalBox*>(p)->setMedianPen(QPen(Qt::darkGreen, 3)); } },
-        { "errorbars.setWhiskerWidth", [](Plot plot) -> QCPAbstractPlottable*
+        { "errorbars.setWhiskerWidth", [](Plot plot) -> QCPPlottable*
           { return new QCPErrorBars(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPErrorBars*>(p)->setWhiskerWidth(10); } },
-        { "errorbars.setErrorType", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPErrorBars(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          [](QCPPlottable* p) { static_cast<QCPErrorBars*>(p)->setWhiskerWidth(10); } },
+        { "errorbars.setErrorType", [](Plot plot) -> QCPPlottable*
+          { return new QCPErrorBars(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPErrorBars*>(p)->setErrorType(QCPErrorBars::etKeyError); } },
-        { "colormap.setDataRange", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPColorMap(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+        { "colormap.setDataRange", [](Plot plot) -> QCPPlottable*
+          { return new QCPColorMap(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPColorMap*>(p)->setDataRange(QCPRange(0, 5)); } },
-        { "colormap.setDataScaleType", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPColorMap(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+        { "colormap.setDataScaleType", [](Plot plot) -> QCPPlottable*
+          { return new QCPColorMap(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPColorMap*>(p)->setDataScaleType(QCPAxis::stLogarithmic); } },
-        { "colormap.setGradient", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPColorMap(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+        { "colormap.setGradient", [](Plot plot) -> QCPPlottable*
+          { return new QCPColorMap(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPColorMap*>(p)->setGradient(QCPColorGradient::gpJet); } },
-        { "colormap.setInterpolate", [](Plot plot) -> QCPAbstractPlottable*
+        { "colormap.setInterpolate", [](Plot plot) -> QCPPlottable*
           { return new QCPColorMap(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setInterpolate(false); } },
-        { "colormap.setTightBoundary", [](Plot plot) -> QCPAbstractPlottable*
+          [](QCPPlottable* p) { static_cast<QCPColorMap*>(p)->setInterpolate(false); } },
+        { "colormap.setTightBoundary", [](Plot plot) -> QCPPlottable*
           { return new QCPColorMap(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setTightBoundary(true); } },
-        { "colormap2.setGapThreshold", [](Plot plot) -> QCPAbstractPlottable*
+          [](QCPPlottable* p) { static_cast<QCPColorMap*>(p)->setTightBoundary(true); } },
+        { "colormap2.setGapThreshold", [](Plot plot) -> QCPPlottable*
           { return new QCPColorMap2(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap2*>(p)->setGapThreshold(0.5); } },
-        { "colormap2.setContourPen", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPColorMap2(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          [](QCPPlottable* p) { static_cast<QCPColorMap2*>(p)->setGapThreshold(0.5); } },
+        { "colormap2.setContourPen", [](Plot plot) -> QCPPlottable*
+          { return new QCPColorMap2(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPColorMap2*>(p)->setContourPen(QPen(Qt::magenta, 2)); } },
-        { "colormap2.setAutoContourLevels", [](Plot plot) -> QCPAbstractPlottable*
+        { "colormap2.setAutoContourLevels", [](Plot plot) -> QCPPlottable*
           { return new QCPColorMap2(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap2*>(p)->setAutoContourLevels(8); } },
-        { "histogram.setBins", [](Plot plot) -> QCPAbstractPlottable*
+          [](QCPPlottable* p) { static_cast<QCPColorMap2*>(p)->setAutoContourLevels(8); } },
+        { "histogram.setBins", [](Plot plot) -> QCPPlottable*
           { return new QCPHistogram(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPHistogram*>(p)->setBins(12); } },
-        { "histogram.setStyle", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPHistogram(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          [](QCPPlottable* p) { static_cast<QCPHistogram*>(p)->setBins(12); } },
+        { "histogram.setStyle", [](Plot plot) -> QCPPlottable*
+          { return new QCPHistogram(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPHistogram*>(p)->setStyle(QCPHistogram::sStep); } },
-        { "histogram2d.setContourPen", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPHistogram2D(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+        { "histogram2d.setContourPen", [](Plot plot) -> QCPPlottable*
+          { return new QCPHistogram2D(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPHistogram2D*>(p)->setContourPen(QPen(Qt::magenta, 2)); } },
-        { "multigraph.setLineStyle", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPGraph(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+        { "multigraph.setLineStyle", [](Plot plot) -> QCPPlottable*
+          { return new QCPGraph(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPGraph*>(p)->setLineStyle(QCPGraph::lsNone); } },
-        { "multigraph.setAdaptiveSampling", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPGraph(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+        { "multigraph.setAdaptiveSampling", [](Plot plot) -> QCPPlottable*
+          { return new QCPGraph(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPGraph*>(p)->setAdaptiveSampling(false); } },
-        { "waterfall.setOffsetMode", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+        { "waterfall.setOffsetMode", [](Plot plot) -> QCPPlottable*
+          { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPWaterfallGraph*>(p)->setOffsetMode(QCPWaterfallGraph::omCustom); } },
-        { "waterfall.setGain", [](Plot plot) -> QCPAbstractPlottable*
+        { "waterfall.setGain", [](Plot plot) -> QCPPlottable*
           { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPWaterfallGraph*>(p)->setGain(2.0); } },
-        { "waterfall.setNormalize", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          [](QCPPlottable* p) { static_cast<QCPWaterfallGraph*>(p)->setGain(2.0); } },
+        { "waterfall.setNormalize", [](Plot plot) -> QCPPlottable*
+          { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
           { static_cast<QCPWaterfallGraph*>(p)->setNormalize(false); } },
     };
     return cases;
@@ -864,7 +864,7 @@ void TestRepaint::plottableSettersScheduleRepaint()
     QVERIFY(it != cases.cend());
 
     auto plot = settledPlot();
-    QCPAbstractPlottable* plottable = it->prepare(*plot);
+    QCPPlottable* plottable = it->prepare(*plot);
     QVERIFY(plottable);
     waitUntilSettled(*plot);
     QVERIFY(!plot->isRepaintQueued());
@@ -892,7 +892,7 @@ void TestRepaint::plottableEqualValueDoesNotDirty()
     QVERIFY(it != cases.cend());
 
     auto plot = settledPlot();
-    QCPAbstractPlottable* plottable = it->prepare(*plot);
+    QCPPlottable* plottable = it->prepare(*plot);
     QVERIFY(plottable);
     waitUntilSettled(*plot);
 
@@ -2064,8 +2064,8 @@ void TestRepaint::itemTakenAndAddedKeepsAxes()
     waitUntilSettled(plot);
     waitUntilSettled(plot);
 
-    QCPAbstractItem* item = line;
-    auto handle = qcp::makeHandle<QCPHandle<QCPAbstractItem>>(item);
+    QCPItem* item = line;
+    auto handle = qcp::makeHandle<QCPHandle<QCPItem>>(item);
     auto taken = plot.take(handle);
     QVERIFY(taken);
     auto added = plot.add(std::move(taken));
@@ -2105,10 +2105,10 @@ public:
 };
 
 // An item that deliberately does not override pixelBounds(): it must never be culled.
-class PlainItem : public QCPAbstractItem
+class PlainItem : public QCPItem
 {
 public:
-    explicit PlainItem(QCustomPlot* plot) : QCPAbstractItem(plot)
+    explicit PlainItem(QCustomPlot* plot) : QCPItem(plot)
     {
         // A recording needs the axes: they come from a position, even one this item never reads.
         mAnchor = createPosition(QStringLiteral("anchor"));
@@ -2148,7 +2148,7 @@ QRectF extentPixelRect(const QCPItemExtent& extent)
     return QRectF(a, b).normalized().adjusted(-pad, -pad, pad, pad);
 }
 
-QCPAbstractItem* makeBoundedItem(const QString& kind, QCustomPlot* plot)
+QCPItem* makeBoundedItem(const QString& kind, QCustomPlot* plot)
 {
     if (kind == QLatin1String("line"))
     {
@@ -2214,7 +2214,7 @@ void TestRepaint::itemExtentContainsDrawing()
 {
     QFETCH(QString, item);
     auto plot = settledPlot();
-    QCPAbstractItem* subject = makeBoundedItem(item, plot.get());
+    QCPItem* subject = makeBoundedItem(item, plot.get());
     QVERIFY(subject);
 
     // Returns the number of painted pixels, or -1 with a message when one is outside the bounds.
@@ -3237,10 +3237,10 @@ namespace
 {
 // Three overlapping "bars" as one recording: their fills and outlines are six commands, so the
 // merge has to keep the order the painter would have used.
-class OverlappingBars : public QCPAbstractItem
+class OverlappingBars : public QCPItem
 {
 public:
-    explicit OverlappingBars(QCustomPlot* plot) : QCPAbstractItem(plot)
+    explicit OverlappingBars(QCustomPlot* plot) : QCPItem(plot)
     {
         setClipAxisRect(plot->axisRect());
         // An item with no position reports no extent, and the index then never asks it to draw.
@@ -3870,12 +3870,12 @@ bool pureBlue(const QColor& colour)
 
 //! An item whose whole recording is one image command: the plot's own replays then carry it, on
 //! screen and in an export, exactly as a plottable's recording would.
-class ImageItem : public QCPAbstractItem
+class ImageItem : public QCPItem
 {
 public:
     ImageItem(QCustomPlot* plot, const QCP::Position& a, const QCP::Position& b,
               const QImage& image, const QRectF& source = { }, bool smooth = false)
-            : QCPAbstractItem(plot)
+            : QCPItem(plot)
             , m_a(a)
             , m_b(b)
             , m_image(image)

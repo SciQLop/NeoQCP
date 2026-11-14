@@ -8,17 +8,17 @@
 #include "plottables/plottable-graph.h"
 #include "selection.h"
 
-QCPHandle<QCPAbstractPlottable> QCPDataLocator::plottable() const
+QCPHandle<QCPPlottable> QCPDataLocator::plottable() const
 {
-    return QCPHandle<QCPAbstractPlottable>(mPlottable);
+    return QCPHandle<QCPPlottable>(mPlottable);
 }
 
-QCPHandle<QCPAbstractPlottable> QCPDataLocator::hitPlottable() const
+QCPHandle<QCPPlottable> QCPDataLocator::hitPlottable() const
 {
-    return QCPHandle<QCPAbstractPlottable>(mHitPlottable);
+    return QCPHandle<QCPPlottable>(mHitPlottable);
 }
 
-void QCPDataLocator::setPlottable(QCPAbstractPlottable* plottable)
+void QCPDataLocator::setPlottable(QCPPlottable* plottable)
 {
     mPlottable = plottable;
     mHitPlottable = nullptr;
@@ -180,7 +180,7 @@ bool QCPDataLocator::locateGraph(const QPointF& pixelPos)
     return true;
 }
 
-bool QCPDataLocator::locateAtKey(QCPAbstractPlottable* plottable, double key, double value)
+bool QCPDataLocator::locateAtKey(QCPPlottable* plottable, double key, double value)
 {
     mValid = false;
     mKey = 0;

@@ -477,7 +477,7 @@ QCPTransform qcpViewTransform(const QCPDrawnView& view)
 
 } // namespace
 
-QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
+QCPDrawnView qcpDrawnViewOf(const QCPItem& item, QRect clip)
 {
     QCPDrawnView view;
     view.plot = item.parentPlotRaw();
@@ -532,7 +532,7 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
     return view;
 }
 
-QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip)
+QCPDrawnView qcpDrawnViewOf(const QCPPlottable& plottable, QRect clip)
 {
     QCPDrawnView view;
     view.plot = plottable.parentPlotRaw();
@@ -805,7 +805,7 @@ std::optional<QCPDataBox> QCPDrawnCore::dataRange(const QCPDrawable& object,
         return std::nullopt;
     const QCPDrawList& list = mState->recording;
     // The recording already knows which sides every command was data on; a log axis cannot index a
-    // box that reaches zero or below, exactly as QCPAbstractItem::positionsExtent decides it.
+    // box that reaches zero or below, exactly as QCPItem::positionsExtent decides it.
     const QCPDrawList::Box& side = list.data;
     bool keyBounded = side.keyBounded;
     bool valueBounded = side.valueBounded;

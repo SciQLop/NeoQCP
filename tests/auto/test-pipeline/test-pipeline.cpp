@@ -25,7 +25,7 @@
 #include <thread>
 
 namespace {
-using GenericPipeline = QCPAsyncPipeline<QCPAbstractDataSource, QCPAbstractDataSource>;
+using GenericPipeline = QCPAsyncPipeline<QCPDataSource, QCPDataSource>;
 
 std::vector<std::vector<double>> oneColumn(std::vector<double> values)
 {
@@ -40,7 +40,7 @@ oneColumnSource(std::vector<double> keys, std::vector<double> values)
 }
 
 // Synthetic multi-column source that computes data on-the-fly without allocating N arrays.
-class SyntheticLargeMultiSource : public QCPAbstractMultiDataSource
+class SyntheticLargeMultiSource : public QCPMultiDataSource
 {
 public:
     explicit SyntheticLargeMultiSource(int n, int cols) : mN(n), mCols(cols) {}
@@ -230,8 +230,8 @@ void TestPipeline::pipelineTransformRuns()
     QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportIndependent,
-        [](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [](const QCPDataSource&, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPDataSource> {
             return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
                 std::vector<double>{1, 2, 3}, std::vector<double>{10, 20, 30});
         });
@@ -248,8 +248,8 @@ void TestPipeline::theFirstJobReportsBusyThenIdleWhenItLands()
     QCPPipelineScheduler scheduler;
     GenericPipeline pipeline(&scheduler);
     pipeline.setTransform(TransformKind::ViewportIndependent,
-        [](const QCPAbstractDataSource& src, const ViewportParams&, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [](const QCPDataSource& src, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPDataSource> {
             return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
                 std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
         });
@@ -270,8 +270,8 @@ void TestPipeline::aBusySlotMayWaitForAnotherThreadUsingThePipeline()
     QCPPipelineScheduler scheduler;
     GenericPipeline pipeline(&scheduler);
     pipeline.setTransform(TransformKind::ViewportIndependent,
-        [](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [](const QCPDataSource&, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPDataSource> {
             return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
                 std::vector<double>{1}, std::vector<double>{1});
         });
@@ -318,8 +318,8 @@ void TestPipeline::aDataChangeBumpedJustBeforeAResultLandsIsStillShown()
         QCPPipelineScheduler scheduler;
         LockablePipeline pipeline(&scheduler);
         pipeline.setTransform(TransformKind::ViewportIndependent,
-            [](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
-                -> std::shared_ptr<QCPAbstractDataSource> {
+            [](const QCPDataSource&, const ViewportParams&, std::any&)
+                -> std::shared_ptr<QCPDataSource> {
                 return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
                     std::vector<double>{1}, std::vector<double>{1});
             });
@@ -359,8 +359,8 @@ void TestPipeline::theLatestResultIsNotBusyWhenItLands()
     QCPPipelineScheduler scheduler;
     GenericPipeline pipeline(&scheduler);
     pipeline.setTransform(TransformKind::ViewportIndependent,
-        [](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [](const QCPDataSource&, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPDataSource> {
             return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
                 std::vector<double>{1}, std::vector<double>{1});
         });
@@ -387,8 +387,8 @@ void TestPipeline::pipelineCoalescing()
     QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportIndependent,
-        [&runCount](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [&runCount](const QCPDataSource&, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPDataSource> {
             ++runCount;
             QThread::msleep(50);
             return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
@@ -417,8 +417,8 @@ void TestPipeline::pipelineViewportIndependentSkipsViewport()
     QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportIndependent,
-        [&runCount](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [&runCount](const QCPDataSource&, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPDataSource> {
             ++runCount;
             return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
                 std::vector<double>{1}, std::vector<double>{1});
@@ -446,8 +446,8 @@ void TestPipeline::pipelineViewportDependentRuns()
     QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportDependent,
-        [&runCount](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [&runCount](const QCPDataSource&, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPDataSource> {
             ++runCount;
             return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
                 std::vector<double>{1}, std::vector<double>{1});
@@ -473,8 +473,8 @@ void TestPipeline::pipelineCachePreservedOnViewport()
     QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportDependent,
-        [](const QCPAbstractDataSource&, const ViewportParams&, std::any& cache)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [](const QCPDataSource&, const ViewportParams&, std::any& cache)
+            -> std::shared_ptr<QCPDataSource> {
             int* counter = std::any_cast<int>(&cache);
             if (!counter)
                 cache = 1;
@@ -507,8 +507,8 @@ void TestPipeline::pipelineCacheClearedOnDataChange()
     QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportDependent,
-        [](const QCPAbstractDataSource&, const ViewportParams&, std::any& cache)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [](const QCPDataSource&, const ViewportParams&, std::any& cache)
+            -> std::shared_ptr<QCPDataSource> {
             int val = cache.has_value() ? std::any_cast<int>(cache) + 1 : 1;
             cache = val;
             return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
@@ -537,8 +537,8 @@ void TestPipeline::pipelineInterimResult()
     std::atomic<bool> gate{false};
 
     pipeline.setTransform(TransformKind::ViewportIndependent,
-        [&gate](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [&gate](const QCPDataSource&, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPDataSource> {
             while (!gate.load()) QThread::msleep(5);
             return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
                 std::vector<double>{1}, std::vector<double>{42});
@@ -567,8 +567,8 @@ void TestPipeline::pipelineDestructionWhileRunning()
 
         auto pipeline = std::make_unique<GenericPipeline>(&scheduler);
         pipeline->setTransform(TransformKind::ViewportIndependent,
-            [&gate, &started](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
-                -> std::shared_ptr<QCPAbstractDataSource> {
+            [&gate, &started](const QCPDataSource&, const ViewportParams&, std::any&)
+                -> std::shared_ptr<QCPDataSource> {
                 started.store(true);
                 while (!gate.load()) QThread::msleep(5);
                 return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
@@ -959,8 +959,8 @@ void TestPipeline::pipelineSourceReplacedDuringJob()
     QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportIndependent,
-        [&gate, &started](const QCPAbstractDataSource& src, const ViewportParams&, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [&gate, &started](const QCPDataSource& src, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPDataSource> {
             started.store(true);
             while (!gate.load()) QThread::msleep(5);
             int n = src.size();
@@ -994,8 +994,8 @@ void TestPipeline::pipelineRapidFireDeliverResult()
     QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportIndependent,
-        [](const QCPAbstractDataSource& src, const ViewportParams&, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [](const QCPDataSource& src, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPDataSource> {
             QThread::msleep(10);
             int n = src.size();
             std::vector<double> k(n), v(n);
@@ -1032,8 +1032,8 @@ void TestPipeline::pipelineNullSourceWhileJobRunningResyncsGeneration()
     GenericPipeline pipeline(&scheduler);
 
     pipeline.setTransform(TransformKind::ViewportIndependent,
-        [&gate, &started](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [&gate, &started](const QCPDataSource&, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPDataSource> {
             started.store(true);
             while (!gate.load()) QThread::msleep(5);
             return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
@@ -1128,7 +1128,7 @@ void TestPipeline::colormap2SetNullSourceAfterDataDoesNotStickBusy()
     cm->setData(x, y, z);
     QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
 
-    cm->setDataSource(std::shared_ptr<QCPAbstractDataSource2D>{});
+    cm->setDataSource(std::shared_ptr<QCPDataSource2D>{});
 
     QVERIFY(!cm->pipeline().isBusy());
 }
@@ -1243,8 +1243,8 @@ void TestPipeline::multiGraphL2FollowsFallingData()
     for (int i = 0; i < N; ++i)
         keys[i] = i, cols[0][i] = -i, cols[1][i] = i;
     QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> src(keys, cols);
-    const auto falling = [](const QCPAbstractMultiDataSource& s, int i) { return s.valueAt(0, i); };
-    const auto rising = [](const QCPAbstractMultiDataSource& s, int i) { return -s.valueAt(1, i); };
+    const auto falling = [](const QCPMultiDataSource& s, int i) { return s.valueAt(0, i); };
+    const auto rising = [](const QCPMultiDataSource& s, int i) { return -s.valueAt(1, i); };
 
     for (const bool withOrigin : {false, true})
     {
@@ -1398,8 +1398,8 @@ void TestPipeline::multiGraphLargeToSmallDataFallback()
 
     // Install the resampling transform (simulates prior large-data assignment)
     g->pipeline().setTransform(TransformKind::ViewportDependent,
-        [](const QCPAbstractMultiDataSource& src, const ViewportParams& vp, std::any& cache)
-            -> std::shared_ptr<QCPAbstractMultiDataSource> {
+        [](const QCPMultiDataSource& src, const ViewportParams& vp, std::any& cache)
+            -> std::shared_ptr<QCPMultiDataSource> {
             return qcp::algo::buildL1Cache(src, vp, cache);
         });
     QVERIFY(g->pipeline().hasTransform());
@@ -2195,7 +2195,7 @@ namespace
 {
 // Four keys a decade apart, all at value 5. Reads off the GUI thread wait for the gate, so a
 // background job can be held while an export bins synchronously.
-class GatedDecadeSource final : public QCPAbstractDataSource
+class GatedDecadeSource final : public QCPDataSource
 {
 public:
     explicit GatedDecadeSource(std::shared_ptr<std::atomic<bool>> open) : mOpen(std::move(open)) {}
@@ -3237,13 +3237,13 @@ void TestPipeline::colormap2ResultSurvivesNullViewport()
     // overlap), applyResult must not overwrite the previous valid result.
     // This caused colormaps to go permanently blank after panning through gaps.
     auto scheduler = std::make_unique<QCPPipelineScheduler>();
-    using Pipeline = QCPAsyncPipeline<QCPAbstractDataSource, QCPAbstractDataSource>;
+    using Pipeline = QCPAsyncPipeline<QCPDataSource, QCPDataSource>;
     Pipeline pipeline(scheduler.get());
 
     // Transform that returns nullptr when viewport key range starts above 50
     pipeline.setTransform(TransformKind::ViewportDependent,
-        [](const QCPAbstractDataSource& src, const ViewportParams& vp, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
+        [](const QCPDataSource& src, const ViewportParams& vp, std::any&)
+            -> std::shared_ptr<QCPDataSource> {
             if (vp.keyRange.lower > 50)
                 return nullptr;
             int n = src.size();

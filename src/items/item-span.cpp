@@ -40,7 +40,7 @@ bool pinnedToTheRatio(const QCP::Position& at)
 } // namespace
 
 QCPItemSpan::QCPItemSpan(QCustomPlot* parentPlot, Qt::Orientation orientation)
-        : QCPAbstractSpanItem(parentPlot)
+        : QCPSpanItem(parentPlot)
         , mOrientation(orientation)
         , lowerEdge(createPosition(QLatin1String("lowerEdge")))
         , upperEdge(createPosition(QLatin1String("upperEdge")))

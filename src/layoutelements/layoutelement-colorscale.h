@@ -36,7 +36,7 @@ class QCPPainter;
 class QCustomPlot;
 class QCPColorMap;
 class QCPColorScale;
-class QCPAbstractColorMapped;
+class QCPColorMapped;
 
 class QCPColorScaleAxisRectPrivate : public QCPAxisRect
 {
@@ -123,7 +123,7 @@ public:
     QList<QCPHandle<QCPColorMap>> colorMaps() const;
 
     //! Every plottable that takes its gradient, range and scale type from this scale.
-    QList<QCPHandle<QCPAbstractColorMapped>> users() const;
+    QList<QCPHandle<QCPColorMapped>> users() const;
 
     void rescaleDataRange(bool onlyVisibleMaps);
 
@@ -151,7 +151,7 @@ protected:
     // non-property members:
     QPointer<QCPColorScaleAxisRectPrivate> mAxisRect;
     QPointer<QCPAxis> mColorAxis;
-    QList<QCPAbstractColorMapped*> mUsers;
+    QList<QCPColorMapped*> mUsers;
     // The rect that owns and places this scale, null for a scale the user put in a layout.
     QPointer<QCPAxisRect> mOwnerRect;
 
@@ -172,7 +172,7 @@ private:
 
     friend class QCPAxisRect;
     friend class QCPColorScaleAxisRectPrivate;
-    friend class QCPAbstractColorMapped;
+    friend class QCPColorMapped;
 };
 
 // The handle of a colour scale: created in the layout by QCustomPlot::add<QCPColorScale>(row,

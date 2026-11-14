@@ -21,7 +21,7 @@ public:
   const QCPDrawList& recording() const { return mCore.recordedList(); }
 
   int polylineNaNs() const { return mCore.recordedPolylineNaNs(); }
-  using QCPAbstractPlottable1D<QCPCurveData, QCPAbstractLine>::drawLegendIcon;
+  using QCPPlottable1D<QCPCurveData, QCPLine>::drawLegendIcon;
 };
 
 InspectableCurve* inspectable(QCPCurve* curve)
@@ -86,7 +86,7 @@ const std::vector<CurveSetterCase>& curveSetterCases()
         [](QCPCurve* curve) { curve->setScatterSkip(1); } },
       { QStringLiteral("setComponentLineStyle"),
         { },
-        [](QCPCurve* curve) { curve->setComponentLineStyle(0, QCPAbstractLine::lsNone); } },
+        [](QCPCurve* curve) { curve->setComponentLineStyle(0, QCPLine::lsNone); } },
       { QStringLiteral("setColorValuesThroughTheBase"),
         { },
         [](QCPCurve* curve)
@@ -94,7 +94,7 @@ const std::vector<CurveSetterCase>& curveSetterCases()
             std::vector<double> values(static_cast<size_t>(curve->data()->size()));
             for (size_t i = 0; i < values.size(); ++i)
                 values[i] = static_cast<double>(i);
-            static_cast<QCPAbstractLine*>(curve)->setColorValues(std::move(values));
+            static_cast<QCPLine*>(curve)->setColorValues(std::move(values));
         } },
       { QStringLiteral("setColorValues"),
         { },
@@ -286,7 +286,7 @@ void TestQCPCurve::curveRefusesAStepStyle()
 {
   test_misuse::calls.clear();
   qcp::setMisuseHandler(test_misuse::record);
-  mCurve->setLineStyle(static_cast<QCPCurve::LineStyle>(QCPAbstractLine::lsStepLeft));
+  mCurve->setLineStyle(static_cast<QCPCurve::LineStyle>(QCPLine::lsStepLeft));
   qcp::setMisuseHandler(nullptr);
 
   QCOMPARE(test_misuse::calls.size(), std::size_t(1));
@@ -298,7 +298,7 @@ void TestQCPCurve::curveRefusesAStepComponentStyle()
 {
   test_misuse::calls.clear();
   qcp::setMisuseHandler(test_misuse::record);
-  mCurve->setComponentLineStyle(0, QCPAbstractLine::lsStepLeft);
+  mCurve->setComponentLineStyle(0, QCPLine::lsStepLeft);
   qcp::setMisuseHandler(nullptr);
 
   QCOMPARE(test_misuse::calls.size(), std::size_t(1));

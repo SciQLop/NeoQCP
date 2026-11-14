@@ -6,13 +6,13 @@
 // shared_ptr to one generation while the graph swaps in the next — like the
 // SoA sources, the adapter co-owns its inner source so an in-flight job can
 // never observe a parameter change, a source swap, or a freed source.
-class QCPWaterfallDataAdapter : public QCPAbstractMultiDataSource {
+class QCPWaterfallDataAdapter : public QCPMultiDataSource {
 public:
-    QCPWaterfallDataAdapter(std::shared_ptr<QCPAbstractMultiDataSource> source,
+    QCPWaterfallDataAdapter(std::shared_ptr<QCPMultiDataSource> source,
                             QVector<double> offsets, QVector<double> normFactors,
                             double gain);
 
-    QCPAbstractMultiDataSource* source() const { return mSource.get(); }
+    QCPMultiDataSource* source() const { return mSource.get(); }
 
     int columnCount() const override;
     int size() const override;
@@ -39,7 +39,7 @@ private:
     // shifted/scaled data.
     TransformedWindow transformedWindow(int column, int begin, int end) const;
 
-    const std::shared_ptr<QCPAbstractMultiDataSource> mSource;
+    const std::shared_ptr<QCPMultiDataSource> mSource;
     const QVector<double> mOffsets;
     const QVector<double> mNormFactors;
     const double mGain;
@@ -71,7 +71,7 @@ public:
 
     explicit QCPWaterfallGraph(QCPAxis* keyAxis, QCPAxis* valueAxis);
 
-    void setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source) override;
+    void setDataSource(std::shared_ptr<QCPMultiDataSource> source) override;
 
     OffsetMode offsetMode() const { return mOffsetMode; }
     void setOffsetMode(OffsetMode mode);
@@ -112,7 +112,7 @@ private:
     bool mNormDirty = true;
     QVector<double> mCachedNormFactors;
 
-    std::shared_ptr<QCPAbstractMultiDataSource> mOriginalSource;
+    std::shared_ptr<QCPMultiDataSource> mOriginalSource;
     std::shared_ptr<QCPWaterfallDataAdapter> mAdapter;
 
     double effectiveOffset(int component) const;

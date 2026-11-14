@@ -27,15 +27,15 @@ void sendKeyClick(QWidget* w, Qt::Key key)
     QApplication::sendEvent(w, &release);
 }
 
-const auto vspanPositioner = [](QCPAbstractItem* item, double ak, double, double ck, double) {
+const auto vspanPositioner = [](QCPItem* item, double ak, double, double ck, double) {
     static_cast<QCPItemSpan*>(item)->setRange(QCPRange(ak, ck));
 };
 
-const auto hspanPositioner = [](QCPAbstractItem* item, double, double av, double, double cv) {
+const auto hspanPositioner = [](QCPItem* item, double, double av, double, double cv) {
     static_cast<QCPItemSpan*>(item)->setRange(QCPRange(av, cv));
 };
 
-const auto rspanPositioner = [](QCPAbstractItem* item, double ak, double av, double ck, double cv) {
+const auto rspanPositioner = [](QCPItem* item, double ak, double av, double ck, double cv) {
     auto* rs = static_cast<QCPItemRSpan*>(item);
     rs->setKeyRange(QCPRange(ak, ck));
     rs->setValueRange(QCPRange(av, cv));
@@ -44,7 +44,7 @@ const auto rspanPositioner = [](QCPAbstractItem* item, double ak, double av, dou
 
 void TestCreationMode::init()
 {
-    qRegisterMetaType<QCPAbstractItem*>();
+    qRegisterMetaType<QCPItem*>();
     mPlot = new QCustomPlot();
     mPlot->resize(400, 300);
     mPlot->xAxis->setRange(0, 10);
@@ -92,7 +92,7 @@ void TestCreationMode::vspanCreationClickMoveClick()
     sendMouseClick(mPlot, Qt::LeftButton, Qt::NoModifier, p2);
 
     QCOMPARE(created.count(), 1);
-    auto* span = qobject_cast<QCPItemSpan*>(created.at(0).at(0).value<QCPAbstractItem*>());
+    auto* span = qobject_cast<QCPItemSpan*>(created.at(0).at(0).value<QCPItem*>());
     QVERIFY(span);
     QVERIFY(qAbs(span->range().lower - 2.0) < 0.5);
     QVERIFY(qAbs(span->range().upper - 6.0) < 0.5);
@@ -115,7 +115,7 @@ void TestCreationMode::hspanCreationClickMoveClick()
     sendMouseClick(mPlot, Qt::LeftButton, Qt::NoModifier, p2);
 
     QCOMPARE(created.count(), 1);
-    auto* span = qobject_cast<QCPItemSpan*>(created.at(0).at(0).value<QCPAbstractItem*>());
+    auto* span = qobject_cast<QCPItemSpan*>(created.at(0).at(0).value<QCPItem*>());
     QVERIFY(span);
     QVERIFY(qAbs(span->range().lower - 3.0) < 0.5);
     QVERIFY(qAbs(span->range().upper - 7.0) < 0.5);
@@ -138,7 +138,7 @@ void TestCreationMode::rspanCreationClickMoveClick()
     sendMouseClick(mPlot, Qt::LeftButton, Qt::NoModifier, p2);
 
     QCOMPARE(created.count(), 1);
-    auto* rspan = qobject_cast<QCPItemRSpan*>(created.at(0).at(0).value<QCPAbstractItem*>());
+    auto* rspan = qobject_cast<QCPItemRSpan*>(created.at(0).at(0).value<QCPItem*>());
     QVERIFY(rspan);
     QVERIFY(qAbs(rspan->keyRange().lower - 2.0) < 0.5);
     QVERIFY(qAbs(rspan->keyRange().upper - 8.0) < 0.5);
@@ -277,7 +277,7 @@ void TestCreationMode::fallbackTwoPositionItem()
     sendMouseClick(mPlot, Qt::LeftButton, Qt::NoModifier, p2);
 
     QCOMPARE(created.count(), 1);
-    auto* line = qobject_cast<QCPItemLine*>(created.at(0).at(0).value<QCPAbstractItem*>());
+    auto* line = qobject_cast<QCPItemLine*>(created.at(0).at(0).value<QCPItem*>());
     QVERIFY(line);
 }
 
@@ -311,7 +311,7 @@ void TestCreationMode::clickOutsideAxisRectDoesNothing()
 
 void TestCreationMode::creatorReturnsNullDoesNotCrash()
 {
-    mPlot->setItemCreator([](QCustomPlot*, QCPAxis*, QCPAxis*) -> QCPAbstractItem* { return nullptr; });
+    mPlot->setItemCreator([](QCustomPlot*, QCPAxis*, QCPAxis*) -> QCPItem* { return nullptr; });
     mPlot->setCreationModeEnabled(true);
 
     QPoint center = mPlot->axisRect()->rect().center();
@@ -387,7 +387,7 @@ void TestCreationMode::multiAxisRectCreation()
     sendMouseClick(mPlot, Qt::LeftButton, Qt::NoModifier, right2);
 
     QCOMPARE(created.count(), 1);
-    auto* span = qobject_cast<QCPItemSpan*>(created.at(0).at(0).value<QCPAbstractItem*>());
+    auto* span = qobject_cast<QCPItemSpan*>(created.at(0).at(0).value<QCPItem*>());
     QVERIFY(span);
     QVERIFY(span->range().lower > 10);
 }
@@ -422,9 +422,9 @@ void TestCreationMode::itemDeletedByAPressSlotIsNotAnnounced()
     int presses = 0;
     connect(mPlot, &QCustomPlot::mousePress, mPlot,
             [this, &presses] { if (++presses == 2) mPlot->clearItems(); });
-    QList<QCPAbstractItem*> announced;
+    QList<QCPItem*> announced;
     connect(mPlot, &QCustomPlot::itemCreated, mPlot,
-            [this, &announced](QCPAbstractItem* item) { announced << item; });
+            [this, &announced](QCPItem* item) { announced << item; });
 
     const int y = mPlot->axisRect()->center().y();
     sendMouseClick(mPlot, Qt::LeftButton, Qt::NoModifier, QPoint(mPlot->xAxis->coordToPixel(2), y));

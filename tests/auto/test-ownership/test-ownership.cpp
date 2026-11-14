@@ -231,7 +231,7 @@ void TestOwnership::deletePlottableInGroup()
 
     delete first;
 
-    QCOMPARE(qcp::pointers(group->members()), QList<QCPAbstractPlottable*> { second });
+    QCOMPARE(qcp::pointers(group->members()), QList<QCPPlottable*> { second });
     QCOMPARE(changed.count(), 1);
     QCOMPARE(mPlot->legend->itemCount(), 1); // the group row
     draw();
@@ -389,7 +389,7 @@ void TestOwnership::clearItemsKeepsOtherLayersOrder()
         const auto kids = mPlot->layer("main")->children();
         QVERIFY(kids.contains(graph.get())); // the layer keeps its non-item content
         for (QCPLayerable* kid : kids)
-            QVERIFY2(!qobject_cast<QCPAbstractItem*>(kid), "an item is still in the layer");
+            QVERIFY2(!qobject_cast<QCPItem*>(kid), "an item is still in the layer");
     }
     QVERIFY(upper->children().isEmpty());
     QVERIFY(mPlot->isRepaintQueued());
@@ -1018,7 +1018,7 @@ void TestOwnership::destroyedSlotDeletesSiblingDuringTeardown()
     QCPGraph* second = plot->addGraph();
     group->addMember(first);
     group->addMember(second);
-    QPointer<QCPAbstractItem> item = new QCPItemText(plot);
+    QPointer<QCPItem> item = new QCPItemText(plot);
     QCPGraph* last = plot->addGraph();
     connect(last, &QObject::destroyed, [first] { delete first.data(); });
     connect(second, &QObject::destroyed, [item] { delete item.data(); });
@@ -1064,7 +1064,7 @@ void TestOwnership::mutatorsRefuseDuringTeardown()
     auto* plot = new QCustomPlot;
     QPointer<QCPGraph> sibling = plot->addGraph().get();
     QPointer<QCPPlottableGroup> group(plot->addPlottableGroup("g"));
-    QPointer<QCPAbstractItem> item = new QCPItemText(plot);
+    QPointer<QCPItem> item = new QCPItemText(plot);
     QVERIFY(plot->addLayer("extra"));
     QCPGraph* watched = plot->addGraph();
     const int plottables = plot->plottableCount();

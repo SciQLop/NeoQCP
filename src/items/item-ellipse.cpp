@@ -73,7 +73,7 @@
   ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
 */
 QCPItemEllipse::QCPItemEllipse(QCustomPlot* parentPlot)
-        : QCPAbstractItem(parentPlot)
+        : QCPItem(parentPlot)
         , topLeft(createPosition(QLatin1String("topLeft")))
         , bottomRight(createPosition(QLatin1String("bottomRight")))
         , topLeftRim(createAnchor(QLatin1String("topLeftRim"), aiTopLeftRim))

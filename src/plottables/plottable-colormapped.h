@@ -5,10 +5,10 @@
 #include <layoutelements/layoutelement-colorscale.h>
 
 //! The colour mapping a plottable shares with a QCPColorScale: gradient, data range, scale type.
-class QCP_LIB_DECL QCPAbstractColorMapped : public QCPAbstractPlottable
+class QCP_LIB_DECL QCPColorMapped : public QCPPlottable
 {
     Q_OBJECT
-    Q_DISABLE_COPY_MOVE(QCPAbstractColorMapped)
+    Q_DISABLE_COPY_MOVE(QCPColorMapped)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QCPRange dataRange READ dataRange WRITE setDataRange NOTIFY dataRangeChanged)
     Q_PROPERTY(QCPAxis::ScaleType dataScaleType READ dataScaleType WRITE setDataScaleType NOTIFY
@@ -19,9 +19,9 @@ class QCP_LIB_DECL QCPAbstractColorMapped : public QCPAbstractPlottable
     /// \endcond
 
 public:
-    explicit QCPAbstractColorMapped(QCPAxis* keyAxis, QCPAxis* valueAxis,
+    explicit QCPColorMapped(QCPAxis* keyAxis, QCPAxis* valueAxis,
                                     bool transparentNan = false, QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale);
-    ~QCPAbstractColorMapped() override;
+    ~QCPColorMapped() override;
 
     // getters:
     [[nodiscard]] QCPRange dataRange() const { return mDataRange; }

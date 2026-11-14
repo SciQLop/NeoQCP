@@ -230,7 +230,7 @@ bool QCPDataRange::contains(const QCPDataRange& other) const
   \section qcpdataselection-iterating Iterating over a data selection
 
   As an example, the following code snippet calculates the average value of a graph's data
-  \ref QCPAbstractPlottable::selection "selection":
+  \ref QCPPlottable::selection "selection":
 
   \snippet documentation/doc-code-snippets/mainwindow.cpp qcpdataselection-iterating-1
 

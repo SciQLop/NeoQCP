@@ -48,9 +48,9 @@ class QCustomPlot;
 class QCPAxis;
 class QCPAxisRect;
 class QCPAxisPainterPrivate;
-class QCPAbstractPlottable;
+class QCPPlottable;
 class QCPGraph;
-class QCPAbstractItem;
+class QCPItem;
 class QCPGridRhiLayer;
 class QCPContourOverlay;
 struct QCPDrawnView;
@@ -366,7 +366,7 @@ public:
     /*! \internal \a pixel seen on the move target's rect, at the same fraction of the axis. */
     double pixelOnMoveTarget(double pixel) const;
     QList<QCPHandle<QCPGraph>> graphs() const;
-    QList<QCPHandle<QCPAbstractItem>> items() const;
+    QList<QCPHandle<QCPItem>> items() const;
 
     static AxisType marginSideToAxisType(QCP::MarginSide side);
 
@@ -503,8 +503,8 @@ private:
     friend class QCPLayer; // pixelOffset() reads the rect raw per plottable
     friend class QCPGridRhiLayer; // groups axes by rect while rebuilding grid geometry
     friend class QCPContourOverlay; // records label tiles through the rect
-    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip);
-    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip);
+    friend QCPDrawnView qcpDrawnViewOf(const QCPItem& item, QRect clip);
+    friend QCPDrawnView qcpDrawnViewOf(const QCPPlottable& plottable, QRect clip);
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPAxis::AxisTypes)
 

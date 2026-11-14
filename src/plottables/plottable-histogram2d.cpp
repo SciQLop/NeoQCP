@@ -40,7 +40,7 @@
 */
 
 QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPAbstractColorMapped(keyAxis, valueAxis, true)
+    : QCPColorMapped(keyAxis, valueAxis, true)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
     , mRenderer(this)
 {
@@ -89,7 +89,7 @@ void QCPHistogram2D::installTransform()
 
     mPipeline.setTransform(TransformKind::ViewportIndependent,
         [capturedKeyBins, capturedValueBins, keyLog, valueLog](
-            const QCPAbstractDataSource& src,
+            const QCPDataSource& src,
             const ViewportParams& /*vp*/,
             std::any& /*cache*/) -> std::shared_ptr<QCPColorMapData> {
             auto* raw = qcp::algo::bin2d(src, capturedKeyBins, capturedValueBins,
@@ -102,7 +102,7 @@ void QCPHistogram2D::installTransform()
         });
 }
 
-void QCPHistogram2D::setDataSource(std::shared_ptr<QCPAbstractDataSource> source)
+void QCPHistogram2D::setDataSource(std::shared_ptr<QCPDataSource> source)
 {
     markDirty();
     mDataSource = std::move(source);
@@ -110,9 +110,9 @@ void QCPHistogram2D::setDataSource(std::shared_ptr<QCPAbstractDataSource> source
     mPipeline.setSource(mDataSource);
 }
 
-void QCPHistogram2D::setDataSource(std::unique_ptr<QCPAbstractDataSource> source)
+void QCPHistogram2D::setDataSource(std::unique_ptr<QCPDataSource> source)
 {
-    setDataSource(std::shared_ptr<QCPAbstractDataSource>(std::move(source)));
+    setDataSource(std::shared_ptr<QCPDataSource>(std::move(source)));
 }
 
 void QCPHistogram2D::dataChanged()
@@ -490,5 +490,5 @@ void QCPHistogram2D::rescaleDataRange(bool recalc)
             mPipeline.onDataChanged();
         return;
     }
-    QCPAbstractColorMapped::rescaleDataRange(recalc);
+    QCPColorMapped::rescaleDataRange(recalc);
 }

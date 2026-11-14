@@ -243,7 +243,7 @@ void QCPLayer::draw(QCPPainter* painter)
             continue;
         if (child->realVisibility())
         {
-            auto* plottable = qobject_cast<QCPAbstractPlottable*>(child);
+            auto* plottable = qobject_cast<QCPPlottable*>(child);
             if (plottable && !plottable->drawableAxes())
                 continue;
             painter->save();
@@ -448,13 +448,13 @@ QPointF QCPLayer::pixelOffset() const
 {
     std::optional<QPointF> result;
     QCPAxisRect* resultAxisRect = nullptr;
-    for (QCPAbstractPlottable* plottable : plottableChildren())
+    for (QCPPlottable* plottable : plottableChildren())
     {
         if (!plottable->realVisibility() || !plottable->canProduceContent())
             continue;
         const QPointF offset = plottable->stallPixelOffset();
         auto* keyAxis = plottable->keyAxisRaw();
-        auto* axisRect = keyAxis ? QCPAbstractPlottable::axisRectOf(keyAxis) : nullptr;
+        auto* axisRect = keyAxis ? QCPPlottable::axisRectOf(keyAxis) : nullptr;
         if (offset.isNull()
             || (result && (axisRect != resultAxisRect || !samePixelOffset(*result, offset))))
             return {};
@@ -497,7 +497,7 @@ bool QCPLayer::canTranslateInsteadOfRepaint() const
         // without this, that alone vetoed the fast pan path for every graph.
         if (!child->realVisibility())
             continue;
-        if (qobject_cast<QCPAbstractItem*>(child))
+        if (qobject_cast<QCPItem*>(child))
             return false;
         // QCPLayout subclasses (QCPLayoutGrid, QCPLayoutInset) are pure containers
         // with empty draw() — they produce no visible output and don't block
@@ -834,7 +834,7 @@ bool QCPLayerable::realVisibility() const
   details.
 
   \see selectEvent, deselectEvent, mousePressEvent, wheelEvent, QCustomPlot::setInteractions,
-  QCPAbstractPlottable1D::selectTestRect
+  QCPPlottable1D::selectTestRect
 */
 double QCPLayerable::selectTest([[maybe_unused]] const QPointF& pos,
                                 [[maybe_unused]] bool onlySelectable,
@@ -1209,13 +1209,13 @@ void QCPLayer::invalidateItemIndex()
     mItemIndexDirty = true;
 }
 
-const QList<QCPAbstractPlottable*>& QCPLayer::plottableChildren() const
+const QList<QCPPlottable*>& QCPLayer::plottableChildren() const
 {
     if (mPlottableChildrenDirty)
     {
         mPlottableChildren.clear();
         for (QCPLayerable* child : mChildren)
-            if (auto* plottable = qobject_cast<QCPAbstractPlottable*>(child))
+            if (auto* plottable = qobject_cast<QCPPlottable*>(child))
                 mPlottableChildren.append(plottable);
         mPlottableChildrenDirty = false;
     }
@@ -1235,17 +1235,17 @@ void addOnce(std::vector<QPointer<T>>& items, T* item)
 }
 } // namespace
 
-void QCPLayer::collectItemFrames(QCPAbstractItem* item, std::vector<QPointer<QCPAxis>>& axes,
+void QCPLayer::collectItemFrames(QCPItem* item, std::vector<QPointer<QCPAxis>>& axes,
                                  std::vector<QPointer<QCPCoordinateSystem>>& systems,
                                  std::vector<QPointer<QCPArea>>& areas) const
 {
     // A position can follow an anchor of another item, and that item's pixels move when its own axes
     // do, so the chain is walked. `seen` ends a cycle (two items anchoring on each other).
-    std::vector<QCPAbstractItem*> pending{item};
-    std::vector<QCPAbstractItem*> seen;
+    std::vector<QCPItem*> pending{item};
+    std::vector<QCPItem*> seen;
     while (!pending.empty())
     {
-        QCPAbstractItem* current = pending.back();
+        QCPItem* current = pending.back();
         pending.pop_back();
         if (!current || std::find(seen.cbegin(), seen.cend(), current) != seen.cend())
             continue;
@@ -1275,7 +1275,7 @@ void QCPLayer::rebuildItemFrames() const
     mItemSystems.clear();
     mItemAreas.clear();
     for (QCPLayerable* child : mChildren)
-        if (auto* item = qobject_cast<QCPAbstractItem*>(child))
+        if (auto* item = qobject_cast<QCPItem*>(child))
             collectItemFrames(item, mItemAxes, mItemSystems, mItemAreas);
     mItemFramesDirty = false;
 }
@@ -1303,14 +1303,14 @@ bool QCPLayer::itemsUseArea(const QCPArea* area) const
                        [area](const QPointer<QCPArea>& candidate) { return candidate.data() == area; });
 }
 
-void QCPLayer::noteItemFrames(QCPAbstractItem* item)
+void QCPLayer::noteItemFrames(QCPItem* item)
 {
     if (mItemFramesDirty || !item)
         return; // the next rebuild collects the new frames anyway
     collectItemFrames(item, mItemAxes, mItemSystems, mItemAreas);
 }
 
-void QCPLayer::noteItemExtentChanged(QCPAbstractItem* item)
+void QCPLayer::noteItemExtentChanged(QCPItem* item)
 {
     if (!item)
         return;
@@ -1350,7 +1350,7 @@ void QCPLayer::rebuildItemIndex() const
     mItemIndexMembershipChanged = false;
     for (int i = 0; i < mChildren.size(); ++i)
     {
-        auto* item = qobject_cast<QCPAbstractItem*>(mChildren.at(i));
+        auto* item = qobject_cast<QCPItem*>(mChildren.at(i));
         if (!item)
             continue;
         // Cached child slot: a move is O(1) instead of an indexOf over the whole layer.

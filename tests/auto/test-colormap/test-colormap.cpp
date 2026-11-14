@@ -855,7 +855,7 @@ void TestColorMap::QCPColorMap2_drawEmitsNoBusyChange()
   settleColorMap(mPlot, cm);
 
   int busyChanges = 0, busyChangesMidReplot = 0;
-  connect(cm, &QCPAbstractPlottable::busyChanged, this, [&](bool) {
+  connect(cm, &QCPPlottable::busyChanged, this, [&](bool) {
     ++busyChanges;
     busyChangesMidReplot += mPlot->isReplotting();
   });
@@ -1324,9 +1324,9 @@ void TestColorMap::QCPColorScale_deletingTheScaleIsNoticed()
     delete scale;
     for (int i = 0; i < 3; ++i)
         QCOMPARE(forgotten[i], 1);
-    for (QCPAbstractColorMapped* user : { static_cast<QCPAbstractColorMapped*>(map),
-                                          static_cast<QCPAbstractColorMapped*>(map2),
-                                          static_cast<QCPAbstractColorMapped*>(hist) })
+    for (QCPColorMapped* user : { static_cast<QCPColorMapped*>(map),
+                                          static_cast<QCPColorMapped*>(map2),
+                                          static_cast<QCPColorMapped*>(hist) })
     {
         QCOMPARE(user->colorScale(), nullptr);
         QCOMPARE(user->gradient(), QCPColorGradient(QCPColorGradient::gpHot));
@@ -1346,7 +1346,7 @@ void TestColorMap::QCPColorScale_deletingAUserLeavesTheScaleList()
 
     delete map;
     QCOMPARE(scale->users().size(), 1);
-    QCOMPARE(scale->users().first(), static_cast<QCPAbstractColorMapped*>(map2));
+    QCOMPARE(scale->users().first(), static_cast<QCPColorMapped*>(map2));
 }
 
 // The colour-map image is a GPU quad composited after the layer's paint buffer: labels painted
@@ -1527,7 +1527,7 @@ void TestColorMap::QCPColorMap2_rescaleKeepsItsViewMeaning()
   mPlot->yAxis->setRange(0, 1);
   mPlot->replot();
   QTRY_VERIFY_WITH_TIMEOUT(!cm->busy(), 5000);
-  QCPAbstractColorMapped* mapped = cm;
+  QCPColorMapped* mapped = cm;
   mapped->rescaleDataRange(false);
   QVERIFY2(cm->dataRange().size() < 10.0, "the view's range should be narrower than the data");
   mapped->rescaleDataRange(true);
@@ -1545,7 +1545,7 @@ void TestColorMap::QCPColorMap_rescaleThroughTheBaseRecalculates()
   map->data()->setCell(1, 1, 2);
   map->data()->recalculateDataBounds();
   map->data()->setCell(1, 1, 1.5); // a lower maximum: the cached bounds keep 2
-  QCPAbstractColorMapped* mapped = map;
+  QCPColorMapped* mapped = map;
   mapped->rescaleDataRange(true);
   QCOMPARE(map->dataRange().upper, 1.5);
 }

@@ -6,7 +6,7 @@
 #include "../painting/draw-context.h"
 
 QCPItemRSpan::QCPItemRSpan(QCustomPlot* parentPlot)
-    : QCPAbstractSpanItem(parentPlot)
+    : QCPSpanItem(parentPlot)
     , leftEdge(createPosition(QLatin1String("leftEdge")))
     , rightEdge(createPosition(QLatin1String("rightEdge")))
     , topEdge(createPosition(QLatin1String("topEdge")))

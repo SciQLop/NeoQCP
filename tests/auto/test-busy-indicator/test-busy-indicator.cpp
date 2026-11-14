@@ -42,7 +42,7 @@ void TestBusyIndicator::externalBusyDefault()
 void TestBusyIndicator::setBusyEmitsBusyChanged()
 {
     auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
-    QSignalSpy spy(g, &QCPAbstractPlottable::busyChanged);
+    QSignalSpy spy(g, &QCPPlottable::busyChanged);
     g->setBusy(true);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(spy.at(0).at(0).toBool(), true);
@@ -55,7 +55,7 @@ void TestBusyIndicator::debounceShowDelay()
 {
     auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     g->setBusyShowDelayMs(100);
-    QSignalSpy spy(g, &QCPAbstractPlottable::visuallyBusyChanged);
+    QSignalSpy spy(g, &QCPPlottable::visuallyBusyChanged);
 
     g->setBusy(true);
     QCOMPARE(g->visuallyBusy(), false);
@@ -73,7 +73,7 @@ void TestBusyIndicator::debounceHideDelay()
     g->setBusy(true);
     QTRY_VERIFY_WITH_TIMEOUT(g->visuallyBusy(), 2000);
 
-    QSignalSpy spy(g, &QCPAbstractPlottable::visuallyBusyChanged);
+    QSignalSpy spy(g, &QCPPlottable::visuallyBusyChanged);
     g->setBusy(false);
     QCOMPARE(g->visuallyBusy(), true); // still shown (hide delay)
 
@@ -85,7 +85,7 @@ void TestBusyIndicator::fastToggleNoVisualChange()
 {
     auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     g->setBusyShowDelayMs(100);
-    QSignalSpy spy(g, &QCPAbstractPlottable::visuallyBusyChanged);
+    QSignalSpy spy(g, &QCPPlottable::visuallyBusyChanged);
 
     g->setBusy(true);
     QTest::qWait(30);
@@ -228,8 +228,8 @@ void TestBusyIndicator::fullLifecycleExternalBusy()
     g->setBusyShowDelayMs(50);
     g->setBusyHideDelayMs(50);
 
-    QSignalSpy busySpy(g, &QCPAbstractPlottable::busyChanged);
-    QSignalSpy visualSpy(g, &QCPAbstractPlottable::visuallyBusyChanged);
+    QSignalSpy busySpy(g, &QCPPlottable::busyChanged);
+    QSignalSpy visualSpy(g, &QCPPlottable::visuallyBusyChanged);
 
     // 1. Download starts
     g->setBusy(true);
@@ -287,7 +287,7 @@ void TestBusyIndicator::visualBusyToggleForcesLayerRepaint()
     // Sampled inside the toggle signal, before the queued replot can run:
     // the offset is still valid (it is a pan) yet the layer refuses to translate.
     bool invalidatedAtToggle = false;
-    connect(graph, &QCPAbstractPlottable::visuallyBusyChanged, this, [&](bool) {
+    connect(graph, &QCPPlottable::visuallyBusyChanged, this, [&](bool) {
         invalidatedAtToggle = !mainLayer->pixelOffset().isNull()
             && !mainLayer->canSkipRepaintForTranslation();
     });
@@ -327,7 +327,7 @@ void TestBusyIndicator::visualBusyToggleRepaintsTheLegend()
 
     // Sampled inside the toggle signal, before the queued replot can run.
     bool legendDirtyAtToggle = false;
-    connect(graph, &QCPAbstractPlottable::visuallyBusyChanged, this,
+    connect(graph, &QCPPlottable::visuallyBusyChanged, this,
             [&](bool) { legendDirtyAtToggle = legendBuffer->contentDirty(); });
 
     graph->setBusyShowDelayMs(0);
@@ -399,11 +399,11 @@ void TestBusyIndicator::gpuEntriesCarryFadeAlpha()
 }
 
 namespace {
-void removeOnBusy(QCustomPlot* plot, QCPAbstractPlottable* p)
+void removeOnBusy(QCustomPlot* plot, QCPPlottable* p)
 {
     QObject::connect(
-        p, &QCPAbstractPlottable::busyChanged, plot,
-        [plot, alive = QPointer<QCPAbstractPlottable>(p)] {
+        p, &QCPPlottable::busyChanged, plot,
+        [plot, alive = QPointer<QCPPlottable>(p)] {
             if (alive)
                 plot->removePlottable(alive);
         },
@@ -438,7 +438,7 @@ void TestBusyIndicator::visuallyBusySlotRemovingThePlottableIsSafe()
 {
     auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     g->setBusyShowDelayMs(0);
-    connect(g, &QCPAbstractPlottable::visuallyBusyChanged, mPlot,
+    connect(g, &QCPPlottable::visuallyBusyChanged, mPlot,
             [this, g] { QVERIFY(mPlot->removePlottable(g)); }, Qt::SingleShotConnection);
     g->setBusy(true);
     QTRY_COMPARE_WITH_TIMEOUT(mPlot->plottableCount(), 0, 2000);

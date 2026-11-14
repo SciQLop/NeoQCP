@@ -15,7 +15,7 @@
 
 namespace
 {
-QCPAbstractItem* makeItem(QCustomPlot* plot, int kind)
+QCPItem* makeItem(QCustomPlot* plot, int kind)
 {
     switch (kind % 5)
     {
@@ -32,7 +32,7 @@ QCPAbstractItem* makeItem(QCustomPlot* plot, int kind)
     }
 }
 
-void setPen(QCPAbstractItem* item, const QPen& pen)
+void setPen(QCPItem* item, const QPen& pen)
 {
     if (auto* line = qobject_cast<QCPItemLine*>(item))
         line->setPen(pen);
@@ -46,7 +46,7 @@ void setPen(QCPAbstractItem* item, const QPen& pen)
         bracket->setPen(pen);
 }
 
-void placeRandomly(QCPAbstractItem* item, std::mt19937& rng, QCPAxis* keyAxis, QCPAxis* valueAxis)
+void placeRandomly(QCPItem* item, std::mt19937& rng, QCPAxis* keyAxis, QCPAxis* valueAxis)
 {
     const auto key = [&] { return std::uniform_real_distribution<double>(-200.0, 200.0)(rng); };
     const auto value = [&] { return std::uniform_real_distribution<double>(-200.0, 200.0)(rng); };
@@ -144,11 +144,11 @@ void TestItemIndex::randomItemsMatchUnindexed()
             plot.setCurrentLayer(QStringLiteral("items2"));
 
         const int count = 120 + round * 20;
-        std::vector<QCPAbstractItem*> items;
+        std::vector<QCPItem*> items;
         items.reserve(std::size_t(count));
         for (int i = 0; i < count; ++i)
         {
-            QCPAbstractItem* item = makeItem(&plot, i + round);
+            QCPItem* item = makeItem(&plot, i + round);
             QCPAxis* keyAxis = (i % 7 == 0) ? plot.xAxis2 : plot.xAxis;
             QCPAxis* valueAxis = (i % 7 == 0) ? plot.yAxis2 : plot.yAxis;
             placeRandomly(item, rng, keyAxis, valueAxis);
@@ -184,7 +184,7 @@ void TestItemIndex::randomItemsMatchUnindexed()
                 break;
             std::uniform_int_distribution<int> pick(0, int(items.size()) - 1);
             const auto index = std::size_t(pick(rng));
-            QCPAbstractItem* item = items[index];
+            QCPItem* item = items[index];
             const int kind = std::uniform_int_distribution<int>(0, 5)(rng);
             switch (kind)
             {
@@ -215,8 +215,8 @@ void TestItemIndex::randomItemsMatchUnindexed()
                     items.erase(items.begin() + std::ptrdiff_t(index));
                     break;
                 default: { // take through the owner and hand it back
-                    auto handle = qcp::makeHandle<QCPHandle<QCPAbstractItem>>(item);
-                    std::unique_ptr<QCPAbstractItem> taken = plot.take(handle);
+                    auto handle = qcp::makeHandle<QCPHandle<QCPItem>>(item);
+                    std::unique_ptr<QCPItem> taken = plot.take(handle);
                     QVERIFY(taken);
                     auto back = plot.add(std::move(taken));
                     QVERIFY(back);
@@ -275,7 +275,7 @@ void TestItemIndex::dragOneItemKeepsTheTree()
     plot.replot();
     QCoreApplication::processEvents();
 
-    QCPAbstractItem* dragged = plot.item(0);
+    QCPItem* dragged = plot.item(0);
     QVERIFY(dragged);
     QCPLayer* layer = dragged->layer();
     QVERIFY(layer);

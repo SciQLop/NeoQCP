@@ -8,10 +8,10 @@
 class QCustomPlot;
 
 //! What every span has: the pens, the brush and the movable flag, and the edge drag they share.
-class QCP_LIB_DECL QCPAbstractSpanItem : public QCPAbstractItem
+class QCP_LIB_DECL QCPSpanItem : public QCPItem
 {
     Q_OBJECT
-    Q_DISABLE_COPY_MOVE(QCPAbstractSpanItem)
+    Q_DISABLE_COPY_MOVE(QCPSpanItem)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QBrush brush READ brush WRITE setBrush NOTIFY brushChanged)
     Q_PROPERTY(
@@ -23,8 +23,8 @@ class QCP_LIB_DECL QCPAbstractSpanItem : public QCPAbstractItem
     /// \endcond
 
 public:
-    using QCPAbstractItem::QCPAbstractItem;
-    virtual ~QCPAbstractSpanItem() override;
+    using QCPItem::QCPItem;
+    virtual ~QCPSpanItem() override;
 
     QBrush brush() const { return mBrush; }
 

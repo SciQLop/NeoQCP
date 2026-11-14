@@ -64,7 +64,7 @@ private:
 // Data layout: values[row * stride + col], where stride >= columnCount.
 // Zero-copy: wraps the caller's buffer directly.
 template <typename K, typename V>
-class QCPRowMajorMultiDataSource final : public QCPAbstractMultiDataSource {
+class QCPRowMajorMultiDataSource final : public QCPMultiDataSource {
 public:
     // dataGuard: optional shared_ptr that keeps the backing buffer alive for the
     // lifetime of this view. Pass the owner of keys/values so that async pipeline

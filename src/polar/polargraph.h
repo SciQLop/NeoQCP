@@ -58,7 +58,7 @@ class QCPPolarGraphOps;
   densified there, so a run that leaves the disc is hidden along the rim instead of being drawn as
   a chord through it. Below the radial range a point lands on the centre.
 */
-class QCP_LIB_DECL QCPPolarGraph : public QCPAbstractPlottable1D<QCPGraphData>
+class QCP_LIB_DECL QCPPolarGraph : public QCPPlottable1D<QCPGraphData>
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPPolarGraph)

@@ -53,8 +53,8 @@ public:
     [[nodiscard]] virtual int findEnd(double sortKey, bool expandedRange = true) const = 0;
 };
 
-template <class DataType, class Base = QCPAbstractPlottable>
-class QCPAbstractPlottable1D
+template <class DataType, class Base = QCPPlottable>
+class QCPPlottable1D
         : public Base,
           public QCPPlottableInterface1D // no QCP_LIB_DECL, template class ends up in header (cpp
                                          // included below)
@@ -62,11 +62,11 @@ class QCPAbstractPlottable1D
     // No Q_OBJECT macro due to template class
 
 public:
-    QCPAbstractPlottable1D(QCPAxis* keyAxis, QCPAxis* valueAxis,
+    QCPPlottable1D(QCPAxis* keyAxis, QCPAxis* valueAxis,
                            QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
-    explicit QCPAbstractPlottable1D(QCPCoordinateSystem* system,
+    explicit QCPPlottable1D(QCPCoordinateSystem* system,
                                     QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
-    virtual ~QCPAbstractPlottable1D() override;
+    virtual ~QCPPlottable1D() override;
 
     // virtual methods of 1d plottable interface:
     [[nodiscard]] virtual int dataCount() const override;
@@ -106,7 +106,7 @@ protected:
     }
 
 private:
-    Q_DISABLE_COPY_MOVE(QCPAbstractPlottable1D)
+    Q_DISABLE_COPY_MOVE(QCPPlottable1D)
 };
 
 // include implementation in header since it is a class template:
@@ -120,19 +120,19 @@ private:
   This class contains only pure virtual methods which define a common interface to the data
   of one-dimensional plottables.
 
-  For example, it is implemented by the template class \ref QCPAbstractPlottable1D (the preferred
+  For example, it is implemented by the template class \ref QCPPlottable1D (the preferred
   base class for one-dimensional plottables). So if you use that template class as base class of
   your one-dimensional plottable, you won't have to care about implementing the 1d interface
   yourself.
 
-  If your plottable doesn't derive from \ref QCPAbstractPlottable1D but still wants to provide a 1d
+  If your plottable doesn't derive from \ref QCPPlottable1D but still wants to provide a 1d
   interface (e.g. like \ref QCPErrorBars does), you should inherit from both \ref
-  QCPAbstractPlottable and \ref QCPPlottableInterface1D and accordingly reimplement the pure
+  QCPPlottable and \ref QCPPlottableInterface1D and accordingly reimplement the pure
   virtual methods of the 1d interface, matching your data container. Also, reimplement \ref
-  QCPAbstractPlottable::interface1D to return the \c this pointer.
+  QCPPlottable::interface1D to return the \c this pointer.
 
-  If you have a \ref QCPAbstractPlottable pointer, you can check whether it implements this
-  interface by calling \ref QCPAbstractPlottable::interface1D and testing it for a non-zero return
+  If you have a \ref QCPPlottable pointer, you can check whether it implements this
+  interface by calling \ref QCPPlottable::interface1D and testing it for a non-zero return
   value. If it indeed implements this interface, you may use it to access the plottable's data
   without needing to know the exact type of the plottable or its data point type.
 */
@@ -152,7 +152,7 @@ private:
   dataselection "data selection mechanism").
 
   If \a onlySelectable is true, an empty QCPDataSelection is returned if this plottable is not
-  selectable (i.e. if \ref QCPAbstractPlottable::setSelectable is \ref QCP::stNone).
+  selectable (i.e. if \ref QCPPlottable::setSelectable is \ref QCP::stNone).
 
   \note \a rect must be a normalized rect (positive or zero width and height). This is especially
   important when using the rect of \ref QCPSelectionRect::accepted, which is not necessarily
@@ -253,13 +253,13 @@ private:
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////// QCPAbstractPlottable1D
+//////////////////// QCPPlottable1D
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*! \class QCPAbstractPlottable1D
+/*! \class QCPPlottable1D
   \brief A template base class for plottables with one-dimensional data
 
-  This template class derives from \ref QCPAbstractPlottable and from the abstract interface \ref
+  This template class derives from \ref QCPPlottable and from the abstract interface \ref
   QCPPlottableInterface1D. It serves as a base class for all one-dimensional data (i.e. data with
   one key dimension) held in a QCPDataContainer, such as \ref QCPCurve and \ref QCPBars.
 
@@ -282,7 +282,7 @@ private:
 
 /* start documentation of inline functions */
 
-/*! \fn QCPPlottableInterface1D *QCPAbstractPlottable1D::interface1D()
+/*! \fn QCPPlottableInterface1D *QCPPlottable1D::interface1D()
 
   Returns a \ref QCPPlottableInterface1D pointer to this plottable, providing access to its 1D
   interface.
@@ -293,11 +293,11 @@ private:
 /* end documentation of inline functions */
 
 /*!
-  Forwards \a keyAxis and \a valueAxis to the \ref QCPAbstractPlottable::QCPAbstractPlottable
-  "QCPAbstractPlottable" constructor and allocates the \a mDataContainer.
+  Forwards \a keyAxis and \a valueAxis to the \ref QCPPlottable::QCPPlottable
+  "QCPPlottable" constructor and allocates the \a mDataContainer.
 */
 template <class DataType, class Base>
-QCPAbstractPlottable1D<DataType, Base>::QCPAbstractPlottable1D(QCPAxis* keyAxis,
+QCPPlottable1D<DataType, Base>::QCPPlottable1D(QCPAxis* keyAxis,
                                                                QCPAxis* valueAxis,
                                                                QCP::Capabilities required)
         : Base(keyAxis, valueAxis, required), mDataContainer(new QCPDataContainer<DataType>)
@@ -305,14 +305,14 @@ QCPAbstractPlottable1D<DataType, Base>::QCPAbstractPlottable1D(QCPAxis* keyAxis,
 }
 
 template <class DataType, class Base>
-QCPAbstractPlottable1D<DataType, Base>::QCPAbstractPlottable1D(QCPCoordinateSystem* system,
+QCPPlottable1D<DataType, Base>::QCPPlottable1D(QCPCoordinateSystem* system,
                                                                QCP::Capabilities required)
         : Base(system, required), mDataContainer(new QCPDataContainer<DataType>)
 {
 }
 
 template <class DataType, class Base>
-QCPAbstractPlottable1D<DataType, Base>::~QCPAbstractPlottable1D()
+QCPPlottable1D<DataType, Base>::~QCPPlottable1D()
 {
 }
 
@@ -320,7 +320,7 @@ QCPAbstractPlottable1D<DataType, Base>::~QCPAbstractPlottable1D()
   \copydoc QCPPlottableInterface1D::dataCount
 */
 template <class DataType, class Base>
-int QCPAbstractPlottable1D<DataType, Base>::dataCount() const
+int QCPPlottable1D<DataType, Base>::dataCount() const
 {
     return mDataContainer->size();
 }
@@ -329,7 +329,7 @@ int QCPAbstractPlottable1D<DataType, Base>::dataCount() const
   \copydoc QCPPlottableInterface1D::dataMainKey
 */
 template <class DataType, class Base>
-double QCPAbstractPlottable1D<DataType, Base>::dataMainKey(int index) const
+double QCPPlottable1D<DataType, Base>::dataMainKey(int index) const
 {
     if (auto* d = dataAt(index)) return d->mainKey();
     return 0;
@@ -339,7 +339,7 @@ double QCPAbstractPlottable1D<DataType, Base>::dataMainKey(int index) const
   \copydoc QCPPlottableInterface1D::dataSortKey
 */
 template <class DataType, class Base>
-double QCPAbstractPlottable1D<DataType, Base>::dataSortKey(int index) const
+double QCPPlottable1D<DataType, Base>::dataSortKey(int index) const
 {
     if (auto* d = dataAt(index)) return d->sortKey();
     return 0;
@@ -349,7 +349,7 @@ double QCPAbstractPlottable1D<DataType, Base>::dataSortKey(int index) const
   \copydoc QCPPlottableInterface1D::dataMainValue
 */
 template <class DataType, class Base>
-double QCPAbstractPlottable1D<DataType, Base>::dataMainValue(int index) const
+double QCPPlottable1D<DataType, Base>::dataMainValue(int index) const
 {
     if (auto* d = dataAt(index)) return d->mainValue();
     return 0;
@@ -359,7 +359,7 @@ double QCPAbstractPlottable1D<DataType, Base>::dataMainValue(int index) const
   \copydoc QCPPlottableInterface1D::dataValueRange
 */
 template <class DataType, class Base>
-QCPRange QCPAbstractPlottable1D<DataType, Base>::dataValueRange(int index) const
+QCPRange QCPPlottable1D<DataType, Base>::dataValueRange(int index) const
 {
     if (auto* d = dataAt(index)) return d->valueRange();
     return QCPRange(0, 0);
@@ -369,7 +369,7 @@ QCPRange QCPAbstractPlottable1D<DataType, Base>::dataValueRange(int index) const
   \copydoc QCPPlottableInterface1D::dataPixelPosition
 */
 template <class DataType, class Base>
-QPointF QCPAbstractPlottable1D<DataType, Base>::dataPixelPosition(int index) const
+QPointF QCPPlottable1D<DataType, Base>::dataPixelPosition(int index) const
 {
     if (auto* d = dataAt(index)) return this->coordsToPixels(d->mainKey(), d->mainValue());
     return QPointF();
@@ -379,7 +379,7 @@ QPointF QCPAbstractPlottable1D<DataType, Base>::dataPixelPosition(int index) con
   \copydoc QCPPlottableInterface1D::sortKeyIsMainKey
 */
 template <class DataType, class Base>
-bool QCPAbstractPlottable1D<DataType, Base>::sortKeyIsMainKey() const
+bool QCPPlottable1D<DataType, Base>::sortKeyIsMainKey() const
 {
     return DataType::sortKeyIsMainKey();
 }
@@ -392,7 +392,7 @@ bool QCPAbstractPlottable1D<DataType, Base>::sortKeyIsMainKey() const
   \seebaseclassmethod
 */
 template <class DataType, class Base>
-QCPDataSelection QCPAbstractPlottable1D<DataType, Base>::selectTestRect(const QRectF& rect,
+QCPDataSelection QCPPlottable1D<DataType, Base>::selectTestRect(const QRectF& rect,
                                                                   bool onlySelectable) const
 {
     QCPDataSelection result;
@@ -478,7 +478,7 @@ QCPDataSelection QCPAbstractPlottable1D<DataType, Base>::selectTestRect(const QR
   \copydoc QCPPlottableInterface1D::findBegin
 */
 template <class DataType, class Base>
-int QCPAbstractPlottable1D<DataType, Base>::findBegin(double sortKey, bool expandedRange) const
+int QCPPlottable1D<DataType, Base>::findBegin(double sortKey, bool expandedRange) const
 {
     return int(mDataContainer->findBegin(sortKey, expandedRange) - mDataContainer->constBegin());
 }
@@ -487,7 +487,7 @@ int QCPAbstractPlottable1D<DataType, Base>::findBegin(double sortKey, bool expan
   \copydoc QCPPlottableInterface1D::findEnd
 */
 template <class DataType, class Base>
-int QCPAbstractPlottable1D<DataType, Base>::findEnd(double sortKey, bool expandedRange) const
+int QCPPlottable1D<DataType, Base>::findEnd(double sortKey, bool expandedRange) const
 {
     return int(mDataContainer->findEnd(sortKey, expandedRange) - mDataContainer->constBegin());
 }
@@ -503,7 +503,7 @@ int QCPAbstractPlottable1D<DataType, Base>::findEnd(double sortKey, bool expande
   \see setSelection
 */
 template <class DataType, class Base>
-void QCPAbstractPlottable1D<DataType, Base>::getDataSegments(
+void QCPPlottable1D<DataType, Base>::getDataSegments(
     QList<QCPDataRange>& selectedSegments, QList<QCPDataRange>& unselectedSegments) const
 {
     selectedSegments.clear();

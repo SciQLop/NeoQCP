@@ -14,7 +14,7 @@ std::vector<std::pair<QString, QColor>> entriesOf(const QCPIntervals* intervals)
 }
 
 QCPIntervalsLegendItem::QCPIntervalsLegendItem(QCPLegend* parent, QCPIntervals* intervals)
-        : QCPAbstractLegendItem(parent), mIntervals(intervals)
+        : QCPLegendItem(parent), mIntervals(intervals)
 {
     leaveLegendWhenDestroyed(intervals);
 }

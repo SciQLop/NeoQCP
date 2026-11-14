@@ -15,7 +15,7 @@ void QCPColormapRenderer::invalidateMapImage()
         layer->markDirty();
 }
 
-QCPColormapRenderer::QCPColormapRenderer(QCPAbstractPlottable* owner) : mOwner(owner)
+QCPColormapRenderer::QCPColormapRenderer(QCPPlottable* owner) : mOwner(owner)
 {
     mGradient.loadPreset(QCPColorGradient::gpCold);
     mGradient.setNanHandling(QCPColorGradient::nhTransparent);

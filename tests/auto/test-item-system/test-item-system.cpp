@@ -71,7 +71,7 @@ QCPPolarArea* secondPolar(QCustomPlot* plot)
     return area;
 }
 
-void bindToPolar(QCPAbstractItem* item, QCPPolarArea* area)
+void bindToPolar(QCPItem* item, QCPPolarArea* area)
 {
     QCPCoordinateSystem* system = area->system(area->angularAxis(), area->radialAxis());
     for (QCPItemPosition* position : item->positions())
@@ -112,7 +112,7 @@ public:
 
 void TestItemSystem::init()
 {
-    qRegisterMetaType<QCPAbstractItem*>();
+    qRegisterMetaType<QCPItem*>();
     mPlot = new QCustomPlot(nullptr);
     mPlot->resize(640, 480);
     mPlot->show();
@@ -240,7 +240,7 @@ void TestItemSystem::aDeletedAxisLeavesThePositionInert()
 void TestItemSystem::takeClearsAndAdoptRebindsItemSystems()
 {
     auto line = mPlot->add<QCPItemLine>();
-    QCPAbstractItem* item = line.get();
+    QCPItem* item = line.get();
     QCPItemPosition* position = item->positions().first();
     QVERIFY(position->system());
     QCOMPARE(item->clipArea(), static_cast<QCPArea*>(mPlot->axisRect()));
@@ -304,7 +304,7 @@ void TestItemSystem::aCreatedItemBindsTheNewRectsSystem()
     sendMouseClick(mPlot, p2);
 
     QCOMPARE(created.count(), 1);
-    auto* item = created.at(0).at(0).value<QCPAbstractItem*>();
+    auto* item = created.at(0).at(0).value<QCPItem*>();
     QVERIFY(item);
     QCPItemPosition* position = item->positions().first();
     // The item constructor bound the main rect's default pair; creation rebinds the clicked one.

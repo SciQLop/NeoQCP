@@ -91,7 +91,7 @@ QCPPolarGraph::QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* v
 
 QCPPolarGraph::QCPPolarGraph(QCPCoordinateSystem* system, QCP::Capabilities required)
         // The polar system is enough: a polar graph needs nothing of the cartesian five.
-        : QCPAbstractPlottable1D<QCPGraphData>(system, required)
+        : QCPPlottable1D<QCPGraphData>(system, required)
         , mLineStyle(lsLine)
         , mScatterStyle()
         , mPeriodic(true)
@@ -315,7 +315,7 @@ QCPPolarGraph::window() const
 */
 double QCPPolarGraph::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {
-    const double recorded = QCPAbstractPlottable::selectTest(pos, onlySelectable, details);
+    const double recorded = QCPPlottable::selectTest(pos, onlySelectable, details);
     if (recorded < 0 || !system() || !parentPlot())
         return recorded;
 
@@ -453,7 +453,7 @@ void QCPPolarGraph::setSystem(QCPCoordinateSystem* system)
 {
     QCP_CHECK_OR_RETURN(!system || qobject_cast<QCPPolarSystem*>(system),
                         "a polar graph draws in a polar system, not in this one", );
-    QCPAbstractPlottable::setSystem(system);
+    QCPPlottable::setSystem(system);
 }
 
 /*! \internal

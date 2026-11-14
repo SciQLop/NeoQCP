@@ -1182,7 +1182,7 @@ void TestDataSource2D::resampleFloatMatchesDouble()
 
     for (bool log : {false, true})
     {
-        auto run = [&](const QCPAbstractDataSource2D& src) {
+        auto run = [&](const QCPDataSource2D& src) {
             return qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(1, 50),
                                          400, 100, log, log, 1.5, nullptr, false);
         };

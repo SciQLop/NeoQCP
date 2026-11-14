@@ -56,7 +56,7 @@ QColor pixelAt(QCustomPlot* plot, const QImage& img, double key, double value);
 bool isRed(const QColor& c);
 } // namespace
 
-std::shared_ptr<QCPAbstractMultiDataSource>
+std::shared_ptr<QCPMultiDataSource>
 TestColorByScalar::makeSource(std::vector<double> keys, std::vector<std::vector<double>> columns)
 {
     return std::make_shared<SoA>(std::move(keys), std::move(columns));
@@ -88,14 +88,14 @@ void TestColorByScalar::setLineStyleInvalidatesLineCache()
 namespace {
 
 // Wraps a source and forwards only the pure virtuals, so the indexed calls
-// hit QCPAbstractMultiDataSource's default implementations.
-class ForwardingSource final : public QCPAbstractMultiDataSource
+// hit QCPMultiDataSource's default implementations.
+class ForwardingSource final : public QCPMultiDataSource
 {
 public:
-    explicit ForwardingSource(std::shared_ptr<QCPAbstractMultiDataSource> inner)
+    explicit ForwardingSource(std::shared_ptr<QCPMultiDataSource> inner)
         : mInner(std::move(inner)) {}
     // Stands in for a source mutated in place (the graph is told via dataChanged()).
-    void setInner(std::shared_ptr<QCPAbstractMultiDataSource> inner) { mInner = std::move(inner); }
+    void setInner(std::shared_ptr<QCPMultiDataSource> inner) { mInner = std::move(inner); }
     int columnCount() const override { return mInner->columnCount(); }
     int size() const override { return mInner->size(); }
     double keyAt(int i) const override { return mInner->keyAt(i); }
@@ -106,7 +106,7 @@ public:
     QCPRange valueRange(int c, bool& f, QCP::SignDomain sd, const QCPRange& r) const override
     { return mInner->valueRange(c, f, sd, r); }
 private:
-    std::shared_ptr<QCPAbstractMultiDataSource> mInner;
+    std::shared_ptr<QCPMultiDataSource> mInner;
 };
 
 // 9000 dense samples on [0, 45], a key gap, then 100 sparse samples on [55, 100];
@@ -239,7 +239,7 @@ void TestColorByScalar::rowMajorIndexedMatchesSoA()
 namespace {
 
 // n samples, two columns, keys 0..n with a hole in [0.3 n, 0.4 n) so some bins stay empty.
-std::shared_ptr<QCPAbstractMultiDataSource> holeySource(int n)
+std::shared_ptr<QCPMultiDataSource> holeySource(int n)
 {
     std::vector<double> keys, a, b;
     for (int i = 0; i < n; ++i)
@@ -253,7 +253,7 @@ std::shared_ptr<QCPAbstractMultiDataSource> holeySource(int n)
                                  std::vector<std::vector<double>>{std::move(a), std::move(b)});
 }
 
-void checkOrigin(const qcp::algo::MultiColumnBinResult& bins, const QCPAbstractMultiDataSource& src)
+void checkOrigin(const qcp::algo::MultiColumnBinResult& bins, const QCPMultiDataSource& src)
 {
     const int s = bins.stride();
     QCOMPARE(static_cast<int>(bins.origin.size()), static_cast<int>(bins.values.size()));
@@ -728,7 +728,7 @@ void TestColorByScalar::coloredRunsMeetWithButtEndsOnExport()
 
 namespace {
 
-QCPGraph* rampGraph(QCustomPlot* plot, std::shared_ptr<QCPAbstractMultiDataSource> src,
+QCPGraph* rampGraph(QCustomPlot* plot, std::shared_ptr<QCPMultiDataSource> src,
                          std::vector<double> scalar)
 {
     auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
@@ -1264,7 +1264,7 @@ void TestColorByScalar::colourValuesAreCompleteBeforeTheColourScaleSignal()
 
     const int before = mg->mRevision;
     bool completeAtDelivery = false;
-    connect(mg, &QCPAbstractColorMapped::colorScaleChanged, mPlot,
+    connect(mg, &QCPColorMapped::colorScaleChanged, mPlot,
             [&completeAtDelivery, mg, before] { completeAtDelivery = mg->mRevision > before; });
     mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
     QVERIFY2(completeAtDelivery, "colorScaleChanged was delivered before the line was updated");
@@ -1281,7 +1281,7 @@ void TestColorByScalar::uncolouringIsCompleteBeforeTheColourScaleSignal()
 
     const int before = mg->mRevision;
     bool completeAtDelivery = false;
-    connect(mg, &QCPAbstractColorMapped::colorScaleChanged, mPlot,
+    connect(mg, &QCPColorMapped::colorScaleChanged, mPlot,
             [&completeAtDelivery, mg, before] { completeAtDelivery = mg->mRevision > before; });
     mg->clearColorValues();
     QVERIFY2(completeAtDelivery, "colorScaleChanged was delivered before the line was updated");
@@ -1295,7 +1295,7 @@ void TestColorByScalar::colourSlotDeletingTheLineIsSafe()
     mPlot->xAxis->setRange(0, 3);
     mPlot->yAxis->setRange(-1, 2);
     const QPointer<QCPGraph> alive(mg);
-    connect(mg, &QCPAbstractColorMapped::colorScaleChanged, mPlot, [mg] { delete mg; },
+    connect(mg, &QCPColorMapped::colorScaleChanged, mPlot, [mg] { delete mg; },
             Qt::SingleShotConnection);
     mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
     QVERIFY(!alive);

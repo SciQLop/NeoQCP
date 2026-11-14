@@ -75,7 +75,7 @@ void TestQCPLegend::itemTextColorRepaintsTheLegend()
   QVERIFY(buffer);
   QVERIFY(!buffer->contentDirty());
 
-  QCPAbstractLegendItem *item = mPlot->legend->item(0);
+  QCPLegendItem *item = mPlot->legend->item(0);
   QVERIFY(item);
   item->setTextColor(Qt::red);
   QVERIFY2(buffer->contentDirty(), "a new text colour must repaint the legend");
@@ -117,8 +117,8 @@ void addSelectedItems(QCustomPlot* plot, int count)
 void TestQCPLegend::deselectSlotRemovingAnItemStillDeselectsTheOthers()
 {
   addSelectedItems(mPlot, 3);
-  QCPAbstractLegendItem* first = mPlot->legend->item(0);
-  connect(first, &QCPAbstractLegendItem::selectionChanged, mPlot,
+  QCPLegendItem* first = mPlot->legend->item(0);
+  connect(first, &QCPLegendItem::selectionChanged, mPlot,
           [this, first] { QVERIFY(mPlot->legend->removeItem(first)); }, Qt::SingleShotConnection);
   mPlot->legend->setSelectedParts(QCPLegend::spNone);
   QCOMPARE(mPlot->legend->itemCount(), 2);
@@ -141,7 +141,7 @@ void TestQCPLegend::theDefaultLegendClearsBeforeItDies()
 void TestQCPLegend::deselectSlotDeletingTheLegendIsSafe()
 {
   addSelectedItems(mPlot, 3);
-  connect(mPlot->legend->item(0), &QCPAbstractLegendItem::selectionChanged, mPlot,
+  connect(mPlot->legend->item(0), &QCPLegendItem::selectionChanged, mPlot,
           [this] { delete mPlot->legend; }, Qt::SingleShotConnection);
   mPlot->legend->setSelectedParts(QCPLegend::spNone);
   QCOMPARE(mPlot->legend, nullptr);
@@ -184,7 +184,7 @@ void TestQCPLegend::clickAwayDeletingTheLegendFromAnItemDeselectionIsSafe()
 {
   addSelectedItems(mPlot, 3);
   bool ran = false;
-  connect(mPlot->legend->item(0), &QCPAbstractLegendItem::selectionChanged, mPlot, [this, &ran] {
+  connect(mPlot->legend->item(0), &QCPLegendItem::selectionChanged, mPlot, [this, &ran] {
     ran = true;
     delete mPlot->legend;
   }, Qt::SingleShotConnection);
@@ -242,7 +242,7 @@ void TestQCPLegend::aSlotDeletingTheLegendARowJoinsIsSafe()
   auto *graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
   QPointer<QCPLegend> other = new QCPLegend;
   mPlot->axisRect()->insetLayout()->addElement(other, Qt::AlignTop | Qt::AlignLeft);
-  QPointer<QCPAbstractLegendItem> row = new QCPPlottableLegendItem(mPlot->legend, graph);
+  QPointer<QCPLegendItem> row = new QCPPlottableLegendItem(mPlot->legend, graph);
   bool ran = false;
   connect(other, &QCPLayoutGrid::rowStretchFactorsChanged, mPlot, [&] {
     ran = true;

@@ -34,7 +34,7 @@ QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> millionPointSour
 }
 
 // Fits the axes to the source and returns its key pixels per key unit.
-double fitKeyPixelsPerUnit(QCustomPlot* plot, const QCPAbstractMultiDataSource& src)
+double fitKeyPixelsPerUnit(QCustomPlot* plot, const QCPMultiDataSource& src)
 {
     plot->xAxis->setRange(src.keyAt(0), src.keyAt(src.size() - 1));
     bool found = false;

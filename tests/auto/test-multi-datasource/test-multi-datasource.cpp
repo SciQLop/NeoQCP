@@ -770,7 +770,7 @@ void TestMultiDataSource::rowMajorFloatBinsLikeSoaDouble()
     const QCPRange range(0, keys.back());
     for (bool parallel : {false, true})
     {
-        auto bin = [&](const QCPAbstractMultiDataSource& src) {
+        auto bin = [&](const QCPMultiDataSource& src) {
             return parallel ? qcp::algo::binMinMaxMultiParallel(src, 0, n, range, 5000, true)
                             : qcp::algo::binMinMaxMulti(src, 0, n, range, 5000, true);
         };
@@ -848,7 +848,7 @@ std::shared_ptr<BurstySource> burstySource()
     return std::make_shared<BurstySource>(std::move(keys), std::vector<std::vector<double>>{std::move(values)});
 }
 
-qcp::algo::GraphResamplerCache l1Of(const QCPAbstractMultiDataSource& src)
+qcp::algo::GraphResamplerCache l1Of(const QCPMultiDataSource& src)
 {
     std::any cache;
     qcp::algo::buildL1Cache(src, ViewportParams{}, cache);
@@ -976,7 +976,7 @@ void TestMultiDataSource::gapsBeforeEqualsTheLineBreaksOfEverySource()
     QCPRowMajorMultiDataSource<double, double> rowMajor(
         std::span<const double>(keys), values.data(), 9, 1, 1);
     auto resampled = resampledWithGaps();
-    const auto check = [&](QCPAbstractMultiDataSource& src, int begin, int end, const char* name) {
+    const auto check = [&](QCPMultiDataSource& src, int begin, int end, const char* name) {
         src.setGapThreshold(2);
         const auto lines = src.linesInData(0, begin, end, 0);
         const auto expected = lineBreaks(lines, end - begin);

@@ -258,7 +258,7 @@ DOC_CODE(interactions_signals)
                      [](const QCPRange& range) { qDebug() << "x now spans" << range.lower << range.upper; });
 
     QObject::connect(customPlot, &QCustomPlot::plottableClick,
-                     [](QCPAbstractPlottable* plottable, int dataIndex, QMouseEvent*) {
+                     [](QCPPlottable* plottable, int dataIndex, QMouseEvent*) {
                          qDebug() << plottable->name() << "clicked at point" << dataIndex;
                      });
 

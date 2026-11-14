@@ -39,7 +39,7 @@
 */
 
 QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPAbstractColorMapped(keyAxis, valueAxis, true)
+    : QCPColorMapped(keyAxis, valueAxis, true)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
     , mRenderer(this)
 {
@@ -93,7 +93,7 @@ void QCPColorMap2::installResampleTransform()
     mPipeline.setTransform(TransformKind::ViewportDependent,
         [gapThreshold = mGapThreshold,
          zLog = mRenderer.dataScaleType() == QCPAxis::stLogarithmic](
-            const QCPAbstractDataSource2D& src,
+            const QCPDataSource2D& src,
             const ViewportParams& vp,
             std::any& cache) -> std::shared_ptr<QCPColorMapData> {
             if (src.xSize() < 2) return nullptr;
@@ -169,13 +169,13 @@ void QCPColorMap2::setGapThreshold(double threshold)
     qcpEmit(this, mParentPlot, &QCPColorMap2::gapThresholdChanged, mGapThreshold);
 }
 
-void QCPColorMap2::setDataSource(std::unique_ptr<QCPAbstractDataSource2D> source)
+void QCPColorMap2::setDataSource(std::unique_ptr<QCPDataSource2D> source)
 {
     markDirty();
-    setDataSource(std::shared_ptr<QCPAbstractDataSource2D>(std::move(source)));
+    setDataSource(std::shared_ptr<QCPDataSource2D>(std::move(source)));
 }
 
-void QCPColorMap2::setDataSource(std::shared_ptr<QCPAbstractDataSource2D> source)
+void QCPColorMap2::setDataSource(std::shared_ptr<QCPDataSource2D> source)
 {
     mDataSource = std::move(source);
     // onViewportChanged() early-returns while mDataSource is null, so it never

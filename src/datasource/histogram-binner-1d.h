@@ -26,7 +26,7 @@ inline bool binnable(double v, bool positiveOnly)
 } // namespace detail
 
 //! Finite values of every column (positive only when positiveOnly); nullopt when there are none.
-inline std::optional<QCPRange> finiteValueBounds(const QCPAbstractMultiDataSource& src,
+inline std::optional<QCPRange> finiteValueBounds(const QCPMultiDataSource& src,
                                                  bool positiveOnly)
 {
     std::optional<QCPRange> bounds;
@@ -67,7 +67,7 @@ inline std::vector<double> binEdges(QCPRange range, int bins, bool log)
 //! Counts finite values inside [range.lower, range.upper] of every column into shared bins.
 //! Values outside the range are not counted. Log: non-positive values are skipped.
 //! bins <= 0 gives an empty histogram.
-inline Histogram1D bin1d(const QCPAbstractMultiDataSource& src, QCPRange range, int bins, bool log)
+inline Histogram1D bin1d(const QCPMultiDataSource& src, QCPRange range, int bins, bool log)
 {
     if (bins <= 0)
         return { {}, {}, {}, log };

@@ -12,7 +12,7 @@ namespace
 // Same dimming as a hidden plottable's row in SciQLopPlots.
 constexpr int kHiddenRowAlpha = 90;
 
-bool isShown(const QCPAbstractPlottable* plottable)
+bool isShown(const QCPPlottable* plottable)
 {
     if (!plottable->visible())
         return false;
@@ -28,7 +28,7 @@ bool isShown(const QCPAbstractPlottable* plottable)
 
 // A graph is shown when visible with a visible component, or none yet (see isShown), so showing or hiding
 // it as a group member sets its components too.
-void setShown(const QPointer<QCPAbstractPlottable>& plottable, bool shown)
+void setShown(const QPointer<QCPPlottable>& plottable, bool shown)
 {
     plottable->setVisible(shown);
     if (auto* graph = qobject_cast<QCPGraph*>(plottable.data()))
@@ -57,7 +57,7 @@ QCPPlottableGroup::QCPPlottableGroup(QCustomPlot* parentPlot, const QString& nam
         : QObject(parentPlot), mParentPlot(parentPlot), mName(name)
 {
     connect(mParentPlot, &QCustomPlot::legendDoubleClick, this,
-            [this](QCPLegend*, QCPAbstractLegendItem* item, QMouseEvent*)
+            [this](QCPLegend*, QCPLegendItem* item, QMouseEvent*)
             {
                 if (item && item == mLegendRow)
                     qcpEmit(this, mParentPlot, &QCPPlottableGroup::doubleClicked);
@@ -83,20 +83,20 @@ void QCPPlottableGroup::setName(const QString& name)
     qcpEmit(this, mParentPlot, &QCPPlottableGroup::nameChanged, mName);
 }
 
-QList<QCPAbstractPlottable*> QCPPlottableGroup::membersRaw() const
+QList<QCPPlottable*> QCPPlottableGroup::membersRaw() const
 {
-    QList<QCPAbstractPlottable*> live;
+    QList<QCPPlottable*> live;
     for (const auto& member : mMembers)
         if (member)
             live.append(member);
     return live;
 }
 
-QList<QCPHandle<QCPAbstractPlottable>> QCPPlottableGroup::members() const
+QList<QCPHandle<QCPPlottable>> QCPPlottableGroup::members() const
 {
-    QList<QCPHandle<QCPAbstractPlottable>> live;
-    for (QCPAbstractPlottable* member : membersRaw())
-        live.append(QCPHandle<QCPAbstractPlottable>(member));
+    QList<QCPHandle<QCPPlottable>> live;
+    for (QCPPlottable* member : membersRaw())
+        live.append(QCPHandle<QCPPlottable>(member));
     return live;
 }
 
@@ -105,12 +105,12 @@ QCPHandle<QCustomPlot> QCPPlottableGroup::parentPlot() const
     return QCPHandle<QCustomPlot>(mParentPlot);
 }
 
-QCPHandle<QCPPlottableGroup> QCPAbstractPlottable::group() const
+QCPHandle<QCPPlottableGroup> QCPPlottable::group() const
 {
     return QCPHandle<QCPPlottableGroup>(mGroup);
 }
 
-bool QCPPlottableGroup::addMember(QCPAbstractPlottable* plottable)
+bool QCPPlottableGroup::addMember(QCPPlottable* plottable)
 {
     if (!plottable || plottable->parentPlot().get() != mParentPlot)
         return false;
@@ -131,7 +131,7 @@ bool QCPPlottableGroup::addMember(QCPAbstractPlottable* plottable)
         noteVisibility();
     };
     connect(plottable, &QCPLayerable::visibleChanged, this, shownChanged);
-    connect(plottable, &QCPAbstractPlottable::visuallyBusyChanged, this,
+    connect(plottable, &QCPPlottable::visuallyBusyChanged, this,
             &QCPPlottableGroup::markRowDirty);
     if (auto* graph = qobject_cast<QCPGraph*>(plottable))
         connect(graph, &QCPGraph::componentVisibilityChanged, this, shownChanged);
@@ -150,7 +150,7 @@ bool QCPPlottableGroup::addMember(QCPAbstractPlottable* plottable)
     return true;
 }
 
-void QCPPlottableGroup::removeMember(QCPAbstractPlottable* plottable)
+void QCPPlottableGroup::removeMember(QCPPlottable* plottable)
 {
     if (!plottable || plottable->mGroup != this)
         return;
@@ -175,7 +175,7 @@ void QCPPlottableGroup::memberLeft()
 /*! \internal
   \a restoreRow is false when the plottable is about to be deleted: no point making it a row.
 */
-void QCPPlottableGroup::detach(QCPAbstractPlottable* plottable, bool restoreRow)
+void QCPPlottableGroup::detach(QCPPlottable* plottable, bool restoreRow)
 {
     disconnect(plottable, nullptr, this, nullptr);
     mMembers.removeAll(plottable);
@@ -196,7 +196,7 @@ void QCPPlottableGroup::setVisible(bool visible)
     // delete a member, this group or the plot.
     const QCPEmissionScope scope(mParentPlot);
     markRowDirty();
-    for (QCPAbstractPlottable* member : membersRaw())
+    for (QCPPlottable* member : membersRaw())
         setShown(member, visible);
     markRowDirty();
     noteVisibility();
@@ -238,12 +238,12 @@ void QCPPlottableGroup::markRowDirty()
 
 QCPPlottableGroupLegendItem::QCPPlottableGroupLegendItem(QCPLegend* parent,
                                                          QCPPlottableGroup* group)
-        : QCPAbstractLegendItem(parent), mGroup(group)
+        : QCPLegendItem(parent), mGroup(group)
 {
     setAntialiased(false);
 }
 
-QCPAbstractPlottable* QCPPlottableGroupLegendItem::iconMember() const
+QCPPlottable* QCPPlottableGroupLegendItem::iconMember() const
 {
     if (!mGroup)
         return nullptr;
@@ -254,13 +254,13 @@ QCPAbstractPlottable* QCPPlottableGroupLegendItem::iconMember() const
     return live.isEmpty() ? nullptr : live.first();
 }
 
-QCPAbstractPlottable* QCPPlottableGroupLegendItem::busyMember() const
+QCPPlottable* QCPPlottableGroupLegendItem::busyMember() const
 {
     if (!mGroup)
         return nullptr;
     const auto live = mGroup->membersRaw();
     auto busy = std::find_if(live.cbegin(), live.cend(),
-                             [](const QCPAbstractPlottable* p) { return p->visuallyBusy(); });
+                             [](const QCPPlottable* p) { return p->visuallyBusy(); });
     return busy == live.cend() ? nullptr : *busy;
 }
 
@@ -285,7 +285,7 @@ QColor QCPPlottableGroupLegendItem::effectiveTextColor() const
 
 void QCPPlottableGroupLegendItem::draw(QCPPainter* painter)
 {
-    QCPAbstractPlottable* icon = iconMember();
+    QCPPlottable* icon = iconMember();
     if (!icon)
         return;
 

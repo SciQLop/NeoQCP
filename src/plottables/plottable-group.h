@@ -3,7 +3,7 @@
 #include "../layoutelements/layoutelement-legend.h"
 #include <QPointer>
 
-class QCPAbstractPlottable;
+class QCPPlottable;
 class QCPPlottableGroupLegendItem;
 
 /*! \class QCPPlottableGroup
@@ -11,7 +11,7 @@ class QCPPlottableGroupLegendItem;
 
   Create it with \ref QCustomPlot::addPlottableGroup and delete it with \ref
   QCustomPlot::removePlottableGroup. A member loses its own legend row while it is grouped and
-  gets it back when it leaves (if it \ref QCPAbstractPlottable::wantsLegend). The group holds its
+  gets it back when it leaves (if it \ref QCPPlottable::wantsLegend). The group holds its
   members, it doesn't own them: \ref QCustomPlot::removePlottable takes a plottable out of its group.
 
   An empty group stays alive, without a legend row.
@@ -42,10 +42,10 @@ public:
     QString name() const { return mName; }
     void setName(const QString& name);
 
-    QList<QCPHandle<QCPAbstractPlottable>> members() const;
+    QList<QCPHandle<QCPPlottable>> members() const;
     //! False for a null plottable or one of another QCustomPlot. A member of another group moves.
-    bool addMember(QCPAbstractPlottable* plottable);
-    void removeMember(QCPAbstractPlottable* plottable);
+    bool addMember(QCPPlottable* plottable);
+    void removeMember(QCPPlottable* plottable);
 
     //! True when any member is shown (for a QCPGraph: visible with a visible component).
     bool visible() const;
@@ -60,8 +60,8 @@ signals:
 private:
     QCPPlottableGroup(QCustomPlot* parentPlot, const QString& name);
     //! The live members raw (K8): the classes that read them per legend-row draw build no handles.
-    QList<QCPAbstractPlottable*> membersRaw() const;
-    void detach(QCPAbstractPlottable* plottable, bool restoreRow);
+    QList<QCPPlottable*> membersRaw() const;
+    void detach(QCPPlottable* plottable, bool restoreRow);
     void updateLegendRow();
     void memberLeft();
     void markRowDirty();
@@ -70,7 +70,7 @@ private:
 
     QCustomPlot* mParentPlot;
     QString mName;
-    QList<QPointer<QCPAbstractPlottable>> mMembers;
+    QList<QPointer<QCPPlottable>> mMembers;
     QPointer<QCPPlottableGroupLegendItem> mLegendRow;
     bool mShown = false; // visible() as last signalled
 
@@ -82,7 +82,7 @@ private:
   \brief The legend row of a \ref QCPPlottableGroup: the first shown member's icon and the group
   name. Dimmed while the group is hidden.
 */
-class QCP_LIB_DECL QCPPlottableGroupLegendItem : public QCPAbstractLegendItem
+class QCP_LIB_DECL QCPPlottableGroupLegendItem : public QCPLegendItem
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPPlottableGroupLegendItem)
@@ -104,8 +104,8 @@ protected:
     QSize minimumOuterSizeHint() const override;
 
 private:
-    QCPAbstractPlottable* iconMember() const;
-    QCPAbstractPlottable* busyMember() const;
+    QCPPlottable* iconMember() const;
+    QCPPlottable* busyMember() const;
 
     QPointer<QCPPlottableGroup> mGroup;
 };

@@ -58,13 +58,13 @@ If you delete an axis, its shortcut tests false. Deleting the whole axis rect do
 Everything visible in a plot is one of three kinds.
 
 **Plottables** represent data.
-They derive from <a href="api/classQCPAbstractPlottable.html">QCPAbstractPlottable</a>.
+They derive from <a href="api/classQCPPlottable.html">QCPPlottable</a>.
 They are drawn against a key axis and a value axis, they appear in the legend, and `rescaleAxes()` fits the axes to them.
 They can be selected point by point.
 See {doc}`graphs`, {doc}`plottables` and {doc}`colormaps`.
 
 **Items** are annotations.
-They derive from <a href="api/classQCPAbstractItem.html">QCPAbstractItem</a>.
+They derive from <a href="api/classQCPItem.html">QCPItem</a>.
 Each item has one or more positions, and each position can be in data coordinates, in pixels, or as a fraction of the axis rect or the widget.
 Items never appear in the legend, and `rescaleAxes()` ignores them.
 See {doc}`items`.

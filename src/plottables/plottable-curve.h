@@ -79,12 +79,12 @@ class QCPCurveOps;
   A parametric curve: its points are ordered by \a t, which is not necessarily the key axis, so the
   line may double back and cross itself.
 
-  The curve is one line component on \ref QCPAbstractLine: the whole curve is recorded once in data
+  The curve is one line component on \ref QCPLine: the whole curve is recorded once in data
   space as one polyline, so a pan translates the recording instead of walking the data again. The
   fill is one polygon of data positions (the replay rasterises it, which is what a self-crossing
   curve needs), and colour by scalar rides the shared coloured polyline.
 */
-class QCP_LIB_DECL QCPCurve : public QCPAbstractPlottable1D<QCPCurveData, QCPAbstractLine>
+class QCP_LIB_DECL QCPCurve : public QCPPlottable1D<QCPCurveData, QCPLine>
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPCurve)
@@ -102,7 +102,7 @@ public:
 
     //! The shared line styles, so 2.x code naming QCPCurve::lsLine keeps compiling. A curve draws
     //! \ref lsLine or \ref lsNone; a step or an impulse style is refused through the misuse tier.
-    using LineStyle = QCPAbstractLine::LineStyle;
+    using LineStyle = QCPLine::LineStyle;
 
     explicit QCPCurve(QCPAxis* keyAxis, QCPAxis* valueAxis);
     ~QCPCurve() override;

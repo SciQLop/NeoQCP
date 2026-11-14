@@ -105,7 +105,7 @@ std::optional<double> plotSlotAlongScreenAxis(const QCPAxis* slotAxis, const QCP
 /*! \class QCPItemAnchor
   \brief An anchor of an item to which positions can be attached to.
 
-  An item (QCPAbstractItem) may have one or more anchors. Unlike QCPItemPosition, an anchor doesn't
+  An item (QCPItem) may have one or more anchors. Unlike QCPItemPosition, an anchor doesn't
   control anything on its item, but provides a way to tie other items via their positions to the
   anchor.
 
@@ -120,7 +120,7 @@ std::optional<double> plotSlotAlongScreenAxis(const QCPAxis* slotAxis, const QCP
   anchor to other positions.
 
   To learn how to provide anchors in your own item subclasses, see the subclassing section of the
-  QCPAbstractItem documentation.
+  QCPItem documentation.
 */
 
 /* start documentation of inline functions */
@@ -139,10 +139,10 @@ std::optional<double> plotSlotAlongScreenAxis(const QCPAxis* slotAxis, const QCP
 
 /*!
   Creates a new QCPItemAnchor. You shouldn't create QCPItemAnchor instances directly, even if
-  you want to make a new item subclass. Use \ref QCPAbstractItem::createAnchor instead, as
-  explained in the subclassing section of the QCPAbstractItem documentation.
+  you want to make a new item subclass. Use \ref QCPItem::createAnchor instead, as
+  explained in the subclassing section of the QCPItem documentation.
 */
-QCPItemAnchor::QCPItemAnchor(QCustomPlot* parentPlot, QCPAbstractItem* parentItem,
+QCPItemAnchor::QCPItemAnchor(QCustomPlot* parentPlot, QCPItem* parentItem,
                              const QString& name, int anchorId)
         : mName(name), mParentPlot(parentPlot), mParentItem(parentItem), mAnchorId(anchorId)
 {
@@ -183,7 +183,7 @@ void QCPItemAnchor::detachChildren(bool keepPixelPosition)
 /*!
   Returns the final absolute pixel position of the QCPItemAnchor on the QCustomPlot surface.
 
-  The pixel information is internally retrieved via QCPAbstractItem::anchorPixelPosition of the
+  The pixel information is internally retrieved via QCPItem::anchorPixelPosition of the
   parent item, QCPItemAnchor is just an intermediary.
 */
 QPointF QCPItemAnchor::pixelPosition() const
@@ -335,10 +335,10 @@ void QCPItemAnchor::removeChildY(QCPItemPosition* pos)
 
 /*!
   Creates a new QCPItemPosition. You shouldn't create QCPItemPosition instances directly, even if
-  you want to make a new item subclass. Use \ref QCPAbstractItem::createPosition instead, as
-  explained in the subclassing section of the QCPAbstractItem documentation.
+  you want to make a new item subclass. Use \ref QCPItem::createPosition instead, as
+  explained in the subclassing section of the QCPItem documentation.
 */
-QCPItemPosition::QCPItemPosition(QCustomPlot* parentPlot, QCPAbstractItem* parentItem,
+QCPItemPosition::QCPItemPosition(QCustomPlot* parentPlot, QCPItem* parentItem,
                                  const QString& name)
         : QCPItemAnchor(parentPlot, parentItem, name)
         , mPositionTypeX(ptAbsolute)
@@ -618,7 +618,7 @@ bool QCPItemPosition::parentChainReachesThis(QCPItemAnchor* parent) const
             pending.push_back(position->parentAnchorX());
             pending.push_back(position->parentAnchorY());
         }
-        else if (QCPAbstractItem* item = anchor->mParentItem)
+        else if (QCPItem* item = anchor->mParentItem)
             for (QCPItemPosition* position : item->positions())
                 pending.push_back(position);
     }
@@ -794,7 +794,7 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
 /*! \internal
 
   The scope a multi-step setter holds when its item signals from its positions (\ref
-  QCPAbstractItem::positionMoved), none otherwise.
+  QCPItem::positionMoved), none otherwise.
 */
 std::optional<QCPEmissionScope> QCPItemPosition::signallingScope() const
 {
@@ -1306,14 +1306,14 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////// QCPAbstractItem
+//////////////////// QCPItem
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*! \class QCPAbstractItem
+/*! \class QCPItem
   \brief The abstract base class for all items in a plot.
 
   In QCustomPlot, items are supplemental graphical elements that are neither plottables
-  (QCPAbstractPlottable) nor axes (QCPAxis). While plottables are always tied to two axes and thus
+  (QCPPlottable) nor axes (QCPAxis). While plottables are always tied to two axes and thus
   plot coordinates, items can also be placed in absolute coordinates independent of any axes. Each
   specific item has at least one QCPItemPosition member which controls the positioning. Some items
   are defined by more than one coordinate and thus have two or more QCPItemPosition members (For
@@ -1376,7 +1376,7 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 
   \section items-subclassing Creating own items
 
-  To create an own item, you implement a subclass of QCPAbstractItem. These are the pure
+  To create an own item, you implement a subclass of QCPItem. These are the pure
   virtual functions, you must implement:
   \li \ref selectTest
   \li \ref draw
@@ -1400,7 +1400,7 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 
   \code
   QCPItemExample::QCPItemExample(QCustomPlot *parentPlot) :
-    QCPAbstractItem(parentPlot),
+    QCPItem(parentPlot),
     myPosition(createPosition("myPosition"))
   {
     // other constructor code
@@ -1441,13 +1441,13 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
   position when anything attached to the anchor needs to know the coordinates.
 */
 
-/*! \fn void QCPAbstractItem::clipToAxisRectChanged(bool clipToAxisRect)
+/*! \fn void QCPItem::clipToAxisRectChanged(bool clipToAxisRect)
 
   This signal is emitted when \ref clipToAxisRect changes, after the plot delivers its deferred
   signals.
 */
 
-/*! \fn void QCPAbstractItem::clipAxisRectChanged(QCPAxisRect* clipAxisRect)
+/*! \fn void QCPItem::clipAxisRectChanged(QCPAxisRect* clipAxisRect)
 
   This signal is emitted when \ref clipAxisRect changes, after the plot delivers its deferred
   signals.
@@ -1455,14 +1455,14 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 
 /* start of documentation of inline functions */
 
-/*! \fn QList<QCPItemPosition*> QCPAbstractItem::positions() const
+/*! \fn QList<QCPItemPosition*> QCPItem::positions() const
 
   Returns all positions of the item in a list.
 
   \see anchors, position
 */
 
-/*! \fn QList<QCPItemAnchor*> QCPAbstractItem::anchors() const
+/*! \fn QList<QCPItemAnchor*> QCPItem::anchors() const
 
   Returns all anchors of the item in a list. Note that since a position (QCPItemPosition) is always
   also an anchor, the list will also contain the positions of this item.
@@ -1473,7 +1473,7 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 /* end of documentation of inline functions */
 /* start documentation of pure virtual functions */
 
-/*! \fn void QCPAbstractItem::draw(QCPPainter *painter)
+/*! \fn void QCPItem::draw(QCPPainter *painter)
   \internal
 
   Draws this item with the provided \a painter.
@@ -1486,19 +1486,19 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 /* end documentation of pure virtual functions */
 /* start documentation of signals */
 
-/*! \fn void QCPAbstractItem::selectionChanged()
+/*! \fn void QCPItem::selectionChanged()
   This signal is emitted when the selection state of this item has changed, either by user
   interaction or by a direct call to \ref setSelected. The slot reads \ref selected.
 */
 
-/*! \fn void QCPAbstractItem::selectableChanged()
+/*! \fn void QCPItem::selectableChanged()
   This signal is emitted when the selectability of this item has changed. The slot reads
   \ref selectable.
 */
 
 /* end documentation of signals */
 
-/*! \fn void QCPAbstractItem::clipAreaChanged(QCPArea* clipArea)
+/*! \fn void QCPItem::clipAreaChanged(QCPArea* clipArea)
 
   This signal is emitted when \ref clipArea changes, after the plot delivers its deferred
   signals.
@@ -1507,7 +1507,7 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 /*!
   Base class constructor which initializes base class members.
 */
-QCPAbstractItem::QCPAbstractItem(QCustomPlot* parentPlot)
+QCPItem::QCPItem(QCustomPlot* parentPlot)
         : QCPLayerable(parentPlot), mClipToAxisRect(false), mSelectable(true), mSelected(false)
 {
     if (parentPlot->registerItem(this))
@@ -1523,7 +1523,7 @@ QCPAbstractItem::QCPAbstractItem(QCustomPlot* parentPlot)
     }
 }
 
-QCPAbstractItem::~QCPAbstractItem()
+QCPItem::~QCPItem()
 {
     // Before any of them goes away: resolving the pixels a child keeps reads our positions, which
     // only this class's anchorPixelPosition can still do - the item's own is gone by now.
@@ -1538,26 +1538,26 @@ QCPAbstractItem::~QCPAbstractItem()
 
 /* can't make this a header inline function, because QPointer breaks with forward declared types,
  * see QTBUG-29588 */
-void QCPAbstractItem::noteFramesChanged()
+void QCPItem::noteFramesChanged()
 {
     if (QCPLayer* itemLayer = layer())
         itemLayer->invalidateItemFrames();
 }
 
-QCPHandle<QCPAxisRect> QCPAbstractItem::clipAxisRect() const
+QCPHandle<QCPAxisRect> QCPItem::clipAxisRect() const
 {
     return QCPHandle<QCPAxisRect>(clipAxisRectRaw());
 }
 
-QCPAxisRect* QCPAbstractItem::clipAxisRectRaw() const
+QCPAxisRect* QCPItem::clipAxisRectRaw() const
 {
     return qobject_cast<QCPAxisRect*>(mClipArea.data());
 }
 
-QCPArea* QCPAbstractItem::clipAreaRaw() const { return mClipArea.data(); }
+QCPArea* QCPItem::clipAreaRaw() const { return mClipArea.data(); }
 
 //! Returns the area this item is clipped to, or null when it clips to nothing but the viewport.
-QCPHandle<QCPArea> QCPAbstractItem::clipArea() const
+QCPHandle<QCPArea> QCPItem::clipArea() const
 {
     return QCPHandle<QCPArea>(mClipArea.data());
 }
@@ -1566,25 +1566,25 @@ QCPHandle<QCPArea> QCPAbstractItem::clipArea() const
   Replays the recording into \a painter. Every item records: what an item draws, it records in
   draw(QCPDrawContext&), and this is the one place the recording reaches a painter.
 */
-void QCPAbstractItem::draw(QCPPainter* painter)
+void QCPItem::draw(QCPPainter* painter)
 {
     mCore.paint(*this, *painter, view());
 }
 
 //! What the core reads from this item this frame.
-QCPDrawnView QCPAbstractItem::view() const
+QCPDrawnView QCPItem::view() const
 {
     return qcpDrawnViewOf(*this, clipRect());
 }
 
 //! What the recording occupies in data coordinates.
-std::optional<QCPDataBox> QCPAbstractItem::drawnDataRange() const
+std::optional<QCPDataBox> QCPItem::drawnDataRange() const
 {
     return mCore.dataRange(*this, view());
 }
 
 //! The pixel distance from \a at to the recording, or none when it missed.
-std::optional<double> QCPAbstractItem::hitTest(QCP::Pixels at, QVariant* details) const
+std::optional<double> QCPItem::hitTest(QCP::Pixels at, QVariant* details) const
 {
     return mCore.hitTest(*this, at, details, view());
 }
@@ -1594,7 +1594,7 @@ std::optional<double> QCPAbstractItem::hitTest(QCP::Pixels at, QVariant* details
   everything they in turn depend on, hashed in order. The anchor chain is acyclic (setParentAnchor
   refuses one that closes a loop), so this walk terminates; a self anchor is skipped all the same.
 */
-quint64 QCPAbstractItem::dependencyRevision() const
+quint64 QCPItem::dependencyRevision() const
 {
     // Most items hang from nothing: no walk, no hash, in the answer every frame asks of every item.
     if (!mAnchoredPositions)
@@ -1603,7 +1603,7 @@ quint64 QCPAbstractItem::dependencyRevision() const
     for (const QCPItemPosition* position : mPositions)
         for (const QCPItemAnchor* anchor : { position->parentAnchorX(), position->parentAnchorY() })
         {
-            const QCPAbstractItem* parent = anchor ? anchor->mParentItem : nullptr;
+            const QCPItem* parent = anchor ? anchor->mParentItem : nullptr;
             if (!parent || parent->mDetachingAnchors || parent == this)
                 continue;
             revision = qHashMulti(revision, quint64(parent->mCore.generation()),
@@ -1613,7 +1613,7 @@ quint64 QCPAbstractItem::dependencyRevision() const
 }
 
 //! The click path: the distance to the recording, or -1 when the click misses it.
-double QCPAbstractItem::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
+double QCPItem::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {
     // Hit and paint agree on the clip: a click outside the shape the item is clipped to cannot hit
     // what is not drawn there.
@@ -1631,7 +1631,7 @@ double QCPAbstractItem::selectTest(const QPointF& pos, bool onlySelectable, QVar
   The recording's box, once the item has one. An item that does not record keeps the
   positions-based answer of its subclass; this default is none.
 */
-std::optional<QCPItemExtent> QCPAbstractItem::dataExtent() const
+std::optional<QCPItemExtent> QCPItem::dataExtent() const
 {
     // A subclass that draws through positions overrides this; one that records gets the index box
     // of its recording. An item that records nothing answers none, exactly as the default did.
@@ -1644,7 +1644,7 @@ std::optional<QCPItemExtent> QCPAbstractItem::dataExtent() const
 
   \see setClipAxisRect
 */
-void QCPAbstractItem::setClipToAxisRect(bool clip)
+void QCPItem::setClipToAxisRect(bool clip)
 {
     if (mClipToAxisRect == clip)
         return;
@@ -1652,7 +1652,7 @@ void QCPAbstractItem::setClipToAxisRect(bool clip)
     mClipToAxisRect = clip;
     if (mClipToAxisRect)
         setParentLayerable(mClipArea.data());
-    qcpEmit(this, mParentPlot, &QCPAbstractItem::clipToAxisRectChanged, clipToAxisRect());
+    qcpEmit(this, mParentPlot, &QCPItem::clipToAxisRectChanged, clipToAxisRect());
 }
 
 /*!
@@ -1661,12 +1661,12 @@ void QCPAbstractItem::setClipToAxisRect(bool clip)
 
   \see setClipToAxisRect
 */
-void QCPAbstractItem::setClipAxisRect(QCPAxisRect* rect)
+void QCPItem::setClipAxisRect(QCPAxisRect* rect)
 {
     setClipArea(rect); // emits clipAxisRectChanged when the rect moves
 }
 
-void QCPAbstractItem::setClipArea(QCPArea* area)
+void QCPItem::setClipArea(QCPArea* area)
 {
     if (mClipArea == area)
         return;
@@ -1679,9 +1679,9 @@ void QCPAbstractItem::setClipArea(QCPArea* area)
         setParentLayerable(mClipArea.data());
     noteFramesChanged();
     // clipAxisRect is the clip area when that is an axis rect.
-    qcpEmit(this, mParentPlot, &QCPAbstractItem::clipAreaChanged, mClipArea.data());
+    qcpEmit(this, mParentPlot, &QCPItem::clipAreaChanged, mClipArea.data());
     if (clipAxisRectRaw() != rectBefore)
-        qcpEmit(this, mParentPlot, &QCPAbstractItem::clipAxisRectChanged, clipAxisRectRaw());
+        qcpEmit(this, mParentPlot, &QCPItem::clipAxisRectChanged, clipAxisRectRaw());
 }
 
 /*!
@@ -1696,7 +1696,7 @@ void QCPAbstractItem::setClipArea(QCPArea* area)
 
   \see QCustomPlot::setInteractions, setSelected
 */
-void QCPAbstractItem::setSelectable(QCP::SelectionType selectable)
+void QCPItem::setSelectable(QCP::SelectionType selectable)
 {
     QCP_CHECK_OR_RETURN(selectable == QCP::stNone || selectable == QCP::stWhole,
                         "an item is either stNone or stWhole selectable");
@@ -1704,7 +1704,7 @@ void QCPAbstractItem::setSelectable(QCP::SelectionType selectable)
     if (mSelectable != selectableWhole)
     {
         mSelectable = selectableWhole;
-        qcpEmit(this, mParentPlot, &QCPAbstractItem::selectableChanged);
+        qcpEmit(this, mParentPlot, &QCPItem::selectableChanged);
     }
 }
 
@@ -1723,13 +1723,13 @@ void QCPAbstractItem::setSelectable(QCP::SelectionType selectable)
 
   \see setSelectable, selectTest
 */
-void QCPAbstractItem::setSelected(bool selected)
+void QCPItem::setSelected(bool selected)
 {
     if (mSelected == selected)
         return;
     markDirty();
     mSelected = selected;
-    qcpEmit(this, mParentPlot, &QCPAbstractItem::selectionChanged);
+    qcpEmit(this, mParentPlot, &QCPItem::selectionChanged);
 }
 
 /*!
@@ -1742,7 +1742,7 @@ void QCPAbstractItem::setSelected(bool selected)
 
   \see positions, anchor
 */
-QCPItemPosition* QCPAbstractItem::position(const QString& name) const
+QCPItemPosition* QCPItem::position(const QString& name) const
 {
     for (QCPItemPosition* position : mPositions)
     {
@@ -1763,7 +1763,7 @@ QCPItemPosition* QCPAbstractItem::position(const QString& name) const
 
   \see anchors, position
 */
-QCPItemAnchor* QCPAbstractItem::anchor(const QString& name) const
+QCPItemAnchor* QCPItem::anchor(const QString& name) const
 {
     for (QCPItemAnchor* anchor : mAnchors)
     {
@@ -1782,7 +1782,7 @@ QCPItemAnchor* QCPAbstractItem::anchor(const QString& name) const
 
   \see anchor, position
 */
-bool QCPAbstractItem::hasAnchor(const QString& name) const
+bool QCPItem::hasAnchor(const QString& name) const
 {
     for (QCPItemAnchor* anchor : mAnchors)
     {
@@ -1801,7 +1801,7 @@ bool QCPAbstractItem::hasAnchor(const QString& name) const
 
   \see draw
 */
-QRect QCPAbstractItem::clipRect() const
+QRect QCPItem::clipRect() const
 {
     if (mClipToAxisRect && mClipArea)
         return mClipArea.data()->rect();
@@ -1822,7 +1822,7 @@ QRect QCPAbstractItem::clipRect() const
 
   \see setAntialiased
 */
-void QCPAbstractItem::applyDefaultAntialiasingHint(QCPPainter* painter) const
+void QCPItem::applyDefaultAntialiasingHint(QCPPainter* painter) const
 {
     applyAntialiasingHint(painter, mAntialiased, QCP::aeItems);
 }
@@ -1840,7 +1840,7 @@ void QCPAbstractItem::applyDefaultAntialiasingHint(QCPPainter* painter) const
   rect, in your \ref selectTest reimplementation. Finally, return the minimum (non -1) of all four
   returned values.
 */
-double QCPAbstractItem::rectDistance(const QRectF& rect, const QPointF& pos, bool filledRect) const
+double QCPItem::rectDistance(const QRectF& rect, const QPointF& pos, bool filledRect) const
 {
     double result = -1;
 
@@ -1877,7 +1877,7 @@ double QCPAbstractItem::rectDistance(const QRectF& rect, const QPointF& pos, boo
 
   \see createAnchor
 */
-QPointF QCPAbstractItem::anchorPixelPosition(int anchorId) const
+QPointF QCPItem::anchorPixelPosition(int anchorId) const
 {
     qDebug() << Q_FUNC_INFO
              << "called on item which shouldn't have any anchors (this method not reimplemented). "
@@ -1900,7 +1900,7 @@ QPointF QCPAbstractItem::anchorPixelPosition(int anchorId) const
 
   \see createAnchor
 */
-void QCPAbstractItem::markDirty()
+void QCPItem::markDirty()
 {
     // A position may follow an anchor of its own item (a line's end pinned to its start), so the
     // follower walk below can come straight back here. Returning at once while marking stops that
@@ -1920,7 +1920,7 @@ void QCPAbstractItem::markDirty()
     markFollowersDirty();
 }
 
-void QCPAbstractItem::markFollowersDirty()
+void QCPItem::markFollowersDirty()
 {
     // A position that follows one of this item's anchors moves with it, whatever layer it is on.
     // A follower may belong to this very item: markDirty() returns at once when it is already
@@ -1936,7 +1936,7 @@ void QCPAbstractItem::markFollowersDirty()
 }
 
 std::optional<QCPItemExtent>
-QCPAbstractItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>& positions) const
+QCPItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>& positions) const
 {
     if (positions.isEmpty())
         return std::nullopt;
@@ -2024,7 +2024,7 @@ QCPAbstractItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>&
     return QCPItemExtent { keyAxis, valueAxis, box, pixelPad, system };
 }
 
-QCPItemPosition* QCPAbstractItem::createPosition(const QString& name)
+QCPItemPosition* QCPItem::createPosition(const QString& name)
 {
     if (hasAnchor(name))
         qDebug() << Q_FUNC_INFO << "anchor/position with name exists already:" << name;
@@ -2048,7 +2048,7 @@ QCPItemPosition* QCPAbstractItem::createPosition(const QString& name)
 
   The \a anchorId must be a number identifying the created anchor. It is recommended to create an
   enum (e.g. "AnchorIndex") for this on each item that uses anchors. This id is used by the anchor
-  to identify itself when it calls QCPAbstractItem::anchorPixelPosition. That function then returns
+  to identify itself when it calls QCPItem::anchorPixelPosition. That function then returns
   the correct pixel coordinates for the passed anchor id.
 
   Don't delete anchors created by this function manually, as the item will take care of it.
@@ -2059,7 +2059,7 @@ QCPItemPosition* QCPAbstractItem::createPosition(const QString& name)
 
   \see createPosition
 */
-QCPItemAnchor* QCPAbstractItem::createAnchor(const QString& name, int anchorId)
+QCPItemAnchor* QCPItem::createAnchor(const QString& name, int anchorId)
 {
     if (hasAnchor(name))
         qDebug() << Q_FUNC_INFO << "anchor/position with name exists already:" << name;
@@ -2069,14 +2069,14 @@ QCPItemAnchor* QCPAbstractItem::createAnchor(const QString& name, int anchorId)
 }
 
 /* inherits documentation from base class */
-void QCPAbstractItem::selectEvent([[maybe_unused]] QMouseEvent* event, bool additive,
+void QCPItem::selectEvent([[maybe_unused]] QMouseEvent* event, bool additive,
                                   [[maybe_unused]] const QVariant& details,
                                   bool* selectionStateChanged)
 {
     if (mSelectable)
     {
         bool selBefore = mSelected;
-        const QPointer<QCPAbstractItem> alive(this);
+        const QPointer<QCPItem> alive(this);
         setSelected(additive ? !mSelected : true);
         if (selectionStateChanged)
             *selectionStateChanged = !alive || mSelected != selBefore;
@@ -2084,12 +2084,12 @@ void QCPAbstractItem::selectEvent([[maybe_unused]] QMouseEvent* event, bool addi
 }
 
 /* inherits documentation from base class */
-void QCPAbstractItem::deselectEvent(bool* selectionStateChanged)
+void QCPItem::deselectEvent(bool* selectionStateChanged)
 {
     if (mSelectable)
     {
         bool selBefore = mSelected;
-        const QPointer<QCPAbstractItem> alive(this);
+        const QPointer<QCPItem> alive(this);
         setSelected(false);
         if (selectionStateChanged)
             *selectionStateChanged = !alive || mSelected != selBefore;
@@ -2097,7 +2097,7 @@ void QCPAbstractItem::deselectEvent(bool* selectionStateChanged)
 }
 
 /* inherits documentation from base class */
-QCP::Interaction QCPAbstractItem::selectionCategory() const
+QCP::Interaction QCPItem::selectionCategory() const
 {
     return QCP::iSelectItems;
 }

@@ -41,7 +41,7 @@
 #include "vector2d.h"
 
 class QCPPainter;
-class QCPAbstractPlottable;
+class QCPPlottable;
 class QCPPlottableGroup;
 class QCPPlottableInterface1D;
 class QKeyEvent;
@@ -94,18 +94,18 @@ protected:
     QCPScatterStyle mScatterStyle;
     QCPScatterStyle::ScatterProperties mUsedScatterProperties;
     // non-property members:
-    QCPAbstractPlottable* mPlottable;
+    QCPPlottable* mPlottable;
 
     // introduced virtual methods:
-    virtual bool registerWithPlottable(QCPAbstractPlottable* plottable);
+    virtual bool registerWithPlottable(QCPPlottable* plottable);
 
 private:
     Q_DISABLE_COPY(QCPSelectionDecorator)
-    friend class QCPAbstractPlottable;
+    friend class QCPPlottable;
 };
 Q_DECLARE_METATYPE(QCPSelectionDecorator*)
 
-class QCP_LIB_DECL QCPAbstractPlottable : public QCPLayerable, public QCPDrawable
+class QCP_LIB_DECL QCPPlottable : public QCPLayerable, public QCPDrawable
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
@@ -132,11 +132,11 @@ public:
     template <typename T>
     using OpsFor = QCPPlottableOps<T>;
 
-    QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis,
+    QCPPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis,
                          QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
-    explicit QCPAbstractPlottable(QCPCoordinateSystem* system,
+    explicit QCPPlottable(QCPCoordinateSystem* system,
                                   QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
-    virtual ~QCPAbstractPlottable() override;
+    virtual ~QCPPlottable() override;
 
     //! Whether \a system can host a plottable that needs \a required; reports the one misuse when it
     //! cannot. The four 2.x capabilities promise the axis pair, which only a cartesian system has.
@@ -415,7 +415,7 @@ protected:
     void leavePlotOnDestruction();
 
 private:
-    Q_DISABLE_COPY_MOVE(QCPAbstractPlottable)
+    Q_DISABLE_COPY_MOVE(QCPPlottable)
 
     // K8: the bars group reads the projection raw, once per bar; a layer does so per plottable.
     friend class QCPBarsGroup;
@@ -459,7 +459,7 @@ private:
         mValueAxis = nullptr;
     }
     //! Marks the legend rows that show \a plottable, raw: a setter marks what a name change moved.
-    static void markLegendRows(QCPLayoutElement* element, QCPAbstractPlottable* plottable);
+    static void markLegendRows(QCPLayoutElement* element, QCPPlottable* plottable);
 
     friend class QCustomPlot;
     friend class QCPSelectionDecorator;
@@ -470,16 +470,16 @@ private:
     friend class QCPPlottableLegendItem;
     friend class QCPPlottableGroup;
     friend class QCPPlottableGroupLegendItem;
-    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip);
+    friend QCPDrawnView qcpDrawnViewOf(const QCPPlottable& plottable, QRect clip);
 };
 
 namespace qcp::ops
 {
 // Checked setters behind the handles: each refuses a bad value with one misuse and keeps the old.
-QCP_LIB_DECL void setAxes(QCPAbstractPlottable& plottable, QCPAxis* keyAxis, QCPAxis* valueAxis);
-QCP_LIB_DECL void setAxes(QCPAbstractPlottable& plottable, QCPAxis::AxisType keyType,
+QCP_LIB_DECL void setAxes(QCPPlottable& plottable, QCPAxis* keyAxis, QCPAxis* valueAxis);
+QCP_LIB_DECL void setAxes(QCPPlottable& plottable, QCPAxis::AxisType keyType,
                           QCPAxis::AxisType valueType);
-QCP_LIB_DECL void setAxisRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect);
+QCP_LIB_DECL void setAxisRect(QCPPlottable& plottable, QCPAxisRect* rect);
 } // namespace qcp::ops
 
 /*!

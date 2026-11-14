@@ -67,12 +67,12 @@ using QCPErrorBarsDataContainer = QVector<QCPErrorBarsData>;
 template <typename T, typename Self = void>
 class QCPErrorBarsOps;
 
-class QCP_LIB_DECL QCPErrorBars : public QCPAbstractPlottable, public QCPPlottableInterface1D
+class QCP_LIB_DECL QCPErrorBars : public QCPPlottable, public QCPPlottableInterface1D
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPErrorBars)
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QCPAbstractPlottable* dataPlottable READ dataPlottable WRITE setDataPlottable NOTIFY
+    Q_PROPERTY(QCPPlottable* dataPlottable READ dataPlottable WRITE setDataPlottable NOTIFY
                    dataPlottableChanged)
     Q_PROPERTY(ErrorType errorType READ errorType WRITE setErrorType NOTIFY errorTypeChanged)
     Q_PROPERTY(
@@ -112,9 +112,9 @@ public:
         return mDataContainer;
     }
 
-    [[nodiscard]] QCPHandle<QCPAbstractPlottable> dataPlottable() const
+    [[nodiscard]] QCPHandle<QCPPlottable> dataPlottable() const
     {
-        return QCPHandle<QCPAbstractPlottable>(mDataPlottable.data());
+        return QCPHandle<QCPPlottable>(mDataPlottable.data());
     }
 
     [[nodiscard]] ErrorType errorType() const { return mErrorType; }
@@ -127,7 +127,7 @@ public:
     void setData(QSharedPointer<QCPErrorBarsDataContainer> data);
     void setData(const QVector<double>& error);
     void setData(const QVector<double>& errorMinus, const QVector<double>& errorPlus);
-    void setDataPlottable(QCPAbstractPlottable* plottable);
+    void setDataPlottable(QCPPlottable* plottable);
     void setErrorType(ErrorType type);
     void setWhiskerWidth(double pixels);
     void setSymbolGap(double pixels);
@@ -164,7 +164,7 @@ public:
     [[nodiscard]] quint64 dependencyRevision() const override;
 
 signals:
-    void dataPlottableChanged(QCPAbstractPlottable* dataPlottable);
+    void dataPlottableChanged(QCPPlottable* dataPlottable);
     void errorTypeChanged(QCPErrorBars::ErrorType errorType);
     void whiskerWidthChanged(double whiskerWidth);
     void symbolGapChanged(double symbolGap);
@@ -174,7 +174,7 @@ protected:
     QSharedPointer<QCPErrorBarsDataContainer> mDataContainer;
     //! How often data() handed the container out: a caller may have changed it in place.
     mutable quint64 mDataAccess = 0;
-    QPointer<QCPAbstractPlottable> mDataPlottable;
+    QPointer<QCPPlottable> mDataPlottable;
     ErrorType mErrorType;
     double mWhiskerWidth;
     double mSymbolGap;

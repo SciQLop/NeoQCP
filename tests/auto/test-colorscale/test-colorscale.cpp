@@ -310,7 +310,7 @@ void TestColorScale::aScaleSlotDeletingTheMovedMapIsSafe()
     QPointer<QCPColorMap> moved
         = mapWithRange(top->axis(QCPAxis::atBottom), top->axis(QCPAxis::atLeft), 0, 1);
     bool ran = false;
-    connect(moved, &QCPAbstractColorMapped::colorScaleChanged, mPlot, [&] {
+    connect(moved, &QCPColorMapped::colorScaleChanged, mPlot, [&] {
         ran = true;
         delete moved.data();
     }, Qt::SingleShotConnection);

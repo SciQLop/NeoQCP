@@ -82,7 +82,7 @@ The angular axis has most of those setters too, for its tick labels around the c
 
 ## Fitting and interaction
 
-A polar graph is not a `QCPAbstractPlottable`.
+A polar graph is not a `QCPPlottable`.
 So `QCustomPlot::rescaleAxes()` and `plottableCount()` do not see it.
 Use the graph's own `rescaleAxes()`, `rescaleKeyAxis()` and `rescaleValueAxis()`, or `rescale()` on the area or an axis.
 

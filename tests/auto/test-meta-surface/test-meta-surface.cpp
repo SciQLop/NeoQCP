@@ -198,7 +198,7 @@ void removeAxis(QObject* object)
 
 void removePlottable(QObject* object)
 {
-    auto* plottable = qobject_cast<QCPAbstractPlottable*>(object);
+    auto* plottable = qobject_cast<QCPPlottable*>(object);
     QVERIFY(plottable->parentPlot()->removePlottable(plottable));
 }
 
@@ -560,14 +560,14 @@ void TestMetaSurface::curvePenNotifiesOnce()
 {
     auto plot = newPlot();
     QCPCurve* curve = curveOn(*plot);
-    QSignalSpy spy(curve, &QCPAbstractPlottable::penChanged);
+    QSignalSpy spy(curve, &QCPPlottable::penChanged);
     curve->setPen(QPen(Qt::green, 2));
     QCOMPARE(spy.count(), 1);
     curve->setPen(QPen(Qt::green, 2));
     QCOMPARE(spy.count(), 1);
 }
 
-// QCPAbstractLine::setPen repaints when only a component's pen differs (plottable-line.cpp), but
+// QCPLine::setPen repaints when only a component's pen differs (plottable-line.cpp), but
 // pen() does not move: no penChanged.
 void TestMetaSurface::componentRepenRepaintsWithoutPenChanged()
 {
@@ -576,7 +576,7 @@ void TestMetaSurface::componentRepenRepaintsWithoutPenChanged()
     graph->setPen(QPen(Qt::red));
     graph->setComponentPens({ QPen(Qt::green) });
     settle(*plot);
-    QSignalSpy spy(graph, &QCPAbstractPlottable::penChanged);
+    QSignalSpy spy(graph, &QCPPlottable::penChanged);
 
     graph->setPen(QPen(Qt::red));
 
@@ -841,8 +841,8 @@ const QVector<std::pair<QMetaType, Different>>& differentValues()
                 QCPLayer* grid = plot->layer(QStringLiteral("grid"));
                 return v == grid ? plot->layer(QStringLiteral("overlay")).get() : grid;
             }),
-        differentFor<QCPAbstractPlottable*>(
-            [](QCPAbstractPlottable* const&, QObject* object) -> QCPAbstractPlottable*
+        differentFor<QCPPlottable*>(
+            [](QCPPlottable* const&, QObject* object) -> QCPPlottable*
             { return graphOn(*plotOf(object)); }),
         differentFor<QCPGraph*>([](QCPGraph* const&, QObject* object) -> QCPGraph*
                                 { return graphOn(*plotOf(object)); }),
@@ -985,18 +985,18 @@ const QVector<Exception>& exceptions()
         { &QCPAxis::staticMetaObject, "tickLabelRotation", Rule::Clamps,
           [](QObject*) { return QVariant(45.0); }, [](QObject*) { return QVariant(120.0); },
           "clamps to [-90, 90]" },
-        { &QCPAbstractPlottable::staticMetaObject, "selection", Rule::TrimmedBySelectable,
+        { &QCPPlottable::staticMetaObject, "selection", Rule::TrimmedBySelectable,
           [](QObject* object)
           {
-              auto* plottable = qobject_cast<QCPAbstractPlottable*>(object);
+              auto* plottable = qobject_cast<QCPPlottable*>(object);
               plottable->setSelectable(QCP::stDataRange);
               return QVariant::fromValue(QCPDataSelection(QCPDataRange(0, 1)));
           },
           nullptr, "enforceType trims it by selectable (plottable.cpp)" },
-        { &QCPAbstractPlottable::staticMetaObject, "selectionDecorator", Rule::TakesOwnership,
+        { &QCPPlottable::staticMetaObject, "selectionDecorator", Rule::TakesOwnership,
           [](QObject*) { return QVariant::fromValue(freshDecorator()); }, nullptr,
           "adopts the decorator and refuses the same one again (plottable.cpp:966-976)" },
-        { &QCPAbstractLine::staticMetaObject, "pen", Rule::ComponentPen,
+        { &QCPLine::staticMetaObject, "pen", Rule::ComponentPen,
           [](QObject*) { return QVariant(QPen(Qt::blue, 3)); }, nullptr,
           "repaints when only a component differs (plottable-line.cpp:84)" },
         { &QCPPolarAxisAngular::staticMetaObject, "numberFormat", Rule::Refuses,
@@ -1287,7 +1287,7 @@ const QVector<Writer>& writers()
           [](QObject* o) { qobject_cast<QCPOverlay*>(o)->setCollapsible(false); },
           { "collapsible", "collapsed" },
           { "opacity" } },
-        { "QCPAbstractPlottable::setKeyAxis dropping the system",
+        { "QCPPlottable::setKeyAxis dropping the system",
           [](QCustomPlot& plot) -> QObject* { return graphOn(plot); },
           [](QObject* o) { qobject_cast<QCPGraph*>(o)->setKeyAxis(nullptr); },
           { "system", "keyAxis" },
@@ -1511,7 +1511,7 @@ const QVector<Writer>& writers()
           [](QObject* o) { qobject_cast<QCPColorScale*>(o)->setType(QCPAxis::atBottom); },
           { "type" },
           { "label", "rangeDrag", "rangeZoom" } },
-        { "QCPAbstractLine::setComponentScatterStyle on component 0",
+        { "QCPLine::setComponentScatterStyle on component 0",
           [](QCustomPlot& plot) -> QObject* { return graphOn(plot); },
           [](QObject* o)
           {
@@ -1591,11 +1591,11 @@ const QVector<Writer>& writers()
           },
           { "background", "backgroundScaled", "backgroundScaledMode" },
           { } },
-        { "QCPAbstractItem::setClipArea",
+        { "QCPItem::setClipArea",
           [](QCustomPlot& plot) -> QObject* { return plot.add<QCPItemLine>().get(); },
           [](QObject* o)
           {
-              auto* item = qobject_cast<QCPAbstractItem*>(o);
+              auto* item = qobject_cast<QCPItem*>(o);
               QCustomPlot* plot = item->parentPlot();
               if (item->clipAxisRect().get() == plot->axisRect().get())
                   item->setClipArea(axisRectOn(*plot));
@@ -1737,7 +1737,7 @@ const QVector<Nested>& nestedWriters()
               const QFont font(QStringLiteral("Serif"), 17);
               QCPLegend* legend = plot.legend.get();
               return probeOnce(
-                  legend->item(0).get(), &QCPAbstractLegendItem::fontChanged,
+                  legend->item(0).get(), &QCPLegendItem::fontChanged,
                   [&] { legend->setFont(font); },
                   [&] { return legend->item(1)->font() == font && legend->font() == font; });
           } },
@@ -2025,7 +2025,7 @@ const QVector<Deleting>& deletingWriters()
               auto* tracer = plot.findChild<QCPItemTracer*>();
               tracer->setGraph(twoColumnGraphOn(plot), 1);
           } },
-        { "QCPAbstractItem::setClipArea", [](QCustomPlot& plot)
+        { "QCPItem::setClipArea", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(plot.add<QCPItemLine>().get(), "clipArea"); },
           [](QCustomPlot& plot)
           {
@@ -2040,10 +2040,10 @@ const QVector<Deleting>& deletingWriters()
               return std::pair<QObject*, const char*>(plot.overlay().get(), "collapsible");
           },
           [](QCustomPlot& plot) { plot.overlay()->setCollapsible(false); } },
-        { "QCPAbstractPlottable::setKeyAxis dropping the system", [](QCustomPlot& plot)
+        { "QCPPlottable::setKeyAxis dropping the system", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(graphOn(plot), "system"); },
           [](QCustomPlot& plot) { plot.graph(0)->setKeyAxis(nullptr); } },
-        { "QCPAbstractPlottable::setWantsLegend",
+        { "QCPPlottable::setWantsLegend",
           [](QCustomPlot& plot)
           {
               graphOn(plot);
@@ -2361,10 +2361,10 @@ const QVector<FormRow>& formRows()
         r += plainRows(&QCPItemRichText::staticMetaObject, { "cornerRadius" });
         r += plainRows(&QCPItemRSpan::staticMetaObject, { "keyRange", "valueRange" });
         r += plainRows(&QCPItemSpan::staticMetaObject, { "range" });
-        r += plainRows(&QCPAbstractSpanItem::staticMetaObject,
+        r += plainRows(&QCPSpanItem::staticMetaObject,
                        { "brush", "selectedBrush", "borderPen", "selectedBorderPen", "movable" });
         r += plainRows(&QCPItemTracer::staticMetaObject, { "component" });
-        r += plainRows(&QCPAbstractItem::staticMetaObject, { "clipArea" });
+        r += plainRows(&QCPItem::staticMetaObject, { "clipArea" });
         for (const char* name :
              { "type", "typeX", "typeY", "coords", "axisRect", "system", "area", "pixelPosition" })
             r += { { &QCPItemPosition::staticMetaObject, name, Form::Off } };
@@ -2404,8 +2404,8 @@ const QVector<FormRow>& formRows()
                { &QCPAlignmentGroup::staticMetaObject, "elements", Form::Off },
                { &QCPAxisBase::staticMetaObject, "linkSource", Form::Off },
                { &QCPAxisBase::staticMetaObject, "link", Form::Off } };
-        r += plainRows(&QCPAbstractPlottable::staticMetaObject, { "system", "wantsLegend" });
-        r += { { &QCPAbstractPlottable::staticMetaObject, "busy", Form::Off } };
+        r += plainRows(&QCPPlottable::staticMetaObject, { "system", "wantsLegend" });
+        r += { { &QCPPlottable::staticMetaObject, "busy", Form::Off } };
         r += plainRows(&QCPColorMap2::staticMetaObject,
                        { "gapThreshold", "contourLevels", "contourPen", "contourLabelEnabled" });
         r += plainRows(&QCPGraph::staticMetaObject, { "deferredDataSwap", "gapThreshold" });
@@ -2784,7 +2784,7 @@ void TestMetaSurface::exceptionRulesHold()
     {
         case Rule::TrimmedBySelectable:
         {
-            auto* plottable = qobject_cast<QCPAbstractPlottable*>(object);
+            auto* plottable = qobject_cast<QCPPlottable*>(object);
             plottable->setSelectable(QCP::stNone);
             QVERIFY(meta.write(object, QVariant::fromValue(QCPDataSelection(QCPDataRange(0, 1)))));
             QVERIFY(plottable->selection().isEmpty());
@@ -2793,7 +2793,7 @@ void TestMetaSurface::exceptionRulesHold()
         }
         case Rule::ComponentPen:
         {
-            auto* line = qobject_cast<QCPAbstractLine*>(object);
+            auto* line = qobject_cast<QCPLine*>(object);
             line->setComponentPens({ QPen(Qt::green) });
             settle(*plot);
             spy.clear();
@@ -2851,10 +2851,10 @@ void TestMetaSurface::exceptionRulesHold()
 // ---------------------------------------------------------------------------------------------
 namespace
 {
-// QCPCurve::LineStyle is an alias of the enum QCPAbstractLine registers (E-13 keeps its metatype line).
+// QCPCurve::LineStyle is an alias of the enum QCPLine registers (E-13 keeps its metatype line).
 const QMetaObject* enumScope(const QMetaObject* meta, const QMetaProperty& property)
 {
-    return qstrcmp(property.typeName(), "QCPCurve::LineStyle") == 0 ? &QCPAbstractLine::staticMetaObject
+    return qstrcmp(property.typeName(), "QCPCurve::LineStyle") == 0 ? &QCPLine::staticMetaObject
                                                                      : meta;
 }
 
@@ -2888,7 +2888,7 @@ const QVector<EnumRow>& publicEnums()
         { &QCPLayoutInset::staticMetaObject, "InsetPlacement", false },
         { &QCPScatterStyle::staticMetaObject, "ScatterShape", false },
         { &QCPColorGradient::staticMetaObject, "NanHandling", false },
-        { &QCPAbstractLine::staticMetaObject, "LineStyle", false },
+        { &QCPLine::staticMetaObject, "LineStyle", false },
         { &QCPBars::staticMetaObject, "WidthType", false },
         { &QCPFinancial::staticMetaObject, "ChartStyle", false },
     };
@@ -2982,7 +2982,7 @@ const QVector<TypeRow>& metatypeRows()
         TYPE_ROW(QCPBars::WidthType), TYPE_ROW(QCPFinancial::ChartStyle),
         TYPE_ROW(QCPPolarGrid::GridType), TYPE_ROW(QCPScatterStyle::ScatterProperty),
         TYPE_ROW(QCPScatterStyle::ScatterShape), TYPE_ROW(QCPSelectionDecoratorBracket::BracketStyle),
-        { "QCPCurve::LineStyle", QMetaType::fromType<QCPCurve::LineStyle>(), "QCPAbstractLine::LineStyle" },
+        { "QCPCurve::LineStyle", QMetaType::fromType<QCPCurve::LineStyle>(), "QCPLine::LineStyle" },
          TYPE_ROW(QCPDataSelection),
         TYPE_ROW(QSharedPointer<QCPAxisTicker>), TYPE_ROW(QCPSelectionDecorator*),
         TYPE_ROW(QCPIntervalEdit),
@@ -3077,7 +3077,7 @@ const QVector<InvokableRow>& invokables()
         { &QCPLayoutGrid::staticMetaObject, "insertRow(int)" },
         { &QCPLayoutGrid::staticMetaObject, "insertColumn(int)" },
         { &QCPLayoutInset::staticMetaObject, "addElement(QCPLayoutElement*,Qt::Alignment)" },
-        { &QCPLegend::staticMetaObject, "addItem(QCPAbstractLegendItem*)" },
+        { &QCPLegend::staticMetaObject, "addItem(QCPLegendItem*)" },
         { &QCPLegend::staticMetaObject, "removeItem(int)" },
         { &QCPLegend::staticMetaObject, "clearItems()" },
     };

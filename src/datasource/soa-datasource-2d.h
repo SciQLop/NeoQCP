@@ -7,7 +7,7 @@
 #include <span>
 
 template <IndexableNumericRange XC, IndexableNumericRange YC, IndexableNumericRange ZC>
-class QCPSoADataSource2D final : public QCPAbstractDataSource2D
+class QCPSoADataSource2D final : public QCPDataSource2D
 {
 public:
     using X = std::ranges::range_value_t<XC>;

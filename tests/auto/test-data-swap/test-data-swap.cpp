@@ -24,10 +24,10 @@ std::vector<std::vector<double>> sines(int n, int cols)
 }
 
 // Minimal plottable that always has pending data and counts commits.
-class PendingStub : public QCPAbstractPlottable
+class PendingStub : public QCPPlottable
 {
 public:
-    PendingStub(QCPAxis* k, QCPAxis* v) : QCPAbstractPlottable(k, v) {}
+    PendingStub(QCPAxis* k, QCPAxis* v) : QCPPlottable(k, v) {}
     int commits = 0;
     const QElapsedTimer* clock = nullptr;
     qint64 committedAt = -1; // clock time of the first commit, if a clock is set

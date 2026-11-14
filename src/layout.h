@@ -181,7 +181,7 @@ private:
     friend class QCustomPlot;
     friend class QCPLayout;
     friend class QCPAlignmentGroup;
-    friend class QCPAbstractPlottable; // walks the layout for the legend rows a name change touches
+    friend class QCPPlottable; // walks the layout for the legend rows a name change touches
 };
 
 class QCP_LIB_DECL QCPLayout : public QCPLayoutElement

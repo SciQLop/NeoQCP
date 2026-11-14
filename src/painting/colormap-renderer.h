@@ -3,14 +3,14 @@
 #include <axis/axis.h>
 #include <colorgradient.h>
 
-class QCPAbstractPlottable;
+class QCPPlottable;
 class QCPColorMapData;
 
 //! Colourises a grid and caches the image. Where and when it is drawn belongs to the plottable.
 class QCPColormapRenderer
 {
 public:
-    explicit QCPColormapRenderer(QCPAbstractPlottable* owner);
+    explicit QCPColormapRenderer(QCPPlottable* owner);
 
     // State
     void setGradient(const QCPColorGradient& gradient);
@@ -45,7 +45,7 @@ public:
     [[nodiscard]] int buildCount() const { return mBuildCount; }
 
 private:
-    QCPAbstractPlottable* mOwner;
+    QCPPlottable* mOwner;
     QCPColorGradient mGradient;
     QCPRange mDataRange;
     QCPAxis::ScaleType mDataScaleType = QCPAxis::stLinear;

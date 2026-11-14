@@ -83,7 +83,7 @@ The classic plottables (`QCPCurve`, `QCPColorMap`, ...) do all their work on the
 
 ### Busy plottables
 
-These calls live on <a href="api/classQCPAbstractPlottable.html">QCPAbstractPlottable</a>. A plottable is busy while a worker job runs for it, or while it holds staged data that is not on screen yet. You can ask, or listen:
+These calls live on <a href="api/classQCPPlottable.html">QCPPlottable</a>. A plottable is busy while a worker job runs for it, or while it holds staged data that is not on screen yet. You can ask, or listen:
 
 - `busy()` is the current state.
 - `busyChanged(bool)` is emitted the moment it changes.
@@ -162,7 +162,7 @@ A data source can feed several graphs. The samples are stored once. Here an over
 - Each graph still builds its own level-1 summary. Only the raw samples are shared.
 - A source that views your memory (`viewData()`, or a source over `std::span`) does not copy it. Your buffer must outlive every graph that uses it. If you change the buffer in place, call `dataChanged()` on each graph.
 
-`QCPGraph` takes a `QCPAbstractMultiDataSource`, and `QCPColorMap2` a `QCPAbstractDataSource2D`. {doc}`graphs` and {doc}`colormaps` cover them.
+`QCPGraph` takes a `QCPMultiDataSource`, and `QCPColorMap2` a `QCPDataSource2D`. {doc}`graphs` and {doc}`colormaps` cover them.
 
 ## Practical tips
 

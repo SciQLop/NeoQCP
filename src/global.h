@@ -122,7 +122,7 @@ enum ExportPen
 
 /*!
   Represents negative and positive sign domain, e.g. for passing to \ref
-  QCPAbstractPlottable::getKeyRange and \ref QCPAbstractPlottable::getValueRange.
+  QCPPlottable::getKeyRange and \ref QCPPlottable::getValueRange.
 
   This is primarily needed when working with logarithmic axis scales, since only one of the sign
   domains can be visible at a time.
@@ -257,7 +257,7 @@ enum Interaction
             ///< \ref QCustomPlot::setMultiSelectModifier while clicking
     ,
     iSelectPlottables = 0x008 ///< <tt>0x008</tt> Plottables are selectable (e.g. graphs, curves,
-                              ///< bars,... see QCPAbstractPlottable)
+                              ///< bars,... see QCPPlottable)
     ,
     iSelectAxes = 0x010 ///< <tt>0x010</tt> Axes are selectable (or parts of them, see
                         ///< QCPAxis::setSelectableParts)
@@ -266,7 +266,7 @@ enum Interaction
                           ///< QCPLegend::setSelectableParts)
     ,
     iSelectItems = 0x040 ///< <tt>0x040</tt> Items are selectable (Rectangles, Arrows, Textitems,
-                         ///< etc. see \ref QCPAbstractItem)
+                         ///< etc. see \ref QCPItem)
     ,
     iSelectOther = 0x080 ///< <tt>0x080</tt> All other objects are selectable (e.g. your own derived
                          ///< layerables, other layout elements,...)
@@ -287,7 +287,7 @@ Q_DECLARE_FLAGS(Interactions, Interaction)
   A system offers the flags that describe its geometry; a plottable requires the ones its drawing
   relies on, and joining a system missing one is reported as misuse rather than drawn wrong.
 
-  \see QCPCoordinateSystem::capabilities, QCPAbstractPlottable::requiredCapabilities
+  \see QCPCoordinateSystem::capabilities, QCPPlottable::requiredCapabilities
 */
 enum Capability
 {
@@ -340,7 +340,7 @@ enum SelectionRectMode
   </table>
   </center>
 
-  \see QCPAbstractPlottable::setSelectable, QCPDataSelection::enforceType
+  \see QCPPlottable::setSelectable, QCPDataSelection::enforceType
 */
 enum SelectionType
 {

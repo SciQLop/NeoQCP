@@ -73,17 +73,17 @@ private:
     mutable int mIconCalls = 0;
 };
 
-class RecordingPlottable : public QCPAbstractPlottable
+class RecordingPlottable : public QCPPlottable
 {
 public:
     //! Needs nothing of its system: it records whatever the frame gives it, disc or rectangle.
     explicit RecordingPlottable(QCPCoordinateSystem* system)
-            : QCPAbstractPlottable(system, QCP::Capabilities())
+            : QCPPlottable(system, QCP::Capabilities())
     {
     }
 
     RecordingPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
-            : QCPAbstractPlottable(keyAxis, valueAxis, QCP::Capabilities())
+            : QCPPlottable(keyAxis, valueAxis, QCP::Capabilities())
     {
     }
 
@@ -176,11 +176,11 @@ QCPCoordinateSystem* polarSystem(QCPPolarArea* area)
 }
 
 //! A plottable that needs nothing of its system and records the arc its data describes.
-class ArcPlottable : public QCPAbstractPlottable1D<QCPGraphData>
+class ArcPlottable : public QCPPlottable1D<QCPGraphData>
 {
 public:
     explicit ArcPlottable(QCPCoordinateSystem* system)
-            : QCPAbstractPlottable1D<QCPGraphData>(system, QCP::Capabilities())
+            : QCPPlottable1D<QCPGraphData>(system, QCP::Capabilities())
     {
     }
 
@@ -580,7 +580,7 @@ void TestCoordinateSystem::theAxisPairFollowsEveryFrame()
 
     // A plot that takes the plottable back clears the pair with the frame.
     plottable->setSystem(rect->system(x, y));
-    auto taken = plot.take(QCPHandle<QCPAbstractPlottable>(plottable));
+    auto taken = plot.take(QCPHandle<QCPPlottable>(plottable));
     QVERIFY(taken);
     QCOMPARE(pairOf(plottable), Pair(nullptr, nullptr));
     QCOMPARE(plottable->rawPair(), Pair(nullptr, nullptr));
@@ -750,7 +750,7 @@ void TestCoordinateSystem::barsAreRefusedInAPolarSystem()
 
     QCPAxis* key = rect->axis(QCPAxis::atBottom);
     QCPAxis* value = rect->axis(QCPAxis::atLeft);
-    QCPAbstractPlottable* plottable = nullptr;
+    QCPPlottable* plottable = nullptr;
     if (kind == QStringLiteral("bars"))
         plottable = new QCPBars(key, value);
     else if (kind == QStringLiteral("colormap"))
@@ -1067,9 +1067,9 @@ void TestCoordinateSystem::axisPlottablesKeepTheirOrder()
     QCPGraph* g2 = plot.addGraph(rect1->axis(QCPAxis::atBottom), rect1->axis(QCPAxis::atLeft));
     QCPGraph* g3 = plot.addGraph(rect2->axis(QCPAxis::atBottom), rect2->axis(QCPAxis::atLeft));
     // Selection by system, but the plot's own order, as the axes have always answered.
-    QCOMPARE(qcp::pointers(plot.xAxis->plottables()), (QList<QCPAbstractPlottable*> { g1, g2 }));
-    QCOMPARE(qcp::pointers(rect1->plottables()), (QList<QCPAbstractPlottable*> { g1, g2 }));
-    QCOMPARE(qcp::pointers(rect2->plottables()), (QList<QCPAbstractPlottable*> { g3 }));
+    QCOMPARE(qcp::pointers(plot.xAxis->plottables()), (QList<QCPPlottable*> { g1, g2 }));
+    QCOMPARE(qcp::pointers(rect1->plottables()), (QList<QCPPlottable*> { g1, g2 }));
+    QCOMPARE(qcp::pointers(rect2->plottables()), (QList<QCPPlottable*> { g3 }));
     QCOMPARE(qcp::pointers(rect1->axis(QCPAxis::atLeft)->graphs()), (QList<QCPGraph*> { g1, g2 }));
 }
 

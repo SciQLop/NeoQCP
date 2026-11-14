@@ -36,7 +36,7 @@ class QCPPlottableRhiLayer;
 template <typename T, typename Self = void>
 class QCPGraphOps;
 
-class QCP_LIB_DECL QCPGraph : public QCPAbstractLine, public QCPPlottableInterface1D
+class QCP_LIB_DECL QCPGraph : public QCPLine, public QCPPlottableInterface1D
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPGraph)
@@ -57,9 +57,9 @@ public:
     ~QCPGraph() override;
 
     // Data source
-    void setDataSource(std::unique_ptr<QCPAbstractMultiDataSource> source);
-    virtual void setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source);
-    [[nodiscard]] QCPAbstractMultiDataSource* dataSource() const { return mDataSource.get(); }
+    void setDataSource(std::unique_ptr<QCPMultiDataSource> source);
+    virtual void setDataSource(std::shared_ptr<QCPMultiDataSource> source);
+    [[nodiscard]] QCPMultiDataSource* dataSource() const { return mDataSource.get(); }
     virtual void dataChanged();
     //! A content change: drops a fill whose partner lost its component, then marks the layer.
     void markDirty() override;
@@ -222,7 +222,7 @@ public:
 
     [[nodiscard]] bool adaptiveSampling() const { return mAdaptiveSampling; }
     void setAdaptiveSampling(bool enabled);
-    // Gap detection on the lines (see QCPAbstractMultiDataSource::setGapThreshold); 0 turns it off.
+    // Gap detection on the lines (see QCPMultiDataSource::setGapThreshold); 0 turns it off.
     [[nodiscard]] double gapThreshold() const { return mGapThreshold; }
     void setGapThreshold(double threshold);
 
@@ -242,7 +242,7 @@ public:
     [[nodiscard]] int findBegin(double sortKey, bool expandedRange = true) const override;
     [[nodiscard]] int findEnd(double sortKey, bool expandedRange = true) const override;
 
-    // QCPAbstractPlottable
+    // QCPPlottable
     QCPPlottableInterface1D* interface1D() override { return this; }
     double selectTest(const QPointF& pos, bool onlySelectable,
                       QVariant* details = nullptr) const override;
@@ -253,8 +253,8 @@ public:
                            const QCPRange& inKeyRange = QCPRange()) const override;
 
     // Legend
-    using QCPAbstractPlottable::addToLegend;
-    using QCPAbstractPlottable::removeFromLegend;
+    using QCPPlottable::addToLegend;
+    using QCPPlottable::removeFromLegend;
     bool addToLegend(QCPLegend* legend) override;
     bool removeFromLegend(QCPLegend* legend) const override;
     //! Draws one component's legend line: its pen, or, when the graph is coloured, the pen
@@ -283,7 +283,7 @@ protected:
     //! Without a finished resample an export resamples on the spot: the two recordings differ.
     bool resolvesForTheExport() const override { return true; }
 
-    using QCPAbstractLine::drawLegendIcon;
+    using QCPLine::drawLegendIcon;
     void drawLegendIcon(QCPDrawContext& icon) const override;
     void systemDidChange() override;
 
@@ -318,7 +318,7 @@ protected:
     friend class TestColorByScalar;
 
 protected:
-    std::shared_ptr<QCPAbstractMultiDataSource> mDataSource;
+    std::shared_ptr<QCPMultiDataSource> mDataSource;
     QVector<Fill> mFills;
     QVector<ErrorBars> mErrorBars;
     mutable QVector<QCPDataSelection> mLastRectSelections; // per-component selections from selectTestRect
@@ -327,7 +327,7 @@ protected:
     // draw() is const: what it resolves for this frame is mutable state, not cached pixels.
     mutable QCPGraphPipeline mPipeline;
     mutable std::shared_ptr<qcp::algo::GraphResamplerCache> mL1Cache;
-    mutable std::shared_ptr<QCPAbstractMultiDataSource> mL2Result;
+    mutable std::shared_ptr<QCPMultiDataSource> mL2Result;
     mutable bool mL2Dirty = false;
     bool mNeedsResampling = false;
     //! Whether the cartesian pipeline is bypassed (the data-space branch): a system change clears
@@ -364,7 +364,7 @@ protected:
     // Replacement data staged while the displayed source keeps rendering; the
     // plot commits it through commitPendingData() (see QCustomPlot::requestDataSwap).
     bool mDeferredDataSwap = false;
-    std::shared_ptr<QCPAbstractMultiDataSource> mPendingSource;
+    std::shared_ptr<QCPMultiDataSource> mPendingSource;
     //! The source the graph owns: the growable one setData()/addData() built. Null after every
     //! other source setter (a view, a shared/unique source, a waterfall adapter).
     std::shared_ptr<QCPGrowableMultiDataSource> mOwnedSource;
@@ -380,7 +380,7 @@ protected:
     //! Installs the source setData() built and records that the graph owns it.
     virtual void setOwnedSource(std::shared_ptr<QCPGrowableMultiDataSource> source);
     //! The one path a new source takes: applied now or staged for the deferred swap.
-    void installSource(std::shared_ptr<QCPAbstractMultiDataSource> source);
+    void installSource(std::shared_ptr<QCPMultiDataSource> source);
     //! The growable source addData() or a removal may write, or null when the graph has no data
     //! yet (a new source starts) or a misuse has already been reported.
     [[nodiscard]] std::shared_ptr<QCPGrowableMultiDataSource> ownedSourceForAppend() const;
@@ -396,11 +396,11 @@ protected:
     bool editOwnedSource(const std::function<bool(QCPGrowableMultiDataSource&)>& edit);
     //! removeDataBefore/After/removeData: addData()'s ownership rules, then the edit.
     void removeOwnedRows(const std::function<bool(QCPGrowableMultiDataSource&)>& remove);
-    void applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> source);
-    void stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSource> source);
+    void applySourceNow(std::shared_ptr<QCPMultiDataSource> source);
+    void stagePendingSource(std::shared_ptr<QCPMultiDataSource> source);
     void markPendingReady();
     void onL1Ready(uint64_t generation);
-    void syncComponentCount(const QCPAbstractMultiDataSource* source);
+    void syncComponentCount(const QCPMultiDataSource* source);
     //! Drops FillToGraph entries whose partner is gone or no longer has the named component.
     void pruneLostPartnerFills();
     [[nodiscard]] static bool partnerDied(const Fill& fill);
@@ -424,24 +424,24 @@ protected:
     [[nodiscard]] bool fillDrawable(const Fill& fill, int columnCount) const;
     [[nodiscard]] static qcp::fill::Step ownerStep(const QCPGraphComponent& owner);
     [[nodiscard]] std::vector<qcp::fill::StripPoint> fillRows(const Fill& fill,
-                                                              const QCPAbstractMultiDataSource& ds,
+                                                              const QCPMultiDataSource& ds,
                                                               int begin, int end) const;
     [[nodiscard]] std::vector<qcp::fill::StripPoint>
-    fillToGraphRows(const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin,
+    fillToGraphRows(const Fill& fill, const QCPMultiDataSource& ds, int begin,
                     int end) const;
     [[nodiscard]] std::vector<qcp::fill::StripPoint>
     shapeFillRows(const Fill& fill, std::vector<qcp::fill::StripPoint> rows) const;
     //! Whether \a row of \a ds is in \a column's selection; a resampled row by its key.
-    [[nodiscard]] bool rowIsSelected(int column, const QCPAbstractMultiDataSource& ds,
+    [[nodiscard]] bool rowIsSelected(int column, const QCPMultiDataSource& ds,
                                      int row) const;
     //! One flag per vertex: whether its row is selected. A break (row -1) follows the vertex before.
     [[nodiscard]] std::vector<char> selectedVertices(int column,
-                                                     const QCPAbstractMultiDataSource& ds,
+                                                     const QCPMultiDataSource& ds,
                                                      const std::vector<int>& rows) const;
     //! Records one component: its line in runs of equally selected rows, then its markers.
     //! \a rows holds each vertex's row in \a ds when asked for, else nothing.
     void recordComponent(QCPDrawContext& context, int column, std::vector<QPointF> line,
-                         const std::vector<int>& rows, const QCPAbstractMultiDataSource& ds,
+                         const std::vector<int>& rows, const QCPMultiDataSource& ds,
                          bool coloured, double impulseBaseline, bool logKeyAxis) const;
     //! Records \a line in \a style with \a pen; \a dataIdx, when not empty, colours it.
     void recordLine(QCPDrawContext& context, LineStyle style, std::vector<QPointF> line,
@@ -463,21 +463,21 @@ protected:
     //! Drops the dependency and destroyed connection of partners no remaining fill uses.
     void releasePartnerDependencies(const QVector<Fill>& removed);
     [[nodiscard]] static double fillValue(const QCPAxis& valueAxis, double value);
-    void recordFills(QCPDrawContext& context, const QCPAbstractMultiDataSource& ds, int begin,
+    void recordFills(QCPDrawContext& context, const QCPMultiDataSource& ds, int begin,
                      int end) const;
     [[nodiscard]] std::vector<qcp::fill::StripPoint>
     binnedWhenDense(std::vector<qcp::fill::StripPoint> rows) const;
     [[nodiscard]] bool errorBarsDrawable(const ErrorBars& spec, int columnCount) const;
     [[nodiscard]] QPen errorBarPen(const ErrorBars& spec) const;
     [[nodiscard]] std::vector<qcp::errorbars::Bar>
-    errorBarRows(const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin,
+    errorBarRows(const ErrorBars& spec, const QCPMultiDataSource& ds, int begin,
                  int end) const;
     [[nodiscard]] bool errorBarsFitInView(std::span<const qcp::errorbars::Bar> bars,
                                           double minSpacingPx) const;
     [[nodiscard]] std::vector<qcp::fill::StripPoint>
-    errorBandRows(const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin,
+    errorBandRows(const ErrorBars& spec, const QCPMultiDataSource& ds, int begin,
                   int end) const;
-    void recordErrorBars(QCPDrawContext& context, const QCPAbstractMultiDataSource& ds,
+    void recordErrorBars(QCPDrawContext& context, const QCPMultiDataSource& ds,
                          bool rawRows, int begin, int end) const;
     void rebuildL2(const ViewportParams& vp) const;
     void onViewportChanged(const QCPRange& newRange, const QCPRange& oldRange);
@@ -568,12 +568,12 @@ public:
         return this->apply([&](T& o) { o.removeData(fromKey, toKey); });
     }
 
-    Ret setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
+    Ret setDataSource(std::shared_ptr<QCPMultiDataSource> source)
     {
         return this->apply([&](T& o) { o.setDataSource(std::move(source)); });
     }
 
-    Ret setDataSource(std::unique_ptr<QCPAbstractMultiDataSource> source)
+    Ret setDataSource(std::unique_ptr<QCPMultiDataSource> source)
     {
         return this->apply([&](T& o) { o.setDataSource(std::move(source)); });
     }

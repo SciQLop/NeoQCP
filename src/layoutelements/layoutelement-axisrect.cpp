@@ -597,7 +597,7 @@ bool QCPAxisRect::unlistAxis(QCPAxis* axis)
 
 void QCPAxisRect::markLayersUsingAxisDirty(const QCPAxis* axis)
 {
-    for (QCPAbstractPlottable* p : mParentPlot->mPlottables)
+    for (QCPPlottable* p : mParentPlot->mPlottables)
     {
         // Through the system, in any kind: a plottable on a system of the user's own has no
         // projection to compare with (J-2), and its axis is the system's.
@@ -809,16 +809,16 @@ bool isOn(const QCPAxis* axis, const QCPAxisRect* rect)
 
   \see graphs, items
 */
-QList<QCPHandle<QCPAbstractPlottable>> QCPAxisRect::plottables() const
+QList<QCPHandle<QCPPlottable>> QCPAxisRect::plottables() const
 {
     // Note: don't append all QCPAxis::plottables() into a list, because we might get duplicate
     // entries
-    QList<QCPHandle<QCPAbstractPlottable>> result;
-    for (QCPAbstractPlottable* plottable : mParentPlot->mPlottables)
+    QList<QCPHandle<QCPPlottable>> result;
+    for (QCPPlottable* plottable : mParentPlot->mPlottables)
     {
         // By the system, not by the axes: what a plottable sits in is the frame it is drawn in.
         if (plottable->system() && plottable->system()->area() == this)
-            result.append(QCPHandle<QCPAbstractPlottable>(plottable));
+            result.append(QCPHandle<QCPPlottable>(plottable));
     }
     return result;
 }
@@ -849,21 +849,21 @@ QList<QCPHandle<QCPGraph>> QCPAxisRect::graphs() const
   An item is considered associated with an axis rect if any of its positions has key or value axis
   set to an axis that is in this axis rect, or if any of its positions has \ref
   QCPItemPosition::setAxisRect set to the axis rect, or if the clip axis rect (\ref
-  QCPAbstractItem::setClipAxisRect) is set to this axis rect.
+  QCPItem::setClipAxisRect) is set to this axis rect.
 
   \see plottables, graphs
 */
-QList<QCPHandle<QCPAbstractItem>> QCPAxisRect::items() const
+QList<QCPHandle<QCPItem>> QCPAxisRect::items() const
 {
     // Note: don't just append all QCPAxis::items() into a list, because we might get duplicate
     // entries
     //       and miss those items that have this axis rect as clipAxisRect.
-    QList<QCPHandle<QCPAbstractItem>> result;
-    for (QCPAbstractItem* item : mParentPlot->mItems)
+    QList<QCPHandle<QCPItem>> result;
+    for (QCPItem* item : mParentPlot->mItems)
     {
         if (item->clipAxisRect().get() == this)
         {
-            result.append(QCPHandle<QCPAbstractItem>(item));
+            result.append(QCPHandle<QCPItem>(item));
             continue;
         }
         for (QCPItemPosition* position : item->positions())
@@ -871,7 +871,7 @@ QList<QCPHandle<QCPAbstractItem>> QCPAxisRect::items() const
             if (position->axisRectRaw() == this || isOn(position->keyAxisRaw(), this)
                 || isOn(position->valueAxisRaw(), this))
             {
-                result.append(QCPHandle<QCPAbstractItem>(item));
+                result.append(QCPHandle<QCPItem>(item));
                 break;
             }
         }
@@ -887,7 +887,7 @@ QList<QCPHandle<QCPAbstractItem>> QCPAxisRect::items() const
   plottable colours through it: a scale nobody colours through takes no room and is never laid out.
 
   A colour map, a 2D histogram or a line with colour values on this rect joins the scale on its
-  own, unless \ref QCPAbstractColorMapped::setColorScale picked another scale or none for it. That
+  own, unless \ref QCPColorMapped::setColorScale picked another scale or none for it. That
   choice sticks: new colour values, new data and moves never join this scale again.
 
   The rect deletes the scale with itself. Removing the scale leaves this rect working; the next
@@ -1767,7 +1767,7 @@ void QCPAxisRect::markAffectedLayersDirty(bool invalidate)
                 markOnce(grid->layerRaw());
         }
     }
-    for (QCPAbstractPlottable* p : mParentPlot->mPlottables)
+    for (QCPPlottable* p : mParentPlot->mPlottables)
     {
         // One pass over the plot's plottables, selected by the system they are drawn in: a plottable
         // whose system died (its axis was removed) is skipped as it draws nothing.

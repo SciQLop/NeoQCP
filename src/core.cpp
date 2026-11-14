@@ -164,7 +164,7 @@ using qcp::guarded;
   the parent widget (once Qt::WA_NoMousePropagation, which QCustomPlot sets, is cleared).
 */
 
-/*! \fn void QCustomPlot::plottableClick(QCPAbstractPlottable *plottable, int dataIndex, QMouseEvent
+/*! \fn void QCustomPlot::plottableClick(QCPPlottable *plottable, int dataIndex, QMouseEvent
   *event)
 
   This signal is emitted when a plottable is clicked.
@@ -176,7 +176,7 @@ using qcp::guarded;
   \see plottableDoubleClick
 */
 
-/*! \fn void QCustomPlot::plottableDoubleClick(QCPAbstractPlottable *plottable, int dataIndex,
+/*! \fn void QCustomPlot::plottableDoubleClick(QCPPlottable *plottable, int dataIndex,
   QMouseEvent *event)
 
   This signal is emitted when a plottable is double clicked.
@@ -188,7 +188,7 @@ using qcp::guarded;
   \see plottableClick
 */
 
-/*! \fn void QCustomPlot::itemClick(QCPAbstractItem *item, QMouseEvent *event)
+/*! \fn void QCustomPlot::itemClick(QCPItem *item, QMouseEvent *event)
 
   This signal is emitted when an item is clicked.
 
@@ -198,7 +198,7 @@ using qcp::guarded;
   \see itemDoubleClick
 */
 
-/*! \fn void QCustomPlot::itemDoubleClick(QCPAbstractItem *item, QMouseEvent *event)
+/*! \fn void QCustomPlot::itemDoubleClick(QCPItem *item, QMouseEvent *event)
 
   This signal is emitted when an item is double clicked.
 
@@ -229,7 +229,7 @@ using qcp::guarded;
   \see axisClick
 */
 
-/*! \fn void QCustomPlot::legendClick(QCPLegend *legend, QCPAbstractLegendItem *item, QMouseEvent
+/*! \fn void QCustomPlot::legendClick(QCPLegend *legend, QCPLegendItem *item, QMouseEvent
   *event)
 
   This signal is emitted when a legend (item) is clicked.
@@ -242,7 +242,7 @@ using qcp::guarded;
   \see legendDoubleClick
 */
 
-/*! \fn void QCustomPlot::legendDoubleClick(QCPLegend *legend,  QCPAbstractLegendItem *item,
+/*! \fn void QCustomPlot::legendDoubleClick(QCPLegend *legend,  QCPLegendItem *item,
   QMouseEvent *event)
 
   This signal is emitted when a legend (item) is double clicked.
@@ -263,7 +263,7 @@ using qcp::guarded;
   deselectAll.
 
   In addition to this signal, selectable objects also provide individual signals, for example \ref
-  QCPAxis::selectionChanged or \ref QCPAbstractPlottable::selectionChanged. Note that those signals
+  QCPAxis::selectionChanged or \ref QCPPlottable::selectionChanged. Note that those signals
   are emitted even if the selection state is changed programmatically.
 
   See the documentation of \ref setInteractions for details about the selection mechanism.
@@ -1024,7 +1024,7 @@ void QCustomPlot::setItemIndexing(bool on)
   each individual element instance is used.
 
   For example, if \a antialiasedElements contains \ref QCP::aePlottables, all plottables will be
-  drawn antialiased, no matter what the specific QCPAbstractPlottable::setAntialiased value was set
+  drawn antialiased, no matter what the specific QCPPlottable::setAntialiased value was set
   to.
 
   if an element in \a antialiasedElements is already set in \ref setNotAntialiasedElements, it is
@@ -1074,7 +1074,7 @@ void QCustomPlot::setAntialiasedElement(QCP::AntialiasedElement antialiasedEleme
   each individual element instance is used.
 
   For example, if \a notAntialiasedElements contains \ref QCP::aePlottables, no plottables will be
-  drawn antialiased, no matter what the specific QCPAbstractPlottable::setAntialiased value was set
+  drawn antialiased, no matter what the specific QCPPlottable::setAntialiased value was set
   to.
 
   if an element in \a notAntialiasedElements is already set in \ref setAntialiasedElements, it is
@@ -1162,14 +1162,14 @@ void QCustomPlot::setAutoAddPlottableToLegend(bool on)
   QCP::iSelectPlottables is set, the user may select plottables (graphs, curves, bars,...) and
   their data by clicking on them or in their vicinity (\ref setSelectionTolerance). Whether the
   user can actually select a plottable and its data can further be restricted with the \ref
-  QCPAbstractPlottable::setSelectable method on the specific plottable. For details, see the
+  QCPPlottable::setSelectable method on the specific plottable. For details, see the
   special page about the \ref dataselection "data selection mechanism". To retrieve a list of all
   currently selected plottables, call \ref selectedPlottables. If you're only interested in
   QCPGraphs, you may use the convenience function \ref selectedGraphs.
 
   <b>Item selection</b> is controlled by \ref QCP::iSelectItems. If \ref QCP::iSelectItems is set,
   the user may select items (QCPItemLine, QCPItemText,...) by clicking on them or in their vicinity.
-  To find out whether a specific item is selected, call QCPAbstractItem::selected(). To retrieve a
+  To find out whether a specific item is selected, call QCPItem::selected(). To retrieve a
   list of all currently selected items, call \ref selectedItems.
 
   <b>Axis selection</b> is controlled with \ref QCP::iSelectAxes. If \ref QCP::iSelectAxes is set,
@@ -1652,11 +1652,11 @@ void QCustomPlot::setBackgroundScaledMode(Qt::AspectRatioMode mode)
 
   \see plottableCount
 */
-QCPHandle<QCPAbstractPlottable> QCustomPlot::plottable(int index)
+QCPHandle<QCPPlottable> QCustomPlot::plottable(int index)
 {
     if (index >= 0 && index < mPlottables.size())
     {
-        return QCPHandle<QCPAbstractPlottable>(mPlottables.at(index));
+        return QCPHandle<QCPPlottable>(mPlottables.at(index));
     }
     else
     {
@@ -1672,11 +1672,11 @@ QCPHandle<QCPAbstractPlottable> QCustomPlot::plottable(int index)
 
   \see plottableCount
 */
-QCPHandle<QCPAbstractPlottable> QCustomPlot::plottable()
+QCPHandle<QCPPlottable> QCustomPlot::plottable()
 {
     if (!mPlottables.isEmpty())
     {
-        return QCPHandle<QCPAbstractPlottable>(mPlottables.last());
+        return QCPHandle<QCPPlottable>(mPlottables.last());
     }
     else
         return {};
@@ -1690,7 +1690,7 @@ QCPHandle<QCPAbstractPlottable> QCustomPlot::plottable()
 
   \see clearPlottables
 */
-bool QCustomPlot::removePlottable(QCPAbstractPlottable* plottable)
+bool QCustomPlot::removePlottable(QCPPlottable* plottable)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (!mPlottables.contains(plottable))
@@ -1707,7 +1707,7 @@ namespace
 {
 // What still points at a bars plottable that leaves without being destroyed: its bars group and its
 // stack. Destruction undoes these by itself.
-void leaveSiblings(QCPAbstractPlottable* plottable)
+void leaveSiblings(QCPPlottable* plottable)
 {
     if (auto* bars = qobject_cast<QCPBars*>(plottable))
     {
@@ -1722,7 +1722,7 @@ void leaveSiblings(QCPAbstractPlottable* plottable)
   QCustomPlot::take for a plottable: everything the plot and its parts hold of it is let go, and the
   object is left whole, in the state of a plottable built without axes (inert, no parent).
 */
-bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
+bool QCustomPlot::detach(QCPPlottable* plottable)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     QCP_CHECK_OR_RETURN(mPlottables.contains(plottable), "the object is not in this plot", false);
@@ -1730,7 +1730,7 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     // the plot runs once this call is done with it.
     const QCPEmissionScope scope(this);
     // The scale stays the old plot's; the choice of one stays the plottable's (see adopt).
-    if (auto* mapped = qobject_cast<QCPAbstractColorMapped*>(plottable))
+    if (auto* mapped = qobject_cast<QCPColorMapped*>(plottable))
         mapped->attachColorScale(nullptr);
     leaveSiblings(plottable);
     plottable->setPipelineScheduler(nullptr);
@@ -1738,7 +1738,7 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
         plottable->removeFromLegend(legend);
     // A tracer keeps the graph it follows as a QPointer: the taken graph outlives the take, so the
     // pointer would stay valid while the graph is no longer in this plot.
-    for (QCPAbstractItem* item : std::as_const(mItems))
+    for (QCPItem* item : std::as_const(mItems))
         if (auto* tracer = qobject_cast<QCPItemTracer*>(item);
             tracer && tracer->graphRaw() == plottable)
             tracer->setGraph(nullptr);
@@ -1762,20 +1762,20 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
   A taken plottable leaves its system and axes. Its signals go through this plot, which holds
   detach's scope: the plottable has no plot of its own any more when they are delivered.
 */
-void QCustomPlot::forgetSystemOf(QCPAbstractPlottable* plottable)
+void QCustomPlot::forgetSystemOf(QCPPlottable* plottable)
 {
     const bool hadSystem = plottable->mSystem;
     const bool hadKeyAxis = plottable->keyAxisRaw();
     const bool hadValueAxis = plottable->valueAxisRaw();
     plottable->forgetSystem();
     if (hadSystem)
-        qcpEmit(plottable, this, &QCPAbstractPlottable::systemChanged,
+        qcpEmit(plottable, this, &QCPPlottable::systemChanged,
                 static_cast<QCPCoordinateSystem*>(nullptr));
     if (hadKeyAxis)
-        qcpEmit(plottable, this, &QCPAbstractPlottable::keyAxisChanged,
+        qcpEmit(plottable, this, &QCPPlottable::keyAxisChanged,
                 static_cast<QCPAxis*>(nullptr));
     if (hadValueAxis)
-        qcpEmit(plottable, this, &QCPAbstractPlottable::valueAxisChanged,
+        qcpEmit(plottable, this, &QCPPlottable::valueAxisChanged,
                 static_cast<QCPAxis*>(nullptr));
 }
 
@@ -1783,7 +1783,7 @@ void QCustomPlot::forgetSystemOf(QCPAbstractPlottable* plottable)
 
   QCustomPlot::add(std::unique_ptr) for a plottable: the inverse of detach, onto the default axes.
 */
-bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
+bool QCustomPlot::adopt(QCPPlottable* plottable)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     QCP_CHECK_OR_RETURN(!plottable->parentPlot(), "the object already belongs to a plot: take it first",
@@ -1799,7 +1799,7 @@ bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
     QCP_CHECK_OR_RETURN(system, "the default axes have no coordinate system", false);
     // Checked before the object is touched: a refusal leaves it exactly as it was, and the caller
     // gets an empty handle, as the area add forms do.
-    if (!QCPAbstractPlottable::systemAdmits(system, plottable->requiredCapabilities()))
+    if (!QCPPlottable::systemAdmits(system, plottable->requiredCapabilities()))
         return false;
     return adoptPlottable(plottable, system, keyAxis->axisRect());
 }
@@ -1810,7 +1810,7 @@ bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
   the given system, as the child of that system's area. An area reads its own objects back in with
   it (see QCPPolarArea::add(std::unique_ptr<T>)).
 */
-bool QCustomPlot::adoptPlottable(QCPAbstractPlottable* plottable, QCPCoordinateSystem* system,
+bool QCustomPlot::adoptPlottable(QCPPlottable* plottable, QCPCoordinateSystem* system,
                                  QCPArea* area)
 {
     QCP_CHECK_OR_RETURN(system && area, "the object has no coordinate system to join", false);
@@ -1836,7 +1836,7 @@ bool QCustomPlot::adoptPlottable(QCPAbstractPlottable* plottable, QCPCoordinateS
 */
 // A position keeps the pixel it had when its anchor is cut, which is what a user expects for a
 // chain; a self-anchor only keeps the relative offset, so the item collapses onto (0, 0).
-void QCustomPlot::cutAnchorLinks(QCPAbstractItem* item)
+void QCustomPlot::cutAnchorLinks(QCPItem* item)
 {
     const auto elsewhere = [item](const QCPItemAnchor* anchor)
     { return anchor && anchor->mParentItem != item; };
@@ -1863,7 +1863,7 @@ void QCustomPlot::cutAnchorLinks(QCPAbstractItem* item)
   QCustomPlot::take for an item. Its positions forget their axes and axis rect, and the anchors the
   plot, so nothing of the old plot is reachable from it. Parent anchors between items are kept.
 */
-bool QCustomPlot::detach(QCPAbstractItem* item)
+bool QCustomPlot::detach(QCPItem* item)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     QCP_CHECK_OR_RETURN(mItems.contains(item), "the object is not in this plot", false);
@@ -1896,7 +1896,7 @@ bool QCustomPlot::detach(QCPAbstractItem* item)
   QCustomPlot::add(std::unique_ptr) for an item: positions get the plot's default axes and axis rect
   as in the item constructor.
 */
-bool QCustomPlot::adopt(QCPAbstractItem* item)
+bool QCustomPlot::adopt(QCPItem* item)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     QCP_CHECK_OR_RETURN(!item->parentPlot(), "the object already belongs to a plot: take it first",
@@ -1926,7 +1926,7 @@ bool QCustomPlot::adopt(QCPAbstractItem* item)
 
   Unlists and deletes \a plottable, one of this plot's.
 */
-void QCustomPlot::deletePlottable(QCPAbstractPlottable* plottable)
+void QCustomPlot::deletePlottable(QCPPlottable* plottable)
 {
     // The legend re-wraps as the row leaves and signals: a slot may delete the plot or another
     // plottable, so it runs once the plottable is gone.
@@ -1946,10 +1946,10 @@ void QCustomPlot::deletePlottable(QCPAbstractPlottable* plottable)
   returns the group it left (null if none). Safe to call twice: the second call finds nothing.
 
   Called from the plottable base destructor too, when the subclass parts are already gone: virtual
-  calls reach the base versions and qobject_cast sees a QCPAbstractPlottable, so neither is relied
-  on here. A subclass's own legend row leaves by itself (QCPAbstractLegendItem::leaveLegendWhenDestroyed).
+  calls reach the base versions and qobject_cast sees a QCPPlottable, so neither is relied
+  on here. A subclass's own legend row leaves by itself (QCPLegendItem::leaveLegendWhenDestroyed).
 */
-QPointer<QCPPlottableGroup> QCustomPlot::unlistPlottable(QCPAbstractPlottable* plottable)
+QPointer<QCPPlottableGroup> QCustomPlot::unlistPlottable(QCPPlottable* plottable)
 {
     QPointer<QCPPlottableGroup> group(plottable->group().get());
     if (group)
@@ -1966,7 +1966,7 @@ QPointer<QCPPlottableGroup> QCustomPlot::unlistPlottable(QCPAbstractPlottable* p
   Called by the destructor of \a plottable: a plain delete (or deleteLater) leaves no dead pointer
   in the plot, its group or its legend row.
 */
-void QCustomPlot::plottableDestroyed(QCPAbstractPlottable* plottable)
+void QCustomPlot::plottableDestroyed(QCPPlottable* plottable)
 {
     QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
     if (group)
@@ -2053,7 +2053,7 @@ int QCustomPlot::plottableCount() const
   There is a convenience function if you're only interested in selected graphs, see \ref
   selectedGraphs.
 
-  \see setInteractions, QCPAbstractPlottable::setSelectable, QCPAbstractPlottable::setSelection
+  \see setInteractions, QCPPlottable::setSelectable, QCPPlottable::setSelection
 */
 QList<QCPHandle<QCPPlottableGroup>> QCustomPlot::plottableGroups() const
 {
@@ -2064,36 +2064,36 @@ QList<QCPHandle<QCPPlottableGroup>> QCustomPlot::plottableGroups() const
     return result;
 }
 
-QList<QCPHandle<QCPAbstractPlottable>> QCustomPlot::selectedPlottables() const
+QList<QCPHandle<QCPPlottable>> QCustomPlot::selectedPlottables() const
 {
-    QList<QCPHandle<QCPAbstractPlottable>> result;
-    for (QCPAbstractPlottable* plottable : mPlottables)
+    QList<QCPHandle<QCPPlottable>> result;
+    for (QCPPlottable* plottable : mPlottables)
     {
         if (plottable->selected())
-            result.append(QCPHandle<QCPAbstractPlottable>(plottable));
+            result.append(QCPHandle<QCPPlottable>(plottable));
     }
     return result;
 }
 
 /*!
   Returns any plottable at the pixel position \a pos. Since it can capture all plottables, the
-  return type is the abstract base class of all plottables, QCPAbstractPlottable.
+  return type is the abstract base class of all plottables, QCPPlottable.
 
   For details, and if you wish to specify a certain plottable type (e.g. QCPGraph), see the
   template method plottableAt<PlottableType>()
 
   \see plottableAt<PlottableType>(), itemAt, layoutElementAt
 */
-QCPHandle<QCPAbstractPlottable> QCustomPlot::plottableAt(const QPointF& pos,
+QCPHandle<QCPPlottable> QCustomPlot::plottableAt(const QPointF& pos,
                                                          bool onlySelectable, int* dataIndex) const
 {
-    return plottableAt<QCPAbstractPlottable>(pos, onlySelectable, dataIndex);
+    return plottableAt<QCPPlottable>(pos, onlySelectable, dataIndex);
 }
 
 /*!
   Returns whether this QCustomPlot instance contains the \a plottable.
 */
-bool QCustomPlot::hasPlottable(QCPAbstractPlottable* plottable) const
+bool QCustomPlot::hasPlottable(QCPPlottable* plottable) const
 {
     return mPlottables.contains(plottable);
 }
@@ -2245,8 +2245,8 @@ int QCustomPlot::graphCount() const
   If you are not only interested in selected graphs but other plottables like QCPCurve, QCPBars,
   etc., use \ref selectedPlottables.
 
-  \see setInteractions, selectedPlottables, QCPAbstractPlottable::setSelectable,
-  QCPAbstractPlottable::setSelection
+  \see setInteractions, selectedPlottables, QCPPlottable::setSelectable,
+  QCPPlottable::setSelection
 */
 QList<QCPHandle<QCPGraph>> QCustomPlot::selectedGraphs() const
 {
@@ -2267,11 +2267,11 @@ QList<QCPHandle<QCPGraph>> QCustomPlot::selectedGraphs() const
 
   \see itemCount
 */
-QCPHandle<QCPAbstractItem> QCustomPlot::item(int index) const
+QCPHandle<QCPItem> QCustomPlot::item(int index) const
 {
     if (index >= 0 && index < mItems.size())
     {
-        return QCPHandle<QCPAbstractItem>(mItems.at(index));
+        return QCPHandle<QCPItem>(mItems.at(index));
     }
     else
     {
@@ -2287,11 +2287,11 @@ QCPHandle<QCPAbstractItem> QCustomPlot::item(int index) const
 
   \see itemCount
 */
-QCPHandle<QCPAbstractItem> QCustomPlot::item() const
+QCPHandle<QCPItem> QCustomPlot::item() const
 {
     if (!mItems.isEmpty())
     {
-        return QCPHandle<QCPAbstractItem>(mItems.last());
+        return QCPHandle<QCPItem>(mItems.last());
     }
     else
         return {};
@@ -2304,7 +2304,7 @@ QCPHandle<QCPAbstractItem> QCustomPlot::item() const
 
   \see clearItems
 */
-bool QCustomPlot::removeItem(QCPAbstractItem* item)
+bool QCustomPlot::removeItem(QCPItem* item)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     // One search, not contains() then removeOne(); it stays a search (not item->mRegisteredPlot)
@@ -2359,7 +2359,7 @@ int QCustomPlot::deleteAllItems()
     // All unlisted before the first delete, as in removeItem: a slot on destroyed() finds none of
     // them. The guarded snapshot skips any that such a slot deletes itself.
     const auto items = guarded(mItems);
-    for (QCPAbstractItem* item : std::as_const(mItems))
+    for (QCPItem* item : std::as_const(mItems))
         item->mRegisteredPlot = nullptr;
     QSet<QCPLayerable*> dying;
     for (const auto& item : items)
@@ -2391,31 +2391,31 @@ int QCustomPlot::itemCount() const
 /*!
   Returns a list of the selected items. If no items are currently selected, the list is empty.
 
-  \see setInteractions, QCPAbstractItem::setSelectable, QCPAbstractItem::setSelected
+  \see setInteractions, QCPItem::setSelectable, QCPItem::setSelected
 */
-QList<QCPHandle<QCPAbstractItem>> QCustomPlot::selectedItems() const
+QList<QCPHandle<QCPItem>> QCustomPlot::selectedItems() const
 {
-    QList<QCPHandle<QCPAbstractItem>> result;
-    for (QCPAbstractItem* item : mItems)
+    QList<QCPHandle<QCPItem>> result;
+    for (QCPItem* item : mItems)
     {
         if (item->selected())
-            result.append(QCPHandle<QCPAbstractItem>(item));
+            result.append(QCPHandle<QCPItem>(item));
     }
     return result;
 }
 
 /*!
   Returns the item at the pixel position \a pos. Since it can capture all items, the
-  return type is the abstract base class of all items, QCPAbstractItem.
+  return type is the abstract base class of all items, QCPItem.
 
   For details, and if you wish to specify a certain item type (e.g. QCPItemLine), see the
   template method itemAt<ItemType>()
 
   \see itemAt<ItemType>(), plottableAt, layoutElementAt
 */
-QCPHandle<QCPAbstractItem> QCustomPlot::itemAt(const QPointF& pos, bool onlySelectable) const
+QCPHandle<QCPItem> QCustomPlot::itemAt(const QPointF& pos, bool onlySelectable) const
 {
-    return itemAt<QCPAbstractItem>(pos, onlySelectable);
+    return itemAt<QCPItem>(pos, onlySelectable);
 }
 
 /*!
@@ -2423,7 +2423,7 @@ QCPHandle<QCPAbstractItem> QCustomPlot::itemAt(const QPointF& pos, bool onlySele
 
   \see item
 */
-bool QCustomPlot::hasItem(QCPAbstractItem* item) const
+bool QCustomPlot::hasItem(QCPItem* item) const
 {
     return mItems.contains(item);
 }
@@ -2476,7 +2476,7 @@ QCPHandle<QCPLayer> QCustomPlot::currentLayer() const
 /*!
   Sets the layer with the specified \a name to be the current layer. All layerables (\ref
   QCPLayerable), e.g. plottables and items, are created on the current layer, except items: they
-  default to the "annotations" layer (see \ref QCPAbstractItem).
+  default to the "annotations" layer (see \ref QCPItem).
 
   Returns true on success, i.e. if there is a layer with the specified \a name in the QCustomPlot.
 
@@ -3104,7 +3104,7 @@ bool QCustomPlot::commitEveryPendingSource()
 {
     // A commit's busyChanged slot may remove plottables: walk a snapshot, skip the gone ones.
     bool committed = false;
-    const QList<QPointer<QCPAbstractPlottable>> plottables(mPlottables.cbegin(), mPlottables.cend());
+    const QList<QPointer<QCPPlottable>> plottables(mPlottables.cbegin(), mPlottables.cend());
     for (const auto& plottable : plottables)
         if (plottable)
             committed |= plottable->commitPendingData();
@@ -3356,7 +3356,7 @@ double QCustomPlot::replotTime(bool average) const
   if \a onlyVisiblePlottables is set to true, only the plottables that have their visibility set to
   true (QCPLayerable::setVisible), will be used to rescale the axes.
 
-  \see QCPAbstractPlottable::rescaleAxes, QCPAxis::rescale
+  \see QCPPlottable::rescaleAxes, QCPAxis::rescale
 */
 void QCustomPlot::rescaleAxes(bool onlyVisiblePlottables)
 {
@@ -3948,7 +3948,7 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
                     if (needsScissor)
                     {
                         QRect clipRect;
-                        for (QCPAbstractPlottable* plottable : layer->plottableChildren())
+                        for (QCPPlottable* plottable : layer->plottableChildren())
                             clipRect = clipRect.isNull() ? plottable->clipRect()
                                                          : clipRect.united(plottable->clipRect());
                         if (!clipRect.isNull())
@@ -4469,7 +4469,7 @@ void QCustomPlot::emitClickSignal(QMouseEvent* event)
 {
     QCPLayerable* clicked = std::exchange(mMouseSignalLayerable, nullptr);
     const QVariant details = mMouseSignalLayerableDetails;
-    if (auto* ap = qobject_cast<QCPAbstractPlottable*>(clicked))
+    if (auto* ap = qobject_cast<QCPPlottable*>(clicked))
         deliver(ap, [this, ap, i = clickedDataIndex(details), event] {
             emit plottableClick(ap, i, event);
         });
@@ -4477,18 +4477,18 @@ void QCustomPlot::emitClickSignal(QMouseEvent* event)
         deliver(ax, [this, ax, part = details.value<QCPAxis::SelectablePart>(), event] {
             emit axisClick(ax, part, event);
         });
-    else if (auto* ai = qobject_cast<QCPAbstractItem*>(clicked))
+    else if (auto* ai = qobject_cast<QCPItem*>(clicked))
         deliver(ai, [this, ai, event] { emit itemClick(ai, event); });
     else if (auto* lg = qobject_cast<QCPLegend*>(clicked))
         deliver(lg, [this, lg, event] { emit legendClick(lg, nullptr, event); });
-    else if (auto* li = qobject_cast<QCPAbstractLegendItem*>(clicked))
+    else if (auto* li = qobject_cast<QCPLegendItem*>(clicked))
         deliver(li, [this, li, event] { emit legendClick(li->parentLegend(), li, event); });
 }
 
 void QCustomPlot::emitDoubleClickSignal(QCPLayerable* clicked, const QVariant& details,
                                         QMouseEvent* event)
 {
-    if (auto* ap = qobject_cast<QCPAbstractPlottable*>(clicked))
+    if (auto* ap = qobject_cast<QCPPlottable*>(clicked))
         deliver(ap, [this, ap, i = clickedDataIndex(details), event] {
             emit plottableDoubleClick(ap, i, event);
         });
@@ -4496,11 +4496,11 @@ void QCustomPlot::emitDoubleClickSignal(QCPLayerable* clicked, const QVariant& d
         deliver(ax, [this, ax, part = details.value<QCPAxis::SelectablePart>(), event] {
             emit axisDoubleClick(ax, part, event);
         });
-    else if (auto* ai = qobject_cast<QCPAbstractItem*>(clicked))
+    else if (auto* ai = qobject_cast<QCPItem*>(clicked))
         deliver(ai, [this, ai, event] { emit itemDoubleClick(ai, event); });
     else if (auto* lg = qobject_cast<QCPLegend*>(clicked))
         deliver(lg, [this, lg, event] { emit legendDoubleClick(lg, nullptr, event); });
-    else if (auto* li = qobject_cast<QCPAbstractLegendItem*>(clicked))
+    else if (auto* li = qobject_cast<QCPLegendItem*>(clicked))
         deliver(li, [this, li, event] { emit legendDoubleClick(li->parentLegend(), li, event); });
 }
 
@@ -5011,7 +5011,7 @@ void QCustomPlot::setupPaintBuffers()
                     if (layer->mPaintBuffer.toStrongRef() == buffer)
                     {
                         hasAnyChildren |= !layer->mChildren.isEmpty();
-                        for (QCPAbstractPlottable* p : layer->plottableChildren())
+                        for (QCPPlottable* p : layer->plottableChildren())
                         {
                             hasPlottables = true;
                             if (p->canProduceContent())
@@ -5137,20 +5137,20 @@ void QCustomPlot::legendRemoved(QCPLegend* legend)
   setSelectionRectMode is set to \ref QCP::srmSelect.
 
   First, it determines which axis rect was the origin of the selection rect judging by the starting
-  point of the selection. Then it goes through the plottables (\ref QCPAbstractPlottable1D to be
+  point of the selection. Then it goes through the plottables (\ref QCPPlottable1D to be
   precise) associated with that axis rect and finds the data points that are in \a rect. It does
-  this by querying their \ref QCPAbstractPlottable1D::selectTestRect method.
+  this by querying their \ref QCPPlottable1D::selectTestRect method.
 
   Then, the actual selection is done by calling the plottables' \ref
-  QCPAbstractPlottable::selectEvent, placing the found selected data points in the \a details
+  QCPPlottable::selectEvent, placing the found selected data points in the \a details
   parameter as <tt>QVariant(\ref QCPDataSelection)</tt>. All plottables that weren't touched by \a
-  rect receive a \ref QCPAbstractPlottable::deselectEvent.
+  rect receive a \ref QCPPlottable::deselectEvent.
 
   \see processRectZoom
 */
 void QCustomPlot::processRectSelection(QRect rect, QMouseEvent* event)
 {
-    using SelectionCandidate = QPair<QPointer<QCPAbstractPlottable>, QCPDataSelection>;
+    using SelectionCandidate = QPair<QPointer<QCPPlottable>, QCPDataSelection>;
     using SelectionCandidates = QMultiMap<int, SelectionCandidate>; // map key is number of selected data points, so we have selections sorted by size
 
     const QPointer<QCustomPlot> alive(this); // a (de)selection slot may delete the plot
@@ -5204,7 +5204,7 @@ void QCustomPlot::processRectSelection(QRect rect, QMouseEvent* event)
             while (it != potentialSelections.constBegin())
             {
                 --it;
-                QCPAbstractPlottable* plottable = it.value().first;
+                QCPPlottable* plottable = it.value().first;
                 if (plottable && mInteractions.testFlag(plottable->selectionCategory()))
                 {
                     bool selChanged = false;
@@ -5304,9 +5304,9 @@ void QCustomPlot::announceUserSelection()
   Returns true on success, i.e. when \a plottable isn't already in this plot and the parent plot of
   \a plottable is this QCustomPlot.
 
-  This method is called automatically in the QCPAbstractPlottable base class constructor.
+  This method is called automatically in the QCPPlottable base class constructor.
 */
-bool QCustomPlot::registerPlottable(QCPAbstractPlottable* plottable)
+bool QCustomPlot::registerPlottable(QCPPlottable* plottable)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (mPlottables.contains(plottable))
@@ -5332,7 +5332,7 @@ bool QCustomPlot::registerPlottable(QCPAbstractPlottable* plottable)
     return true;
 }
 
-bool QCustomPlot::registerJoinedPlottable(QCPAbstractPlottable* plottable)
+bool QCustomPlot::registerJoinedPlottable(QCPPlottable* plottable)
 {
     if (!plottable)
         return false;
@@ -5346,7 +5346,7 @@ bool QCustomPlot::registerJoinedPlottable(QCPAbstractPlottable* plottable)
         registerGraph(graph);
     // The scale it followed belonged to the plot it left: join the new rect's, as a fresh one does,
     // unless it chose a scale or none (followKeyAxisRectScale() then does nothing).
-    if (auto* mapped = qobject_cast<QCPAbstractColorMapped*>(plottable);
+    if (auto* mapped = qobject_cast<QCPColorMapped*>(plottable);
         mapped && mapped->joinsOnArrival())
         mapped->followKeyAxisRectScale();
     return true;
@@ -5359,7 +5359,7 @@ bool QCustomPlot::registerJoinedPlottable(QCPAbstractPlottable* plottable)
   on success, i.e. if \a graph is valid and wasn't already registered with this QCustomPlot.
 
   This graph specific registration happens in addition to the call to \ref registerPlottable by the
-  QCPAbstractPlottable base class.
+  QCPPlottable base class.
 */
 bool QCustomPlot::registerGraph(QCPGraph* graph)
 {
@@ -5385,7 +5385,7 @@ bool QCustomPlot::registerGraph(QCPGraph* graph)
   Called by the destructor of \a item: a plain delete (or deleteLater) leaves no dead pointer in
   the item list.
 */
-void QCustomPlot::itemDestroyed(QCPAbstractItem* item)
+void QCustomPlot::itemDestroyed(QCPItem* item)
 {
     // simplify: one linear search per deleted item (~1 us at 10k items, the order of Qt's own
     // children search). item(index) needs the order; an index stored on the item or tombstones
@@ -5401,9 +5401,9 @@ void QCustomPlot::itemDestroyed(QCPAbstractItem* item)
   Returns true on success, i.e. when \a item wasn't already in the plot and the parent plot of \a
   item is this QCustomPlot.
 
-  This method is called automatically in the QCPAbstractItem base class constructor.
+  This method is called automatically in the QCPItem base class constructor.
 */
-bool QCustomPlot::registerItem(QCPAbstractItem* item)
+bool QCustomPlot::registerItem(QCPItem* item)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     // A live item knows the plot that lists it (registerItem sets it below, detach clears it), so
@@ -5732,8 +5732,8 @@ void QCustomPlot::toPainter(QCPPainter* painter, int width, int height)
 // The owner of each family removes its member (see qcp::detail::removeObject in handle.h).
 namespace qcp::detail
 {
-void removeObject(QCPAbstractPlottable& plottable) { delete &plottable; }
-void removeObject(QCPAbstractItem& item) { delete &item; }
+void removeObject(QCPPlottable& plottable) { delete &plottable; }
+void removeObject(QCPItem& item) { delete &item; }
 void removeObject(QCPBarsGroup& group) { delete &group; }
 void removeObject(QCPPlottableGroup& group) { delete &group; }
 

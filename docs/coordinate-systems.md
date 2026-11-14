@@ -197,7 +197,7 @@ space is inherited.
 ## Writing a plottable for any system
 
 A plottable class says what it needs in its constructor: the last argument of the
-`QCPAbstractPlottable` constructors is a `QCP::Capabilities` mask. The default is
+`QCPPlottable` constructors is a `QCP::Capabilities` mask. The default is
 `capRectangular | capStraightKey`, the 2.x assumption. A plottable that records in data space
 (see [Writing a plot type](writing-a-plot-type.md)) and draws only straight segments can pass
 `capStraightSegments` and run on any such system.

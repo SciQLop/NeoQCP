@@ -3,9 +3,9 @@
 #include "algorithms.h"
 #include <atomic>
 
-class QCPAbstractMultiDataSource {
+class QCPMultiDataSource {
 public:
-    virtual ~QCPAbstractMultiDataSource() = default;
+    virtual ~QCPMultiDataSource() = default;
 
     virtual int columnCount() const = 0;
     virtual int size() const = 0;

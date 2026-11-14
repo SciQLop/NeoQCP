@@ -6,7 +6,7 @@
 #include <optional>
 #include <vector>
 
-class QCPAbstractMultiDataSource;
+class QCPMultiDataSource;
 struct QCPGraphComponent;
 
 //! Shared base of the line plottables.
@@ -14,10 +14,10 @@ struct QCPGraphComponent;
 //! Owns the components (one line each, with its own pens, marker style and line style) and the
 //! colour-by-scalar mapper shared by them. Subclasses supply the data and draw the components;
 //! every setter here changes what they draw, so it dirties the layer through lineChanged().
-class QCP_LIB_DECL QCPAbstractLine : public QCPAbstractColorMapped
+class QCP_LIB_DECL QCPLine : public QCPColorMapped
 {
     Q_OBJECT
-    Q_DISABLE_COPY_MOVE(QCPAbstractLine)
+    Q_DISABLE_COPY_MOVE(QCPLine)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(LineStyle lineStyle READ lineStyle WRITE setLineStyle NOTIFY lineStyleChanged)
     Q_PROPERTY(QCPScatterStyle scatterStyle READ scatterStyle WRITE setScatterStyle NOTIFY
@@ -28,10 +28,10 @@ public:
     enum LineStyle { lsNone, lsLine, lsStepLeft, lsStepRight, lsStepCenter, lsImpulse };
     Q_ENUM(LineStyle)
 
-    explicit QCPAbstractLine(QCPAxis* keyAxis, QCPAxis* valueAxis,
+    explicit QCPLine(QCPAxis* keyAxis, QCPAxis* valueAxis,
                              QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale);
     // Out of line: QCPGraphComponent is complete only after this class (it holds a LineStyle).
-    ~QCPAbstractLine() override;
+    ~QCPLine() override;
 
     // Components
     [[nodiscard]] int componentCount() const;
@@ -73,7 +73,7 @@ public:
     // call replot() (the first colouring may repaint on its own once
     // startColouring() has rebuilt what it needs).
     // The gradient, range and scale type are the colour mapping inherited from
-    // QCPAbstractColorMapped: a coloured line follows its key axis rect's colour
+    // QCPColorMapped: a coloured line follows its key axis rect's colour
     // scale, and setColorScale() on an uncoloured line makes it a user at once.
     // A plain line never shows its rect's colour bar: clearColorValues() leaves the
     // rect's scale. A scale picked with setColorScale(), or none, stays the line's.
@@ -87,7 +87,7 @@ public:
 Q_SIGNALS:
     //! A component was shown or hidden: the legend group row draws one segment per visible one.
     void componentVisibilityChanged();
-    void lineStyleChanged(QCPAbstractLine::LineStyle lineStyle);
+    void lineStyleChanged(QCPLine::LineStyle lineStyle);
     void scatterStyleChanged(const QCPScatterStyle& scatterStyle);
     void scatterSkipChanged(int scatterSkip);
 
@@ -157,12 +157,12 @@ struct QCPGraphComponent {
     bool inLegend = true;
     bool hiddenByErrorBars = false; //!< out of the legend as an error bound, not by the user
     //! Set through setComponentLineStyle(): a direct write leaves the cached lines stale.
-    QCPAbstractLine::LineStyle lineStyle = QCPAbstractLine::lsLine;
+    QCPLine::LineStyle lineStyle = QCPLine::lsLine;
 };
 
-inline int QCPAbstractLine::componentCount() const { return mComponents.size(); }
-inline QCPGraphComponent& QCPAbstractLine::component(int index) { return mComponents[index]; }
-inline const QCPGraphComponent& QCPAbstractLine::component(int index) const
+inline int QCPLine::componentCount() const { return mComponents.size(); }
+inline QCPGraphComponent& QCPLine::component(int index) { return mComponents[index]; }
+inline const QCPGraphComponent& QCPLine::component(int index) const
 {
     return mComponents[index];
 }

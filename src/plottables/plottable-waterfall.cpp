@@ -4,7 +4,7 @@
 // --- QCPWaterfallDataAdapter ---
 
 QCPWaterfallDataAdapter::QCPWaterfallDataAdapter(
-    std::shared_ptr<QCPAbstractMultiDataSource> source,
+    std::shared_ptr<QCPMultiDataSource> source,
     QVector<double> offsets, QVector<double> normFactors, double gain)
     : mSource(std::move(source))
     , mOffsets(std::move(offsets))
@@ -121,7 +121,7 @@ QCPWaterfallGraph::QCPWaterfallGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
 {
 }
 
-void QCPWaterfallGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
+void QCPWaterfallGraph::setDataSource(std::shared_ptr<QCPMultiDataSource> source)
 {
     markDirty();
     mOriginalSource = std::move(source);
@@ -133,7 +133,7 @@ void QCPWaterfallGraph::setOwnedSource(std::shared_ptr<QCPGrowableMultiDataSourc
 {
     // setData() still builds the growable source, but the waterfall draws its adapter and owns
     // neither: take the data through the normal setter, without recording an owned source.
-    setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>(std::move(source)));
+    setDataSource(std::shared_ptr<QCPMultiDataSource>(std::move(source)));
 }
 
 void QCPWaterfallGraph::setOffsetMode(OffsetMode mode)
@@ -230,7 +230,7 @@ void QCPWaterfallGraph::rebuildAdapter()
         // Clearing the source must uninstall the previous adapter too, or the
         // graph keeps rendering the old data (base caches stay populated).
         mAdapter.reset();
-        QCPGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>{});
+        QCPGraph::setDataSource(std::shared_ptr<QCPMultiDataSource>{});
         return;
     }
     if (mNormDirty)

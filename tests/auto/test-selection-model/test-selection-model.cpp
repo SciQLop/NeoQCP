@@ -215,7 +215,7 @@ void TestSelectionModel::userSelectionStillAnnounced()
     mPlot->replot();
 
     QStringList order;
-    connect(graph, &QCPAbstractPlottable::selectionChanged, mPlot,
+    connect(graph, &QCPPlottable::selectionChanged, mPlot,
             [&order] { order << QStringLiteral("graph"); });
     connect(mPlot, &QCustomPlot::selectionChangedByUser, mPlot,
             [&order] { order << QStringLiteral("user"); });

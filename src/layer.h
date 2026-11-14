@@ -48,8 +48,8 @@ class QCPLayout;
 class QCPAxis;
 class QCPArea;
 class QCPCoordinateSystem;
-class QCPAbstractItem;
-class QCPAbstractPlottable;
+class QCPItem;
+class QCPPlottable;
 class QCPTheme;
 class QCPContourOverlay;
 class QCPColormapRenderer;
@@ -190,7 +190,7 @@ private:
     [[nodiscard]] QList<QCPLayerable*> childrenRaw() const { return mChildren; }
     void childrenChanged();
     void invalidateItemIndex();
-    void noteItemExtentChanged(QCPAbstractItem* item);
+    void noteItemExtentChanged(QCPItem* item);
 
     // The frames the item children of this layer follow: the axes, the systems and the areas of
     // their positions. A range change on an axis, or a mapping change on a system, marks this
@@ -200,8 +200,8 @@ private:
     //! The frames an item follows changed (a position was rebound): collect them again before the
     //! next query. Cheap and rare, so the setters call it after they assigned.
     void invalidateItemFrames();
-    void noteItemFrames(QCPAbstractItem* item);
-    void collectItemFrames(QCPAbstractItem* item, std::vector<QPointer<QCPAxis>>& axes,
+    void noteItemFrames(QCPItem* item);
+    void collectItemFrames(QCPItem* item, std::vector<QPointer<QCPAxis>>& axes,
                            std::vector<QPointer<QCPCoordinateSystem>>& systems,
                            std::vector<QPointer<QCPArea>>& areas) const;
     [[nodiscard]] bool itemsUseAxis(const QCPAxis* axis) const;
@@ -216,11 +216,11 @@ private:
     // The plottable children, in child order. Frame code asks for them on every replot; a cast per
     // child was a sixth of a frame on a layer of 10 000 items. Rebuilt lazily: a layerable joins
     // its layer from the base constructor, before it is a plottable.
-    [[nodiscard]] const QList<QCPAbstractPlottable*>& plottableChildren() const;
-    mutable QList<QCPAbstractPlottable*> mPlottableChildren;
+    [[nodiscard]] const QList<QCPPlottable*>& plottableChildren() const;
+    mutable QList<QCPPlottable*> mPlottableChildren;
     mutable bool mPlottableChildrenDirty = true;
 
-    friend class QCPAbstractItem;
+    friend class QCPItem;
     friend class QCPAxis; // a scale type change invalidates the item index
     friend class QCPAxisRect; // a range change asks which layers follow the axis
     friend class QCPPolarArea; // it asks which layers draw items in its disc
@@ -361,8 +361,8 @@ private:
     friend class QCPCoordinateSystem; // reads its area's plot raw on the per-frame paths
     friend class QCPContourOverlay; // reads the parent plot raw while recording label tiles
     friend class QCPColormapRenderer; // reads the layer raw when invalidating its map image
-    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip);
-    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip);
+    friend QCPDrawnView qcpDrawnViewOf(const QCPItem& item, QRect clip);
+    friend QCPDrawnView qcpDrawnViewOf(const QCPPlottable& plottable, QRect clip);
 };
 
 #endif // QCP_LAYER_H

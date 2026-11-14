@@ -25,7 +25,7 @@ std::optional<QCPRange> usableRange(std::optional<QCPRange> range, bool log)
     return range;
 }
 
-std::optional<QCPRange> binningRange(const QCPAbstractMultiDataSource& src,
+std::optional<QCPRange> binningRange(const QCPMultiDataSource& src,
                                      std::optional<QCPRange> fixed,
                                      std::optional<QCPRange> autoRange, bool log)
 {
@@ -94,7 +94,7 @@ double largest(const std::vector<std::vector<double>>& heights)
 */
 
 QCPHistogram::QCPHistogram(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPAbstractPlottable(keyAxis, valueAxis)
+    : QCPPlottable(keyAxis, valueAxis)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
 {
     installTransform();
@@ -141,7 +141,7 @@ void QCPHistogram::installTransform()
     const auto fixed = mFixedRange;
     const auto autoRange = mAutoRange;
     mPipeline.setTransform(TransformKind::ViewportIndependent,
-        [bins, log, normalization, fixed, autoRange](const QCPAbstractMultiDataSource& src,
+        [bins, log, normalization, fixed, autoRange](const QCPMultiDataSource& src,
                                                      const ViewportParams&,
                                                      std::any&) -> std::shared_ptr<Histogram1D> {
             const auto range = binningRange(src, fixed, autoRange, log);
@@ -201,7 +201,7 @@ std::shared_ptr<Histogram1D> QCPHistogram::pipelineResult() const
     return std::make_shared<Histogram1D>(*result);
 }
 
-void QCPHistogram::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
+void QCPHistogram::setDataSource(std::shared_ptr<QCPMultiDataSource> source)
 {
     markDirty();
     mDataSource = std::move(source);

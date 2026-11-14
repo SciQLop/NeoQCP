@@ -20,7 +20,7 @@ class TestPipeline;
 template <typename T, typename Self = void>
 class QCPHistogram2DOps;
 
-class QCP_LIB_DECL QCPHistogram2D : public QCPAbstractColorMapped
+class QCP_LIB_DECL QCPHistogram2D : public QCPColorMapped
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPHistogram2D)
@@ -64,9 +64,9 @@ public:
             keys, values));
     }
 
-    void setDataSource(std::shared_ptr<QCPAbstractDataSource> source);
-    void setDataSource(std::unique_ptr<QCPAbstractDataSource> source);
-    const QCPAbstractDataSource* dataSource() const { return mDataSource.get(); }
+    void setDataSource(std::shared_ptr<QCPDataSource> source);
+    void setDataSource(std::unique_ptr<QCPDataSource> source);
+    const QCPDataSource* dataSource() const { return mDataSource.get(); }
     void dataChanged();
 
     // Binning. Bins follow the axis scales: a logarithmic axis bins in log10 (dropping
@@ -122,7 +122,7 @@ public:
     [[nodiscard]] const void* dataSourceIdentity() const override { return mDataSource.get(); }
     //! An export bins synchronously, so the screen and export recordings differ.
     [[nodiscard]] bool resolvesForTheExport() const override { return true; }
-    using QCPAbstractColorMapped::drawLegendIcon;
+    using QCPColorMapped::drawLegendIcon;
 public Q_SLOTS:
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
     QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
@@ -150,7 +150,7 @@ private:
     void redrawLater();
     void followAxisScales();
 
-    std::shared_ptr<QCPAbstractDataSource> mDataSource;
+    std::shared_ptr<QCPDataSource> mDataSource;
     int mKeyBins = 100;
     int mValueBins = 100;
     QCP::HistogramNormalization mNormalization = QCP::HistogramNormalization::Count;
@@ -220,11 +220,11 @@ public:
     {
         return this->apply([&](T& p) { p.setData(std::forward<KC>(keys), std::forward<VC>(values)); });
     }
-    Ret setDataSource(std::shared_ptr<QCPAbstractDataSource> source)
+    Ret setDataSource(std::shared_ptr<QCPDataSource> source)
     {
         return this->apply([&](T& p) { p.setDataSource(std::move(source)); });
     }
-    Ret setDataSource(std::unique_ptr<QCPAbstractDataSource> source)
+    Ret setDataSource(std::unique_ptr<QCPDataSource> source)
     {
         return this->apply([&](T& p) { p.setDataSource(std::move(source)); });
     }

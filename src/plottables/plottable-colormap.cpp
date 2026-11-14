@@ -685,7 +685,7 @@ bool QCPColorMapData::createAlpha(bool initializeOpaque)
   \section qcpcolormap-usage Usage
 
   Like all data representing objects in QCustomPlot, the QCPColorMap is a plottable
-  (QCPAbstractPlottable). So the plottable-interface of QCustomPlot applies
+  (QCPPlottable). So the plottable-interface of QCustomPlot applies
   (QCustomPlot::plottable, QCustomPlot::removePlottable, etc.)
 
   Usually, you first create an instance:
@@ -784,7 +784,7 @@ QCPRange rangeWithHalfACell(QCPAxis* axis, const QCPRange& range, int size)
   manually but use QCustomPlot::removePlottable() instead.
 */
 QCPColorMap::QCPColorMap(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractColorMapped(keyAxis, valueAxis)
+        : QCPColorMapped(keyAxis, valueAxis)
         , mMapData(new QCPColorMapData(10, 10, QCPRange(0, 5), QCPRange(0, 5)))
         , mInterpolate(true)
         , mTightBoundary(false)

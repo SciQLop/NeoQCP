@@ -21,7 +21,7 @@
 #include <QPainterPath>
 #include <QRect>
 
-class QCPAbstractPlottable;
+class QCPPlottable;
 class QCPArea;
 class QCPAxis;
 class QCPAxisBase;
@@ -117,7 +117,7 @@ public:
     [[nodiscard]] bool listens() const { return mChangedListeners > 0; }
 
     //! The plottables drawn through this system, in plot order.
-    QList<QCPHandle<QCPAbstractPlottable>> plottables() const;
+    QList<QCPHandle<QCPPlottable>> plottables() const;
 
 signals:
     //! The mapping moved: a recording of it is stale.
@@ -147,16 +147,16 @@ protected:
     int mChangedListeners = 0;
 
     // The plottables raw: QCPAxisBase::plottables collects them per axis, so it reads this one (K8).
-    QList<QCPAbstractPlottable*> plottablesRaw() const;
+    QList<QCPPlottable*> plottablesRaw() const;
     friend class QCPAxisBase;
 
 private:
     friend class QCPArea;
     friend class QCPAxisRect; // its mark pass selects the systems by area raw
     friend class QCPPolarArea; // same, for the polar disc
-    friend class QCPAbstractItem; // its index box reads the axes raw, once per item and rebuild
+    friend class QCPItem; // its index box reads the axes raw, once per item and rebuild
     friend class QCPItemPosition; // binding a system reads its frame raw, once per position
-    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip);
+    friend QCPDrawnView qcpDrawnViewOf(const QCPPlottable& plottable, QRect clip);
     Q_DISABLE_COPY_MOVE(QCPCoordinateSystem)
 };
 

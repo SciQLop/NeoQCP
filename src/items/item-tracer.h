@@ -37,7 +37,7 @@ class QCustomPlot;
 template <typename T, typename Self = void>
 class QCPItemTracerOps;
 
-class QCP_LIB_DECL QCPItemTracer : public QCPAbstractItem
+class QCP_LIB_DECL QCPItemTracer : public QCPItem
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPItemTracer)

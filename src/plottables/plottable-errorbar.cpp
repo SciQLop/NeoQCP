@@ -107,7 +107,7 @@ QCPErrorBarsData::QCPErrorBarsData(double errorMinus, double errorPlus)
   This gap size can be controlled via \ref setSymbolGap.
 */
 
-/*! \fn void QCPErrorBars::dataPlottableChanged(QCPAbstractPlottable* dataPlottable)
+/*! \fn void QCPErrorBars::dataPlottableChanged(QCPPlottable* dataPlottable)
 
   This signal is emitted when \ref dataPlottable changes, after the plot delivers its deferred
   signals.
@@ -157,7 +157,7 @@ QCPErrorBarsData::QCPErrorBarsData(double errorMinus, double errorPlus)
   delete it manually but use \ref QCustomPlot::removePlottable() instead.
 */
 QCPErrorBars::QCPErrorBars(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractPlottable(keyAxis, valueAxis)
+        : QCPPlottable(keyAxis, valueAxis)
         , mDataContainer(new QVector<QCPErrorBarsData>)
         , mErrorType(etValueError)
         , mWhiskerWidth(9)
@@ -242,7 +242,7 @@ void QCPErrorBars::setData(const QVector<double>& errorMinus, const QVector<doub
   For proper display, care must also be taken that the key and value axes of the \a plottable match
   those configured for this \ref QCPErrorBars instance.
 */
-void QCPErrorBars::setDataPlottable(QCPAbstractPlottable* plottable)
+void QCPErrorBars::setDataPlottable(QCPPlottable* plottable)
 {
     if (plottable && qobject_cast<QCPErrorBars*>(plottable))
     {
@@ -270,7 +270,7 @@ void QCPErrorBars::setDataPlottable(QCPAbstractPlottable* plottable)
         return;
 
     markDirty();
-    if (QCPAbstractPlottable* previous = mDataPlottable.data())
+    if (QCPPlottable* previous = mDataPlottable.data())
         previous->removeDependent(this);
     mDataPlottable = plottable;
     // The whiskers follow the data plottable's values wherever their own layer is.
@@ -285,13 +285,13 @@ void QCPErrorBars::setDataPlottable(QCPAbstractPlottable* plottable)
 void QCPErrorBars::detachDataPlottable()
 {
     markDirty();
-    QCPAbstractPlottable* previous = mDataPlottable.data();
+    QCPPlottable* previous = mDataPlottable.data();
     if (!previous)
         return;
     previous->removeDependent(this);
     mDataPlottable = nullptr;
     qcpEmit(this, mParentPlot, &QCPErrorBars::dataPlottableChanged,
-            static_cast<QCPAbstractPlottable*>(nullptr));
+            static_cast<QCPPlottable*>(nullptr));
 }
 
 /*!
@@ -560,7 +560,7 @@ int QCPErrorBars::findEnd(double sortKey, bool expandedRange) const
   If \a details is not 0, it will be set to a \ref QCPDataSelection, describing the closest data
   point to \a pos.
 
-  \seebaseclassmethod \ref QCPAbstractPlottable::selectTest
+  \seebaseclassmethod \ref QCPPlottable::selectTest
 */
 double QCPErrorBars::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {
@@ -1044,9 +1044,9 @@ double QCPErrorBars::pointDistance(const QPointF& pixelPoint,
 
 /*! \internal
 
-  \note This method is identical to \ref QCPAbstractPlottable1D::getDataSegments but needs to be
+  \note This method is identical to \ref QCPPlottable1D::getDataSegments but needs to be
   reproduced here since the \ref QCPErrorBars plottable, as a special case that doesn't have its
-  own key/value data coordinates, doesn't derive from \ref QCPAbstractPlottable1D. See the
+  own key/value data coordinates, doesn't derive from \ref QCPPlottable1D. See the
   documentation there for details.
 */
 void QCPErrorBars::getDataSegments(QList<QCPDataRange>& selectedSegments,
@@ -1148,7 +1148,7 @@ const void* QCPErrorBars::dataSourceIdentity() const
 */
 quint64 QCPErrorBars::dependencyRevision() const
 {
-    const QCPAbstractPlottable* source = mDataPlottable.data();
+    const QCPPlottable* source = mDataPlottable.data();
     return qHashMulti(0, mDataContainer->size(), mDataAccess, source, qcpDependencyKey(source),
                       source ? source->keyAxis() : nullptr, source ? source->valueAxis() : nullptr);
 }

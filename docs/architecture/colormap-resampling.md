@@ -27,7 +27,7 @@ flowchart TB
 
 ## Data Model
 
-QCPColorMap2 accepts data via `QCPAbstractDataSource2D`, which represents a 2D grid of `(x, y, z)` values.
+QCPColorMap2 accepts data via `QCPDataSource2D`, which represents a 2D grid of `(x, y, z)` values.
 
 ### Y Dimensionality
 
@@ -193,7 +193,7 @@ The X axis of the grid is always linear. A logarithmic key axis is not supported
 
 ## Async Integration
 
-QCPColorMap2 uses `QCPColormapPipeline` (an alias for `QCPAsyncPipeline<QCPAbstractDataSource2D, QCPColorMapData>`). See [Async Pipeline](async-pipeline.md) for the threading model.
+QCPColorMap2 uses `QCPColormapPipeline` (an alias for `QCPAsyncPipeline<QCPDataSource2D, QCPColorMapData>`). See [Async Pipeline](async-pipeline.md) for the threading model.
 
 The transform is viewport-dependent. Resampling is triggered by:
 - **New data** → `setDataSource()` / `dataChanged()` → `onDataChanged()` on the pipeline (Heavy priority)
@@ -221,6 +221,6 @@ Exports don't wait for the worker: a draw in export mode with no usable result r
 | `src/datasource/algorithms-2d.h` | Range queries and binary search for 2D data |
 | `src/plottables/plottable-colormap2.h/.cpp` | QCPColorMap2 plottable; the resample transform and output size selection |
 | `src/painting/colormap-renderer.h/.cpp` | Colorization and image management, shared with QCPHistogram2D |
-| `src/datasource/abstract-datasource-2d.h` | QCPAbstractDataSource2D interface |
+| `src/datasource/abstract-datasource-2d.h` | QCPDataSource2D interface |
 | `src/datasource/soa-datasource-2d.h` | QCPSoADataSource2D template |
 | `src/datasource/async-pipeline.h` | QCPColormapPipeline type alias |

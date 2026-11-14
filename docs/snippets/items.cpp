@@ -231,14 +231,14 @@ DOC_SNIPPET(items_creation, 600, 360)
     customPlot->xAxis->setRange(0, 100);
     customPlot->yAxis->setRange(-2, 2);
 
-    customPlot->setItemCreator([](QCustomPlot* plot, QCPAxis*, QCPAxis*) -> QCPAbstractItem*
+    customPlot->setItemCreator([](QCustomPlot* plot, QCPAxis*, QCPAxis*) -> QCPItem*
     {
         auto span = plot->add<QCPItemSpan>(Qt::Vertical);
         span->setBrush(QColor(255, 127, 14, 50));
         span->setBorderPen(QPen(QColor(255, 127, 14), 2));
         return span.get();
     });
-    customPlot->setItemPositioner([](QCPAbstractItem* item, double anchorKey, double,
+    customPlot->setItemPositioner([](QCPItem* item, double anchorKey, double,
                                      double currentKey, double)
     {
         static_cast<QCPItemSpan*>(item)->setRange(QCPRange(anchorKey, currentKey));
@@ -246,7 +246,7 @@ DOC_SNIPPET(items_creation, 600, 360)
     customPlot->setCreationModeEnabled(true); // or hold Shift on the first click
 
     QObject::connect(customPlot, &QCustomPlot::itemCreated, customPlot,
-                     [](QCPAbstractItem* item)
+                     [](QCPItem* item)
                      { qDebug() << "new span:" << static_cast<QCPItemSpan*>(item)->range().lower; });
     // [/items_creation]
 }

@@ -18,7 +18,7 @@ Q_DECLARE_METATYPE(QCPIntervalEdit)
 template <typename T, typename Self = void>
 class QCPIntervalsOps;
 
-class QCP_LIB_DECL QCPIntervals : public QCPAbstractPlottable, public QCPPlottableInterface1D
+class QCP_LIB_DECL QCPIntervals : public QCPPlottable, public QCPPlottableInterface1D
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPIntervals)
@@ -55,8 +55,8 @@ public:
     void setCategoryNames(const QStringList& names);
     //! (name, colour) of each category the data uses, first seen first.
     [[nodiscard]] std::vector<std::pair<QString, QColor>> legendEntries() const;
-    using QCPAbstractPlottable::addToLegend;
-    using QCPAbstractPlottable::removeFromLegend;
+    using QCPPlottable::addToLegend;
+    using QCPPlottable::removeFromLegend;
     bool addToLegend(QCPLegend* legend) override;
     bool removeFromLegend(QCPLegend* legend) const override;
     [[nodiscard]] QColor categoryColor(int category) const;
@@ -111,7 +111,7 @@ public:
     void setStyle(Style style);
     [[nodiscard]] Style style() const { return mStyle; }
 
-    using QCPAbstractPlottable::hitTest; // the base's recording hit test stays reachable
+    using QCPPlottable::hitTest; // the base's recording hit test stays reachable
     [[nodiscard]] Hit hitTest(const QPointF& pos) const;
     [[nodiscard]] QVector<int> selectedRows() const;
     [[nodiscard]] QVector<qint64> selectedIds() const;

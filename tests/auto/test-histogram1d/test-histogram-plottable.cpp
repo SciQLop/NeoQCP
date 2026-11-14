@@ -20,7 +20,7 @@ struct Probe : QCPHistogram
 {
     using QCPHistogram::QCPHistogram;
     using QCPHistogram::canProduceContent;
-    void paintOn(QCPPainter* painter) { QCPAbstractPlottable::draw(painter); }
+    void paintOn(QCPPainter* painter) { QCPPlottable::draw(painter); }
     [[nodiscard]] const QCPDrawnCore& core() const { return mCore; }
 };
 
@@ -78,7 +78,7 @@ struct Gate
 };
 
 // Blocks every read until the gate opens, so the test controls when a binning job ends.
-class GatedSource final : public QCPAbstractMultiDataSource
+class GatedSource final : public QCPMultiDataSource
 {
 public:
     GatedSource(std::shared_ptr<Src> inner, std::shared_ptr<Gate> gate)

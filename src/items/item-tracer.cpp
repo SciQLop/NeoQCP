@@ -135,7 +135,7 @@
   ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
 */
 QCPItemTracer::QCPItemTracer(QCustomPlot* parentPlot)
-        : QCPAbstractItem(parentPlot)
+        : QCPItem(parentPlot)
         , position(createPosition(QLatin1String("position")))
         , mSize(6)
         , mStyle(tsCrosshair)
@@ -462,7 +462,7 @@ void QCPItemTracer::draw(QCPDrawContext& context) const
 quint64 QCPItemTracer::dependencyRevision() const
 {
     const quint64 graph = mGraph ? qHashMulti(qcpDependencyKey(mGraph.data()), mComponent) : 0;
-    return qHashMulti(graph, QCPAbstractItem::dependencyRevision());
+    return qHashMulti(graph, QCPItem::dependencyRevision());
 }
 
 /*!

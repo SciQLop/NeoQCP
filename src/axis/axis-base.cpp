@@ -392,11 +392,11 @@ void QCPAxisBase::scaleRange(double factor, double center)
 /*!
   Returns the plottables of every system that maps through this axis, in the plot's own order.
 */
-QList<QCPHandle<QCPAbstractPlottable>> QCPAxisBase::plottables() const
+QList<QCPHandle<QCPPlottable>> QCPAxisBase::plottables() const
 {
-    QList<QCPHandle<QCPAbstractPlottable>> result;
-    for (QCPAbstractPlottable* plottable : plottablesRaw())
-        result << QCPHandle<QCPAbstractPlottable>(plottable);
+    QList<QCPHandle<QCPPlottable>> result;
+    for (QCPPlottable* plottable : plottablesRaw())
+        result << QCPHandle<QCPPlottable>(plottable);
     return result;
 }
 
@@ -406,15 +406,15 @@ QList<QCPHandle<QCPAbstractPlottable>> QCPAxisBase::plottables() const
   read this one (K8). One name, one order (M1): a cartesian axis used to hide this with a list of
   its own.
 */
-QList<QCPAbstractPlottable*> QCPAxisBase::plottablesRaw() const
+QList<QCPPlottable*> QCPAxisBase::plottablesRaw() const
 {
-    QList<QCPAbstractPlottable*> result;
+    QList<QCPPlottable*> result;
     if (!mArea)
         return result;
     QCustomPlot* plot = mArea->parentPlot().get();
     if (!plot)
         return result;
-    for (QCPAbstractPlottable* plottable : plot->plottablesRaw())
+    for (QCPPlottable* plottable : plot->plottablesRaw())
         if (QCPCoordinateSystem* system = plottable->systemRaw(); system && system->usesAxis(this))
             result.append(plottable);
     return result;
@@ -425,7 +425,7 @@ QList<QCPAbstractPlottable*> QCPAxisBase::plottablesRaw() const
   drawn data ranges, in this axis' dimension. A constant plottable leaves a zero-size range, which
   recentres the current range instead (see rescaleTo).
 
-  \see QCPAbstractPlottable::rescaleAxes, QCustomPlot::rescaleAxes
+  \see QCPPlottable::rescaleAxes, QCustomPlot::rescaleAxes
 */
 void QCPAxisBase::rescale(bool onlyVisiblePlottables)
 {
@@ -435,7 +435,7 @@ void QCPAxisBase::rescale(bool onlyVisiblePlottables)
         mScaleType == stLogarithmic ? (mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive)
                                     : QCP::sdBoth;
     // Through the virtual list: a user axis that drops a plottable must be honoured (M1).
-    for (const QCPHandle<QCPAbstractPlottable>& plottable : plottables())
+    for (const QCPHandle<QCPPlottable>& plottable : plottables())
     {
         if (!plottable)
             continue;

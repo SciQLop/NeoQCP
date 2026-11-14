@@ -9,7 +9,7 @@ class QCustomPlot;
 template <typename T, typename Self = void>
 class QCPItemRSpanOps;
 
-class QCP_LIB_DECL QCPItemRSpan : public QCPAbstractSpanItem
+class QCP_LIB_DECL QCPItemRSpan : public QCPSpanItem
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPItemRSpan)

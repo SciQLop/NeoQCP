@@ -124,8 +124,8 @@ public:
     std::any& cache() { return mCache; }
 };
 
-class QCPAbstractDataSource;
-class QCPAbstractDataSource2D;
+class QCPDataSource;
+class QCPDataSource2D;
 class QCPColorMapData;
 
 template<typename In, typename Out>
@@ -283,11 +283,11 @@ private:
     ViewportParams mResultViewport;
 };
 
-using QCPColormapPipeline = QCPAsyncPipeline<QCPAbstractDataSource2D, QCPColorMapData>;
-using QCPHistogramPipeline = QCPAsyncPipeline<QCPAbstractDataSource, QCPColorMapData>;
+using QCPColormapPipeline = QCPAsyncPipeline<QCPDataSource2D, QCPColorMapData>;
+using QCPHistogramPipeline = QCPAsyncPipeline<QCPDataSource, QCPColorMapData>;
 
-class QCPAbstractMultiDataSource;
-using QCPGraphPipeline = QCPAsyncPipeline<QCPAbstractMultiDataSource, QCPAbstractMultiDataSource>;
+class QCPMultiDataSource;
+using QCPGraphPipeline = QCPAsyncPipeline<QCPMultiDataSource, QCPMultiDataSource>;
 
 namespace qcp::algo { struct Histogram1D; }
-using QCPHistogram1DPipeline = QCPAsyncPipeline<QCPAbstractMultiDataSource, qcp::algo::Histogram1D>;
+using QCPHistogram1DPipeline = QCPAsyncPipeline<QCPMultiDataSource, qcp::algo::Histogram1D>;

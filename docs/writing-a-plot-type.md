@@ -14,10 +14,10 @@ with a label. It is a complete plot type in 73 lines that only uses public heade
 :language: cpp
 ````
 
-- `RangeBand` derives from `QCPDrawn<QCPAbstractPlottable>`, so it is added to the plot by its
+- `RangeBand` derives from `QCPDrawn<QCPPlottable>`, so it is added to the plot by its
   constructor (`new RangeBand(plot.xAxis, plot.yAxis)`), appears in the legend and can be selected.
-- A drawn item derives from `QCPDrawn<QCPAbstractItem>` instead, and a plottable with a data
-  container from `QCPDrawn<QCPAbstractPlottable1D<MyData>>`. The base class keeps its data and its
+- A drawn item derives from `QCPDrawn<QCPItem>` instead, and a plottable with a data
+  container from `QCPDrawn<QCPPlottable1D<MyData>>`. The base class keeps its data and its
   ranges; the adapter only answers the drawing virtuals (one exception: the value range ignores its
   key window, see [Ranges](#ranges-hit-tests-and-the-legend-icon)).
 - `draw()` is `const` and runs only when the recording is stale. It must not change the object.

@@ -160,7 +160,7 @@ protected:
   rendering artifacts and potential data loss.
 
   Implementing one-dimensional plottables that make use of a \ref QCPDataContainer<T> is usually
-  done by subclassing from \ref QCPAbstractPlottable1D "QCPAbstractPlottable1D<T>", which
+  done by subclassing from \ref QCPPlottable1D "QCPPlottable1D<T>", which
   introduces an according \a mDataContainer member and some convenience methods.
 
   \section qcpdatacontainer-datatype Requirements for the DataType template parameter

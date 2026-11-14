@@ -71,7 +71,7 @@ int lowerBoundRaw(const double* x, int begin, int end, double value)
     return lo;
 }
 
-int lowerBoundVirtual(const QCPAbstractDataSource2D& src, int begin, int end, double value)
+int lowerBoundVirtual(const QCPDataSource2D& src, int begin, int end, double value)
 {
     int lo = begin, hi = end;
     while (lo < hi)
@@ -132,7 +132,7 @@ struct RawAccessor
 
 struct VirtualAccessor
 {
-    const QCPAbstractDataSource2D& src;
+    const QCPDataSource2D& src;
     int ys;
     bool yIs2D;
 
@@ -421,7 +421,7 @@ void resampleImpl(
 } // anonymous namespace
 
 QCPColorMapData* resample(
-    const QCPAbstractDataSource2D& src,
+    const QCPDataSource2D& src,
     int xBegin, int xEnd,
     const QCPRange& xRange, const QCPRange& yRange,
     int targetWidth, int targetHeight,

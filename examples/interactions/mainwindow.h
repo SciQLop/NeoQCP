@@ -23,14 +23,14 @@ protected:
 private slots:
   void titleDoubleClick(QMouseEvent *event);
   void axisLabelDoubleClick(QCPAxis* axis, QCPAxis::SelectablePart part);
-  void legendDoubleClick(QCPLegend* legend, QCPAbstractLegendItem* item);
+  void legendDoubleClick(QCPLegend* legend, QCPLegendItem* item);
   void selectionChanged();
   void addRandomGraph();
   void removeSelectedGraph();
   void removeAllGraphs();
   void contextMenuRequest(QPoint pos);
   void moveLegend();
-  void graphClicked(QCPAbstractPlottable *plottable, int dataIndex);
+  void graphClicked(QCPPlottable *plottable, int dataIndex);
   
 private:
   void limitDragToSelectedAxis();

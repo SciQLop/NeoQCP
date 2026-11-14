@@ -248,7 +248,7 @@ QList<QCPPolarGraph*> QCPPolarArea::graphs() const
     QList<QCPPolarGraph*> result;
     if (!mParentPlot)
         return result;
-    for (QCPAbstractPlottable* plottable : mParentPlot->plottablesRaw())
+    for (QCPPlottable* plottable : mParentPlot->plottablesRaw())
         if (auto* graph = qobject_cast<QCPPolarGraph*>(plottable))
             if (graph->system() && graph->system()->area() == this)
                 result.append(graph);
@@ -368,7 +368,7 @@ void QCPPolarArea::markAffectedLayersDirty(bool invalidate)
         return;
     // The plottables of this area's systems draw in the disc too, wherever their layer sits: the
     // same one-pass selection by system the axis rect uses.
-    for (QCPAbstractPlottable* plottable : mParentPlot->plottablesRaw())
+    for (QCPPlottable* plottable : mParentPlot->plottablesRaw())
     {
         if (QCPCoordinateSystem* system = plottable->systemRaw();
             system && system->areaRaw() == this)

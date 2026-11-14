@@ -39,9 +39,9 @@
 namespace
 {
 // A snapshot that goes null when a slot deletes one of the users mid-loop.
-QList<QPointer<QCPAbstractColorMapped>> liveUsers(const QList<QCPAbstractColorMapped*>& users)
+QList<QPointer<QCPColorMapped>> liveUsers(const QList<QCPColorMapped*>& users)
 {
-    QList<QPointer<QCPAbstractColorMapped>> result;
+    QList<QPointer<QCPColorMapped>> result;
     result.reserve(users.size());
     for (auto* user : users)
         result.append(user);
@@ -539,11 +539,11 @@ QList<QCPHandle<QCPColorMap>> QCPColorScale::colorMaps() const
     return result;
 }
 
-QList<QCPHandle<QCPAbstractColorMapped>> QCPColorScale::users() const
+QList<QCPHandle<QCPColorMapped>> QCPColorScale::users() const
 {
-    QList<QCPHandle<QCPAbstractColorMapped>> result;
-    for (QCPAbstractColorMapped* user : mUsers)
-        result.append(QCPHandle<QCPAbstractColorMapped>(user));
+    QList<QCPHandle<QCPColorMapped>> result;
+    for (QCPColorMapped* user : mUsers)
+        result.append(QCPHandle<QCPColorMapped>(user));
     return result;
 }
 

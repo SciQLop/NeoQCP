@@ -105,14 +105,14 @@ QCPLayer* layerAbove(QCustomPlot* plot, QCPLayer* base)
 
 QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* layout,
                            QCP::Capabilities required)
-        : QCPAbstractPlottable(keyAxis, valueAxis, required), mLayout(layout)
+        : QCPPlottable(keyAxis, valueAxis, required), mLayout(layout)
 {
     setSelectable(QCP::stMultipleDataRanges);
     // The base constructor auto-added a plain legend item (our addToLegend override was not
     // in place yet): swap in the category list. A refused object has no system and no row to swap.
     if (mSystem && mParentPlot && mParentPlot->autoAddPlottableToLegend() && mParentPlot->legend)
     {
-        QCPAbstractPlottable::removeFromLegend(mParentPlot->legend);
+        QCPPlottable::removeFromLegend(mParentPlot->legend);
         addToLegend(mParentPlot->legend);
     }
     if (hasLaneLayout())
@@ -120,7 +120,7 @@ QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* 
             regroupIfLanesWereAdded();
             markDirty();
         });
-    connect(this, &QCPAbstractPlottable::selectionChanged, this, &QCPIntervals::markLayersDirty);
+    connect(this, &QCPPlottable::selectionChanged, this, &QCPIntervals::markLayersDirty);
     if (!mParentPlot || !mSystem)
         return; // inert (null axis or a refused system): no plot-side label layer
     mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
@@ -423,7 +423,7 @@ double QCPIntervals::selectTest(const QPointF& pos, bool onlySelectable, QVarian
 
 bool QCPIntervals::siblingHasBarAt(const QPointF& pos) const
 {
-    for (QCPAbstractPlottable* plottable : mParentPlot->plottablesRaw())
+    for (QCPPlottable* plottable : mParentPlot->plottablesRaw())
         if (auto* other = qobject_cast<QCPIntervals*>(plottable);
             other && other != this && other->mLayout == mLayout && other->realVisibility()
             && other->hitTest(pos).row >= 0)
@@ -464,7 +464,7 @@ void QCPIntervals::deselectEvent(bool* selectionStateChanged)
 void QCPIntervals::emitSelectionChanged()
 {
     const QCPEmissionScope scope(mParentPlot);
-    QCPAbstractPlottable::emitSelectionChanged();
+    QCPPlottable::emitSelectionChanged();
     QVector<int> rows = selectedRows();
     if (rows == mNotifiedRows)
         return;
@@ -1312,7 +1312,7 @@ bool QCPIntervals::drawsLaneNames() const
 {
     if (!mLayout || mLayout->placement() != QCPLaneLayout::plStrip)
         return false;
-    for (QCPAbstractPlottable* plottable : mParentPlot->plottablesRaw())
+    for (QCPPlottable* plottable : mParentPlot->plottablesRaw())
         if (auto* other = qobject_cast<QCPIntervals*>(plottable);
             other && other->mLayout == mLayout && other->realVisibility())
             return other == this;

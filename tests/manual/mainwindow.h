@@ -66,7 +66,7 @@ public:
   void presetInteractive(QCustomPlot *customPlot);
   
   // helpers:
-  void labelItemAnchors(QCPAbstractItem *item, int fontSize=8, bool circle=true, bool labelBelow=true);
+  void labelItemAnchors(QCPItem *item, int fontSize=8, bool circle=true, bool labelBelow=true);
   void showSelectTestColorMap(QCustomPlot *customPlot);
   
   // special use cases test:

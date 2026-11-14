@@ -79,9 +79,9 @@ constexpr double kDefaultGapThreshold = 1.5;
 
 // Non-templated abstract base class for all data sources.
 // QCPHistogram2D holds a pointer to this; virtual dispatch happens once per binning.
-class QCPAbstractDataSource {
+class QCPDataSource {
 public:
-    virtual ~QCPAbstractDataSource() = default;
+    virtual ~QCPDataSource() = default;
 
     virtual int size() const = 0;
     virtual bool empty() const { return size() == 0; }

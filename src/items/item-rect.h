@@ -35,7 +35,7 @@ class QCustomPlot;
 template <typename T, typename Self = void>
 class QCPItemRectOps;
 
-class QCP_LIB_DECL QCPItemRect : public QCPAbstractItem
+class QCP_LIB_DECL QCPItemRect : public QCPItem
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPItemRect)
@@ -72,7 +72,7 @@ public:
     // reimplemented virtual methods:
     void draw(QCPDrawContext& context) const override;
 
-    // what the layer's index needs; see QCPAbstractItem::dataExtent()
+    // what the layer's index needs; see QCPItem::dataExtent()
     [[nodiscard]] std::optional<QCPItemExtent> dataExtent() const override;
 
     QCPItemPosition* const topLeft;

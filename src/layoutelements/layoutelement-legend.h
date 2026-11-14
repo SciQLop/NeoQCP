@@ -33,10 +33,10 @@
 
 class QCPPainter;
 class QCustomPlot;
-class QCPAbstractPlottable;
+class QCPPlottable;
 class QCPLegend;
 
-class QCP_LIB_DECL QCPAbstractLegendItem : public QCPLayoutElement
+class QCP_LIB_DECL QCPLegendItem : public QCPLayoutElement
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
@@ -52,7 +52,7 @@ class QCP_LIB_DECL QCPAbstractLegendItem : public QCPLayoutElement
     /// \endcond
 
 public:
-    explicit QCPAbstractLegendItem(QCPLegend* parent);
+    explicit QCPLegendItem(QCPLegend* parent);
 
     // getters:
     QCPHandle<QCPLegend> parentLegend() const;
@@ -100,8 +100,8 @@ protected:
     //! The busy symbol is part of this item, but the plottable's own layer is not the
     //! legend's: repaint the legend layer when the symbol shows or hides. This only marks
     //! the layer dirty; the replot that paints it (and re-lays out the wider legend) is the
-    //! one QCPAbstractPlottable::onDebounceTimeout queues right after visuallyBusyChanged.
-    void repaintWhenBusyChanges(QCPAbstractPlottable* plottable);
+    //! one QCPPlottable::onDebounceTimeout queues right after visuallyBusyChanged.
+    void repaintWhenBusyChanges(QCPPlottable* plottable);
     //! A row about \a subject has nothing left to show once it is gone: it leaves its legend.
     void leaveLegendWhenDestroyed(QObject* subject);
 
@@ -126,25 +126,25 @@ protected:
     virtual void deselectEvent(bool* selectionStateChanged) override;
 
 private:
-    Q_DISABLE_COPY_MOVE(QCPAbstractLegendItem)
+    Q_DISABLE_COPY_MOVE(QCPLegendItem)
 
     friend class QCPLegend;
 };
 
-class QCP_LIB_DECL QCPPlottableLegendItem : public QCPAbstractLegendItem
+class QCP_LIB_DECL QCPPlottableLegendItem : public QCPLegendItem
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPPlottableLegendItem)
 
 public:
-    QCPPlottableLegendItem(QCPLegend* parent, QCPAbstractPlottable* plottable);
+    QCPPlottableLegendItem(QCPLegend* parent, QCPPlottable* plottable);
 
     // getters:
-    QCPHandle<QCPAbstractPlottable> plottable();
+    QCPHandle<QCPPlottable> plottable();
 
 protected:
     // property members:
-    QPointer<QCPAbstractPlottable> mPlottable;
+    QPointer<QCPPlottable> mPlottable;
 
     // reimplemented virtual methods:
     virtual void draw(QCPPainter* painter) override;
@@ -156,10 +156,10 @@ protected:
 
 private:
     // Raw, for the walks over every row (K8: no handle per row).
-    [[nodiscard]] QCPAbstractPlottable* plottableRaw() const { return mPlottable.data(); }
+    [[nodiscard]] QCPPlottable* plottableRaw() const { return mPlottable.data(); }
 
     friend class QCPLegend;
-    friend class QCPAbstractPlottable;
+    friend class QCPPlottable;
 };
 
 template <typename T, typename Self = void>
@@ -276,18 +276,18 @@ public:
                               QVariant* details = nullptr) const override;
 
     // non-virtual methods:
-    QCPHandle<QCPAbstractLegendItem> item(int index) const;
-    QCPHandle<QCPPlottableLegendItem> itemWithPlottable(const QCPAbstractPlottable* plottable) const;
+    QCPHandle<QCPLegendItem> item(int index) const;
+    QCPHandle<QCPPlottableLegendItem> itemWithPlottable(const QCPPlottable* plottable) const;
     int itemCount() const;
-    bool hasItem(QCPAbstractLegendItem* item) const;
-    bool hasItemWithPlottable(const QCPAbstractPlottable* plottable) const;
-    Q_INVOKABLE bool addItem(QCPAbstractLegendItem* item);
+    bool hasItem(QCPLegendItem* item) const;
+    bool hasItemWithPlottable(const QCPPlottable* plottable) const;
+    Q_INVOKABLE bool addItem(QCPLegendItem* item);
     // An item leaving can take the last selected one with it: selectedParts may move.
     QCPLayoutElement* takeAt(int index) override;
     Q_INVOKABLE bool removeItem(int index);
-    bool removeItem(QCPAbstractLegendItem* item);
+    bool removeItem(QCPLegendItem* item);
     Q_INVOKABLE void clearItems();
-    QList<QCPHandle<QCPAbstractLegendItem>> selectedItems() const;
+    QList<QCPHandle<QCPLegendItem>> selectedItems() const;
 
 signals:
     void selectionChanged();
@@ -341,11 +341,11 @@ private:
     bool mApplyingSelection = false; // setSelectedParts deselects the items and signals once
 
     // The rows raw: the legend's own setters and selection passes loop over them (K8).
-    QCPAbstractLegendItem* itemRaw(int index) const;
+    QCPLegendItem* itemRaw(int index) const;
 
     friend class QCustomPlot;
-    friend class QCPAbstractLegendItem;
-    friend class QCPAbstractPlottable; // walks the rows raw when a name change marks them
+    friend class QCPLegendItem;
+    friend class QCPPlottable; // walks the rows raw when a name change marks them
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPLegend::SelectableParts)
 

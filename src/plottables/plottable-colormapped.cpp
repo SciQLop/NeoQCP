@@ -3,9 +3,9 @@
 #include <core.h>
 #include <layoutelements/layoutelement-colorscale.h>
 
-QCPAbstractColorMapped::QCPAbstractColorMapped(QCPAxis* keyAxis, QCPAxis* valueAxis,
+QCPColorMapped::QCPColorMapped(QCPAxis* keyAxis, QCPAxis* valueAxis,
                                                bool transparentNan, QCP::Capabilities required)
-        : QCPAbstractPlottable(keyAxis, valueAxis, required)
+        : QCPPlottable(keyAxis, valueAxis, required)
         , mDataScaleType(QCPAxis::stLinear)
         , mGradient(QCPColorGradient::gpCold)
 {
@@ -13,7 +13,7 @@ QCPAbstractColorMapped::QCPAbstractColorMapped(QCPAxis* keyAxis, QCPAxis* valueA
         mGradient.setNanHandling(QCPColorGradient::nhTransparent);
 }
 
-QCPAbstractColorMapped::~QCPAbstractColorMapped()
+QCPColorMapped::~QCPColorMapped()
 {
     const QPointer<QCPColorScale> scale(mColorScale);
     if (mColorScale)
@@ -22,7 +22,7 @@ QCPAbstractColorMapped::~QCPAbstractColorMapped()
         scale->usersChanged();
 }
 
-void QCPAbstractColorMapped::setDataRange(const QCPRange& dataRange)
+void QCPColorMapped::setDataRange(const QCPRange& dataRange)
 {
     if (!QCPRange::validRange(dataRange))
         return;
@@ -33,56 +33,56 @@ void QCPAbstractColorMapped::setDataRange(const QCPRange& dataRange)
     }
     // The plottable's own signal comes first, as it did when the two were wired together; a slot
     // may delete this plottable, and then the scale never hears of the change.
-    const QPointer<QCPAbstractColorMapped> alive(this);
+    const QPointer<QCPColorMapped> alive(this);
     applyDataRange(dataRange);
     if (alive && mColorScale)
         mColorScale->setDataRange(mDataRange);
 }
 
-void QCPAbstractColorMapped::setDataScaleType(QCPAxis::ScaleType scaleType)
+void QCPColorMapped::setDataScaleType(QCPAxis::ScaleType scaleType)
 {
     if (!mColorScale)
     {
         applyDataScaleType(scaleType);
         return;
     }
-    const QPointer<QCPAbstractColorMapped> alive(this);
+    const QPointer<QCPColorMapped> alive(this);
     applyDataScaleType(scaleType);
     if (alive && mColorScale)
         mColorScale->setDataScaleType(mDataScaleType);
 }
 
-void QCPAbstractColorMapped::setGradient(const QCPColorGradient& gradient)
+void QCPColorMapped::setGradient(const QCPColorGradient& gradient)
 {
     if (!mColorScale)
     {
         applyGradient(gradient);
         return;
     }
-    const QPointer<QCPAbstractColorMapped> alive(this);
+    const QPointer<QCPColorMapped> alive(this);
     applyGradient(gradient);
     if (alive && mColorScale)
         mColorScale->setGradient(mGradient);
 }
 
-void QCPAbstractColorMapped::setColorScale(QCPColorScale* colorScale)
+void QCPColorMapped::setColorScale(QCPColorScale* colorScale)
 {
     mScaleChoice = colorScale ? ScaleChoice::User : ScaleChoice::None;
     attachColorScale(colorScale);
 }
 
-void QCPAbstractColorMapped::leaveRectScale()
+void QCPColorMapped::leaveRectScale()
 {
     if (mScaleChoice == ScaleChoice::Rect)
         attachColorScale(nullptr);
 }
 
-bool QCPAbstractColorMapped::hasUserColorScale() const
+bool QCPColorMapped::hasUserColorScale() const
 {
     return mScaleChoice == ScaleChoice::User && mColorScale;
 }
 
-void QCPAbstractColorMapped::attachColorScale(QCPColorScale* colorScale)
+void QCPColorMapped::attachColorScale(QCPColorScale* colorScale)
 {
     if (mColorScale == colorScale)
         return;
@@ -95,14 +95,14 @@ void QCPAbstractColorMapped::attachColorScale(QCPColorScale* colorScale)
         previous->usersChanged(); // a scale nobody uses takes no room
     if (!colorScale)
     {
-        qcpEmit(this, mParentPlot, &QCPAbstractColorMapped::colorScaleChanged);
+        qcpEmit(this, mParentPlot, &QCPColorMapped::colorScaleChanged);
         return;
     }
     colorScale->mUsers.append(this);
     colorScale->usersChanged();
 
     // Each setter signals, and a slot may delete this plottable or the scale.
-    const QPointer<QCPAbstractColorMapped> alive(this);
+    const QPointer<QCPColorMapped> alive(this);
     const QPointer<QCPColorScale> live(colorScale);
     applyGradient(colorScale->gradient());
     if (alive && live)
@@ -111,10 +111,10 @@ void QCPAbstractColorMapped::attachColorScale(QCPColorScale* colorScale)
         applyDataScaleType(colorScale->dataScaleType());
     if (!alive || !live)
         return;
-    qcpEmit(this, mParentPlot, &QCPAbstractColorMapped::colorScaleChanged);
+    qcpEmit(this, mParentPlot, &QCPColorMapped::colorScaleChanged);
 }
 
-void QCPAbstractColorMapped::rescaleDataRange(bool)
+void QCPColorMapped::rescaleDataRange(bool)
 {
     bool found = false;
     const QCPRange range = colorDataBounds(found);
@@ -122,7 +122,7 @@ void QCPAbstractColorMapped::rescaleDataRange(bool)
         setDataRange(range);
 }
 
-void QCPAbstractColorMapped::applyDataRange(const QCPRange& dataRange)
+void QCPColorMapped::applyDataRange(const QCPRange& dataRange)
 {
     const QCPRange range = (mDataScaleType == QCPAxis::stLogarithmic)
         ? dataRange.sanitizedForLogScale()
@@ -131,40 +131,40 @@ void QCPAbstractColorMapped::applyDataRange(const QCPRange& dataRange)
         return;
     mDataRange = range;
     colorMappingChanged();
-    qcpEmit(this, mParentPlot, &QCPAbstractColorMapped::dataRangeChanged, mDataRange);
+    qcpEmit(this, mParentPlot, &QCPColorMapped::dataRangeChanged, mDataRange);
 }
 
-void QCPAbstractColorMapped::applyDataScaleType(QCPAxis::ScaleType scaleType)
+void QCPColorMapped::applyDataScaleType(QCPAxis::ScaleType scaleType)
 {
     if (mDataScaleType == scaleType)
         return;
     mDataScaleType = scaleType;
     // Handing the type to a renderer may start a pipeline job whose slot deletes this plottable.
-    const QPointer<QCPAbstractColorMapped> alive(this);
+    const QPointer<QCPColorMapped> alive(this);
     colorMappingChanged();
     if (!alive)
         return;
     const QCPEmissionScope scope(mParentPlot);
-    qcpEmit(this, mParentPlot, &QCPAbstractColorMapped::dataScaleTypeChanged, mDataScaleType);
+    qcpEmit(this, mParentPlot, &QCPColorMapped::dataScaleTypeChanged, mDataScaleType);
     if (mDataScaleType == QCPAxis::stLogarithmic)
         applyDataRange(mDataRange.sanitizedForLogScale());
 }
 
-void QCPAbstractColorMapped::applyGradient(const QCPColorGradient& gradient)
+void QCPColorMapped::applyGradient(const QCPColorGradient& gradient)
 {
     if (mGradient == gradient)
         return;
     mGradient = gradient;
     colorMappingChanged();
-    qcpEmit(this, mParentPlot, &QCPAbstractColorMapped::gradientChanged, mGradient);
+    qcpEmit(this, mParentPlot, &QCPColorMapped::gradientChanged, mGradient);
 }
 
-void QCPAbstractColorMapped::setSystem(QCPCoordinateSystem* system)
+void QCPColorMapped::setSystem(QCPCoordinateSystem* system)
 {
     // The system's signals wait for the join below: a slot may delete this plottable.
     const QCPEmissionScope scope(mParentPlot);
     const bool follows = mScaleChoice == ScaleChoice::Rect && mColorScale;
-    QCPAbstractPlottable::setSystem(system);
+    QCPPlottable::setSystem(system);
     if (!follows || !system || mSystem != system)
         return;
     // The scale belonged to the rect it left: an area that is not an axis rect has none to give.
@@ -174,15 +174,15 @@ void QCPAbstractColorMapped::setSystem(QCPCoordinateSystem* system)
         attachColorScale(nullptr);
 }
 
-void QCPAbstractColorMapped::detachColorScale()
+void QCPColorMapped::detachColorScale()
 {
     if (!mColorScale)
         return;
     mColorScale = nullptr;
-    qcpEmit(this, mParentPlot, &QCPAbstractColorMapped::colorScaleChanged);
+    qcpEmit(this, mParentPlot, &QCPColorMapped::colorScaleChanged);
 }
 
-void QCPAbstractColorMapped::followKeyAxisRectScale()
+void QCPColorMapped::followKeyAxisRectScale()
 {
     if (mScaleChoice != ScaleChoice::Rect)
         return;
@@ -202,7 +202,7 @@ void QCPAbstractColorMapped::followKeyAxisRectScale()
     // plottable's own defaults (such as transparent NaN) are not silently dropped. A plottable
     // with no range of its own yet leaves the scale's own default range alone.
     // The scale setters and setColorScale() signal, and a slot may delete this plottable.
-    const QPointer<QCPAbstractColorMapped> alive(this);
+    const QPointer<QCPColorMapped> alive(this);
     if (madeHere)
     {
         scale->setGradient(mGradient);

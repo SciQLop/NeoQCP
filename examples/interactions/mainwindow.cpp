@@ -45,11 +45,11 @@ MainWindow::MainWindow(QWidget *parent) :
   
   // connect some interaction slots:
   connect(ui->customPlot, SIGNAL(axisDoubleClick(QCPAxis*,QCPAxis::SelectablePart,QMouseEvent*)), this, SLOT(axisLabelDoubleClick(QCPAxis*,QCPAxis::SelectablePart)));
-  connect(ui->customPlot, SIGNAL(legendDoubleClick(QCPLegend*,QCPAbstractLegendItem*,QMouseEvent*)), this, SLOT(legendDoubleClick(QCPLegend*,QCPAbstractLegendItem*)));
+  connect(ui->customPlot, SIGNAL(legendDoubleClick(QCPLegend*,QCPLegendItem*,QMouseEvent*)), this, SLOT(legendDoubleClick(QCPLegend*,QCPLegendItem*)));
   connect(title, SIGNAL(doubleClicked(QMouseEvent*)), this, SLOT(titleDoubleClick(QMouseEvent*)));
   
   // connect slot that shows a message in the status bar when a graph is clicked:
-  connect(ui->customPlot, SIGNAL(plottableClick(QCPAbstractPlottable*,int,QMouseEvent*)), this, SLOT(graphClicked(QCPAbstractPlottable*,int)));
+  connect(ui->customPlot, SIGNAL(plottableClick(QCPPlottable*,int,QMouseEvent*)), this, SLOT(graphClicked(QCPPlottable*,int)));
   
   // setup policy and connect slot for context menu popup:
   ui->customPlot->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -92,7 +92,7 @@ void MainWindow::axisLabelDoubleClick(QCPAxis *axis, QCPAxis::SelectablePart par
   }
 }
 
-void MainWindow::legendDoubleClick(QCPLegend *legend, QCPAbstractLegendItem *item)
+void MainWindow::legendDoubleClick(QCPLegend *legend, QCPLegendItem *item)
 {
   // Rename a graph by double clicking on its legend item
   Q_UNUSED(legend)
@@ -271,7 +271,7 @@ void MainWindow::moveLegend()
   }
 }
 
-void MainWindow::graphClicked(QCPAbstractPlottable *plottable, int dataIndex)
+void MainWindow::graphClicked(QCPPlottable *plottable, int dataIndex)
 {
   // since we know we only have QCPGraphs in the plot, we can immediately access interface1D()
   // usually it's better to first check whether interface1D() returns non-zero, and only then use it.

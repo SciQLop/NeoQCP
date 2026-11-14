@@ -53,10 +53,10 @@ classDiagram
 Four concrete type aliases are used:
 
 ```cpp
-using QCPGraphPipeline = QCPAsyncPipeline<QCPAbstractMultiDataSource, QCPAbstractMultiDataSource>;
-using QCPColormapPipeline = QCPAsyncPipeline<QCPAbstractDataSource2D, QCPColorMapData>;
-using QCPHistogramPipeline = QCPAsyncPipeline<QCPAbstractDataSource, QCPColorMapData>;
-using QCPHistogram1DPipeline = QCPAsyncPipeline<QCPAbstractMultiDataSource, qcp::algo::Histogram1D>;
+using QCPGraphPipeline = QCPAsyncPipeline<QCPMultiDataSource, QCPMultiDataSource>;
+using QCPColormapPipeline = QCPAsyncPipeline<QCPDataSource2D, QCPColorMapData>;
+using QCPHistogramPipeline = QCPAsyncPipeline<QCPDataSource, QCPColorMapData>;
+using QCPHistogram1DPipeline = QCPAsyncPipeline<QCPMultiDataSource, qcp::algo::Histogram1D>;
 ```
 
 ## Pipeline Scheduler
@@ -123,7 +123,7 @@ When nothing is left running or pending, `mDisplayedGeneration` catches up with 
 
 `isBusy()` is true while `mGeneration > mDisplayedGeneration`, that is, while a requested result has not arrived. The pipeline emits `busyChanged(bool)` on each transition.
 
-The plottable combines it with its own state in `QCPAbstractPlottable::busy()`: pipeline busy, data staged for a deferred swap (see {doc}`../performance`), or `setBusy(true)` from the application. `busyChanged()` on the plottable fires on every change; `visuallyBusyChanged()` follows after the theme's show/hide delays and drives the faded drawing and the legend's busy symbol.
+The plottable combines it with its own state in `QCPPlottable::busy()`: pipeline busy, data staged for a deferred swap (see {doc}`../performance`), or `setBusy(true)` from the application. `busyChanged()` on the plottable fires on every change; `visuallyBusyChanged()` follows after the theme's show/hide delays and drives the faded drawing and the legend's busy symbol.
 
 ## Request Coalescing
 

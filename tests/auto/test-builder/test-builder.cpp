@@ -348,7 +348,7 @@ void TestBuilder::setterSlotDeletesInsideTheSetter()
 {
     QCustomPlot plot;
     auto g = plot.add<QCPGraph>(kKeys, kValues);
-    connect(g.get(), &QCPAbstractPlottable::selectionChanged, &plot,
+    connect(g.get(), &QCPPlottable::selectionChanged, &plot,
             [g]() mutable { g.remove(); });
     auto after = g.with([](QCPGraph& graph) { graph.setSelection(QCPDataSelection(QCPDataRange(0, 1))); })
                      .setName("gone");
@@ -615,7 +615,7 @@ void TestBuilder::addOnAnArea()
     QCPGraph* second = rect->add<QCPGraph>(rect->axis(QCPAxis::atBottom), right).get();
     QCOMPARE(second->valueAxis(), right);
     QVERIFY(second->system() != graph->system());
-    QCOMPARE(qcp::pointers(rect->plottables()), (QList<QCPAbstractPlottable*> { graph, second }));
+    QCOMPARE(qcp::pointers(rect->plottables()), (QList<QCPPlottable*> { graph, second }));
     QCOMPARE(gMisuses, 0);
 }
 

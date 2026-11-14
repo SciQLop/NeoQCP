@@ -17,7 +17,7 @@
 template <typename T, typename Self = void>
 class QCPHistogramOps;
 
-class QCP_LIB_DECL QCPHistogram : public QCPAbstractPlottable
+class QCP_LIB_DECL QCPHistogram : public QCPPlottable
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPHistogram)
@@ -40,7 +40,7 @@ public:
     explicit QCPHistogram(QCPAxis* keyAxis, QCPAxis* valueAxis);
     ~QCPHistogram() override;
 
-    void setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source);
+    void setDataSource(std::shared_ptr<QCPMultiDataSource> source);
     //! Bars with the given edges; heights[c] has edges.size() - 1 entries for every column.
     void setBinned(std::vector<double> edges, std::vector<std::vector<double>> heights);
     void setBins(int bins);
@@ -94,7 +94,7 @@ protected:
 private:
     void followKeyAxis();
     QMetaObject::Connection mKeyScaleLink;
-    std::shared_ptr<QCPAbstractMultiDataSource> mDataSource;
+    std::shared_ptr<QCPMultiDataSource> mDataSource;
     std::shared_ptr<qcp::algo::Histogram1D> mResult;
     std::optional<QCPRange> mFixedRange, mAutoRange;
     int mBins = 64;
@@ -147,7 +147,7 @@ public:
     using typename Base::Ret;
     using Base::Base;
 
-    Ret setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
+    Ret setDataSource(std::shared_ptr<QCPMultiDataSource> source)
     {
         return this->apply([&](T& o) { o.setDataSource(std::move(source)); });
     }

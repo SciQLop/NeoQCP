@@ -146,7 +146,7 @@ inline MultiColumnBinResult orderColumnsByTrend(MultiColumnBinResult bins)
 }
 
 inline MultiColumnBinResult binMinMaxMulti(
-    const QCPAbstractMultiDataSource& src,
+    const QCPMultiDataSource& src,
     int begin, int end,
     const QCPRange& keyRange,
     int numBins, bool withOrigin = false);
@@ -157,7 +157,7 @@ namespace detail {
 // source row of each into origin. bins[i] is the output bin of row first + i, -1 to skip it.
 // Rows outer, columns inner: a row-major (N, k) array is then read once instead of k times.
 template <bool WithOrigin>
-inline void binRowsMinMax(const QCPAbstractMultiDataSource& src, int first,
+inline void binRowsMinMax(const QCPMultiDataSource& src, int first,
                           const std::vector<int>& bins, double* out,
                           [[maybe_unused]] int* origin, int stride)
 {
@@ -199,7 +199,7 @@ inline void binRowsMinMax(const QCPAbstractMultiDataSource& src, int first,
 
 // binRatio[b]: the largest keyStepRatio of the rows of bin b (see binRowsMinMax for bins),
 // left at -1 for a bin without rows.
-inline void foldRowStepRatios(const QCPAbstractMultiDataSource& src, int first,
+inline void foldRowStepRatios(const QCPMultiDataSource& src, int first,
                               const std::vector<int>& bins, float* binRatio)
 {
     const double* rawKeys = src.rawKeyData();
@@ -230,7 +230,7 @@ inline void setGapRatios(MultiColumnBinResult& out, const std::vector<float>& bi
 
 template <bool WithOrigin>
 inline MultiColumnBinResult binMinMaxMultiImpl(
-    const QCPAbstractMultiDataSource& src,
+    const QCPMultiDataSource& src,
     int begin, int end,
     const QCPRange& keyRange,
     int numBins)
@@ -281,7 +281,7 @@ inline MultiColumnBinResult binMinMaxMultiImpl(
 
 template <bool WithOrigin>
 inline MultiColumnBinResult binMinMaxMultiParallelImpl(
-    const QCPAbstractMultiDataSource& src,
+    const QCPMultiDataSource& src,
     int begin, int end,
     const QCPRange& keyRange,
     int numBins)
@@ -366,7 +366,7 @@ inline MultiColumnBinResult binMinMaxMultiParallelImpl(
 } // namespace detail
 
 inline MultiColumnBinResult binMinMaxMulti(
-    const QCPAbstractMultiDataSource& src,
+    const QCPMultiDataSource& src,
     int begin, int end,
     const QCPRange& keyRange,
     int numBins, bool withOrigin)
@@ -376,7 +376,7 @@ inline MultiColumnBinResult binMinMaxMulti(
 }
 
 inline MultiColumnBinResult binMinMaxMultiParallel(
-    const QCPAbstractMultiDataSource& src,
+    const QCPMultiDataSource& src,
     int begin, int end,
     const QCPRange& keyRange,
     int numBins, bool withOrigin = false)
@@ -465,8 +465,8 @@ inline RowRange rawRowsInView(const Source& raw, const QCPRange& keyRange)
 
 // L1 build for multi-column sources — heavy, meant for async pipeline.
 // Stores the L1 cache in the std::any; returns nullptr (L2 is done synchronously).
-inline std::shared_ptr<QCPAbstractMultiDataSource> buildL1Cache(
-    const QCPAbstractMultiDataSource& src,
+inline std::shared_ptr<QCPMultiDataSource> buildL1Cache(
+    const QCPMultiDataSource& src,
     const ViewportParams& /*vp*/,
     std::any& cache, bool withOrigin = false)
 {

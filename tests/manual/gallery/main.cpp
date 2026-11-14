@@ -96,8 +96,8 @@ static QWidget* createSpansTab()
 
     // delete support for all spans
     for (int i = 0; i < plot->itemCount(); ++i) {
-        QCPAbstractItem* item = plot->item(i);
-        QObject::connect(item, &QCPAbstractItem::deleteRequested, plot, [plot, item]() {
+        QCPItem* item = plot->item(i);
+        QObject::connect(item, &QCPItem::deleteRequested, plot, [plot, item]() {
             plot->removeItem(item);
             plot->replot();
         });
@@ -143,8 +143,8 @@ static QWidget* createSpansTab()
     // Wire up creator and positioner based on combo selection
     auto updateCreator = [plot, typeCombo]() {
         int type = typeCombo->currentData().toInt();
-        plot->setItemCreator([plot, type](QCustomPlot* p, QCPAxis*, QCPAxis*) -> QCPAbstractItem* {
-            QCPAbstractItem* item = nullptr;
+        plot->setItemCreator([plot, type](QCustomPlot* p, QCPAxis*, QCPAxis*) -> QCPItem* {
+            QCPItem* item = nullptr;
             if (type == 0) {
                 auto* s = new QCPItemSpan(p, Qt::Vertical);
                 s->setBrush(QBrush(QColor(0, 100, 255, 50)));
@@ -161,22 +161,22 @@ static QWidget* createSpansTab()
                 s->setBorderPen(QPen(QColor(0, 180, 0), 2));
                 item = s;
             }
-            QObject::connect(item, &QCPAbstractItem::deleteRequested, plot, [plot, item]() {
+            QObject::connect(item, &QCPItem::deleteRequested, plot, [plot, item]() {
                 plot->removeItem(item);
                 plot->replot();
             });
             return item;
         });
         if (type == 0) {
-            plot->setItemPositioner([](QCPAbstractItem* item, double ak, double, double ck, double) {
+            plot->setItemPositioner([](QCPItem* item, double ak, double, double ck, double) {
                 static_cast<QCPItemSpan*>(item)->setRange(QCPRange(ak, ck));
             });
         } else if (type == 1) {
-            plot->setItemPositioner([](QCPAbstractItem* item, double, double av, double, double cv) {
+            plot->setItemPositioner([](QCPItem* item, double, double av, double, double cv) {
                 static_cast<QCPItemSpan*>(item)->setRange(QCPRange(av, cv));
             });
         } else {
-            plot->setItemPositioner([](QCPAbstractItem* item, double ak, double av, double ck, double cv) {
+            plot->setItemPositioner([](QCPItem* item, double ak, double av, double ck, double cv) {
                 auto* rs = static_cast<QCPItemRSpan*>(item);
                 rs->setKeyRange(QCPRange(ak, ck));
                 rs->setValueRange(QCPRange(av, cv));
@@ -192,7 +192,7 @@ static QWidget* createSpansTab()
 
     auto created = std::make_shared<int>(0);
     QObject::connect(plot, &QCustomPlot::itemCreated, countLabel,
-                     [countLabel, created](QCPAbstractItem*) {
+                     [countLabel, created](QCPItem*) {
                          ++(*created);
                          countLabel->setText(QString("Created: %1").arg(*created));
                      });
@@ -667,7 +667,7 @@ static QWidget* createItemsTab()
     tracerLabel->setPadding(QMargins(4, 2, 4, 2));
 
     // Shift+click to draw a line item
-    plot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) -> QCPAbstractItem* {
+    plot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) -> QCPItem* {
         auto* l = new QCPItemLine(p);
         l->setPen(QPen(QColor(200, 50, 50), 2));
         l->setHead(QCPLineEnding::esSpikeArrow);
@@ -1387,7 +1387,7 @@ static QWidget* createBusyIndicatorTab()
     auto* panel = new QWidget;
     auto* layout = new QVBoxLayout(panel);
 
-    auto simulateDownload = [](QCPAbstractPlottable* p, int durationMs) {
+    auto simulateDownload = [](QCPPlottable* p, int durationMs) {
         p->setBusy(true);
         QTimer::singleShot(durationMs, p, [p] { p->setBusy(false); });
     };

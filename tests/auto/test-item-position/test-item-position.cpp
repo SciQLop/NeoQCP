@@ -269,7 +269,7 @@ void TestItemPosition::parentDeletedBeforeAnyFrameKeepsPlace()
 // SciQLop#151: an item anchored far outside the view has a pixel position beyond int range (or NaN).
 // QRect arithmetic on it overflowed, which Qt 6.11's checked QRect turns into an abort on mouse move
 // (selectTest) or on draw.
-using ItemFactory = std::function<QCPAbstractItem*(QCustomPlot*)>;
+using ItemFactory = std::function<QCPItem*(QCustomPlot*)>;
 Q_DECLARE_METATYPE(ItemFactory)
 
 void TestItemPosition::setRefusedAnchorIsReported()
@@ -459,7 +459,7 @@ void TestItemPosition::farOffscreenItemsDoNotOverflow()
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
     mPlot->replot();
-    QCPAbstractItem* item = make(mPlot);
+    QCPItem* item = make(mPlot);
     const auto positions = item->positions();
     for (int i = 0; i < positions.size(); ++i)
         positions[i]->setCoords(coord + i, coord + 2 * i);

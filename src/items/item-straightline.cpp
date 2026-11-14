@@ -62,7 +62,7 @@
   ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
 */
 QCPItemStraightLine::QCPItemStraightLine(QCustomPlot* parentPlot)
-        : QCPAbstractItem(parentPlot)
+        : QCPItem(parentPlot)
         , point1(createPosition(QLatin1String("point1")))
         , point2(createPosition(QLatin1String("point2")))
 {

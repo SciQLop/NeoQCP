@@ -84,7 +84,7 @@
   ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
 */
 QCPItemCurve::QCPItemCurve(QCustomPlot* parentPlot)
-        : QCPAbstractItem(parentPlot)
+        : QCPItem(parentPlot)
         , start(createPosition(QLatin1String("start")))
         , startDir(createPosition(QLatin1String("startDir")))
         , endDir(createPosition(QLatin1String("endDir")))

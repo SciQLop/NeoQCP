@@ -169,7 +169,7 @@ QCPFinancialData::QCPFinancialData(double key, double open, double high, double 
   \section qcpfinancial-usage Usage
 
   Like all data representing objects in QCustomPlot, the QCPFinancial is a plottable
-  (QCPAbstractPlottable). So the plottable-interface of QCustomPlot applies
+  (QCPPlottable). So the plottable-interface of QCustomPlot applies
   (QCustomPlot::plottable, QCustomPlot::removePlottable, etc.)
 
   Usually, you first create an instance:
@@ -254,7 +254,7 @@ QCPFinancialData::QCPFinancialData(double key, double open, double high, double 
   manually but use QCustomPlot::removePlottable() instead.
 */
 QCPFinancial::QCPFinancial(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractPlottable1D<QCPFinancialData>(keyAxis, valueAxis)
+        : QCPPlottable1D<QCPFinancialData>(keyAxis, valueAxis)
         , mChartStyle(csCandlestick)
         , mWidth(0.5)
         , mWidthType(wtPlotCoords)
@@ -533,7 +533,7 @@ QCPDataSelection QCPFinancial::selectTestRect(const QRectF& rect, bool onlySelec
   If \a details is not 0, it will be set to a \ref QCPDataSelection, describing the closest data
   point to \a pos.
 
-  \seebaseclassmethod \ref QCPAbstractPlottable::selectTest
+  \seebaseclassmethod \ref QCPPlottable::selectTest
 */
 double QCPFinancial::selectTest(const QPointF& pos, bool onlySelectable,
                                 [[maybe_unused]] QVariant* details) const

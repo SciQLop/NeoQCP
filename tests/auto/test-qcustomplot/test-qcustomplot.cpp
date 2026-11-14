@@ -283,7 +283,7 @@ void TestQCustomPlot::plottableClickReportsTheGraphsDataIndex()
   flatGraph(mPlot);
   int index = -1;
   connect(mPlot, &QCustomPlot::plottableClick, mPlot,
-          [&index](QCPAbstractPlottable*, int dataIndex, QMouseEvent*) { index = dataIndex; });
+          [&index](QCPPlottable*, int dataIndex, QMouseEvent*) { index = dataIndex; });
   clickAt(mPlot, pixelOf(mPlot, 8, 5));
   QCOMPARE(index, 2);
 }
@@ -293,7 +293,7 @@ void TestQCustomPlot::clickSlotDeletingTheGraphIsSafe()
 {
   layOut(mPlot, QCP::iSelectPlottables);
   auto* g = flatGraph(mPlot);
-  connect(g, &QCPAbstractPlottable::selectionChanged, mPlot,
+  connect(g, &QCPPlottable::selectionChanged, mPlot,
           [this, g] { QVERIFY(mPlot->removePlottable(g)); });
   clickAt(mPlot, pixelOf(mPlot, 5, 5));
   QCOMPARE(mPlot->plottableCount(), 0);
@@ -305,7 +305,7 @@ void TestQCustomPlot::deselectSlotDeletingTheClickedGraphIsSafe()
   auto* selected = flatGraph(mPlot, 2);
   auto* clicked = flatGraph(mPlot, 8);
   selected->setSelection(QCPDataSelection(QCPDataRange(0, 3)));
-  connect(selected, &QCPAbstractPlottable::selectionChanged, mPlot,
+  connect(selected, &QCPPlottable::selectionChanged, mPlot,
           [this, clicked] { QVERIFY(mPlot->removePlottable(clicked)); });
   clickAt(mPlot, pixelOf(mPlot, 5, 8));
   QCOMPARE(mPlot->plottableCount(), 1);
@@ -319,7 +319,7 @@ void TestQCustomPlot::rectDeselectSlotDeletingACandidateIsSafe()
   auto* selected = flatGraph(mPlot, 2);
   auto* candidate = flatGraph(mPlot, 8);
   selected->setSelection(QCPDataSelection(QCPDataRange(0, 3)));
-  connect(selected, &QCPAbstractPlottable::selectionChanged, mPlot,
+  connect(selected, &QCPPlottable::selectionChanged, mPlot,
           [this, candidate] { QVERIFY(mPlot->removePlottable(candidate)); });
   dragFromTo(mPlot, pixelOf(mPlot, 1, 9), pixelOf(mPlot, 9, 7));
   QCOMPARE(mPlot->plottableCount(), 1);
@@ -331,7 +331,7 @@ void TestQCustomPlot::clickSlotDeletingTheItemIsSafe()
   auto* line = new QCPItemLine(mPlot);
   line->start->setCoords(2, 5);
   line->end->setCoords(8, 5);
-  connect(line, &QCPAbstractItem::selectionChanged, mPlot,
+  connect(line, &QCPItem::selectionChanged, mPlot,
           [this, line] { QVERIFY(mPlot->removeItem(line)); });
   clickAt(mPlot, pixelOf(mPlot, 5, 5));
   QCOMPARE(mPlot->itemCount(), 0);
@@ -344,7 +344,7 @@ void TestQCustomPlot::deleteKeySlotDeletingEveryItemIsSafe()
   {
     auto* line = new QCPItemLine(mPlot);
     line->setSelected(true);
-    connect(line, &QCPAbstractItem::deleteRequested, mPlot, [this] { mPlot->clearItems(); });
+    connect(line, &QCPItem::deleteRequested, mPlot, [this] { mPlot->clearItems(); });
   }
   QKeyEvent del(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
   QCoreApplication::sendEvent(mPlot, &del);
@@ -580,16 +580,16 @@ void TestQCustomPlot::rectSelectionKeepsThePlotOrder()
   QCOMPARE(rect->systems().size(), 2);
   mPlot->replot();
 
-  QList<QCPAbstractPlottable*> selected;
+  QList<QCPPlottable*> selected;
   for (QCPGraph* graph : { first, second, third })
-    connect(graph, &QCPAbstractPlottable::selectionChanged, this,
+    connect(graph, &QCPPlottable::selectionChanged, this,
             [&selected, graph] { selected << graph; });
 
   // Half a unit past the outer points: a point on the rect's edge falls in or out with the pixel
   // rounding, which moves with the tick label font.
   dragFromTo(mPlot, pixelOf(mPlot, 0.5, 9), pixelOf(mPlot, 9.5, 1));
 
-  QCOMPARE(selected, (QList<QCPAbstractPlottable*>{ first, second, third }));
+  QCOMPARE(selected, (QList<QCPPlottable*>{ first, second, third }));
 }
 
 void TestQCustomPlot::rectZoomSlotDeletingThePlotIsSafe()

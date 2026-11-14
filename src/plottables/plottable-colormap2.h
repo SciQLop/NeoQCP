@@ -19,7 +19,7 @@ class TestPipeline;
 template <typename T, typename Self = void>
 class QCPColorMap2Ops;
 
-class QCP_LIB_DECL QCPColorMap2 : public QCPAbstractColorMapped
+class QCP_LIB_DECL QCPColorMap2 : public QCPColorMapped
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPColorMap2)
@@ -42,9 +42,9 @@ public:
     explicit QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis);
 
     // Data source management
-    void setDataSource(std::unique_ptr<QCPAbstractDataSource2D> source);
-    void setDataSource(std::shared_ptr<QCPAbstractDataSource2D> source);
-    [[nodiscard]] QCPAbstractDataSource2D* dataSource() const { return mDataSource.get(); }
+    void setDataSource(std::unique_ptr<QCPDataSource2D> source);
+    void setDataSource(std::shared_ptr<QCPDataSource2D> source);
+    [[nodiscard]] QCPDataSource2D* dataSource() const { return mDataSource.get(); }
     void dataChanged();
 
     // Owning setData
@@ -77,7 +77,7 @@ public:
     void setGapThreshold(double threshold);
     [[nodiscard]] double gapThreshold() const { return mGapThreshold; }
 
-    using QCPAbstractColorMapped::colorDataBounds;
+    using QCPColorMapped::colorDataBounds;
     QCPRange colorDataBounds(bool& found) const override;
     //! The resampled view's range, or all the data's when \a recalc.
     void rescaleDataRange(bool recalc = false) override;
@@ -119,7 +119,7 @@ public:
     // Exposed for tests: the labels the last draw placed.
     [[nodiscard]] const QVector<ContourLabel>& lastContourLabels() const { return mContours.lastLabels(); }
 
-    using QCPAbstractColorMapped::drawLegendIcon;
+    using QCPColorMapped::drawLegendIcon;
 public Q_SLOTS:
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
 
@@ -147,7 +147,7 @@ private:
     [[nodiscard]] bool needsAnImageOfTheNewSize() const;
     void installResampleTransform();
 
-    std::shared_ptr<QCPAbstractDataSource2D> mDataSource;
+    std::shared_ptr<QCPDataSource2D> mDataSource;
     // Captured by value in the pipeline transform (re-baked by setGapThreshold / setDataScaleType)
     // so background jobs never reference this object's memory.
     double mGapThreshold = 1.5;
@@ -181,11 +181,11 @@ public:
         return this->apply(
             [&](T& p) { p.setData(std::forward<XC>(x), std::forward<YC>(y), std::forward<ZC>(z)); });
     }
-    Ret setDataSource(std::unique_ptr<QCPAbstractDataSource2D> source)
+    Ret setDataSource(std::unique_ptr<QCPDataSource2D> source)
     {
         return this->apply([&](T& p) { p.setDataSource(std::move(source)); });
     }
-    Ret setDataSource(std::shared_ptr<QCPAbstractDataSource2D> source)
+    Ret setDataSource(std::shared_ptr<QCPDataSource2D> source)
     {
         return this->apply([&](T& p) { p.setDataSource(std::move(source)); });
     }

@@ -58,12 +58,12 @@ static_assert(!std::is_convertible_v<QCPHandle<QCPAxis>, QPointer<QCPAxis>>);
 static_assert(std::is_constructible_v<QPointer<QCPAxis>, QCPHandle<QCPAxis>>);
 static_assert(std::is_constructible_v<bool, QCPHandle<QCPAxis>>);
 static_assert(CallableWithTheOverloadSet<QCPHandle<QCPAxis>>);
-static_assert(std::is_convertible_v<QCPHandle<QCPGraph>, QCPHandle<QCPAbstractPlottable>>);
+static_assert(std::is_convertible_v<QCPHandle<QCPGraph>, QCPHandle<QCPPlottable>>);
 // Assignments: a derived handle assigns to a base one, and nullptr copy-initialises a handle
 // (Opus I1, opencode I-2, Opus M-1, M-2). `h = 0` and `h = {}` are pinned in the body below.
-static_assert(std::is_assignable_v<QCPHandle<QCPAbstractPlottable>&, QCPHandle<QCPGraph>>);
+static_assert(std::is_assignable_v<QCPHandle<QCPPlottable>&, QCPHandle<QCPGraph>>);
 static_assert(std::is_convertible_v<std::nullptr_t, QCPHandle<QCPAxis>>);
-static_assert(!std::is_assignable_v<QCPHandle<QCPGraph>&, QCPHandle<QCPAbstractPlottable>>);
+static_assert(!std::is_assignable_v<QCPHandle<QCPGraph>&, QCPHandle<QCPPlottable>>);
 
 void TestHandle::init()
 {
@@ -155,12 +155,12 @@ void TestHandle::aDerivedHandleConvertsToABaseHandle()
 {
     QCustomPlot plot;
     QCPHandle<QCPGraph> graph(plot.addGraph());
-    QCPHandle<QCPAbstractPlottable> base = graph; // implicit converting constructor
+    QCPHandle<QCPPlottable> base = graph; // implicit converting constructor
     QVERIFY(base);
-    QCOMPARE(base.get(), static_cast<QCPAbstractPlottable*>(graph.get()));
+    QCOMPARE(base.get(), static_cast<QCPPlottable*>(graph.get()));
 
     const QCPHandle<QCPGraph>& cref = graph;
-    QCPHandle<QCPAbstractPlottable> direct(cref);
+    QCPHandle<QCPPlottable> direct(cref);
     QVERIFY(direct);
 
     base.remove();
@@ -275,10 +275,10 @@ void TestHandle::aHandleTakesPartInTheAmbiguityMatrix()
     pickOverload(handle);
     QCOMPARE(gPicked, OverloadPicked::pointer);
 
-    QCPHandle<QCPAbstractPlottable> plottable(plot.addGraph());
+    QCPHandle<QCPPlottable> plottable(plot.addGraph());
     QVERIFY(qobject_cast<QCPGraph*>(plottable));
     QVERIFY(!qobject_cast<QCPCurve*>(plottable));
-    QVERIFY(!qobject_cast<QCPGraph*>(QCPHandle<QCPAbstractPlottable>()));
+    QVERIFY(!qobject_cast<QCPGraph*>(QCPHandle<QCPPlottable>()));
 
     {
         QSignalBlocker blocker(handle);
@@ -296,16 +296,16 @@ void TestHandle::aHandleTakesPartInTheAmbiguityMatrix()
     assigned = nullptr;
     QVERIFY(!assigned);
 
-    QCPHandle<QCPAbstractPlottable> baseAssigned;
+    QCPHandle<QCPPlottable> baseAssigned;
     QCPGraph* graph = plot.addGraph();
     baseAssigned = graph;
-    QCOMPARE(baseAssigned.get(), static_cast<QCPAbstractPlottable*>(graph));
+    QCOMPARE(baseAssigned.get(), static_cast<QCPPlottable*>(graph));
 
     // A derived handle assigns to a base one, and a creator's handle assigns where a base handle is
     // expected (Opus I1).
     QCPHandle<QCPGraph> derived(graph);
     baseAssigned = derived;
-    QCOMPARE(baseAssigned.get(), static_cast<QCPAbstractPlottable*>(graph));
+    QCOMPARE(baseAssigned.get(), static_cast<QCPPlottable*>(graph));
     baseAssigned = plot.add<QCPBars>();
     QVERIFY(baseAssigned);
 
@@ -354,26 +354,26 @@ void TestHandle::thePlotHandsOutHandles()
     static_assert(std::is_same_v<decltype(std::declval<const Plot&>().pipelineScheduler()),
                                  QCPHandle<QCPPipelineScheduler>>);
     static_assert(std::is_same_v<decltype(std::declval<Plot&>().plottable(0)),
-                                 QCPHandle<QCPAbstractPlottable>>);
+                                 QCPHandle<QCPPlottable>>);
     static_assert(std::is_same_v<decltype(std::declval<Plot&>().plottable()),
-                                 QCPHandle<QCPAbstractPlottable>>);
+                                 QCPHandle<QCPPlottable>>);
     static_assert(std::is_same_v<decltype(std::declval<Plot&>().plottableGroups()),
                                  QList<QCPHandle<QCPPlottableGroup>>>);
     static_assert(std::is_same_v<decltype(std::declval<const Plot&>().selectedPlottables()),
-                                 QList<QCPHandle<QCPAbstractPlottable>>>);
+                                 QList<QCPHandle<QCPPlottable>>>);
     static_assert(std::is_same_v<decltype(std::declval<const Plot&>().plottableAt(QPointF())),
-                                 QCPHandle<QCPAbstractPlottable>>);
+                                 QCPHandle<QCPPlottable>>);
     static_assert(
         std::is_same_v<decltype(std::declval<const Plot&>().plottableAt<QCPGraph>(QPointF())),
                        QCPHandle<QCPGraph>>);
     static_assert(std::is_same_v<decltype(std::declval<const Plot&>().item(0)),
-                                 QCPHandle<QCPAbstractItem>>);
+                                 QCPHandle<QCPItem>>);
     static_assert(std::is_same_v<decltype(std::declval<const Plot&>().item()),
-                                 QCPHandle<QCPAbstractItem>>);
+                                 QCPHandle<QCPItem>>);
     static_assert(std::is_same_v<decltype(std::declval<const Plot&>().selectedItems()),
-                                 QList<QCPHandle<QCPAbstractItem>>>);
+                                 QList<QCPHandle<QCPItem>>>);
     static_assert(std::is_same_v<decltype(std::declval<const Plot&>().itemAt(QPointF())),
-                                 QCPHandle<QCPAbstractItem>>);
+                                 QCPHandle<QCPItem>>);
     static_assert(
         std::is_same_v<decltype(std::declval<const Plot&>().itemAt<QCPItemLine>(QPointF())),
                        QCPHandle<QCPItemLine>>);
@@ -492,8 +492,8 @@ void TestHandle::addGraphReturnsTheSameHandleAsAdd()
     QCOMPARE(plot.graph().get(), chained.get());
     QVERIFY(plot.removeGraph(chained));
     QCOMPARE(plot.graph(1), added.get());
-    QCOMPARE(plot.plottable(0).get(), static_cast<QCPAbstractPlottable*>(graph));
-    QCOMPARE(plot.plottable(1).get(), static_cast<QCPAbstractPlottable*>(added.get()));
+    QCOMPARE(plot.plottable(0).get(), static_cast<QCPPlottable*>(graph));
+    QCOMPARE(plot.plottable(1).get(), static_cast<QCPPlottable*>(added.get()));
     QCOMPARE(plot.plottableCount(), 2);
     QCOMPARE(gMisuses, 0);
 }
@@ -584,11 +584,11 @@ void TestHandle::theLayoutHandsOutHandles()
     static_assert(std::is_same_v<decltype(std::declval<Rect&>().colorScale()),
                                  QCPColorScaleOps<QCPColorScale>>);
     static_assert(std::is_same_v<decltype(std::declval<Rect&>().plottables()),
-                                 QList<QCPHandle<QCPAbstractPlottable>>>);
+                                 QList<QCPHandle<QCPPlottable>>>);
     static_assert(std::is_same_v<decltype(std::declval<Rect&>().graphs()),
                                  QList<QCPHandle<QCPGraph>>>);
     static_assert(std::is_same_v<decltype(std::declval<Rect&>().items()),
-                                 QList<QCPHandle<QCPAbstractItem>>>);
+                                 QList<QCPHandle<QCPItem>>>);
 
     using Scale = QCPColorScale;
     static_assert(std::is_same_v<decltype(std::declval<Scale&>().axis()),
@@ -596,7 +596,7 @@ void TestHandle::theLayoutHandsOutHandles()
     static_assert(std::is_same_v<decltype(std::declval<Scale&>().colorMaps()),
                                  QList<QCPHandle<QCPColorMap>>>);
     static_assert(std::is_same_v<decltype(std::declval<Scale&>().users()),
-                                 QList<QCPHandle<QCPAbstractColorMapped>>>);
+                                 QList<QCPHandle<QCPColorMapped>>>);
 
     QCustomPlot plot;
     QVERIFY(plot.axisRect()->addAxis(QCPAxis::atBottom));
@@ -609,7 +609,7 @@ void TestHandle::theAxesHandOutHandles()
 {
     using Base = QCPAxisBase;
     static_assert(std::is_same_v<decltype(std::declval<Base&>().plottables()),
-                                 QList<QCPHandle<QCPAbstractPlottable>>>);
+                                 QList<QCPHandle<QCPPlottable>>>);
     // K4: the virtual getters whose overrides return a derived pointer stay raw.
     static_assert(std::is_same_v<decltype(std::declval<Base&>().linkSource()), QCPAxisBase*>);
     static_assert(std::is_same_v<decltype(std::declval<Base&>().moveTarget()), QCPAxisBase*>);
@@ -629,12 +629,12 @@ void TestHandle::theAxesHandOutHandles()
     static_assert(std::is_same_v<decltype(std::declval<Axis&>().moveTarget()), QCPAxis*>);
     static_assert(std::is_same_v<decltype(std::declval<Axis&>().area()), QCPArea*>);
     static_assert(std::is_same_v<decltype(std::declval<Axis&>().plottables()),
-                                 QList<QCPHandle<QCPAbstractPlottable>>>);
+                                 QList<QCPHandle<QCPPlottable>>>);
     // G-3 (5c).
     static_assert(std::is_same_v<decltype(std::declval<Axis&>().graphs()),
                                  QList<QCPHandle<QCPGraph>>>);
     static_assert(std::is_same_v<decltype(std::declval<Axis&>().items()),
-                                 QList<QCPHandle<QCPAbstractItem>>>);
+                                 QList<QCPHandle<QCPItem>>>);
 
     QCustomPlot plot;
     QVERIFY(plot.xAxis->axisRect());
@@ -647,18 +647,18 @@ void TestHandle::theAxesHandOutHandles()
 void TestHandle::theLegendHandsOutHandles()
 {
     static_assert(
-        std::is_same_v<decltype(std::declval<QCPAbstractLegendItem&>().parentLegend()),
+        std::is_same_v<decltype(std::declval<QCPLegendItem&>().parentLegend()),
                        QCPHandle<QCPLegend>>);
     static_assert(std::is_same_v<decltype(std::declval<QCPLegend&>().item(0)),
-                                 QCPHandle<QCPAbstractLegendItem>>);
+                                 QCPHandle<QCPLegendItem>>);
     static_assert(
         std::is_same_v<decltype(std::declval<QCPLegend&>().itemWithPlottable(nullptr)),
                        QCPHandle<QCPPlottableLegendItem>>);
     static_assert(std::is_same_v<decltype(std::declval<QCPLegend&>().selectedItems()),
-                                 QList<QCPHandle<QCPAbstractLegendItem>>>);
+                                 QList<QCPHandle<QCPLegendItem>>>);
     static_assert(
         std::is_same_v<decltype(std::declval<QCPPlottableLegendItem&>().plottable()),
-                       QCPHandle<QCPAbstractPlottable>>);
+                       QCPHandle<QCPPlottable>>);
     // G-1/G-3 (5c).
     static_assert(std::is_same_v<decltype(std::declval<QCPGroupLegendItem&>().graph()),
                                  QCPHandle<QCPGraph>>);
@@ -711,7 +711,7 @@ void TestHandle::theSystemsAndPolarHandOutHandles()
     static_assert(std::is_same_v<decltype(std::declval<System&>().valueAxis()),
                                  QCPHandle<QCPAxisBase>>);
     static_assert(std::is_same_v<decltype(std::declval<System&>().plottables()),
-                                 QList<QCPHandle<QCPAbstractPlottable>>>);
+                                 QList<QCPHandle<QCPPlottable>>>);
 
     using Polar = QCPPolarArea;
     static_assert(std::is_same_v<decltype(std::declval<Polar&>().angularAxis()),
@@ -761,7 +761,7 @@ void TestHandle::theSystemsAndPolarHandOutHandles()
 
 void TestHandle::thePlottablesHandOutHandles()
 {
-    using Plottable = QCPAbstractPlottable;
+    using Plottable = QCPPlottable;
     // Inventory §2.4: every plot-owned QObject getter returns a handle (K1), lists of handles (K5).
     static_assert(std::is_same_v<decltype(std::declval<Plottable&>().system()),
                                  QCPHandle<QCPCoordinateSystem>>);
@@ -786,7 +786,7 @@ void TestHandle::thePlottablesHandOutHandles()
                                  QCPPlottableInterface1D*>);
 
     static_assert(std::is_same_v<decltype(std::declval<QCPErrorBars&>().dataPlottable()),
-                                 QCPHandle<QCPAbstractPlottable>>);
+                                 QCPHandle<QCPPlottable>>);
     static_assert(std::is_same_v<decltype(std::declval<QCPBars&>().barsGroup()),
                                  QCPHandle<QCPBarsGroup>>);
     static_assert(std::is_same_v<decltype(std::declval<QCPBars&>().barBelow()),
@@ -797,7 +797,7 @@ void TestHandle::thePlottablesHandOutHandles()
                                  QCPHandle<QCPBars>>);
     static_assert(std::is_same_v<decltype(std::declval<QCPBarsGroup&>().bars()),
                                  QList<QCPHandle<QCPBars>>>);
-    static_assert(std::is_same_v<decltype(std::declval<QCPAbstractColorMapped&>().colorScale()),
+    static_assert(std::is_same_v<decltype(std::declval<QCPColorMapped&>().colorScale()),
                                  QCPHandle<QCPColorScale>>);
     static_assert(std::is_same_v<decltype(std::declval<QCPColorMap&>().data()),
                                  QCPColorMapData*>); // H-3
@@ -815,14 +815,14 @@ void TestHandle::thePlottablesHandOutHandles()
     static_assert(std::is_same_v<decltype(std::declval<QCPPlottableGroup&>().parentPlot()),
                                  QCPHandle<QCustomPlot>>);
     static_assert(std::is_same_v<decltype(std::declval<QCPPlottableGroup&>().members()),
-                                 QList<QCPHandle<QCPAbstractPlottable>>>);
+                                 QList<QCPHandle<QCPPlottable>>>);
     static_assert(
         std::is_same_v<decltype(std::declval<QCPPlottableGroupLegendItem&>().group()),
                        QCPHandle<QCPPlottableGroup>>);
     static_assert(std::is_same_v<decltype(std::declval<QCPDataLocator&>().plottable()),
-                                 QCPHandle<QCPAbstractPlottable>>);
+                                 QCPHandle<QCPPlottable>>);
     static_assert(std::is_same_v<decltype(std::declval<QCPDataLocator&>().hitPlottable()),
-                                 QCPHandle<QCPAbstractPlottable>>);
+                                 QCPHandle<QCPPlottable>>);
 
     QCustomPlot plot;
     QCPGraph* graph = plot.addGraph();
@@ -840,12 +840,12 @@ void TestHandle::thePlottablesHandOutHandles()
     QVERIFY(group.addMember(grouped));
     QCOMPARE(graph->group().get(), group.get());
     QCOMPARE(group->members().size(), 2);
-    QCOMPARE(group->members().first().get(), static_cast<QCPAbstractPlottable*>(graph));
+    QCOMPARE(group->members().first().get(), static_cast<QCPPlottable*>(graph));
     QCOMPARE(group->parentPlot().get(), &plot);
 
     QCPErrorBars* errors = new QCPErrorBars(plot.xAxis, plot.yAxis);
     errors->setDataPlottable(graph);
-    QCOMPARE(errors->dataPlottable().get(), static_cast<QCPAbstractPlottable*>(graph));
+    QCOMPARE(errors->dataPlottable().get(), static_cast<QCPPlottable*>(graph));
 
     QCPBarsGroup* barsGroup = new QCPBarsGroup(&plot);
     auto bars = plot.add<QCPBars>();
@@ -863,7 +863,7 @@ void TestHandle::thePlottablesHandOutHandles()
 
     QCPDataLocator locator;
     locator.setPlottable(graph);
-    QCOMPARE(locator.plottable().get(), static_cast<QCPAbstractPlottable*>(graph));
+    QCOMPARE(locator.plottable().get(), static_cast<QCPPlottable*>(graph));
     QVERIFY(!locator.hitPlottable());
     QVERIFY(graph->dependentLayers().isEmpty());
     plot.replot();
@@ -872,7 +872,7 @@ void TestHandle::thePlottablesHandOutHandles()
 
 void TestHandle::theItemsHandOutHandles()
 {
-    using Item = QCPAbstractItem;
+    using Item = QCPItem;
     // Inventory §2.6: the item's clip frame is handles; the Q_GADGET positions and anchors stay raw
     // (H-3), and so do the lists of them.
     static_assert(std::is_same_v<decltype(std::declval<Item&>().clipAxisRect()),
@@ -940,7 +940,7 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
     graph->setName("a");
     QCPItemTracer* tracer = plot.add<QCPItemTracer>().get();
     tracer->setGraph(graph);
-    QCPAbstractItem* item = plot.add<QCPItemLine>().get();
+    QCPItem* item = plot.add<QCPItemLine>().get();
     item->setClipAxisRect(rect);
     QCPColorScale* scale = new QCPColorScale(&plot);
     QCPColorMap* map = new QCPColorMap(plot.xAxis, plot.yAxis);
@@ -953,7 +953,7 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
     QCPBars* below = new QCPBars(plot.xAxis, plot.yAxis);
     QCPBars* above = new QCPBars(plot.xAxis, plot.yAxis);
     above->moveAbove(below);
-    QCPAbstractLegendItem* row = legend->item(0).get();
+    QCPLegendItem* row = legend->item(0).get();
     QVERIFY(row);
 
     QCOMPARE(axis->property("axisRect").value<QCPAxisRect*>(), axis->axisRect().get());
@@ -962,7 +962,7 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
     QCOMPARE(tracer->property("graph").value<QCPGraph*>(), tracer->graph().get());
     QCOMPARE(item->property("clipAxisRect").value<QCPAxisRect*>(), item->clipAxisRect().get());
     QCOMPARE(map->property("colorScale").value<QCPColorScale*>(), map->colorScale().get());
-    QCOMPARE(errors->property("dataPlottable").value<QCPAbstractPlottable*>(),
+    QCOMPARE(errors->property("dataPlottable").value<QCPPlottable*>(),
              errors->dataPlottable().get());
     QCOMPARE(bars->property("barsGroup").value<QCPBarsGroup*>(), bars->barsGroup().get());
     QCOMPARE(graph->property("keyAxis").value<QCPAxis*>(), graph->keyAxis().get());
@@ -1036,10 +1036,10 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
 void TestHandle::handleAsCast()
 {
     QCustomPlot plot;
-    QCPHandle<QCPAbstractPlottable> h(plot.addGraph());
+    QCPHandle<QCPPlottable> h(plot.addGraph());
     QVERIFY(h.as<QCPGraph>());
     QVERIFY(!h.as<QCPCurve>());
-    QCPHandle<QCPAbstractPlottable> dead;
+    QCPHandle<QCPPlottable> dead;
     QVERIFY(!dead.as<QCPGraph>());
 }
 

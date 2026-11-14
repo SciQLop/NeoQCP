@@ -433,7 +433,7 @@ void TestSignalDelivery::nestedEventDeliversWhenItReturns()
     int clicks = 0;
     QPoint clickedAt;
     connect(plot.get(), &QCustomPlot::plottableClick, plot.get(),
-            [&](QCPAbstractPlottable*, int, QMouseEvent* event) {
+            [&](QCPPlottable*, int, QMouseEvent* event) {
                 ++clicks;
                 clickedAt = event->pos();
             });
@@ -818,7 +818,7 @@ void TestSignalDelivery::selectionRectSlotDeletingThePlot()
 
     const QPointer<QCustomPlot> alive(plot);
     int plottableSelections = 0;
-    connect(graph, &QCPAbstractPlottable::selectionChanged, plot,
+    connect(graph, &QCPPlottable::selectionChanged, plot,
             [&plottableSelections] { ++plottableSelections; });
     connect(plot->selectionRect(), &QCPSelectionRect::accepted, plot,
             [plot](const QRect&, QMouseEvent*) { delete plot; });
@@ -902,8 +902,8 @@ void TestSignalDelivery::plottableSelectionSlotDeletingThePlot()
     const QPointer<QCustomPlot> alive(plot);
     int selectionChanges = 0;
     // The first slot deletes the plot: the second slot of the same signal must not run.
-    connect(graph, &QCPAbstractPlottable::selectionChanged, plot, [plot] { delete plot; });
-    connect(graph, &QCPAbstractPlottable::selectionChanged, plot,
+    connect(graph, &QCPPlottable::selectionChanged, plot, [plot] { delete plot; });
+    connect(graph, &QCPPlottable::selectionChanged, plot,
             [&selectionChanges] { ++selectionChanges; });
 
     graph->setSelection(QCPDataSelection(QCPDataRange(0, 1)));

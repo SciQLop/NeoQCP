@@ -36,7 +36,7 @@ class QCustomPlot;
 template <typename T, typename Self = void>
 class QCPItemPixmapOps;
 
-class QCP_LIB_DECL QCPItemPixmap : public QCPAbstractItem
+class QCP_LIB_DECL QCPItemPixmap : public QCPItem
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPItemPixmap)

@@ -15,7 +15,7 @@
   \section mainpage-plottables Plottables
 
   \a Plottables are classes that display any kind of data in QCustomPlot. They all derive from \ref
-  QCPAbstractPlottable. For example, \ref QCPGraph is a plottable that displays a graph with
+  QCPPlottable. For example, \ref QCPGraph is a plottable that displays a graph with
   different line styles, scatter styles, filling etc.
 
   Since plotting graphs is such a dominant use case, QCustomPlot has a special interface for
@@ -29,7 +29,7 @@
   pointer.
 
   Plottables (including graphs) can be retrieved via \ref QCustomPlot::plottable. Since the return
-  type of that function is the abstract base class of all plottables, QCPAbstractPlottable, you
+  type of that function is the abstract base class of all plottables, QCPPlottable, you
   will probably want to <tt>qobject_cast</tt> the returned pointer to the respective plottable
   subclass. As usual, the cast returns \c nullptr if the plottable wasn't of that specific
   subclass.
@@ -70,9 +70,9 @@
 
   Every QCustomPlot has one \ref QCPLegend (as \ref QCustomPlot::legend) by default. A legend is a
   small layout element inside the plot which lists the plottables with an icon of the plottable
-  line/symbol and a name (\ref QCPAbstractPlottable::setName). Plottables can be added and removed
-  from the legend via \ref QCPAbstractPlottable::addToLegend and \ref
-  QCPAbstractPlottable::removeFromLegend. By default, adding a plottable to QCustomPlot
+  line/symbol and a name (\ref QCPPlottable::setName). Plottables can be added and removed
+  from the legend via \ref QCPPlottable::addToLegend and \ref
+  QCPPlottable::removeFromLegend. By default, adding a plottable to QCustomPlot
   automatically adds it to the legend, too. This behaviour can be changed with the \ref
   QCustomPlot::setAutoAddPlottableToLegend property.
 
@@ -103,7 +103,7 @@
   \section mainpage-items Decorations and Auxiliary Items
 
   Apart from plottables there is another category of plot objects that are important: Items. The
-  base class of all items is \ref QCPAbstractItem. An item sets itself apart from plottables in
+  base class of all items is \ref QCPItem. An item sets itself apart from plottables in
   that it's not necessarily bound to any axes. This means it may also be positioned in absolute
   pixel coordinates or placed at a relative position on an axis rect. Further, it usually doesn't
   represent data directly, but acts as decoration, emphasis, description etc.
@@ -115,7 +115,7 @@
   ranges. This way the arrow stretches and turns so it always points from the label to the
   specified plot coordinate, without any further code necessary.
 
-  For a more detailed introduction, see the \ref QCPAbstractItem documentation, and from there the
+  For a more detailed introduction, see the \ref QCPItem documentation, and from there the
   documentations of the individual standard items, to find out how to use them.
 
   \section mainpage-layoutelements Layout Elements and Layouts

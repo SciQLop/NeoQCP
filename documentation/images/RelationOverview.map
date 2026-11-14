@@ -4,8 +4,8 @@
 <area shape="rect" coords="229,15,528,56" href="./classQCustomPlot.html" />
 <area shape="rect" coords="58,86,160,118" href="./classQCPLayer.html" />
 <area shape="rect" coords="59,164,159,195" href="./classQCPLayerable.html" />
-<area shape="rect" coords="230,85,369,116" href="./classQCPAbstractItem.html" />
-<area shape="rect" coords="388,86,527,118" href="./classQCPAbstractPlottable.html" />
+<area shape="rect" coords="230,85,369,116" href="./classQCPItem.html" />
+<area shape="rect" coords="388,86,527,118" href="./classQCPPlottable.html" />
 <area shape="rect" coords="246,145,354,163" href="./classQCPItemAnchor.html" />
 <area shape="rect" coords="247,178,356,194" href="./classQCPItemPosition.html" />
 <area shape="rect" coords="651,85,789,119" href="./classQCPLayoutGrid.html" />
@@ -17,6 +17,6 @@
 <area shape="rect" coords="430,329,500,350" href="./classQCPRange.html" />
 <area shape="rect" coords="443,360,545,381" href="./classQCPGrid.html" />
 <area shape="rect" coords="606,331,707,349" href="./classQCPLegend.html" />
-<area shape="rect" coords="573,366,739,382" href="./classQCPAbstractLegendItem.html" />
+<area shape="rect" coords="573,366,739,382" href="./classQCPLegendItem.html" />
 <area shape="rect" coords="573,398,741,417" href="./classQCPPlottableLegendItem.html" />
 </map>

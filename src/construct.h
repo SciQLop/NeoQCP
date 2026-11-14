@@ -31,9 +31,9 @@ namespace qcp
 namespace detail
 {
 template <typename T>
-concept Plottable = std::derived_from<T, QCPAbstractPlottable>;
+concept Plottable = std::derived_from<T, QCPPlottable>;
 template <typename T>
-concept Item = std::derived_from<T, QCPAbstractItem>;
+concept Item = std::derived_from<T, QCPItem>;
 template <typename T>
 concept LayoutPart = std::derived_from<T, QCPLayoutElement>;
 // addAxis returns a QCPAxis*, and QCPAxis::OpsFor is the only axis handle: the family is one type.
@@ -211,7 +211,7 @@ struct Construct<QCPPlottableGroup>
 // a pair given explicitly. Either way the plottable is drawn in that pair's system, which the
 // plottable resolves from the axes.
 template <typename T, typename... Args>
-    requires std::derived_from<T, QCPAbstractPlottable>
+    requires std::derived_from<T, QCPPlottable>
           && qcp::FirstArgumentIsNotAnAxis<Args...>
 qcp::HandleFor<T> QCPAxisRect::add(Args&&... args)
 {
@@ -223,7 +223,7 @@ qcp::HandleFor<T> QCPAxisRect::add(Args&&... args)
 }
 
 template <typename T, typename... Args>
-    requires std::derived_from<T, QCPAbstractPlottable>
+    requires std::derived_from<T, QCPPlottable>
 qcp::HandleFor<T> QCPAxisRect::add(QCPAxis* key, QCPAxis* value, Args&&... args)
 {
     using Handle = qcp::HandleFor<T>;
@@ -248,7 +248,7 @@ qcp::HandleFor<T> QCPAxisRect::add(QCPAxis* key, QCPAxis* value, Args&&... args)
 // The plottable forms of QCPPolarArea::add: on the area's system (its angular axis and its first
 // radial axis), or the object of another area readded here.
 template <typename T, typename... Args>
-    requires std::derived_from<T, QCPAbstractPlottable>
+    requires std::derived_from<T, QCPPlottable>
 qcp::HandleFor<T> QCPPolarArea::add(Args&&... args)
 {
     using Handle = qcp::HandleFor<T>;
@@ -270,7 +270,7 @@ qcp::HandleFor<T> QCPPolarArea::add(Args&&... args)
 }
 
 template <typename T>
-    requires std::derived_from<T, QCPAbstractPlottable>
+    requires std::derived_from<T, QCPPlottable>
 qcp::HandleFor<T> QCPPolarArea::add(std::unique_ptr<T> plottable)
 {
     using Handle = qcp::HandleFor<T>;

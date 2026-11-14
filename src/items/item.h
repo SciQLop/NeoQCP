@@ -40,7 +40,7 @@ class QCPEmissionScope;
 class QCPPainter;
 class QCustomPlot;
 class QCPItemPosition;
-class QCPAbstractItem;
+class QCPItem;
 class QCPAxisRect;
 class QCPArea;
 class QCPCoordinateSystem;
@@ -53,7 +53,7 @@ class QCP_LIB_DECL QCPItemAnchor
     friend class QCPLayer; // reads mParentItem to follow an anchor chain for repaint marking
 
 public:
-    QCPItemAnchor(QCustomPlot* parentPlot, QCPAbstractItem* parentItem, const QString& name,
+    QCPItemAnchor(QCustomPlot* parentPlot, QCPItem* parentItem, const QString& name,
                   int anchorId = -1);
     virtual ~QCPItemAnchor();
 
@@ -68,7 +68,7 @@ protected:
 
     // non-property members:
     QCustomPlot* mParentPlot;
-    QCPAbstractItem* mParentItem;
+    QCPItem* mParentItem;
     int mAnchorId;
     QSet<QCPItemPosition*> mChildrenX, mChildrenY;
     //! The pixel position last reported, kept because a dying item can no longer compute one.
@@ -92,7 +92,7 @@ private:
 
     friend class QCPItemPosition;
     friend class QCustomPlot; // take()/add() move an item between plots
-    friend class QCPAbstractItem; // marks the items that follow its anchors
+    friend class QCPItem; // marks the items that follow its anchors
 };
 
 class QCP_LIB_DECL QCPItemPosition : public QCPItemAnchor
@@ -136,7 +136,7 @@ public:
     };
     Q_ENUM(PositionType)
 
-    QCPItemPosition(QCustomPlot* parentPlot, QCPAbstractItem* parentItem, const QString& name);
+    QCPItemPosition(QCustomPlot* parentPlot, QCPItem* parentItem, const QString& name);
     virtual ~QCPItemPosition() override;
 
     // getters:
@@ -236,11 +236,11 @@ private:
     [[nodiscard]] QCPCoordinateSystem* systemRaw() const;
     [[nodiscard]] QCPArea* areaRaw() const;
 
-    friend class QCPAbstractItem;
+    friend class QCPItem;
     friend class QCPAxis;
     friend class QCPAxisRect;
     friend class QCPLayer;
-    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip);
+    friend QCPDrawnView qcpDrawnViewOf(const QCPItem& item, QRect clip);
 
     // True when the pixel dependency graph above  parent comes back here: a position depends on its
     // own parent anchor on the same axis, a plain anchor on every position of its item.
@@ -260,7 +260,7 @@ private:
 // of its recording on one axis pair, plus the pixels its drawing may add around it. A side that
 // cannot be expressed in data coordinates is infinite.
 
-class QCP_LIB_DECL QCPAbstractItem : public QCPLayerable, public QCPDrawable
+class QCP_LIB_DECL QCPItem : public QCPLayerable, public QCPDrawable
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
@@ -278,8 +278,8 @@ public:
     template <typename T>
     using OpsFor = QCPItemOps<T>;
 
-    explicit QCPAbstractItem(QCustomPlot* parentPlot);
-    virtual ~QCPAbstractItem() override;
+    explicit QCPItem(QCustomPlot* parentPlot);
+    virtual ~QCPItem() override;
 
     // getters:
     [[nodiscard]] bool clipToAxisRect() const { return mClipToAxisRect; }
@@ -434,7 +434,7 @@ protected:
     QCPItemAnchor* createAnchor(const QString& name, int anchorId);
 
 private:
-    Q_DISABLE_COPY_MOVE(QCPAbstractItem)
+    Q_DISABLE_COPY_MOVE(QCPItem)
 
     QPointer<QCustomPlot> mRegisteredPlot; // the plot whose item list holds this one
     //! True while the destructor detaches the anchors: their item has lost its virtuals.
@@ -456,14 +456,14 @@ protected:
     // K8: the drawn view reads the clip raw, once per item per frame.
     [[nodiscard]] QCPArea* clipAreaRaw() const;
     [[nodiscard]] QCPAxisRect* clipAxisRectRaw() const;
-    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip);
+    friend QCPDrawnView qcpDrawnViewOf(const QCPItem& item, QRect clip);
 };
 
 /*!
   The fluent handle of an item: what QCustomPlot::add<T>() returns. An item's constructor takes the
   plot only, so add<T>() needs no arguments. Subclass contract as in QCPObjectOps; the position
   setters of a concrete item (setStart/setEnd, ...) take coordinates in the position's current type,
-  which is ptPlotCoords on the plot's default axes for a new item (QCPAbstractItem::createPosition).
+  which is ptPlotCoords on the plot's default axes for a new item (QCPItem::createPosition).
 */
 template <typename T, typename Self>
 class QCPItemOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPItemOps<T>>>

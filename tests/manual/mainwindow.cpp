@@ -1518,7 +1518,7 @@ void MainWindow::presetInteractive(QCustomPlot *customPlot)
   connect(customPlot, SIGNAL(mousePress(QMouseEvent*)), this, SLOT(selectionRectChooser(QMouseEvent*)), Qt::UniqueConnection);
 }
 
-void MainWindow::labelItemAnchors(QCPAbstractItem *item, int fontSize, bool circle, bool labelBelow)
+void MainWindow::labelItemAnchors(QCPItem *item, int fontSize, bool circle, bool labelBelow)
 {
   QList<QCPItemAnchor*> anchors = item->anchors();
   for (int i=0; i<anchors.size(); ++i)
@@ -1573,7 +1573,7 @@ void MainWindow::showSelectTestColorMap(QCustomPlot *customPlot)
   // for items:
   for (int i=0; i<customPlot->itemCount(); ++i)
   {
-    QCPAbstractItem *item = customPlot->item(i);
+    QCPItem *item = customPlot->item(i);
     for (int y=0; y<colorMap.height(); ++y)
     {
       QRgb *p = reinterpret_cast<QRgb*>(colorMap.scanLine(y));
@@ -1597,7 +1597,7 @@ void MainWindow::showSelectTestColorMap(QCustomPlot *customPlot)
   // for plottables:
   for (int i=0; i<customPlot->plottableCount(); ++i)
   {
-    QCPAbstractPlottable *plottable = customPlot->plottable(i);
+    QCPPlottable *plottable = customPlot->plottable(i);
     for (int y=0; y<colorMap.height(); ++y)
     {
       QRgb *p = reinterpret_cast<QRgb*>(colorMap.scanLine(y));

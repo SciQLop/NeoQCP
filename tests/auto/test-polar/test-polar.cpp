@@ -616,7 +616,7 @@ void TestPolar::aPolarGraphJoinsAGroup()
     QCPPlottableGroup* group = plot.addPlottableGroup("polar");
     QVERIFY(group->addMember(graph.get()));
     QCOMPARE(graph->group(), group);
-    QCOMPARE(qcp::pointers(group->members()), QList<QCPAbstractPlottable*> { graph.get() });
+    QCOMPARE(qcp::pointers(group->members()), QList<QCPPlottable*> { graph.get() });
     settle(plot);
 }
 

@@ -80,7 +80,7 @@ Most changes are confined to the new classes. A few touch existing code.
 - **Item positions.** Items far outside the visible range no longer abort under Qt 6.11's checked integer rectangles. Pixel geometry of items uses floating point.
 - **Axis labels.** An axis label longer than its axis is elided with "…" instead of being cut at both ends.
 - **Log axes.** On a log axis spanning less than 1.6 decades, upstream falls back to linear ticks. NeoQCP puts the ticks on round mantissas (2, 5, ...) instead.
-- **Keyboard.** `QCustomPlot` now handles key presses. Each plottable sees the key first, through the new virtual `QCPAbstractPlottable::keyPress()`. Delete and Backspace make every selected item emit `QCPAbstractItem::deleteRequested()`; nothing is deleted for you.
+- **Keyboard.** `QCustomPlot` now handles key presses. Each plottable sees the key first, through the new virtual `QCPPlottable::keyPress()`. Delete and Backspace make every selected item emit `QCPItem::deleteRequested()`; nothing is deleted for you.
 - **Fixed upstream bugs.** DPI scaling on macOS and Windows; a crash of the date-time ticker on Qt 6.10 and newer; a use-after-delete in `removeLayer()`.
 - **Slots may delete their sender.** A slot connected to a NeoQCP signal can delete the object that emitted it: a plottable, an item, an axis rect, the legend, a colour scale, even the plot. Upstream this often crashed. To make it safe, a few signals moved or went away:
   - Deleting a selection rect no longer emits its `canceled` signal. If your code resets its own drag state on `canceled`, also watch the rect's `destroyed` signal.
@@ -119,7 +119,7 @@ NeoQCP 3.0 draws every plottable and item through a `QCPCoordinateSystem`. The c
 
 - **`QCP::capStraightSegments`.** A graph or curve now needs only this capability, not a rectangle and a straight key. A custom system that keeps straight lines straight can host them. Every other plottable keeps the 2.x default (`capRectangular | capStraightKey`).
 - **`keyAxis()` and `valueAxis()` can be null.** On a non-cartesian system, including a user system and a polar area, a plottable's and an item position's `keyAxis()`/`valueAxis()` return `nullptr`; 2.x pixel code must not assume an axis. Use `system()`, `keyAxisBase()` and `valueAxisBase()` to reach the axes on any system.
-- **`requiredCapabilities()` is a stored mask.** It is no longer virtual: the last argument of the `QCPAbstractPlottable` constructors is the `QCP::Capabilities` mask, and every intermediate constructor forwards it. An out-of-tree plottable that overrode `requiredCapabilities()` must pass the mask to its base constructor instead; an old override hides the accessor and is ignored.
+- **`requiredCapabilities()` is a stored mask.** It is no longer virtual: the last argument of the `QCPPlottable` constructors is the `QCP::Capabilities` mask, and every intermediate constructor forwards it. An out-of-tree plottable that overrode `requiredCapabilities()` must pass the mask to its base constructor instead; an old override hides the accessor and is ignored.
 - **A refused plottable is inert.** A plottable whose system lacks a capability it needs is built but joins no layer and no list, with one misuse report. `QCustomPlot::add<T>()` returns an empty handle for it, and `add(std::unique_ptr)` refuses it before touching the object. A later `setSystem()` with a system that admits it makes it a normal member of the plot.
 - **Layout elements stay in their plot.** Adding an axis rect or other layout element that belongs to another plot to this plot's layout is a misuse; the element stays in its old layout and plot, also when it is nested inside a plot-less layout first. Build a new element in the other plot instead.
 
@@ -189,7 +189,7 @@ Behaviour that changed:
 - **Fill partners.** A fill to another graph goes when that graph leaves the plot or its frame (taken, or moved to another axis rect), as it goes when that graph is deleted.
 - **Removing points.** `removeData(from, to)` removes nothing when `from >= to`, as 2.x.
 - **Equal values.** `setPen()` with the pen the graph already has does not repaint.
-- **New virtual.** `QCPAbstractPlottable::assignSelection(const QCPDataSelection&)` is a new protected virtual, called when the selection is set. A plottable of your own that has a method of that name must rename it.
+- **New virtual.** `QCPPlottable::assignSelection(const QCPDataSelection&)` is a new protected virtual, called when the selection is set. A plottable of your own that has a method of that name must rename it.
 
 ## Properties, change signals and bindings
 
@@ -278,25 +278,44 @@ Plot-wide settings:
 | `QCustomPlot::paintEvent()` override | items, layers or `overlay()` |
 | qmake project files, the amalgamated source | the Meson build |
 | Qt 4 / Qt 5 compatibility code | Qt 6.7 or newer |
-| Overriding `QCPAbstractItem::draw(QCPPainter*)` (it is final) | override `draw(QCPDrawContext&)` and record what the item draws |
-| Overriding `QCPAbstractPlottable::draw(QCPPainter*)` or `drawLegendIcon(QCPPainter*, const QRectF&)` (both final) | override `draw(QCPDrawContext&)`, and `drawLegendIcon(QCPDrawContext&)` for an icon of its own; `context.painter()` keeps painter code no command expresses |
-| `QCPAbstractPlottable1D::drawPolyline()`, `QCPAbstractPlottable::applyFillAntialiasingHint()`/`applyScattersAntialiasingHint()`, `QCPSelectionDecorator::applyPen()`/`applyBrush()` | record through `draw(QCPDrawContext&)`; inside a `context.painter()` callback, set the pen, brush and antialiasing on the painter directly |
+| Overriding `QCPItem::draw(QCPPainter*)` (it is final) | override `draw(QCPDrawContext&)` and record what the item draws |
+| Overriding `QCPPlottable::draw(QCPPainter*)` or `drawLegendIcon(QCPPainter*, const QRectF&)` (both final) | override `draw(QCPDrawContext&)`, and `drawLegendIcon(QCPDrawContext&)` for an icon of its own; `context.painter()` keeps painter code no command expresses |
+| `QCPPlottable1D::drawPolyline()`, `QCPPlottable::applyFillAntialiasingHint()`/`applyScattersAntialiasingHint()`, `QCPSelectionDecorator::applyPen()`/`applyBrush()` | record through `draw(QCPDrawContext&)`; inside a `context.painter()` callback, set the pen, brush and antialiasing on the painter directly |
 | Overriding `QCPStatisticalBox::drawStatisticalBox()` | override `draw(QCPDrawContext&)` |
 | `QCPPlottableLegendItem::getIconBorderPen()` | `legendIconBorderPen()`, on every legend row |
 | `QCPPolarAxisAngular` as a layout element (`addElement`, its background, inset layout, drag and wheel, `addRadialAxis`, `add<QCPPolarGraph>`) | `QCPPolarArea`, which owns the angular axis, the radial axes and the grid |
 | `QCPPolarAxisRadial::ScaleType`, the polar axes' `SelectablePart(s)`, `rangeDrag`/`rangeZoom` | `QCPAxisBase::ScaleType`, `QCPAxisBase::SelectablePart(s)`, `rangeDraggable`/`rangeZoomable` |
-| Overriding `QCPAbstractPlottable::axesChanged()` (NeoQCP 3.0 preview) | override `systemDidChange()`: a plottable now moves between coordinate systems |
-| Overriding `QCPAbstractPlottable::systemChanged()` (NeoQCP 3.0 preview) | override `systemDidChange()`: `systemChanged(QCPCoordinateSystem*)` is now the `system` property's signal |
+| Overriding `QCPPlottable::axesChanged()` (NeoQCP 3.0 preview) | override `systemDidChange()`: a plottable now moves between coordinate systems |
+| Overriding `QCPPlottable::systemChanged()` (NeoQCP 3.0 preview) | override `systemDidChange()`: `systemChanged(QCPCoordinateSystem*)` is now the `system` property's signal |
 | `QCPGraph2`, `QCPMultiGraph`, `QCPGraph::data()` (NeoQCP 3.0 preview) | see "One graph" above |
 | `QCPPolarArea::removeGraph(graph)` | `plot.remove(graph)`: the plot owns polar graphs; the area no longer deletes them |
 | `QCPPolarLegendItem`, `QCPPolarGraph::addToLegend`/`removeFromLegend` (polar overloads) | the plottable ones: a polar graph has a `QCPPlottableLegendItem` row |
 | `QCPCoordinateSystem::ratioTransform()`, `frameRatioTransform()` (NeoQCP 3.0 preview) | `QCPArea::ratioTransform()`: the ratio space belongs to the area |
 | `setRangeZoomFactor` on each radial axis | `QCPPolarArea::setRangeZoomFactor` (one factor for the area) |
 | String-based connections naming `QCPAxis::ScaleType` or `QCPAxis::SelectableParts`, such as `SIGNAL(scaleTypeChanged(QCPAxis::ScaleType))` | pointer-to-member `connect` (`&QCPAxis::scaleTypeChanged`), or spell the type `QCPAxisBase::ScaleType`: the enums now live in `QCPAxisBase` |
-| `QCPAbstractPlottable::mKeyAxis`, `mValueAxis` (protected members, now private) | in a subclass, the protected `keyAxisRaw()`/`valueAxisRaw()` (raw pointers, for per-point code) or `system()`; from outside, `keyAxis()`/`valueAxis()` (handles). All are null on a non-cartesian system |
+| `QCPPlottable::mKeyAxis`, `mValueAxis` (protected members, now private) | in a subclass, the protected `keyAxisRaw()`/`valueAxisRaw()` (raw pointers, for per-point code) or `system()`; from outside, `keyAxis()`/`valueAxis()` (handles). All are null on a non-cartesian system |
 | `QCPItemPosition::mKeyAxis`, `mValueAxis`, `mAxisRect` (protected members, now private) | the position's `keyAxis()`/`valueAxis()`/`axisRect()` (handles) or `system()`/`area()`. A one-axis position (`setAxes(nullptr, axis)`) keeps its axis and has no system; on a non-cartesian system the axes are null, and `axisRect()` is null on an area that is not an axis rect |
 | `QCPMarginGroup`, `QCPLayoutElement::setMarginGroup()`/`marginGroup()`/`marginGroups()` | `QCPAlignmentGroup::create({ a, b }, sides)`. Membership is per side, so one element can be in a left/right group and in a top/bottom group: `a->setMarginGroup(QCP::msLeft, g); b->setMarginGroup(QCP::msLeft, g);` becomes `QCPAlignmentGroup::create({ a, b }, QCP::msLeft);`. A group lines up inner edges instead of making margins equal; for elements in one column or one row this is the same. Stacked rows grouped on their top and bottom sides too (`msAll`) have no port: group their left and right sides only, and set the top and bottom margins by hand if they must match |
 | `QCPLayoutElement::alignmentGroup()` (3.0 preview, one group per element) | `alignmentGroup(side)`: an element holds one group per side |
 | `QCPItemSpan`/`QCPItemRSpan` `setPen()`, `setSelectedPen()`, `pen()`, `selectedPen()` and the `pen`/`selectedPen` properties | nothing: a span never drew its pen. It has no pen, so `handle.setPen(...)` on a span handle no longer compiles. Use `setBorderPen()`/`setSelectedBorderPen()` for the edge lines and `setBrush()` for the band |
 
 Everything else in the public API of QCustomPlot 2.1.1 is still there. The polar classes were a 2.1 tech preview; their changes are listed above.
+
+## Base classes drop "Abstract"
+
+The base classes of the 3.0 line lose the word. No alias is kept: rename the name in your code.
+
+| Old | New |
+|---|---|
+| `QCPAbstractPlottable` | `QCPPlottable` |
+| `QCPAbstractPlottable1D` | `QCPPlottable1D` |
+| `QCPAbstractItem` | `QCPItem` |
+| `QCPAbstractLegendItem` | `QCPLegendItem` |
+| `QCPAbstractLine` | `QCPLine` |
+| `QCPAbstractColorMapped` | `QCPColorMapped` |
+| `QCPAbstractSpanItem` | `QCPSpanItem` |
+| `QCPAbstractDataSource` | `QCPDataSource` |
+| `QCPAbstractDataSource2D` | `QCPDataSource2D` |
+| `QCPAbstractMultiDataSource` | `QCPMultiDataSource` |
+
+`QCPAbstractPaintBuffer` is internal and keeps its name. Source files such as `abstract-datasource.h` keep their names.

@@ -5,7 +5,7 @@
 class QCPIntervals;
 
 //! One legend row per category an interval plottable uses: a colour swatch and the name.
-class QCP_LIB_DECL QCPIntervalsLegendItem : public QCPAbstractLegendItem
+class QCP_LIB_DECL QCPIntervalsLegendItem : public QCPLegendItem
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPIntervalsLegendItem)

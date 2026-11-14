@@ -138,5 +138,5 @@ With several columns, `QCPGraph` calls `linesInData()` once per column over the 
 | `src/datasource/algorithms.h` | `qcp::algo::linesInData()` — the per-pixel algorithm, in data space (`envelopeInto()`, `KeyBucketGrid`, `LogKeyBucketGrid`); gap detection |
 | `src/datasource/graph-resampler.h` | `buildL1Cache()`, `resampleL2()` and their multi-column versions — the two resampling levels |
 | `src/plottables/plottable-graph.h/.cpp` | QCPGraph — drives the levels and the line cache in `draw()` |
-| `src/datasource/abstract-multi-datasource.h` | QCPAbstractMultiDataSource — the graph's data source interface, `linesInData(column, ...)` |
+| `src/datasource/abstract-multi-datasource.h` | QCPMultiDataSource — the graph's data source interface, `linesInData(column, ...)` |
 | `src/datasource/soa-multi-datasource.h` | QCPSoAMultiDataSource — keys plus one value array per column |

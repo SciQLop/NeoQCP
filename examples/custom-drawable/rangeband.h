@@ -15,11 +15,11 @@
   recording. setData and setBrush open a new generation, which is what makes the next frame record
   again.
 */
-class RangeBand : public QCPAbstractPlottable
+class RangeBand : public QCPPlottable
 {
 public:
     RangeBand(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractPlottable(keyAxis, valueAxis)
+        : QCPPlottable(keyAxis, valueAxis)
     { }
 
     void setData(const QVector<double>& keys, const QVector<double>& lower,

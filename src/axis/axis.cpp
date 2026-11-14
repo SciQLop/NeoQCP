@@ -1647,13 +1647,13 @@ void QCPAxis::setScaleRatio(const QCPAxis* otherAxis, double ratio)
   Changes the axis range such that all plottables associated with this axis are fully visible in
   that dimension.
 
-  \see QCPAbstractPlottable::rescaleAxes, QCustomPlot::rescaleAxes
+  \see QCPPlottable::rescaleAxes, QCustomPlot::rescaleAxes
 */
 void QCPAxis::rescale(bool onlyVisiblePlottables)
 {
     QCPRange newRange;
     bool haveRange = false;
-    for (QCPAbstractPlottable* plottable : plottablesRaw())
+    for (QCPPlottable* plottable : plottablesRaw())
     {
         if (!plottable->realVisibility() && onlyVisiblePlottables)
             continue;
@@ -1870,13 +1870,13 @@ QList<QCPHandle<QCPGraph>> QCPAxis::graphs() const
 
   \see plottables, graphs
 */
-QList<QCPHandle<QCPAbstractItem>> QCPAxis::items() const
+QList<QCPHandle<QCPItem>> QCPAxis::items() const
 {
-    QList<QCPHandle<QCPAbstractItem>> result;
+    QList<QCPHandle<QCPItem>> result;
     if (!mParentPlot)
         return result;
 
-    for (QCPAbstractItem* item : mParentPlot->mItems)
+    for (QCPItem* item : mParentPlot->mItems)
     {
         for (QCPItemPosition* position : item->positions())
         {
@@ -1885,7 +1885,7 @@ QList<QCPHandle<QCPAbstractItem>> QCPAxis::items() const
             if ((position->systemRaw() && position->systemRaw()->usesAxis(this))
                 || position->keyAxisRaw() == this || position->valueAxisRaw() == this)
             {
-                result.append(QCPHandle<QCPAbstractItem>(item));
+                result.append(QCPHandle<QCPItem>(item));
                 break;
             }
         }

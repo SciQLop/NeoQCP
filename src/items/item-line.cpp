@@ -93,7 +93,7 @@ QPointF pixelOf(const QCPDrawContext& context, const QCP::Position& at, QCPItemP
   ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
 */
 QCPItemLine::QCPItemLine(QCustomPlot* parentPlot)
-        : QCPAbstractItem(parentPlot)
+        : QCPItem(parentPlot)
         , start(createPosition(QLatin1String("start")))
         , end(createPosition(QLatin1String("end")))
 {

@@ -282,7 +282,7 @@ class DroppingAxis : public FlatAxis
 public:
     DroppingAxis(QCPArea* area, Qt::Orientation orientation) : FlatAxis(area, orientation) { }
 
-    QList<QCPHandle<QCPAbstractPlottable>> plottables() const override
+    QList<QCPHandle<QCPPlottable>> plottables() const override
     {
         ++mPlottablesCalls;
         return { };
@@ -1792,7 +1792,7 @@ void TestUserSystem::aSkewItemIsAlwaysAnIndexCandidate()
 void TestUserSystem::aPolarGraphIsRectSelected()
 {
     // A pin: QCPPolarGraph has had its own selectTestRect since before 4j. The user-system branch
-    // this milestone added to QCPAbstractPlottable1D never serves it.
+    // this milestone added to QCPPlottable1D never serves it.
     QCustomPlot plot;
     QCPPolarArea* area = polarArea(plot);
     auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180 },
@@ -2437,7 +2437,7 @@ void TestUserSystem::setColorScaleOnTheBaseIsRefused()
     QCOMPARE(graph->system(), flatSystem);
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 
-    QCPAbstractColorMapped* base = graph;
+    QCPColorMapped* base = graph;
     base->setColorScale(nullptr);
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     QCOMPARE(graph->colorScale(), scale);

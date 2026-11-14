@@ -522,7 +522,7 @@ QCPBarsData::QCPBarsData(double key, double value) : key(key), value(value) { }
   \section qcpbars-usage Usage
 
   Like all data representing objects in QCustomPlot, the QCPBars is a plottable
-  (QCPAbstractPlottable). So the plottable-interface of QCustomPlot applies
+  (QCPPlottable). So the plottable-interface of QCustomPlot applies
   (QCustomPlot::plottable, QCustomPlot::removePlottable, etc.)
 
   Usually, you first create an instance:
@@ -599,7 +599,7 @@ QCPBarsData::QCPBarsData(double key, double value) : key(key), value(value) { }
   but use QCustomPlot::removePlottable() instead.
 */
 QCPBars::QCPBars(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractPlottable1D<QCPBarsData>(keyAxis, valueAxis)
+        : QCPPlottable1D<QCPBarsData>(keyAxis, valueAxis)
         , mWidth(0.75)
         , mWidthType(wtPlotCoords)
         , mBarsGroup(nullptr)
@@ -936,7 +936,7 @@ QCPDataSelection QCPBars::selectTestRect(const QRectF& rect, bool onlySelectable
   If \a details is not 0, it will be set to a \ref QCPDataSelection, describing the closest data
   point to \a pos.
 
-  \seebaseclassmethod \ref QCPAbstractPlottable::selectTest
+  \seebaseclassmethod \ref QCPPlottable::selectTest
 */
 std::optional<double> QCPBars::hitTest(QCP::Pixels at, QVariant* details) const
 {
@@ -1176,7 +1176,7 @@ bool QCPBars::hasPixelGeometry() const
 
 quint64 QCPBars::dependencyRevision() const
 {
-    const quint64 own = QCPAbstractPlottable1D<QCPBarsData>::dependencyRevision();
+    const quint64 own = QCPPlottable1D<QCPBarsData>::dependencyRevision();
     // simplify: every bar of a stack walks the whole stack below it, and a check round asks each of
     // them (stallOffset per plottable, then ensureRecording per paint), so the round costs
     // O(depth^2) - 20k virtual calls for a 200-bar stack, twice a pan frame. A per-frame cache is

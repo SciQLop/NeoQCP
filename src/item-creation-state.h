@@ -2,7 +2,7 @@
 #include "layer.h"
 #include <QPointer>
 
-class QCPAbstractItem;
+class QCPItem;
 class QCPAxis;
 class QCPAxisRect;
 class QCPPainter;
@@ -25,7 +25,7 @@ public:
     void cancel();
 
 signals:
-    void itemCreated(QCPAbstractItem* item);
+    void itemCreated(QCPItem* item);
     void itemCanceled();
 
 protected:
@@ -35,7 +35,7 @@ protected:
 private:
     QCustomPlot* mPlot;
     State mState = Idle;
-    QPointer<QCPAbstractItem> mCurrentItem;
+    QPointer<QCPItem> mCurrentItem;
     QCPAxis* mKeyAxis = nullptr;
     QCPAxis* mValueAxis = nullptr;
     double mAnchorKey = 0;
@@ -46,7 +46,7 @@ private:
     void cancelItem();
     void updateItemPosition(const QPointF& pixelPos);
     void drawBadge(QCPPainter* painter, const QRect& axisRectArea);
-    static void rebindPositions(QCPAbstractItem* item, QCPAxis* keyAxis,
+    static void rebindPositions(QCPItem* item, QCPAxis* keyAxis,
                                 QCPAxis* valueAxis, QCPAxisRect* axisRect);
     QCPAxisRect* axisRectAt(const QPointF& pos) const;
 };

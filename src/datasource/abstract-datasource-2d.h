@@ -2,10 +2,10 @@
 #include "abstract-datasource.h" // for IndexableNumericRange concept, QCPRange
 #include "global.h"              // for QCP::SignDomain
 
-class QCPAbstractDataSource2D
+class QCPDataSource2D
 {
 public:
-    virtual ~QCPAbstractDataSource2D() = default;
+    virtual ~QCPDataSource2D() = default;
 
     virtual int xSize() const = 0;
     virtual int ySize() const = 0;

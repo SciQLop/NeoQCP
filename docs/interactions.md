@@ -151,7 +151,7 @@ The default one draws a blue pen, 2.5 pixels wide.
 
 A `QCPGraph` keeps one selection per component. It draws the selected segments with each component's selected pen. Once you style the decorator, or set one of your own, the line takes the decorator's pen and the markers its marker style. Error bars of a selected component use its selected pen. See {doc}`graphs`.
 
-A plottable that wants to react to a new selection overrides the protected virtual `QCPAbstractPlottable::assignSelection()`.
+A plottable that wants to react to a new selection overrides the protected virtual `QCPPlottable::assignSelection()`.
 
 (selection-rect)=
 ## Drag a rectangle
@@ -298,7 +298,7 @@ The mouse works like upstream QCustomPlot, with these changes:
 - `noAntialiasingOnDrag` is on by default. While you drag, and while the wheel turns, antialiasing is off. It comes back on release, or 300 ms after the last wheel step.
 - Mouse tracking is on, so `mouseMove` is emitted without a pressed button.
 - The plot takes keyboard focus on click. `Delete` and `Backspace` emit `deleteRequested()` on every selected item. The item is not deleted for you.
-- A plottable can consume key presses by overriding `QCPAbstractPlottable::keyPress()`.
+- A plottable can consume key presses by overriding `QCPPlottable::keyPress()`.
 - Items can be created with the mouse. That mode gets the press before anything else, and a right click cancels it. See {doc}`items`.
 - Plottables can show the busy indicator described above.
 - `QCP::iGestures` adds trackpad and touch gestures (swipe, pinch).
