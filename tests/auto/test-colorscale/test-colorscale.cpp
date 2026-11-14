@@ -314,8 +314,10 @@ void TestColorScale::aScaleSlotDeletingTheMovedMapIsSafe()
         ran = true;
         delete moved.data();
     }, Qt::SingleShotConnection);
+    // Either setter may complete the move: the slot may have deleted the map after the first.
     moved->setKeyAxis(bottom->axis(QCPAxis::atBottom));
-    moved->setValueAxis(bottom->axis(QCPAxis::atLeft));
+    if (moved)
+        moved->setValueAxis(bottom->axis(QCPAxis::atLeft));
     QVERIFY(ran);
     QVERIFY(!moved);
     mPlot->replot();
