@@ -50,7 +50,8 @@ class QCP_LIB_DECL QCPPolarArea : public QCPArea
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-
+    Q_PROPERTY(double rangeZoomFactor READ rangeZoomFactor WRITE setRangeZoomFactor NOTIFY
+                   rangeZoomFactorChanged)
     /// \endcond
 
 public:
@@ -87,10 +88,7 @@ public:
     bool removeRadialAxis(QCPPolarAxisRadial* axis);
     void rescale(bool onlyVisiblePlottables = false);
 
-    /*! Sets the factor a wheel step zooms every radial range by, around the radius under the
-     * cursor.
-     */
-    void setRangeZoomFactor(double factor) { mRangeZoomFactor = factor; }
+    void setRangeZoomFactor(double factor);
 
     // Out of line: QCustomPlot is incomplete here, and clang checks add<T>'s body at its
     // definition.
@@ -117,6 +115,9 @@ public:
     // reimplemented virtual methods:
     virtual void update(UpdatePhase phase) override;
     virtual QList<QCPHandle<QCPAxisBase>> allAxes() const override;
+
+signals:
+    void rangeZoomFactorChanged(double rangeZoomFactor);
 
 protected:
     QList<QCPAxisBase*> allAxesRaw() const override;

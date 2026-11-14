@@ -41,6 +41,66 @@
   functionality to be incomplete, as well as changing public interfaces in the future.
 */
 
+/*! \fn void QCPPolarGrid::radialAxisChanged(QCPPolarAxisRadial* radialAxis)
+
+  This signal is emitted when \ref radialAxis changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarGrid::typeChanged(QCPPolarGrid::GridTypes type)
+
+  This signal is emitted when \ref type changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarGrid::subGridTypeChanged(QCPPolarGrid::GridTypes subGridType)
+
+  This signal is emitted when \ref subGridType changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarGrid::antialiasedSubGridChanged(bool antialiasedSubGrid)
+
+  This signal is emitted when \ref antialiasedSubGrid changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarGrid::antialiasedZeroLineChanged(bool antialiasedZeroLine)
+
+  This signal is emitted when \ref antialiasedZeroLine changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarGrid::angularPenChanged(const QPen& angularPen)
+
+  This signal is emitted when \ref angularPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarGrid::angularSubGridPenChanged(const QPen& angularSubGridPen)
+
+  This signal is emitted when \ref angularSubGridPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarGrid::radialPenChanged(const QPen& radialPen)
+
+  This signal is emitted when \ref radialPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarGrid::radialSubGridPenChanged(const QPen& radialSubGridPen)
+
+  This signal is emitted when \ref radialSubGridPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarGrid::radialZeroLinePenChanged(const QPen& radialZeroLinePen)
+
+  This signal is emitted when \ref radialZeroLinePen changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates a QCPPolarGrid instance and sets default values.
 
@@ -87,6 +147,7 @@ void QCPPolarGrid::setRadialAxis(QCPPolarAxisRadial* axis)
         return;
     markDirty();
     mRadialAxis = axis;
+    qcpEmit(this, mParentPlot, &QCPPolarGrid::radialAxisChanged, mRadialAxis.data());
 }
 
 void QCPPolarGrid::setType(GridTypes type)
@@ -95,6 +156,7 @@ void QCPPolarGrid::setType(GridTypes type)
         return;
     markDirty();
     mType = type;
+    qcpEmit(this, mParentPlot, &QCPPolarGrid::typeChanged, mType);
 }
 
 void QCPPolarGrid::setSubGridType(GridTypes type)
@@ -103,6 +165,7 @@ void QCPPolarGrid::setSubGridType(GridTypes type)
         return;
     markDirty();
     mSubGridType = type;
+    qcpEmit(this, mParentPlot, &QCPPolarGrid::subGridTypeChanged, mSubGridType);
 }
 
 /*!
@@ -114,6 +177,7 @@ void QCPPolarGrid::setAntialiasedSubGrid(bool enabled)
         return;
     markDirty();
     mAntialiasedSubGrid = enabled;
+    qcpEmit(this, mParentPlot, &QCPPolarGrid::antialiasedSubGridChanged, antialiasedSubGrid());
 }
 
 /*!
@@ -125,6 +189,7 @@ void QCPPolarGrid::setAntialiasedZeroLine(bool enabled)
         return;
     markDirty();
     mAntialiasedZeroLine = enabled;
+    qcpEmit(this, mParentPlot, &QCPPolarGrid::antialiasedZeroLineChanged, antialiasedZeroLine());
 }
 
 /*!
@@ -136,6 +201,7 @@ void QCPPolarGrid::setAngularPen(const QPen& pen)
         return;
     markDirty();
     mAngularPen = pen;
+    qcpEmit(this, mParentPlot, &QCPPolarGrid::angularPenChanged, angularPen());
 }
 
 /*!
@@ -147,6 +213,7 @@ void QCPPolarGrid::setAngularSubGridPen(const QPen& pen)
         return;
     markDirty();
     mAngularSubGridPen = pen;
+    qcpEmit(this, mParentPlot, &QCPPolarGrid::angularSubGridPenChanged, angularSubGridPen());
 }
 
 void QCPPolarGrid::setRadialPen(const QPen& pen)
@@ -155,6 +222,7 @@ void QCPPolarGrid::setRadialPen(const QPen& pen)
         return;
     markDirty();
     mRadialPen = pen;
+    qcpEmit(this, mParentPlot, &QCPPolarGrid::radialPenChanged, radialPen());
 }
 
 void QCPPolarGrid::setRadialSubGridPen(const QPen& pen)
@@ -163,6 +231,7 @@ void QCPPolarGrid::setRadialSubGridPen(const QPen& pen)
         return;
     markDirty();
     mRadialSubGridPen = pen;
+    qcpEmit(this, mParentPlot, &QCPPolarGrid::radialSubGridPenChanged, radialSubGridPen());
 }
 
 void QCPPolarGrid::setRadialZeroLinePen(const QPen& pen)
@@ -171,6 +240,7 @@ void QCPPolarGrid::setRadialZeroLinePen(const QPen& pen)
         return;
     markDirty();
     mRadialZeroLinePen = pen;
+    qcpEmit(this, mParentPlot, &QCPPolarGrid::radialZeroLinePenChanged, radialZeroLinePen());
 }
 
 /*! \internal

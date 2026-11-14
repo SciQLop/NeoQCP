@@ -44,6 +44,8 @@ private slots:
     void slotDeletingThePlotDuringAWriter_data();
     void slotDeletingThePlotDuringAWriter();
     void exceptionsNameRealProperties();
+    void everyFormRowHolds_data();
+    void everyFormRowHolds();
     void everyNotifyPropertyNotifiesOncePerChange_data();
     void everyNotifyPropertyNotifiesOncePerChange();
     void exceptionRulesHold_data();

@@ -184,6 +184,8 @@ class QCP_LIB_DECL QCPAxis : public QCPAxisBase
         QCPLineEnding lowerEnding READ lowerEnding WRITE setLowerEnding NOTIFY lowerEndingChanged)
     Q_PROPERTY(
         QCPLineEnding upperEnding READ upperEnding WRITE setUpperEnding NOTIFY upperEndingChanged)
+    Q_PROPERTY(QCPLabelRenderer* labelRenderer READ labelRenderer WRITE setLabelRenderer NOTIFY
+                   labelRendererChanged)
     /// \endcond
 
 public:
@@ -410,6 +412,7 @@ signals:
     void selectedSubTickPenChanged(const QPen& selectedSubTickPen);
     void lowerEndingChanged(const QCPLineEnding& lowerEnding);
     void upperEndingChanged(const QCPLineEnding& upperEnding);
+    void labelRendererChanged(QCPLabelRenderer* labelRenderer);
 
 protected:
     // property members:

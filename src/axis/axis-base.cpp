@@ -26,6 +26,18 @@
   deferred signals.
 */
 
+/*! \fn void QCPAxisBase::rangeDraggableChanged(bool rangeDraggable)
+
+  This signal is emitted when \ref rangeDraggable changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAxisBase::rangeZoomableChanged(bool rangeZoomable)
+
+  This signal is emitted when \ref rangeZoomable changes, after the plot delivers its deferred
+  signals.
+*/
+
 QCPAxisBase::QCPAxisBase(QCPArea* area, Qt::Orientation orientation)
         : QCPLayerable(area ? area->parentPlot() : nullptr, QString(), area)
         , mArea(area)
@@ -257,7 +269,10 @@ void QCPAxisBase::setRangeReversed(bool reversed)
 */
 void QCPAxisBase::setRangeDraggable(bool draggable)
 {
+    if (draggable == mRangeDraggable)
+        return;
     mRangeDraggable = draggable;
+    qcpEmit(this, mParentPlot, &QCPAxisBase::rangeDraggableChanged, rangeDraggable());
 }
 
 /*!
@@ -265,7 +280,10 @@ void QCPAxisBase::setRangeDraggable(bool draggable)
 */
 void QCPAxisBase::setRangeZoomable(bool zoomable)
 {
+    if (zoomable == mRangeZoomable)
+        return;
     mRangeZoomable = zoomable;
+    qcpEmit(this, mParentPlot, &QCPAxisBase::rangeZoomableChanged, rangeZoomable());
 }
 
 /*!

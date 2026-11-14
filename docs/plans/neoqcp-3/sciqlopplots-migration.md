@@ -352,3 +352,17 @@ it instead of `property("name")`.
 - The plot setters `setBackgroundScaled`, `setBackgroundScaledMode`, `setAutoAddPlottableToLegend`,
   `setSelectionTolerance`, `setNoAntialiasingOnDrag`, `setMultiSelectModifier` and `setBackground(QPixmap)` return
   on an equal value.
+
+### New properties (Task 3)
+
+The one-argument setter/getter pairs that had no `Q_PROPERTY` are properties now, each with an `xChanged(T)`
+signal. Nothing that compiled stops compiling; the rows below are the behaviour that moved with them.
+
+- Axes and polar classes: `QCPAxisBase::rangeDraggable` / `rangeZoomable`, `QCPAxis::labelRenderer`, every pair of
+  `QCPPolarAxisAngular`, `QCPPolarAxisRadial` and `QCPPolarGrid`, `QCPPolarArea::rangeZoomFactor`, and
+  `QCPPolarGraph::periodic` / `lineStyle` / `scatterStyle`.
+- `QCPAxisBase::setRangeDraggable` / `setRangeZoomable`, `QCPPolarArea::setRangeZoomFactor` and
+  `QCPPolarGraph::setScatterStyle` return on an equal value. `QCPPolarArea::setRangeZoomFactor` moved out of line.
+- The polar axes' `setTickLabelRotation` compares the clamped angle, like `QCPAxis`'s.
+- The polar axes' `numberFormatChanged` fires only when `numberFormat()` moves. The angular axis reads its
+  multiplication sign from its label painter, so a write can move the members without moving the getter.

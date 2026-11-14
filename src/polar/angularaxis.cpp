@@ -47,6 +47,181 @@
   \warning In this QCustomPlot version, polar plots are a tech preview. Expect documentation and
   functionality to be incomplete, as well as changing public interfaces in the future.
 */
+/*! \fn void QCPPolarAxisAngular::angleChanged(double angle)
+
+  This signal is emitted when \ref angle changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::ticksChanged(bool ticks)
+
+  This signal is emitted when \ref ticks changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::tickLabelsChanged(bool tickLabels)
+
+  This signal is emitted when \ref tickLabels changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::tickLabelPaddingChanged(int tickLabelPadding)
+
+  This signal is emitted when \ref tickLabelPadding changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::tickLabelFontChanged(const QFont& tickLabelFont)
+
+  This signal is emitted when \ref tickLabelFont changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::tickLabelColorChanged(const QColor& tickLabelColor)
+
+  This signal is emitted when \ref tickLabelColor changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::tickLabelRotationChanged(double tickLabelRotation)
+
+  This signal is emitted when \ref tickLabelRotation changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::tickLabelModeChanged(QCPPolarAxisAngular::LabelMode tickLabelMode)
+
+  This signal is emitted when \ref tickLabelMode changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::numberFormatChanged(const QString& numberFormat)
+
+  This signal is emitted when \ref numberFormat changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::numberPrecisionChanged(int numberPrecision)
+
+  This signal is emitted when \ref numberPrecision changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::tickLengthInChanged(int tickLengthIn)
+
+  This signal is emitted when \ref tickLengthIn changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::tickLengthOutChanged(int tickLengthOut)
+
+  This signal is emitted when \ref tickLengthOut changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::subTicksChanged(bool subTicks)
+
+  This signal is emitted when \ref subTicks changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::subTickLengthInChanged(int subTickLengthIn)
+
+  This signal is emitted when \ref subTickLengthIn changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::subTickLengthOutChanged(int subTickLengthOut)
+
+  This signal is emitted when \ref subTickLengthOut changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::basePenChanged(const QPen& basePen)
+
+  This signal is emitted when \ref basePen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::tickPenChanged(const QPen& tickPen)
+
+  This signal is emitted when \ref tickPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::subTickPenChanged(const QPen& subTickPen)
+
+  This signal is emitted when \ref subTickPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::labelFontChanged(const QFont& labelFont)
+
+  This signal is emitted when \ref labelFont changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::labelColorChanged(const QColor& labelColor)
+
+  This signal is emitted when \ref labelColor changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::labelChanged(const QString& label)
+
+  This signal is emitted when \ref label changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::labelPaddingChanged(int labelPadding)
+
+  This signal is emitted when \ref labelPadding changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::selectedTickLabelFontChanged(const QFont& selectedTickLabelFont)
+
+  This signal is emitted when \ref selectedTickLabelFont changes, after the plot delivers its
+  deferred signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::selectedLabelFontChanged(const QFont& selectedLabelFont)
+
+  This signal is emitted when \ref selectedLabelFont changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::selectedTickLabelColorChanged(const QColor&
+  selectedTickLabelColor)
+
+  This signal is emitted when \ref selectedTickLabelColor changes, after the plot delivers its
+  deferred signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::selectedLabelColorChanged(const QColor& selectedLabelColor)
+
+  This signal is emitted when \ref selectedLabelColor changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::selectedBasePenChanged(const QPen& selectedBasePen)
+
+  This signal is emitted when \ref selectedBasePen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::selectedTickPenChanged(const QPen& selectedTickPen)
+
+  This signal is emitted when \ref selectedTickPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarAxisAngular::selectedSubTickPenChanged(const QPen& selectedSubTickPen)
+
+  This signal is emitted when \ref selectedSubTickPen changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates the angular axis belonging to \a area.
 */
@@ -295,12 +470,15 @@ void QCPPolarAxisAngular::setAngle(double degrees)
 {
     if (degrees == mAngle)
         return;
+    // The area's systems signal the new frame: a slot there may delete the axis.
+    const QCPEmissionScope scope(mParentPlot);
     markAppearanceDirty();
     mAngle = degrees;
     mAngleRad = mAngle / 180.0 * M_PI;
     // The rotation is part of every polar frame: no range moved, so the area is told here.
     if (polarArea())
         polarArea()->axisMappingChanged(this);
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::angleChanged, angle());
 }
 
 /*!
@@ -318,6 +496,7 @@ void QCPPolarAxisAngular::setTicks(bool show)
         markDirty();
         mTicks = show;
         // mCachedMarginValid = false;
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::ticksChanged, ticks());
     }
 }
 
@@ -333,6 +512,7 @@ void QCPPolarAxisAngular::setTickLabels(bool show)
         // mCachedMarginValid = false;
         if (!mTickLabels)
             mTickVectorLabels.clear();
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLabelsChanged, tickLabels());
     }
 }
 
@@ -346,6 +526,7 @@ void QCPPolarAxisAngular::setTickLabelPadding(int padding)
         return;
     markDirty();
     mLabelPainter.setPadding(padding);
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLabelPaddingChanged, tickLabelPadding());
 }
 
 /*!
@@ -359,6 +540,7 @@ void QCPPolarAxisAngular::setTickLabelFont(const QFont& font)
         return;
     markDirty();
     mTickLabelFont = font;
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLabelFontChanged, tickLabelFont());
 }
 
 /*!
@@ -372,6 +554,7 @@ void QCPPolarAxisAngular::setTickLabelColor(const QColor& color)
         return;
     markDirty();
     mTickLabelColor = color;
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLabelColorChanged, tickLabelColor());
 }
 
 /*!
@@ -385,10 +568,11 @@ void QCPPolarAxisAngular::setTickLabelColor(const QColor& color)
 */
 void QCPPolarAxisAngular::setTickLabelRotation(double degrees)
 {
-    if (mLabelPainter.rotation() == degrees)
+    if (mLabelPainter.rotation() == qBound(-90.0, degrees, 90.0))
         return;
     markDirty();
     mLabelPainter.setRotation(degrees);
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLabelRotationChanged, tickLabelRotation());
 }
 
 void QCPPolarAxisAngular::setTickLabelMode(LabelMode mode)
@@ -399,6 +583,7 @@ void QCPPolarAxisAngular::setTickLabelMode(LabelMode mode)
         return;
     markDirty();
     mLabelPainter.setAnchorMode(anchor);
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLabelModeChanged, tickLabelMode());
 }
 
 /*!
@@ -433,6 +618,9 @@ void QCPPolarAxisAngular::setTickLabelMode(LabelMode mode)
 */
 void QCPPolarAxisAngular::setNumberFormat(const QString& formatCode)
 {
+    // The getter is what the signal reports; the members can move without it (the angular axis
+    // reads the cross from its label painter).
+    const QString before = numberFormat();
     const QChar previousChar = mNumberFormatChar;
     const bool previousBeautiful = mNumberBeautifulPowers;
     const bool previousCross = mNumberMultiplyCross;
@@ -497,6 +685,8 @@ void QCPPolarAxisAngular::setNumberFormat(const QString& formatCode)
     mLabelPainter.setSubstituteExponent(mNumberBeautifulPowers);
     mLabelPainter.setMultiplicationSymbol(mNumberMultiplyCross ? QCPLabelPainterPrivate::SymbolCross
                                                                : QCPLabelPainterPrivate::SymbolDot);
+    if (numberFormat() != before)
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::numberFormatChanged, numberFormat());
 }
 
 /*!
@@ -510,6 +700,7 @@ void QCPPolarAxisAngular::setNumberPrecision(int precision)
         return;
     markDirty();
     mNumberPrecision = precision;
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::numberPrecisionChanged, numberPrecision());
 }
 
 /*!
@@ -522,6 +713,8 @@ void QCPPolarAxisAngular::setNumberPrecision(int precision)
 */
 void QCPPolarAxisAngular::setTickLength(int inside, int outside)
 {
+    // Both signals wait for the scope: a slot of the first may delete the axis.
+    const QCPEmissionScope scope(mParentPlot);
     setTickLengthIn(inside);
     setTickLengthOut(outside);
 }
@@ -538,6 +731,7 @@ void QCPPolarAxisAngular::setTickLengthIn(int inside)
     {
         markDirty();
         mTickLengthIn = inside;
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLengthInChanged, tickLengthIn());
     }
 }
 
@@ -555,6 +749,7 @@ void QCPPolarAxisAngular::setTickLengthOut(int outside)
         markDirty();
         mTickLengthOut = outside;
         // mCachedMarginValid = false; // only outside tick length can change margin
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickLengthOutChanged, tickLengthOut());
     }
 }
 
@@ -572,6 +767,7 @@ void QCPPolarAxisAngular::setSubTicks(bool show)
         markDirty();
         mSubTicks = show;
         // mCachedMarginValid = false;
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::subTicksChanged, subTicks());
     }
 }
 
@@ -585,6 +781,8 @@ void QCPPolarAxisAngular::setSubTicks(bool show)
 */
 void QCPPolarAxisAngular::setSubTickLength(int inside, int outside)
 {
+    // Both signals wait for the scope: a slot of the first may delete the axis.
+    const QCPEmissionScope scope(mParentPlot);
     setSubTickLengthIn(inside);
     setSubTickLengthOut(outside);
 }
@@ -601,6 +799,7 @@ void QCPPolarAxisAngular::setSubTickLengthIn(int inside)
     {
         markDirty();
         mSubTickLengthIn = inside;
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::subTickLengthInChanged, subTickLengthIn());
     }
 }
 
@@ -617,6 +816,7 @@ void QCPPolarAxisAngular::setSubTickLengthOut(int outside)
         return;
     markDirty();
     mSubTickLengthOut = outside;
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::subTickLengthOutChanged, subTickLengthOut());
 }
 
 /*!
@@ -630,6 +830,7 @@ void QCPPolarAxisAngular::setBasePen(const QPen& pen)
         return;
     markDirty();
     mBasePen = pen;
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::basePenChanged, basePen());
 }
 
 /*!
@@ -643,6 +844,7 @@ void QCPPolarAxisAngular::setTickPen(const QPen& pen)
         return;
     markDirty();
     mTickPen = pen;
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::tickPenChanged, tickPen());
 }
 
 /*!
@@ -656,6 +858,7 @@ void QCPPolarAxisAngular::setSubTickPen(const QPen& pen)
         return;
     markDirty();
     mSubTickPen = pen;
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::subTickPenChanged, subTickPen());
 }
 
 /*!
@@ -670,6 +873,7 @@ void QCPPolarAxisAngular::setLabelFont(const QFont& font)
         markDirty();
         mLabelFont = font;
         // mCachedMarginValid = false;
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::labelFontChanged, labelFont());
     }
 }
 
@@ -684,6 +888,7 @@ void QCPPolarAxisAngular::setLabelColor(const QColor& color)
         return;
     markDirty();
     mLabelColor = color;
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::labelColorChanged, labelColor());
 }
 
 /*!
@@ -697,6 +902,7 @@ void QCPPolarAxisAngular::setLabel(const QString& str)
         markDirty();
         mLabel = str;
         // mCachedMarginValid = false;
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::labelChanged, label());
     }
 }
 
@@ -712,6 +918,7 @@ void QCPPolarAxisAngular::setLabelPadding(int padding)
         markDirty();
         mLabelPadding = padding;
         // mCachedMarginValid = false;
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::labelPaddingChanged, labelPadding());
     }
 }
 
@@ -728,6 +935,8 @@ void QCPPolarAxisAngular::setSelectedTickLabelFont(const QFont& font)
         mSelectedTickLabelFont = font;
         // don't set mCachedMarginValid to false here because margin calculation is always done with
         // non-selected fonts
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectedTickLabelFontChanged,
+                selectedTickLabelFont());
     }
 }
 
@@ -742,6 +951,7 @@ void QCPPolarAxisAngular::setSelectedLabelFont(const QFont& font)
         return;
     markDirty();
     mSelectedLabelFont = font;
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectedLabelFontChanged, selectedLabelFont());
 }
 
 /*!
@@ -755,6 +965,8 @@ void QCPPolarAxisAngular::setSelectedTickLabelColor(const QColor& color)
     {
         markDirty();
         mSelectedTickLabelColor = color;
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectedTickLabelColorChanged,
+                selectedTickLabelColor());
     }
 }
 
@@ -769,6 +981,8 @@ void QCPPolarAxisAngular::setSelectedLabelColor(const QColor& color)
         return;
     markDirty();
     mSelectedLabelColor = color;
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectedLabelColorChanged,
+            selectedLabelColor());
 }
 
 /*!
@@ -782,6 +996,7 @@ void QCPPolarAxisAngular::setSelectedBasePen(const QPen& pen)
         return;
     markDirty();
     mSelectedBasePen = pen;
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectedBasePenChanged, selectedBasePen());
 }
 
 /*!
@@ -795,6 +1010,7 @@ void QCPPolarAxisAngular::setSelectedTickPen(const QPen& pen)
         return;
     markDirty();
     mSelectedTickPen = pen;
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectedTickPenChanged, selectedTickPen());
 }
 
 /*!
@@ -808,6 +1024,8 @@ void QCPPolarAxisAngular::setSelectedSubTickPen(const QPen& pen)
         return;
     markDirty();
     mSelectedSubTickPen = pen;
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectedSubTickPenChanged,
+            selectedSubTickPen());
 }
 
 /*! \internal

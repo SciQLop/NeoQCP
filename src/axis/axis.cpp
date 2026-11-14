@@ -646,6 +646,12 @@ void QCPGrid::drawSubGridLines(QCPPainter* painter) const
 
 /* end of documentation of signals */
 
+/*! \fn void QCPAxis::labelRendererChanged(QCPLabelRenderer* labelRenderer)
+
+  This signal is emitted when \ref labelRenderer changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Constructs an Axis instance of Type \a type for the axis rect \a parent.
 
@@ -1401,6 +1407,7 @@ void QCPAxis::setLabelRenderer(QCPLabelRenderer* renderer)
         mLabelRenderer = renderer;
         mCachedMarginValid = false; // a different typesetter means a different size
         markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::labelRendererChanged, labelRenderer());
     }
 }
 

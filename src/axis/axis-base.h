@@ -69,6 +69,10 @@ class QCP_LIB_DECL QCPAxisBase : public QCPLayerable
                    selectionChanged)
     Q_PROPERTY(SelectableParts selectableParts READ selectableParts WRITE setSelectableParts NOTIFY
                    selectableChanged)
+    Q_PROPERTY(bool rangeDraggable READ rangeDraggable WRITE setRangeDraggable NOTIFY
+                   rangeDraggableChanged)
+    Q_PROPERTY(
+        bool rangeZoomable READ rangeZoomable WRITE setRangeZoomable NOTIFY rangeZoomableChanged)
     /// \endcond
 
 public:
@@ -193,6 +197,8 @@ signals:
     void selectableChanged();
     void rangeReversedChanged(bool rangeReversed);
     void tickerChanged(const QSharedPointer<QCPAxisTicker>& ticker);
+    void rangeDraggableChanged(bool rangeDraggable);
+    void rangeZoomableChanged(bool rangeZoomable);
 
 protected:
     // The hot members sit together, first among this class's: a coordToPixel call reads where the

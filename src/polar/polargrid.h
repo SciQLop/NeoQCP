@@ -40,7 +40,23 @@ class QCP_LIB_DECL QCPPolarGrid : public QCPLayerable
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-
+    Q_PROPERTY(
+        QCPPolarAxisRadial* radialAxis READ radialAxis WRITE setRadialAxis NOTIFY radialAxisChanged)
+    Q_PROPERTY(GridTypes type READ type WRITE setType NOTIFY typeChanged)
+    Q_PROPERTY(
+        GridTypes subGridType READ subGridType WRITE setSubGridType NOTIFY subGridTypeChanged)
+    Q_PROPERTY(bool antialiasedSubGrid READ antialiasedSubGrid WRITE setAntialiasedSubGrid NOTIFY
+                   antialiasedSubGridChanged)
+    Q_PROPERTY(bool antialiasedZeroLine READ antialiasedZeroLine WRITE setAntialiasedZeroLine NOTIFY
+                   antialiasedZeroLineChanged)
+    Q_PROPERTY(QPen angularPen READ angularPen WRITE setAngularPen NOTIFY angularPenChanged)
+    Q_PROPERTY(QPen angularSubGridPen READ angularSubGridPen WRITE setAngularSubGridPen NOTIFY
+                   angularSubGridPenChanged)
+    Q_PROPERTY(QPen radialPen READ radialPen WRITE setRadialPen NOTIFY radialPenChanged)
+    Q_PROPERTY(QPen radialSubGridPen READ radialSubGridPen WRITE setRadialSubGridPen NOTIFY
+                   radialSubGridPenChanged)
+    Q_PROPERTY(QPen radialZeroLinePen READ radialZeroLinePen WRITE setRadialZeroLinePen NOTIFY
+                   radialZeroLinePenChanged)
     /// \endcond
 
 public:
@@ -103,6 +119,18 @@ public:
     void setRadialPen(const QPen& pen);
     void setRadialSubGridPen(const QPen& pen);
     void setRadialZeroLinePen(const QPen& pen);
+
+signals:
+    void radialAxisChanged(QCPPolarAxisRadial* radialAxis);
+    void typeChanged(QCPPolarGrid::GridTypes type);
+    void subGridTypeChanged(QCPPolarGrid::GridTypes subGridType);
+    void antialiasedSubGridChanged(bool antialiasedSubGrid);
+    void antialiasedZeroLineChanged(bool antialiasedZeroLine);
+    void angularPenChanged(const QPen& angularPen);
+    void angularSubGridPenChanged(const QPen& angularSubGridPen);
+    void radialPenChanged(const QPen& radialPen);
+    void radialSubGridPenChanged(const QPen& radialSubGridPen);
+    void radialZeroLinePenChanged(const QPen& radialZeroLinePen);
 
 protected:
     // property members:

@@ -52,6 +52,12 @@
   functionality to be incomplete, as well as changing public interfaces in the future.
 */
 
+/*! \fn void QCPPolarArea::rangeZoomFactorChanged(double rangeZoomFactor)
+
+  This signal is emitted when \ref rangeZoomFactor changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates a polar area with one angular axis, one radial axis and a grid, on the plot's current
   layer.
@@ -247,6 +253,17 @@ QList<QCPPolarGraph*> QCPPolarArea::graphs() const
             if (graph->system() && graph->system()->area() == this)
                 result.append(graph);
     return result;
+}
+
+/*!
+  Sets the factor a wheel step zooms every radial range by, around the radius under the cursor.
+*/
+void QCPPolarArea::setRangeZoomFactor(double factor)
+{
+    if (factor == mRangeZoomFactor)
+        return;
+    mRangeZoomFactor = factor;
+    qcpEmit(this, mParentPlot, &QCPPolarArea::rangeZoomFactorChanged, rangeZoomFactor());
 }
 
 /*!

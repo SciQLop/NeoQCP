@@ -28,6 +28,7 @@
 #include "../coordinate-system-polar.h"
 #include "../coordinate-system.h"
 #include "../coords.h"
+#include "../core.h"
 #include "../painting/draw-commands.h"
 #include "../painting/draw-context.h"
 #include "polar-area.h"
@@ -64,6 +65,24 @@ QCPCoordinateSystem* systemOfAxes(QCPPolarAxisAngular* angular, QCPPolarAxisRadi
 }
 } // namespace
 
+/*! \fn void QCPPolarGraph::periodicChanged(bool periodic)
+
+  This signal is emitted when \ref periodic changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarGraph::lineStyleChanged(QCPPolarGraph::LineStyle lineStyle)
+
+  This signal is emitted when \ref lineStyle changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPolarGraph::scatterStyleChanged(const QCPScatterStyle& scatterStyle)
+
+  This signal is emitted when \ref scatterStyle changes, after the plot delivers its deferred
+  signals.
+*/
+
 QCPPolarGraph::QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* valueAxis,
                              QCP::Capabilities required)
         : QCPPolarGraph(systemOfAxes(keyAxis, valueAxis), required)
@@ -99,6 +118,7 @@ void QCPPolarGraph::setPeriodic(bool enabled)
         return;
     mPeriodic = enabled;
     markDirty();
+    qcpEmit(this, mParentPlot, &QCPPolarGraph::periodicChanged, periodic());
 }
 
 void QCPPolarGraph::setLineStyle(LineStyle ls)
@@ -107,12 +127,16 @@ void QCPPolarGraph::setLineStyle(LineStyle ls)
         return;
     mLineStyle = ls;
     markDirty();
+    qcpEmit(this, mParentPlot, &QCPPolarGraph::lineStyleChanged, lineStyle());
 }
 
 void QCPPolarGraph::setScatterStyle(const QCPScatterStyle& style)
 {
+    if (style == mScatterStyle)
+        return;
     mScatterStyle = style;
     markDirty();
+    qcpEmit(this, mParentPlot, &QCPPolarGraph::scatterStyleChanged, scatterStyle());
 }
 
 void QCPPolarGraph::setData(QSharedPointer<QCPGraphDataContainer> data)

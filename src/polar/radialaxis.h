@@ -50,7 +50,54 @@ class QCP_LIB_DECL QCPPolarAxisRadial : public QCPAxisBase
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-
+    Q_PROPERTY(double angle READ angle WRITE setAngle NOTIFY angleChanged)
+    Q_PROPERTY(AngleReference angleReference READ angleReference WRITE setAngleReference NOTIFY
+                   angleReferenceChanged)
+    Q_PROPERTY(bool ticks READ ticks WRITE setTicks NOTIFY ticksChanged)
+    Q_PROPERTY(bool tickLabels READ tickLabels WRITE setTickLabels NOTIFY tickLabelsChanged)
+    Q_PROPERTY(int tickLabelPadding READ tickLabelPadding WRITE setTickLabelPadding NOTIFY
+                   tickLabelPaddingChanged)
+    Q_PROPERTY(
+        QFont tickLabelFont READ tickLabelFont WRITE setTickLabelFont NOTIFY tickLabelFontChanged)
+    Q_PROPERTY(QColor tickLabelColor READ tickLabelColor WRITE setTickLabelColor NOTIFY
+                   tickLabelColorChanged)
+    Q_PROPERTY(double tickLabelRotation READ tickLabelRotation WRITE setTickLabelRotation NOTIFY
+                   tickLabelRotationChanged)
+    Q_PROPERTY(LabelMode tickLabelMode READ tickLabelMode WRITE setTickLabelMode NOTIFY
+                   tickLabelModeChanged)
+    Q_PROPERTY(
+        QString numberFormat READ numberFormat WRITE setNumberFormat NOTIFY numberFormatChanged)
+    Q_PROPERTY(int numberPrecision READ numberPrecision WRITE setNumberPrecision NOTIFY
+                   numberPrecisionChanged)
+    Q_PROPERTY(int tickLengthIn READ tickLengthIn WRITE setTickLengthIn NOTIFY tickLengthInChanged)
+    Q_PROPERTY(
+        int tickLengthOut READ tickLengthOut WRITE setTickLengthOut NOTIFY tickLengthOutChanged)
+    Q_PROPERTY(bool subTicks READ subTicks WRITE setSubTicks NOTIFY subTicksChanged)
+    Q_PROPERTY(int subTickLengthIn READ subTickLengthIn WRITE setSubTickLengthIn NOTIFY
+                   subTickLengthInChanged)
+    Q_PROPERTY(int subTickLengthOut READ subTickLengthOut WRITE setSubTickLengthOut NOTIFY
+                   subTickLengthOutChanged)
+    Q_PROPERTY(QPen basePen READ basePen WRITE setBasePen NOTIFY basePenChanged)
+    Q_PROPERTY(QPen tickPen READ tickPen WRITE setTickPen NOTIFY tickPenChanged)
+    Q_PROPERTY(QPen subTickPen READ subTickPen WRITE setSubTickPen NOTIFY subTickPenChanged)
+    Q_PROPERTY(QFont labelFont READ labelFont WRITE setLabelFont NOTIFY labelFontChanged)
+    Q_PROPERTY(QColor labelColor READ labelColor WRITE setLabelColor NOTIFY labelColorChanged)
+    Q_PROPERTY(QString label READ label WRITE setLabel NOTIFY labelChanged)
+    Q_PROPERTY(int labelPadding READ labelPadding WRITE setLabelPadding NOTIFY labelPaddingChanged)
+    Q_PROPERTY(QFont selectedTickLabelFont READ selectedTickLabelFont WRITE setSelectedTickLabelFont
+                   NOTIFY selectedTickLabelFontChanged)
+    Q_PROPERTY(QFont selectedLabelFont READ selectedLabelFont WRITE setSelectedLabelFont NOTIFY
+                   selectedLabelFontChanged)
+    Q_PROPERTY(QColor selectedTickLabelColor READ selectedTickLabelColor WRITE
+                   setSelectedTickLabelColor NOTIFY selectedTickLabelColorChanged)
+    Q_PROPERTY(QColor selectedLabelColor READ selectedLabelColor WRITE setSelectedLabelColor NOTIFY
+                   selectedLabelColorChanged)
+    Q_PROPERTY(QPen selectedBasePen READ selectedBasePen WRITE setSelectedBasePen NOTIFY
+                   selectedBasePenChanged)
+    Q_PROPERTY(QPen selectedTickPen READ selectedTickPen WRITE setSelectedTickPen NOTIFY
+                   selectedTickPenChanged)
+    Q_PROPERTY(QPen selectedSubTickPen READ selectedSubTickPen WRITE setSelectedSubTickPen NOTIFY
+                   selectedSubTickPenChanged)
     /// \endcond
 
 public:
@@ -188,6 +235,38 @@ public:
 
     // The part of this axis at pos, spNone where there is none. Public as in 2.x.
     SelectablePart getPartAt(const QPointF& pos) const override;
+
+signals:
+    void angleChanged(double angle);
+    void angleReferenceChanged(QCPPolarAxisRadial::AngleReference angleReference);
+    void ticksChanged(bool ticks);
+    void tickLabelsChanged(bool tickLabels);
+    void tickLabelPaddingChanged(int tickLabelPadding);
+    void tickLabelFontChanged(const QFont& tickLabelFont);
+    void tickLabelColorChanged(const QColor& tickLabelColor);
+    void tickLabelRotationChanged(double tickLabelRotation);
+    void tickLabelModeChanged(QCPPolarAxisRadial::LabelMode tickLabelMode);
+    void numberFormatChanged(const QString& numberFormat);
+    void numberPrecisionChanged(int numberPrecision);
+    void tickLengthInChanged(int tickLengthIn);
+    void tickLengthOutChanged(int tickLengthOut);
+    void subTicksChanged(bool subTicks);
+    void subTickLengthInChanged(int subTickLengthIn);
+    void subTickLengthOutChanged(int subTickLengthOut);
+    void basePenChanged(const QPen& basePen);
+    void tickPenChanged(const QPen& tickPen);
+    void subTickPenChanged(const QPen& subTickPen);
+    void labelFontChanged(const QFont& labelFont);
+    void labelColorChanged(const QColor& labelColor);
+    void labelChanged(const QString& label);
+    void labelPaddingChanged(int labelPadding);
+    void selectedTickLabelFontChanged(const QFont& selectedTickLabelFont);
+    void selectedLabelFontChanged(const QFont& selectedLabelFont);
+    void selectedTickLabelColorChanged(const QColor& selectedTickLabelColor);
+    void selectedLabelColorChanged(const QColor& selectedLabelColor);
+    void selectedBasePenChanged(const QPen& selectedBasePen);
+    void selectedTickPenChanged(const QPen& selectedTickPen);
+    void selectedSubTickPenChanged(const QPen& selectedSubTickPen);
 
 protected:
     // The area as the polar one it always is: the base stores it as a plain QCPArea.

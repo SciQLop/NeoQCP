@@ -583,6 +583,22 @@ QCustomPlot* plotOf(QObject* object)
     return qobject_cast<QCustomPlot*>(object);
 }
 
+// A typesetter other than the default one, which is null without LaTeX.
+class PlainRenderer : public QCPLabelRenderer
+{
+public:
+    QSize measure(const QFont& font, const QString& text) const override
+    {
+        return measureWith(nullptr, font, text);
+    }
+
+    void draw(QCPPainter* painter, const QRect& rect, const QFont& font, const QColor& color,
+              const QString& text, int flags) const override
+    {
+        drawWith(nullptr, painter, rect, font, color, text, flags);
+    }
+} plainRenderer;
+
 QColor otherColor(const QColor& color)
 {
     return color == QColor(Qt::magenta) ? QColor(Qt::cyan) : QColor(Qt::magenta);
@@ -691,6 +707,16 @@ const QVector<std::pair<QMetaType, Different>>& differentValues()
                                     { return new QCPBarsGroup(plotOf(object)); }),
         differentFor<QCPColorScale*>([](QCPColorScale* const&, QObject* object) -> QCPColorScale*
                                      { return colorScaleOn(*plotOf(object)); }),
+        differentFor<QCPLabelRenderer*>(
+            [](QCPLabelRenderer* const& v, QObject*) -> QCPLabelRenderer*
+            { return v == &plainRenderer ? nullptr : &plainRenderer; }),
+        differentFor<QCPPolarAxisRadial*>(
+            [](QCPPolarAxisRadial* const& v, QObject* object) -> QCPPolarAxisRadial*
+            {
+                auto* area = plotOf(object)->findChild<QCPPolarArea*>();
+                QCPPolarAxisRadial* first = area->radialAxis().get();
+                return v == first ? area->addRadialAxis().get() : first;
+            }),
         differentFor<QCPAxis*>(
             [](QCPAxis* const& v, QObject* object) -> QCPAxis*
             {
@@ -791,6 +817,20 @@ const QVector<Exception>& exceptions()
         { &QCPAbstractLine::staticMetaObject, "pen", Rule::ComponentPen,
           [](QObject*) { return QVariant(QPen(Qt::blue, 3)); }, nullptr,
           "repaints when only a component differs (plottable-line.cpp:84)" },
+        { &QCPPolarAxisAngular::staticMetaObject, "numberFormat", Rule::Refuses,
+          [](QObject*) { return QVariant(QStringLiteral("eb")); },
+          [](QObject*) { return QVariant(QStringLiteral("xb")); },
+          "parses the format code and refuses an invalid one (angularaxis.cpp)" },
+        { &QCPPolarAxisRadial::staticMetaObject, "numberFormat", Rule::Refuses,
+          [](QObject*) { return QVariant(QStringLiteral("eb")); },
+          [](QObject*) { return QVariant(QStringLiteral("xb")); },
+          "parses the format code and refuses an invalid one (radialaxis.cpp)" },
+        { &QCPPolarAxisAngular::staticMetaObject, "tickLabelRotation", Rule::Clamps,
+          [](QObject*) { return QVariant(45.0); }, [](QObject*) { return QVariant(120.0); },
+          "the label painter clamps to [-90, 90]" },
+        { &QCPPolarAxisRadial::staticMetaObject, "tickLabelRotation", Rule::Clamps,
+          [](QObject*) { return QVariant(45.0); }, [](QObject*) { return QVariant(120.0); },
+          "the label painter clamps to [-90, 90]" },
         { &QCPPolarAxisAngular::staticMetaObject, "scaleType", Rule::Refuses, nullptr,
           [](QObject*) { return QVariant::fromValue(QCPAxisBase::stLogarithmic); },
           "the ring has no logarithmic scale (angularaxis.cpp:938)", true },
@@ -927,6 +967,26 @@ const QVector<Writer>& writers()
         { "QCPAxis::setSubTickLength",
           [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
           [](QObject* o) { qobject_cast<QCPAxis*>(o)->setSubTickLength(9, 8); },
+          { "subTickLengthIn", "subTickLengthOut" },
+          { "tickLengthIn" } },
+        { "QCPPolarAxisAngular::setTickLength",
+          [](QCustomPlot& plot) -> QObject* { return polarAreaOn(plot)->angularAxis().get(); },
+          [](QObject* o) { qobject_cast<QCPPolarAxisAngular*>(o)->setTickLength(9, 8); },
+          { "tickLengthIn", "tickLengthOut" },
+          { "subTickLengthIn" } },
+        { "QCPPolarAxisAngular::setSubTickLength",
+          [](QCustomPlot& plot) -> QObject* { return polarAreaOn(plot)->angularAxis().get(); },
+          [](QObject* o) { qobject_cast<QCPPolarAxisAngular*>(o)->setSubTickLength(9, 8); },
+          { "subTickLengthIn", "subTickLengthOut" },
+          { "tickLengthIn" } },
+        { "QCPPolarAxisRadial::setTickLength",
+          [](QCustomPlot& plot) -> QObject* { return polarAreaOn(plot)->radialAxis().get(); },
+          [](QObject* o) { qobject_cast<QCPPolarAxisRadial*>(o)->setTickLength(9, 8); },
+          { "tickLengthIn", "tickLengthOut" },
+          { "subTickLengthIn" } },
+        { "QCPPolarAxisRadial::setSubTickLength",
+          [](QCustomPlot& plot) -> QObject* { return polarAreaOn(plot)->radialAxis().get(); },
+          [](QObject* o) { qobject_cast<QCPPolarAxisRadial*>(o)->setSubTickLength(9, 8); },
           { "subTickLengthIn", "subTickLengthOut" },
           { "tickLengthIn" } },
         { "QCPAxisBase::setRangeLower",
@@ -1226,6 +1286,22 @@ const QVector<Nested>& nestedWriters()
                   axis, &QCPAxis::tickLengthInChanged, [&] { axis->setTickLength(9, 8); },
                   [&] { return axis->tickLengthOut() == 8; });
           } },
+        { "QCPPolarAxisAngular::setTickLength",
+          [](QCustomPlot& plot)
+          {
+              QCPPolarAxisAngular* axis = polarAreaOn(plot)->angularAxis().get();
+              return probeOnce(
+                  axis, &QCPPolarAxisAngular::tickLengthInChanged,
+                  [&] { axis->setTickLength(9, 8); }, [&] { return axis->tickLengthOut() == 8; });
+          } },
+        { "QCPPolarAxisRadial::setSubTickLength",
+          [](QCustomPlot& plot)
+          {
+              QCPPolarAxisRadial* axis = polarAreaOn(plot)->radialAxis().get();
+              return probeOnce(
+                  axis, &QCPPolarAxisRadial::subTickLengthInChanged, [&]
+                  { axis->setSubTickLength(9, 8); }, [&] { return axis->subTickLengthOut() == 8; });
+          } },
         { "QCPColorScale::setType",
           [](QCustomPlot& plot)
           {
@@ -1430,6 +1506,22 @@ const QVector<Deleting>& deletingWriters()
               return std::pair<QObject*, const char*>(plot.legend.get(), "rowStretchFactors");
           },
           [](QCustomPlot& plot) { plot.add(std::move(pendingGraph)); } },
+        { "QCPPolarAxisAngular::setTickLength",
+          [](QCustomPlot& plot)
+          {
+              return std::pair<QObject*, const char*>(polarAreaOn(plot)->angularAxis().get(),
+                                                      "tickLengthIn");
+          },
+          [](QCustomPlot& plot)
+          { plot.findChild<QCPPolarArea*>()->angularAxis()->setTickLength(9, 8); } },
+        { "QCPPolarAxisRadial::setSubTickLength",
+          [](QCustomPlot& plot)
+          {
+              return std::pair<QObject*, const char*>(polarAreaOn(plot)->radialAxis().get(),
+                                                      "subTickLengthIn");
+          },
+          [](QCustomPlot& plot)
+          { plot.findChild<QCPPolarArea*>()->radialAxis()->setSubTickLength(9, 8); } },
         { "QCPAxisRect::setupFullAxesBox", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(plot.xAxis2.get(), "visible"); },
           [](QCustomPlot& plot) { plot.axisRect()->setupFullAxesBox(); } },
@@ -1474,6 +1566,150 @@ void TestMetaSurface::exceptionsNameRealProperties()
                  qPrintable(QStringLiteral("%1::%2 is no property")
                                 .arg(QLatin1String(e.meta->className()),
                                      QLatin1String(e.property))));
+}
+
+namespace
+{
+// The form table (docs/plans/neoqcp-3/m5e-forms.md), sections 3.1 and 3.3, row by row.
+enum class Form
+{
+    Plain, // writable, NOTIFY
+    Constant, // CONSTANT, read-only
+    Derived, // read-only, NOTIFY
+    Gadget, // writable, no NOTIFY, on a Q_GADGET
+    Off, // dropped or out: no property of that name
+};
+
+struct FormRow
+{
+    const QMetaObject* meta;
+    const char* property;
+    Form form;
+    const char* notify = nullptr; // the NOTIFY's name when it is not <property>Changed
+};
+
+QVector<FormRow> plainRows(const QMetaObject* meta, std::initializer_list<const char*> names)
+{
+    QVector<FormRow> rows;
+    for (const char* name : names)
+        rows.append({ meta, name, Form::Plain });
+    return rows;
+}
+
+QVector<FormRow> polarAxisRows(const QMetaObject* meta)
+{
+    return plainRows(meta,
+                     { "angle",
+                       "ticks",
+                       "tickLabels",
+                       "tickLabelPadding",
+                       "tickLabelFont",
+                       "tickLabelColor",
+                       "tickLabelRotation",
+                       "tickLabelMode",
+                       "numberFormat",
+                       "numberPrecision",
+                       "tickLengthIn",
+                       "tickLengthOut",
+                       "subTicks",
+                       "subTickLengthIn",
+                       "subTickLengthOut",
+                       "basePen",
+                       "tickPen",
+                       "subTickPen",
+                       "labelFont",
+                       "labelColor",
+                       "label",
+                       "labelPadding",
+                       "selectedTickLabelFont",
+                       "selectedLabelFont",
+                       "selectedTickLabelColor",
+                       "selectedLabelColor",
+                       "selectedBasePen",
+                       "selectedTickPen",
+                       "selectedSubTickPen" });
+}
+
+const QVector<FormRow>& formRows()
+{
+    static const QVector<FormRow> rows = []
+    {
+        QVector<FormRow> r;
+        r += plainRows(&QCPAxisBase::staticMetaObject, { "rangeDraggable", "rangeZoomable" });
+        r += plainRows(&QCPAxis::staticMetaObject, { "labelRenderer" });
+        r += polarAxisRows(&QCPPolarAxisAngular::staticMetaObject);
+        r += polarAxisRows(&QCPPolarAxisRadial::staticMetaObject);
+        r += plainRows(&QCPPolarAxisRadial::staticMetaObject, { "angleReference" });
+        r += plainRows(&QCPPolarArea::staticMetaObject, { "rangeZoomFactor" });
+        r += plainRows(&QCPPolarGraph::staticMetaObject,
+                       { "periodic", "lineStyle", "scatterStyle" });
+        r += { { &QCPPolarGraph::staticMetaObject, "data", Form::Off } };
+        r += plainRows(&QCPPolarGrid::staticMetaObject,
+                       { "radialAxis", "type", "subGridType", "antialiasedSubGrid",
+                         "antialiasedZeroLine", "angularPen", "angularSubGridPen", "radialPen",
+                         "radialSubGridPen", "radialZeroLinePen" });
+        for (const char* name : { "tickStepStrategy", "tickCount", "tickOrigin" })
+            r += { { &QCPAxisTicker::staticMetaObject, name, Form::Off } };
+        for (const char* name : { "tickStep", "scaleStrategy" })
+            r += { { &QCPAxisTickerFixed::staticMetaObject, name, Form::Off } };
+        for (const char* name : { "piSymbol", "piValue", "periodicity", "fractionStyle" })
+            r += { { &QCPAxisTickerPi::staticMetaObject, name, Form::Off } };
+        r += { { &QCPAxisTickerTime::staticMetaObject, "timeFormat", Form::Off } };
+        for (const char* name :
+             { "anchorSide", "anchorMode", "anchorReference", "anchorReferenceType", "font",
+               "color", "padding", "rotation", "substituteExponent", "multiplicationSymbol",
+               "abbreviateDecimalPowers", "cacheSize" })
+            r += { { &QCPLabelPainterPrivate::staticMetaObject, name, Form::Off } };
+        return r;
+    }();
+    return rows;
+}
+} // namespace
+
+void TestMetaSurface::everyFormRowHolds_data()
+{
+    QTest::addColumn<int>("row");
+    for (int i = 0; i < formRows().size(); ++i)
+        QTest::addRow("%s::%s", formRows()[i].meta->className(), formRows()[i].property) << i;
+}
+
+void TestMetaSurface::everyFormRowHolds()
+{
+    QFETCH(int, row);
+    const FormRow& r = formRows()[row];
+    const int index = r.meta->indexOfProperty(r.property);
+    if (r.form == Form::Off)
+    {
+        QVERIFY2(index < 0, "a property, against the table");
+        return;
+    }
+    QVERIFY2(index >= 0, "no such property");
+    QVERIFY2(declaringClass(r.meta, index) == r.meta, "declared by another class");
+    const QMetaProperty property = r.meta->property(index);
+    switch (r.form)
+    {
+        case Form::Plain:
+            QVERIFY(property.isWritable());
+            QVERIFY(property.hasNotifySignal());
+            QCOMPARE(property.notifySignal().name(),
+                     r.notify ? QByteArray(r.notify) : QByteArray(r.property) + "Changed");
+            break;
+        case Form::Constant:
+            QVERIFY(property.isConstant());
+            QVERIFY(!property.isWritable());
+            break;
+        case Form::Derived:
+            QVERIFY(!property.isWritable());
+            QVERIFY(property.hasNotifySignal());
+            QCOMPARE(property.notifySignal().name(), QByteArray(r.notify));
+            break;
+        case Form::Gadget:
+            QVERIFY(property.isWritable());
+            QVERIFY(!property.hasNotifySignal());
+            break;
+        case Form::Off:
+            break;
+    }
 }
 
 void TestMetaSurface::everyNotifyPropertyNotifiesOncePerChange_data()

@@ -62,7 +62,10 @@ class QCP_LIB_DECL QCPPolarGraph : public QCPAbstractPlottable1D<QCPGraphData>
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-
+    Q_PROPERTY(bool periodic READ periodic WRITE setPeriodic NOTIFY periodicChanged)
+    Q_PROPERTY(LineStyle lineStyle READ lineStyle WRITE setLineStyle NOTIFY lineStyleChanged)
+    Q_PROPERTY(QCPScatterStyle scatterStyle READ scatterStyle WRITE setScatterStyle NOTIFY
+                   scatterStyleChanged)
     /// \endcond
 
 public:
@@ -133,6 +136,11 @@ public:
     // introduced virtual methods:
     void draw(QCPDrawContext& context) const override;
     quint64 dependencyRevision() const override;
+
+signals:
+    void periodicChanged(bool periodic);
+    void lineStyleChanged(QCPPolarGraph::LineStyle lineStyle);
+    void scatterStyleChanged(const QCPScatterStyle& scatterStyle);
 
 protected:
     // The keys the recording holds: 2.1's window (the whole container for a periodic graph).
