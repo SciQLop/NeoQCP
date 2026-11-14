@@ -198,10 +198,6 @@ user would see and where the code is. Fixed items are deleted, not ticked.
   setters open an emission scope around their two setters: +3-4 % on `QCPAxis_SetTickLength10kItems`
   (ruling R-17). The scopes of `setTheme`, the legend, plottable removal and legend selection are unbenched
   (R-18). Upgrade: open the scope only when one of the signals has a receiver.
-- **`QCPGraph::setComponentErrorBars` emits with no scope, then keeps working.** Hiding the bound columns sends
-  `componentVisibilityChanged`; the function then hides the next column and marks the decorations. A slot that
-  deletes the graph there reads freed memory. Pre-existing (the signal predates 5e), same class as the final
-  review's I1/I2: one scope at the top, plus a deleting-writer row.
 - **`QCPDrawContext_ReplayMarkers100k` +10.2 % at the end of 5e.** 9 pairs; 5e changed nothing on the replay
   path. The base build is bimodal (35.4 or 39.5 M ticks), the new one sits at 39.0. Check it on several linker
   layouts before looking for code (`baseline.md`, "End of milestone 5e").

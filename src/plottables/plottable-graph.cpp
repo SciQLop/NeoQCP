@@ -1074,6 +1074,9 @@ bool QCPGraph::setComponentErrorBars(int value, int lower, int upper, double cap
     if (!isValidColumn(value) || !isValidColumn(lower) || !isValidColumn(upper)
         || lower == upper || value == lower || value == upper)
         return false;
+    // Hiding a bound signals componentVisibilityChanged: deliver it once this graph is done, so a
+    // slot may delete it.
+    const QCPEmissionScope scope(mParentPlot);
     clearComponentErrorBars(value);
     mErrorBars.append({ value, lower, upper, std::move(pen), capWidthPx });
     hideErrorBound(lower);
@@ -1087,6 +1090,9 @@ void QCPGraph::clearComponentErrorBars(int value)
     const auto old = componentErrorBars(value);
     if (!old)
         return;
+    // Showing a bound again signals componentVisibilityChanged: deliver it once this graph is
+    // done, so a slot may delete it.
+    const QCPEmissionScope scope(mParentPlot);
     mErrorBars.erase(std::remove_if(mErrorBars.begin(), mErrorBars.end(),
                                     [value](const ErrorBars& e) { return e.value == value; }),
                      mErrorBars.end());

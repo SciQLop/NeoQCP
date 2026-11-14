@@ -125,6 +125,11 @@ workspace `neoqcp`.
   - `overlay()` kept working after it delivered the layer's `modeChanged`.
   - Pre-existing: `followKeyAxisRectScale` wrote to the plottable after a slot deleted it (R-21).
   - The migration page still stated E-13's false premise.
+- Before the push, pre-existing: `QCPGraph::setComponentErrorBars` and `clearComponentErrorBars` sent
+  `componentVisibilityChanged` with no scope, then kept using the graph. A slot that deleted the graph read freed
+  memory (ASan, two new deleting-writer rows). Each holds one scope now. The other component setters send their
+  signal last. A new source that drops error bars re-shows their bounds too: `installSource`, `dataChanged` and
+  `setSystem` hold a scope already, and the owned-source edits that skip one cannot change the column count.
 
 ## Deferred (also in backlog.md)
 
@@ -133,9 +138,6 @@ workspace `neoqcp`.
   final (final review M2).
 - `QCPItems_Add10k` and `QCPItems_RestyleAll10k` move with code layout (R-19).
 - A setter's scope costs a `QPointer` and a flush even when nothing listens (R-17, R-18).
-- Pre-existing, same bug class: `QCPGraph::setComponentErrorBars` emits `componentVisibilityChanged` with no scope,
-  then keeps working on the graph. A slot that deletes the graph there reads freed memory. The final review left
-  it out of scope (the signal predates 5e).
 - `QCPDrawContext_ReplayMarkers100k` +10.2 % at the end of the milestone, unexplained (see Results).
 - No bench row adds or removes plottables, or touches the legend or the theme.
 - `QCPHitAction` is a global `enum class`, outside any meta-object scope. It stays unregistered: moving it into

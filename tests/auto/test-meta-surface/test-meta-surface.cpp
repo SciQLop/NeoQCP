@@ -44,6 +44,15 @@ QCPGraph* twoColumnGraphOn(QCustomPlot& plot)
     return graph;
 }
 
+// A value column and its two error bounds.
+QCPGraph* threeColumnGraphOn(QCustomPlot& plot)
+{
+    QCPGraph* graph = plot.addGraph();
+    graph->setData(QVector<double> { 0, 5, 10 },
+                   std::vector<QVector<double>> { { 1, 6, 2 }, { 0, 5, 1 }, { 2, 7, 3 } });
+    return graph;
+}
+
 QCPIntervals* intervalsOn(QCustomPlot& plot)
 {
     auto* layout = new QCPLaneLayout(&plot);
@@ -2210,6 +2219,20 @@ const QVector<Deleting>& deletingWriters()
         { "QCPAxisRect::setupFullAxesBox", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(plot.xAxis2.get(), "visible"); },
           [](QCustomPlot& plot) { plot.axisRect()->setupFullAxesBox(); } },
+        { "QCPGraph::setComponentErrorBars hiding both bounds", [](QCustomPlot& plot)
+          {
+              return std::pair<QObject*, const char*>(threeColumnGraphOn(plot),
+                                                      "componentVisibilityChanged()");
+          },
+          [](QCustomPlot& plot) { (void)plot.graph(0)->setComponentErrorBars(0, 1, 2); }, true },
+        { "QCPGraph::clearComponentErrorBars showing both bounds",
+          [](QCustomPlot& plot)
+          {
+              QCPGraph* graph = threeColumnGraphOn(plot);
+              (void)graph->setComponentErrorBars(0, 1, 2);
+              return std::pair<QObject*, const char*>(graph, "componentVisibilityChanged()");
+          },
+          [](QCustomPlot& plot) { plot.graph(0)->clearComponentErrorBars(0); }, true },
     };
     return list;
 }
