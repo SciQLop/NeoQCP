@@ -1031,16 +1031,17 @@ double QCPErrorBars::pointDistance(const QPointF& pixelPoint,
     QCPErrorBarsDataContainer::const_iterator begin, end;
     getVisibleDataBounds(begin, end, QCPDataRange(0, dataCount()));
 
-    // calculate minimum distances to error backbones (whiskers are ignored for speed) and find
-    // closestData iterator:
+    // The whiskers count: they are drawn, so a click on one must select the bar.
     double minDistSqr = (std::numeric_limits<double>::max)();
     QVector<QLineF> backbones, whiskers;
     for (QCPErrorBarsDataContainer::const_iterator it = begin; it != end; ++it)
     {
+        backbones.clear();
+        whiskers.clear();
         getErrorBarLines(it, backbones, whiskers);
-        for (const QLineF& backbone : backbones)
+        for (const QLineF& line : backbones + whiskers)
         {
-            const double currentDistSqr = QCPVector2D(pixelPoint).distanceSquaredToLine(backbone);
+            const double currentDistSqr = QCPVector2D(pixelPoint).distanceSquaredToLine(line);
             if (currentDistSqr < minDistSqr)
             {
                 minDistSqr = currentDistSqr;

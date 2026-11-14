@@ -16,6 +16,7 @@ private slots:
     void axisRectWheelZoomStillWins();
     void topmostWithinToleranceWins();
     void spanDragStillBeatsRangeDrag();
+    void aWhiskerTipIsHitThroughTheIndex();
 
 private:
     QPointF pixelOf(double key, double value) const;

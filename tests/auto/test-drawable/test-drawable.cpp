@@ -1,5 +1,6 @@
 #include "test-drawable.h"
 
+#include <algorithm>
 #include <drawable.h>
 #include <examples/custom-drawable/rangeband.h>
 #include <misuse.h>
@@ -80,6 +81,7 @@ public:
         DashedUnderRect, //!< a dashed line an opaque rect covers: the record order must survive
         RasterUnderRect, //!< a rasterised fill an opaque rect covers: the same
         ErrorBars, //!< three error bars in a pen no vertex colour can carry
+        Whiskers, //!< one value error bar at key 5 from 3 to 7, with 40 px whiskers
         Raster, //!< a texture-brush rect beside a long polyline: two kept runs of different kinds
         AsymmetricBox //!< keys 2..3, values 8..9: the two sides sit on different pixel intervals
     };
@@ -233,6 +235,17 @@ public:
             auto spans = std::make_shared<const std::vector<QPointF>>(
                 std::vector<QPointF> { { 0.4, 2 }, { 0.4, 2 }, { 0.4, 2 } });
             context.errorBars(std::move(centres), std::move(spans), QPen(gradientBrush(), 2));
+            return;
+        }
+        if (mode == Whiskers)
+        {
+            auto centres = std::make_shared<const std::vector<QPointF>>(
+                std::vector<QPointF> { { 5, 5 } });
+            auto ends = std::make_shared<const std::vector<QPointF>>(
+                std::vector<QPointF> { { 5, 3 }, { 5, 7 } });
+            context.errorBars(std::move(centres), std::move(ends), /*alongKeys=*/false,
+                              /*whiskerWidth=*/40, /*symbolGap=*/0, QPen(Qt::black, 1),
+                              /*inPixels=*/false);
             return;
         }
         if (mode == Raster) // a texture-brush rect and a long polyline, kept differently
@@ -1394,6 +1407,24 @@ void TestDrawable::hitTestBesideTextIsTheGap()
     QVERIFY2(beside.has_value(), "3 px beside the box at mid-height is inside the tolerance");
     QVERIFY2(*beside > 2.0 && *beside < 4.0, qPrintable(QString("distance %1").arg(*beside)));
     QVERIFY(!shape->hitTest(QCP::Pixels { right + 30, middle }, nullptr).has_value());
+}
+
+// A whisker reaches across its bar by a pixel width the data box cannot hold: the cull before the
+// geometry and the item index both pad the bars by it, or a click on a whisker tip is dropped.
+void TestDrawable::aWhiskerTipIsHittable()
+{
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::Whiskers;
+    f.plot->setSelectionTolerance(2);
+    f.plot->replot();
+
+    const QPointF tip(f.plot->xAxis->coordToPixel(5) - 15, f.plot->yAxis->coordToPixel(7));
+    QVERIFY2(shape->hitTest(QCP::Pixels { tip.x(), tip.y() }, nullptr).has_value(),
+             "the hit test culls the whisker tip");
+    const std::optional<QCPItemExtent> extent = shape->dataExtent();
+    QVERIFY(extent.has_value());
+    QVERIFY2(extent->pixelPad >= 20.0, "the item index box stops short of the whisker tip");
 }
 
 void TestDrawable::pixelAnchoredShapeIsHittable()

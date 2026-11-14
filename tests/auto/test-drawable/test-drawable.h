@@ -47,6 +47,7 @@ private slots:
     void hitTestWithAVerticalKeyAxis();
     void hitTestWithAVerticalKeyAxisChecksEachSideOnItsOwnAxis();
     void hitTestBesideTextIsTheGap();
+    void aWhiskerTipIsHittable();
     void pixelAnchoredShapeIsHittable();
     void frameEpochsAreNeverShared();
     void twoRectsOneLayerDrawInTheirOwnFrames();

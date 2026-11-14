@@ -648,8 +648,8 @@ void QCPDrawContext::errorBars(std::shared_ptr<const std::vector<QPointF>> centr
         }
     }
     extent.settle();
-    // The whiskers reach across the bar by a pixel width the box cannot know; the index pads a
-    // command by its pen, which is all a bar needs for a hit test on its own backbone.
+    // The whiskers reach across the bar by a pixel width the box cannot know: the index pads the
+    // command by half that width (QCPDrawnCore::pixelPad).
     record(*mList,
            qcp::ErrorBarsCmd { std::move(centres), nullptr, std::move(ends), alongKeys,
                                whiskerWidth, symbolGap, inPixels, pen },

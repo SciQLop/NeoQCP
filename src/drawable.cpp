@@ -863,6 +863,8 @@ double QCPDrawnCore::pixelPad() const
                                using Command = std::decay_t<decltype(cmd)>;
                                if constexpr (std::is_same_v<Command, qcp::MarkersCmd>)
                                    return cmd.style->size() / 2.0;
+                               else if constexpr (std::is_same_v<Command, qcp::ErrorBarsCmd>)
+                                   return cmd.whiskerWidth / 2.0 + halfPen(cmd.pen);
                                else if constexpr (std::is_same_v<Command, qcp::TextCmd>
                                                   || std::is_same_v<Command, qcp::ImageCmd>
                                                   || std::is_same_v<Command, qcp::FillBetweenCmd>

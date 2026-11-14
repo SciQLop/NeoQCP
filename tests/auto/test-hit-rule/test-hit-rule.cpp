@@ -171,3 +171,21 @@ void TestHitRule::spanDragStillBeatsRangeDrag()
     QVERIFY(span->range().lower > 3.0);
     QVERIFY(span->range().upper > 7.0);
 }
+
+// A whisker reaches across its bar by a pixel width the data box cannot hold: the index must pad
+// the error bars by it, or a click on a whisker tip is culled before the hit test runs.
+void TestHitRule::aWhiskerTipIsHitThroughTheIndex()
+{
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setData(std::vector<double> { 5 }, std::vector<std::vector<double>> { { 5 } });
+    graph->setLineStyle(QCPGraph::lsNone);
+    auto* bars = new QCPErrorBars(mPlot->xAxis, mPlot->yAxis);
+    bars->setDataPlottable(graph);
+    bars->setData(QVector<double> { 2 });
+    bars->setWhiskerWidth(40);
+    mPlot->setSelectionTolerance(2);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QPointF tip = pixelOf(5, 7) - QPointF(15, 0);
+    QVERIFY(hitsContain(mPlot->hitsAt(tip, QCPHitAction::Select), bars));
+}
