@@ -1,6 +1,7 @@
 #include "test-meta-surface.h"
 #include "../misuse-recorder.h"
 #include "datasource/async-pipeline.h"
+#include "datasource/graph-resampler.h"
 #include "datasource/pipeline-scheduler.h"
 #include <QBindable>
 #include <QProperty>
@@ -67,6 +68,45 @@ QCPHistogram* settledHistogramOn(QCustomPlot& plot)
         std::vector<double> { 0, 1, 2 }, std::vector<std::vector<double>> { { 1, 2, 3 } }));
     QTest::qWaitFor([histogram] { return !histogram->busy(); }, 5000);
     return histogram;
+}
+
+QCPWaterfallGraph* settledWaterfallOn(QCustomPlot& plot)
+{
+    // Enough points for the resampling pipeline: a new source makes the graph busy again.
+    const int count = qcp::algo::kResampleThreshold;
+    QVector<double> keys(count), first(count), second(count);
+    for (int i = 0; i < count; ++i)
+    {
+        keys[i] = i;
+        first[i] = i % 7;
+        second[i] = i % 5;
+    }
+    auto* waterfall = new QCPWaterfallGraph(plot.xAxis, plot.yAxis);
+    waterfall->setData(keys, std::vector<QVector<double>> { first, second });
+    QTest::qWaitFor([waterfall] { return !waterfall->busy(); }, 5000);
+    return waterfall;
+}
+
+QCPColorMap2* settledColorMap2On(QCustomPlot& plot)
+{
+    auto* map = new QCPColorMap2(plot.xAxis, plot.yAxis);
+    map->setData(std::vector<double> { 0, 1, 2 }, std::vector<double> { 0, 1, 2 },
+                 std::vector<double>(9, 1.0));
+    QTest::qWaitFor([map] { return !map->busy(); }, 5000);
+    return map;
+}
+
+// The row's plottable, armed on its busy signal: a pipeline restart makes it busy again.
+template <typename T>
+std::pair<QObject*, const char*> armedOnBusy(T* plottable)
+{
+    return { plottable, "busyChanged(bool)" };
+}
+
+template <typename T>
+T* firstPlottable(QCustomPlot& plot)
+{
+    return qobject_cast<T*>(plot.plottable(0).get());
 }
 
 QCPCurve* curveOn(QCustomPlot& plot)
@@ -1872,6 +1912,42 @@ const QVector<Deleting>& deletingWriters()
           },
           [](QCustomPlot& plot)
           { qobject_cast<QCPHistogram*>(plot.plottable(0).get())->setBins(23); } },
+        { "QCPHistogram::setNormalization",
+          [](QCustomPlot& plot) { return armedOnBusy(settledHistogramOn(plot)); },
+          [](QCustomPlot& plot)
+          {
+              firstPlottable<QCPHistogram>(plot)->setNormalization(
+                  QCP::HistogramNormalization::Density);
+          } },
+        { "QCPColorMap2::setGapThreshold",
+          [](QCustomPlot& plot) { return armedOnBusy(settledColorMap2On(plot)); },
+          [](QCustomPlot& plot) { firstPlottable<QCPColorMap2>(plot)->setGapThreshold(4.5); } },
+        { "QCPWaterfallGraph::setOffsetMode",
+          [](QCustomPlot& plot) { return armedOnBusy(settledWaterfallOn(plot)); },
+          [](QCustomPlot& plot)
+          {
+              firstPlottable<QCPWaterfallGraph>(plot)->setOffsetMode(QCPWaterfallGraph::omCustom);
+          } },
+        { "QCPWaterfallGraph::setUniformSpacing", [](QCustomPlot& plot)
+          { return armedOnBusy(settledWaterfallOn(plot)); }, [](QCustomPlot& plot)
+          { firstPlottable<QCPWaterfallGraph>(plot)->setUniformSpacing(7.5); } },
+        { "QCPWaterfallGraph::setOffsets", [](QCustomPlot& plot)
+          { return armedOnBusy(settledWaterfallOn(plot)); }, [](QCustomPlot& plot)
+          { firstPlottable<QCPWaterfallGraph>(plot)->setOffsets({ 1, 5 }); } },
+        { "QCPWaterfallGraph::setNormalize",
+          [](QCustomPlot& plot) { return armedOnBusy(settledWaterfallOn(plot)); },
+          [](QCustomPlot& plot)
+          {
+              auto* waterfall = firstPlottable<QCPWaterfallGraph>(plot);
+              waterfall->setNormalize(!waterfall->normalize());
+          } },
+        { "QCPWaterfallGraph::setGain",
+          [](QCustomPlot& plot) { return armedOnBusy(settledWaterfallOn(plot)); },
+          [](QCustomPlot& plot) { firstPlottable<QCPWaterfallGraph>(plot)->setGain(3.5); } },
+        { "QCPIntervals::setStackMode", [](QCustomPlot& plot)
+          { return std::pair<QObject*, const char*>(intervalsOn(plot), "stackMode"); },
+          [](QCustomPlot& plot)
+          { firstPlottable<QCPIntervals>(plot)->setStackMode(QCPIntervals::skTime); } },
         { "QCPIntervals::setSelection", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(intervalsOn(plot), "selection"); },
           [](QCustomPlot& plot)
