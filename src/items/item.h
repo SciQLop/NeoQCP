@@ -313,8 +313,9 @@ public:
                       QVariant* details = nullptr) const override;
 
     // introduced virtual methods:
-    //! The recording: append what this item draws to \a context. The default records nothing.
-    virtual void draw(QCPDrawContext& context) const { Q_UNUSED(context) }
+    //! The recording: append what this item draws to \a context. Pure: an item that forgot it would
+    //! otherwise compile and draw nothing.
+    virtual void draw(QCPDrawContext& context) const = 0;
 
     //! What the recording occupies in data coordinates.
     std::optional<QCPDataBox> drawnDataRange() const override;

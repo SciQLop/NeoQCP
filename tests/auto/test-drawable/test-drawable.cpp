@@ -2373,3 +2373,15 @@ void TestDrawable::aPlottableWithoutARecordingIsAbstract()
 {
     QVERIFY(std::is_abstract_v<NoRecordingStub>);
 }
+
+//! The same for an item: forgetting the recording must not compile into an item that draws nothing.
+class NoRecordingItem : public QCPAbstractItem
+{
+public:
+    using QCPAbstractItem::QCPAbstractItem;
+};
+
+void TestDrawable::anItemWithoutARecordingIsAbstract()
+{
+    QVERIFY(std::is_abstract_v<NoRecordingItem>);
+}
