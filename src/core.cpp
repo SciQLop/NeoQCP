@@ -4111,6 +4111,11 @@ void QCustomPlot::moveEvent(QMoveEvent* event)
 */
 bool QCustomPlot::eventFilter(QObject* watched, QEvent* event)
 {
+    // The plot may be installed as a filter elsewhere: only the watched ancestors concern it.
+    const bool ancestor = std::ranges::any_of(
+        mWatchedAncestors, [watched](const QPointer<QWidget>& w) { return w.data() == watched; });
+    if (!ancestor)
+        return QRhiWidget::eventFilter(watched, event);
     switch (event->type())
     {
     case QEvent::Move:
