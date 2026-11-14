@@ -450,8 +450,9 @@ rows are the behaviour that moved with the new properties.
   The registered type name is the same scoped name (a test checks all 32), so `QMetaType::fromName("QCPAxis::AxisType")`
   and queued connections by name keep working, and `qMetaTypeId<QCPAxis::AxisType>()` still compiles: Qt 6 builds the
   id from the moc registration.
-- **Kept:** `QCPCurve::LineStyle` (an alias of `QCPAbstractLine::LineStyle`: deleting the line would rename the
-  registered type), and the four non-enums `QCPDataSelection`, `QSharedPointer<QCPAxisTicker>`,
+- **Kept:** `QCPCurve::LineStyle` (an alias of `QCPAbstractLine::LineStyle`; the line is inert on Qt 6.12, which
+  names the registered type from the compiler: the name rows of the test pin the registered names), and the four
+  non-enums `QCPDataSelection`, `QSharedPointer<QCPAxisTicker>`,
   `QCPSelectionDecorator*`, `QCPIntervalEdit`.
 - `Q_INVOKABLE` on these actions (one overload each; `QMetaObject::invokeMethod` can call them by name, no signature
   changed). `QCPAxisBase`: `moveRange(double)`, `scaleRange(double)`, `rescale(bool)`, `unlink()`. `QCustomPlot`:
@@ -467,3 +468,17 @@ rows are the behaviour that moved with the new properties.
   caller changes). The tickers, `QCPItemAnchor`/`QCPItemPosition` and `QCPSelectionDecorator` are not `QObject`s and
   keep `Q_DISABLE_COPY`.
 - The 11 `Q_DECLARE_TYPEINFO` lines were re-checked and stay as they are.
+
+### Final review fixes
+
+- `QCPLegend::selectionChanged` also fires when an item is selected or deselected, or a selected item leaves the
+  legend: `selectedParts` reads the items' selection. `QCPLegend` overrides `takeAt` for it (ABI).
+- A deferred signal's pointer argument to a `QObject` is held by a `QPointer` until delivery: a slot gets null,
+  not a dangling pointer, when the object was deleted before the signal was delivered.
+- `removePlottable`, `clearPlottables`, `removeGraph`, `clearGraphs` and a plain delete of a plottable deliver the
+  legend's and the group's signals after the plottable is gone. A plain delete of a plottable unparents it from the
+  plot first, so a slot that deletes the plot does not delete it twice.
+- A plottable whose system goes away (`removeRadialAxis`, deleting an axis or a polar area) delivers its
+  `systemChanged(nullptr)` after it is done with itself.
+- `QCustomPlot::overlay()` delivers the notification layer's `modeChanged` after the overlay is made; a slot that
+  deletes the plot leaves the returned handle null.
