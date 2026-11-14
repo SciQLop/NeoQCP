@@ -66,6 +66,9 @@ private slots:
     void publicEnumsAreRegistered();
     void invokablesAreFound_data();
     void invokablesAreFound();
+    void metatypesKeepTheirNames_data();
+    void metatypesKeepTheirNames();
+    void invokableOnAVirtualReachesTheOverride();
 };
 
 // Runs its action when a signal it is connected to through QMetaMethod fires.

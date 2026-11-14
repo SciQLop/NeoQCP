@@ -2805,10 +2805,91 @@ void TestMetaSurface::publicEnumsAreRegistered()
     QVERIFY(meta.isValid());
     QCOMPARE(meta.isFlag(), e.isFlag);
     QVERIFY(meta.keyCount() > 0);
-    const QByteArray scoped = QByteArray(e.scope->className()) + "::" + e.name;
-    const QMetaType type = QMetaType::fromName(scoped);
-    if (!e.isFlag && type.isValid()) // a flag type registers as QFlags<Enum>
-        QCOMPARE(QByteArray(type.name()), scoped);
+    if (!e.isFlag)
+    {
+        QCOMPARE(QByteArray(meta.scope()), QByteArray(e.scope->className()));
+        QCOMPARE(QByteArray(meta.enumName()), QByteArray(e.name));
+    }
+}
+
+namespace
+{
+struct TypeRow
+{
+    const char* name;
+    QMetaType type;
+    const char* registeredAs; // the name moc gives it, when it differs from how it is written
+};
+
+#define TYPE_ROW(T) { #T, QMetaType::fromType<T>(), #T }
+
+// E-13: the 32 enums whose Q_DECLARE_METATYPE line is gone, and the 5 lines kept. Each registers under
+// the name it is written with: a deleted line that renamed its type, or an alias line removed, fails.
+const QVector<TypeRow>& metatypeRows()
+{
+    static const QVector<TypeRow> list {
+        TYPE_ROW(QCPAxisBase::ScaleType), TYPE_ROW(QCPAxisBase::SelectablePart),
+        TYPE_ROW(QCPAxis::AxisType), TYPE_ROW(QCPAxis::LabelSide),
+        TYPE_ROW(QCPAxisTicker::TickStepStrategy), TYPE_ROW(QCPAxisTickerFixed::ScaleStrategy),
+        TYPE_ROW(QCPAxisTickerPi::FractionStyle), TYPE_ROW(QCPAxisTickerTime::TimeUnit),
+        TYPE_ROW(QCPLabelPainterPrivate::AnchorMode), TYPE_ROW(QCPLabelPainterPrivate::AnchorSide),
+        TYPE_ROW(QCPColorGradient::ColorInterpolation), TYPE_ROW(QCPColorGradient::NanHandling),
+        TYPE_ROW(QCPColorGradient::GradientPreset), TYPE_ROW(QCustomPlot::LayerInsertMode),
+        TYPE_ROW(QCustomPlot::RefreshPriority), TYPE_ROW(QCPItemBracket::BracketStyle),
+        TYPE_ROW(QCPItemTracer::TracerStyle), TYPE_ROW(QCPItemPosition::PositionType),
+        TYPE_ROW(QCPLayer::LayerMode), TYPE_ROW(QCPLayoutElement::UpdatePhase),
+        TYPE_ROW(QCPLayoutGrid::FillOrder), TYPE_ROW(QCPLayoutInset::InsetPlacement),
+        TYPE_ROW(QCPLegend::SelectablePart), TYPE_ROW(QCPLineEnding::EndingStyle),
+        TYPE_ROW(QCPPainter::PainterMode), TYPE_ROW(QCPBarsGroup::SpacingType),
+        TYPE_ROW(QCPBars::WidthType), TYPE_ROW(QCPFinancial::ChartStyle),
+        TYPE_ROW(QCPPolarGrid::GridType), TYPE_ROW(QCPScatterStyle::ScatterProperty),
+        TYPE_ROW(QCPScatterStyle::ScatterShape), TYPE_ROW(QCPSelectionDecoratorBracket::BracketStyle),
+        { "QCPCurve::LineStyle", QMetaType::fromType<QCPCurve::LineStyle>(), "QCPAbstractLine::LineStyle" },
+         TYPE_ROW(QCPDataSelection),
+        TYPE_ROW(QSharedPointer<QCPAxisTicker>), TYPE_ROW(QCPSelectionDecorator*),
+        TYPE_ROW(QCPIntervalEdit),
+    };
+    return list;
+}
+} // namespace
+
+void TestMetaSurface::metatypesKeepTheirNames_data()
+{
+    QTest::addColumn<int>("row");
+    for (int i = 0; i < metatypeRows().size(); ++i)
+        QTest::addRow("%s", metatypeRows()[i].name) << i;
+}
+
+void TestMetaSurface::metatypesKeepTheirNames()
+{
+    QFETCH(int, row);
+    const TypeRow& r = metatypeRows()[row];
+    QVERIFY(r.type.isValid());
+    QCOMPARE(QByteArray(r.type.name()), QByteArray(r.registeredAs));
+    QVERIFY(r.type.id() != 0);
+    QCOMPARE(QMetaType::fromName(r.registeredAs), r.type);
+}
+
+// An invokable declared on a base is found through a derived class's meta-object, and a virtual one
+// reaches the override.
+void TestMetaSurface::invokableOnAVirtualReachesTheOverride()
+{
+    auto plot = newPlot();
+    graphOn(*plot);
+    plot->xAxis->setRange(100, 200);
+    QVERIFY(QCPAxis::staticMetaObject.indexOfMethod("rescale(bool)") >= 0);
+    QVERIFY(QMetaObject::invokeMethod(plot->xAxis, "rescale", Q_ARG(bool, false)));
+    QVERIFY(plot->xAxis->range().lower <= 0);
+    QVERIFY(plot->xAxis->range().upper < 100);
+
+    QCPLayoutGrid* grid = plot->plotLayout().get();
+    QVERIFY(grid->metaObject()->indexOfMethod("takeAt(int)") >= 0);
+    QCPLayoutElement* taken = nullptr;
+    QVERIFY(QMetaObject::invokeMethod(grid, "takeAt", Q_RETURN_ARG(QCPLayoutElement*, taken),
+                                      Q_ARG(int, 0)));
+    QVERIFY(taken);
+    QCOMPARE(taken->parent(), plot.get());
+    QVERIFY(QMetaObject::invokeMethod(grid, "simplify"));
 }
 
 namespace
@@ -2847,8 +2928,6 @@ const QVector<InvokableRow>& invokables()
         { &QCustomPlot::staticMetaObject,
           "saveJpg(QString,int,int,double,int,int,QCP::ResolutionUnit)" },
         { &QCustomPlot::staticMetaObject, "saveBmp(QString,int,int,double,int,QCP::ResolutionUnit)" },
-        { &QCustomPlot::staticMetaObject,
-          "saveRastered(QString,int,int,double,const char*,int,int,QCP::ResolutionUnit)" },
         { &QCPLayout::staticMetaObject, "takeAt(int)" },
         { &QCPLayout::staticMetaObject, "take(QCPLayoutElement*)" },
         { &QCPLayout::staticMetaObject, "simplify()" },

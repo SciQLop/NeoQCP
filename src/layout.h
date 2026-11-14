@@ -198,6 +198,8 @@ public:
     // introduced virtual methods:
     virtual int elementCount() const = 0;
     virtual QCPHandle<QCPLayoutElement> elementAt(int index) const = 0;
+    //! take() and takeAt() release the element but do not delete it: it is re-parented to the plot, which
+    //! keeps it alive until the plot dies or the element is added again (so a script cannot orphan it).
     Q_INVOKABLE virtual QCPLayoutElement* takeAt(int index) = 0;
     Q_INVOKABLE virtual bool take(QCPLayoutElement* element) = 0;
     Q_INVOKABLE virtual void simplify();

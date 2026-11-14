@@ -437,19 +437,32 @@ rows are the behaviour that moved with the new properties.
 - **Out, unchanged:** `QCPHitAction` (global `enum class`, not in a meta-object scope; moving it into `QCP` would break
   `hitsAt` callers, and no property or invokable takes it), `QCPTransform::Kind`, the protected
   `QCPAxisTickerDateTime::DateStrategy`, `QCPRawColumn::Type`.
-- **Deleted `Q_DECLARE_METATYPE` lines (32):** the enums moc registers through a `Q_ENUM` in the same class
-  (`QCPAxis::AxisType`, `LabelSide`; `QCPAxisBase::ScaleType`, `SelectablePart`; `QCPLayer::LayerMode`;
-  `QCustomPlot::LayerInsertMode`, `RefreshPriority`; the layout enums; the tickers, label painter, gradient, scatter
-  style, line ending, item, painter, bars, financial, legend and polar grid enums; see the Task 4 report for the list).
-  The registered type name is the same scoped name, so `QMetaType::fromName("QCPAxis::AxisType")` and queued
-  connections by name keep working. Code that relied on the line itself, such as `qMetaTypeId<QCPAxis::AxisType>()`
-  through the removed specialisation, still compiles: Qt 6 builds the id from the moc registration.
+- **Deleted `Q_DECLARE_METATYPE` lines (32):** the enums moc registers through a `Q_ENUM` in the same class:
+  `QCPAxisBase::ScaleType`, `SelectablePart`; `QCPAxis::AxisType`, `LabelSide`; `QCPAxisTicker::TickStepStrategy`;
+  `QCPAxisTickerFixed::ScaleStrategy`; `QCPAxisTickerPi::FractionStyle`; `QCPAxisTickerTime::TimeUnit`;
+  `QCPLabelPainterPrivate::AnchorMode`, `AnchorSide`; `QCPColorGradient::ColorInterpolation`, `NanHandling`,
+  `GradientPreset`; `QCustomPlot::LayerInsertMode`, `RefreshPriority`; `QCPItemBracket::BracketStyle`;
+  `QCPItemTracer::TracerStyle`; `QCPItemPosition::PositionType`; `QCPLayer::LayerMode`;
+  `QCPLayoutElement::UpdatePhase`; `QCPLayoutGrid::FillOrder`; `QCPLayoutInset::InsetPlacement`;
+  `QCPLegend::SelectablePart`; `QCPLineEnding::EndingStyle`; `QCPPainter::PainterMode`; `QCPBarsGroup::SpacingType`;
+  `QCPBars::WidthType`; `QCPFinancial::ChartStyle`; `QCPPolarGrid::GridType`; `QCPScatterStyle::ScatterProperty`,
+  `ScatterShape`; `QCPSelectionDecoratorBracket::BracketStyle`.
+  The registered type name is the same scoped name (a test checks all 32), so `QMetaType::fromName("QCPAxis::AxisType")`
+  and queued connections by name keep working, and `qMetaTypeId<QCPAxis::AxisType>()` still compiles: Qt 6 builds the
+  id from the moc registration.
 - **Kept:** `QCPCurve::LineStyle` (an alias of `QCPAbstractLine::LineStyle`: deleting the line would rename the
   registered type), and the four non-enums `QCPDataSelection`, `QSharedPointer<QCPAxisTicker>`,
   `QCPSelectionDecorator*`, `QCPIntervalEdit`.
-- `Q_INVOKABLE` on the named actions of `QCustomPlot`, `QCPAxisBase`, `QCPLayout`, `QCPLayoutGrid`, `QCPLayoutInset`
-  and `QCPLegend` (one overload each; list in the Task 4 report). Python or QML can now call them by name through
-  `QMetaObject::invokeMethod`. No signature changed.
+- `Q_INVOKABLE` on these actions (one overload each; `QMetaObject::invokeMethod` can call them by name, no signature
+  changed). `QCPAxisBase`: `moveRange(double)`, `scaleRange(double)`, `rescale(bool)`, `unlink()`. `QCustomPlot`:
+  `requestRepaint()`, `settle()`, `requestDataSwap()`, `removePlottable(int)`, `clearPlottables()`,
+  `removePlottableGroup(QCPPlottableGroup*)`, `removeGraph(int)`, `clearGraphs()`, `removeItem(int)`, `clearItems()`,
+  `addLayer`, `removeLayer`, `moveLayer`, `savePdf`, `savePng`, `saveJpg`, `saveBmp`. `QCPLayout`: `takeAt(int)`,
+  `take(el)`, `simplify()`, `removeAt(int)`, `remove(el)`, `clear()`. `QCPLayoutGrid`: `addElement(row, col, el)`,
+  `expandTo`, `insertRow`, `insertColumn`. `QCPLayoutInset`: `addElement(el, Qt::Alignment)`. `QCPLegend`:
+  `addItem(item)`, `removeItem(int)`, `clearItems()`. Left out: `saveRastered` (takes a `const char*` format, not
+  callable from a script), the other overloads, the actions that return handles. `take` and `takeAt` re-parent the
+  element to the plot, which keeps it alive.
 - `Q_DISABLE_COPY` became `Q_DISABLE_COPY_MOVE` on every `QObject` class (a `QObject` was never copyable, so no
   caller changes). The tickers, `QCPItemAnchor`/`QCPItemPosition` and `QCPSelectionDecorator` are not `QObject`s and
   keep `Q_DISABLE_COPY`.

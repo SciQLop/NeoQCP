@@ -517,7 +517,7 @@ public:
                  QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
     Q_INVOKABLE [[nodiscard]] bool saveBmp(const QString& fileName, int width = 0, int height = 0, double scale = 1.0,
                  int resolution = 96, QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
-    Q_INVOKABLE [[nodiscard]] bool saveRastered(const QString& fileName, int width, int height, double scale,
+    [[nodiscard]] bool saveRastered(const QString& fileName, int width, int height, double scale,
                       const char* format, int quality = -1, int resolution = 96,
                       QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
     [[nodiscard]] QPixmap toPixmap(int width = 0, int height = 0, double scale = 1.0);
