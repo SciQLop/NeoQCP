@@ -30,6 +30,10 @@ private slots:
     void aPlotThatLeftItsGroupIgnoresItsContainer();
     void aPlotDeletedDuringItsContainerMoveIsSafe();
     void aContainerDeletedAfterItsMoveIsSafe();
+    void anElementPutBackInItsLayoutIsWatched();
+    void anAncestorThatBecameAWindowIsLeftAlone();
+    void aWindowPutIntoAWidgetIsWatchedThere();
+    void anAncestorsOtherFiltersHearItsReparent();
   void aMemberResizedRealigns();
     void sideBySideRectsAlignAndSettle();
 

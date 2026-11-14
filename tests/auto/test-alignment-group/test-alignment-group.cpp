@@ -829,6 +829,130 @@ void TestAlignmentGroup::aContainerDeletedAfterItsMoveIsSafe()
     QVERIFY(!containerA);
 }
 
+void TestAlignmentGroup::anElementPutBackInItsLayoutIsWatched()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    QScopedPointer<QWidget> window(makeContainedStack({ a, b }, 24));
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    // Grouped while out of its layout: the plot has nothing aligned in its tree at that moment.
+    QCPAxisRect* rect = b->axisRect();
+    QVERIFY(b->plotLayout()->take(rect));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), rect });
+    QVERIFY(group);
+    QVERIFY(b->plotLayout()->addElement(0, 0, rect));
+    QVERIFY(settle({ a, b }));
+    QCOMPARE(innerLeft(a), innerLeft(b));
+
+    QWidget* container = b->parentWidget();
+    container->move(container->x() + 30, container->y());
+    QTest::qWait(200);
+    QCOMPARE(innerLeft(a), innerLeft(b));
+}
+
+void TestAlignmentGroup::anAncestorThatBecameAWindowIsLeftAlone()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    QScopedPointer<QWidget> window(makeContainedStack({ a, b }, 24));
+    auto* middle = new QWidget(window.data());
+    middle->setGeometry(0, 120, 400, 100);
+    QWidget* container = b->parentWidget();
+    container->setParent(middle);
+    container->move(24, 0);
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
+    QVERIFY(group);
+    QVERIFY(settle({ a, b }));
+
+    // The container floats, like an undocked dock: the middle widget leaves b's chain.
+    QScopedPointer<QWidget> floating(container);
+    container->setParent(nullptr);
+    container->show();
+    QVERIFY(QTest::qWaitForWindowExposed(container));
+    QVERIFY(settle({ a, b }));
+    int repaints = 0;
+    const auto counted = connect(b, &QCustomPlot::afterReplot, b, [&repaints] { ++repaints; });
+    middle->move(middle->x() + 30, middle->y());
+    container->move(container->x() + 30, container->y()); // a window's own move
+    QTest::qWait(200);
+    disconnect(counted);
+    QCOMPARE(repaints, 0);
+
+    // Docked again: its moves count once more.
+    container->setParent(window.data());
+    floating.take();
+    container->move(24, 120);
+    container->show();
+    QVERIFY(settle({ a, b }));
+    QCOMPARE(innerLeft(a), innerLeft(b));
+    container->move(container->x() + 30, container->y());
+    QTest::qWait(200);
+    QCOMPARE(innerLeft(a), innerLeft(b));
+}
+
+void TestAlignmentGroup::aWindowPutIntoAWidgetIsWatchedThere()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    QScopedPointer<QWidget> window(makeContainedStack({ a }, 24));
+    window->resize(400, 240);
+    // b lives in a window of its own when the group is made.
+    auto* own = new QWidget;
+    own->resize(400, 100);
+    auto* container = new QWidget(own);
+    container->setGeometry(24, 0, 300, 100);
+    b->setParent(container);
+    b->setGeometry(0, 0, 300, 100);
+    window->show();
+    own->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    QVERIFY(QTest::qWaitForWindowExposed(own));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
+    QVERIFY(group);
+
+    // That window goes into a holder inside the first window: the holder joins b's chain.
+    auto* holder = new QWidget(window.data());
+    holder->setGeometry(0, 120, 400, 100);
+    own->setParent(holder);
+    own->move(0, 0);
+    own->show();
+    holder->show();
+    QVERIFY(settle({ a, b }));
+    QCOMPARE(innerLeft(a), innerLeft(b));
+    holder->move(holder->x() + 30, holder->y());
+    QTest::qWait(200);
+    QCOMPARE(innerLeft(a), innerLeft(b));
+}
+
+void TestAlignmentGroup::anAncestorsOtherFiltersHearItsReparent()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    QScopedPointer<QWidget> window(makeContainedStack({ a, b }, 24));
+    auto* middle = new QWidget(window.data());
+    QWidget* container = b->parentWidget();
+    container->setParent(middle);
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    bool heard = false;
+    EventSpy later(QEvent::ParentChange, [&heard] { heard = true; });
+    middle->installEventFilter(&later); // runs after the plot's filter
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
+    QVERIFY(group);
+    {
+        // A filter removed before the event leaves a hole in front of the plot's filter.
+        EventSpy gone(QEvent::None, nullptr);
+        middle->installEventFilter(&gone);
+        middle->removeEventFilter(&gone);
+    }
+    auto* other = new QWidget(window.data());
+    middle->setParent(other);
+    QVERIFY2(heard, "the plot's filter reshuffled the list Qt was walking");
+}
+
 void TestAlignmentGroup::sideBySideRectsAlignAndSettle()
 {
     QCustomPlot plot;

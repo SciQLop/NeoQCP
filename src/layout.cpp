@@ -846,6 +846,8 @@ void QCPLayout::adoptElement(QCPLayoutElement* el)
         if (!el->parentPlot())
             el->initializeParentPlot(mParentPlot);
         el->layoutChanged();
+        if (mParentPlot)
+            mParentPlot->layoutAdopted(el);
     }
     else
         qDebug() << Q_FUNC_INFO << "Null element passed";

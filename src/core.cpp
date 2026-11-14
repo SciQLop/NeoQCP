@@ -4114,7 +4114,8 @@ bool QCustomPlot::eventFilter(QObject* watched, QEvent* event)
     {
     case QEvent::Move:
         // A whole window moving does not move anything relative to the window.
-        if (!mBeingDestroyed && !static_cast<QWidget*>(watched)->isWindow())
+        if (const auto* widget = qobject_cast<QWidget*>(watched);
+            widget && !mBeingDestroyed && !widget->isWindow())
             notifyAlignmentGroups();
         break;
     case QEvent::ParentChange:
@@ -4143,26 +4144,51 @@ bool QCustomPlot::hasAlignedElements() const
     return layout && std::ranges::any_of(layout->elementsRaw(true), isAligned);
 }
 
+namespace
+{
+//! The widgets from \a widget's parent up to and including its window.
+QList<QWidget*> ancestorChain(const QWidget* widget)
+{
+    QList<QWidget*> chain;
+    for (QWidget* ancestor = widget->parentWidget(); ancestor; ancestor = ancestor->parentWidget())
+    {
+        chain.append(ancestor);
+        if (ancestor->isWindow()) // its own move does not count, its reparent does
+            break;
+    }
+    return chain;
+}
+} // namespace
+
 /*! \internal
 
   Filters the events of the widgets from this plot's parent up to its window while one of its
   elements is in an alignment group, and of none otherwise: an unaligned plot costs its ancestors
-  nothing.
+  nothing. Only widgets that left or joined the chain are touched: this runs from an ancestor's
+  ParentChange, while Qt walks that ancestor's filter list.
 */
 void QCustomPlot::watchAncestors()
 {
-    for (const QPointer<QWidget>& ancestor : std::exchange(mWatchedAncestors, {}))
-        if (ancestor)
+    const QList<QWidget*> chain
+        = mBeingDestroyed || !hasAlignedElements() ? QList<QWidget*>() : ancestorChain(this);
+    for (const QPointer<QWidget>& ancestor : std::as_const(mWatchedAncestors))
+        if (ancestor && !chain.contains(ancestor.data()))
             ancestor->removeEventFilter(this);
-    if (mBeingDestroyed || !hasAlignedElements())
-        return;
-    for (QWidget* ancestor = parentWidget(); ancestor; ancestor = ancestor->parentWidget())
-    {
-        ancestor->installEventFilter(this);
-        mWatchedAncestors.append(ancestor);
-        if (ancestor->isWindow()) // its own move does not count, its reparent does
-            break;
-    }
+    for (QWidget* ancestor : chain)
+        if (!mWatchedAncestors.contains(ancestor))
+            ancestor->installEventFilter(this);
+    mWatchedAncestors = QList<QPointer<QWidget>>(chain.cbegin(), chain.cend());
+}
+
+/*! \internal
+
+  Called by a layout that just took \a element in: an element grouped while out of the layout tree
+  brings the plot its first aligned element.
+*/
+void QCustomPlot::layoutAdopted(QCPLayoutElement* element)
+{
+    if (isAligned(element) || std::ranges::any_of(element->elementsRaw(true), isAligned))
+        watchAncestors();
 }
 
 /*! \internal
@@ -4525,7 +4551,7 @@ bool QCustomPlot::handleInScope(QEvent* event)
 
 bool QCustomPlot::handleEvent(QEvent* event)
 {
-    if (event->type() == QEvent::ParentChange)
+    if (event->type() == QEvent::ParentChange && !mBeingDestroyed)
     {
         watchAncestors();
         notifyAlignmentGroups();

@@ -759,6 +759,7 @@ protected:
     static bool isAligned(const QCPLayoutElement* element);
     bool hasAlignedElements() const;
     void watchAncestors();
+    void layoutAdopted(QCPLayoutElement* element);
     void relayoutAlignmentGroups();
     void restoreViewportAfterExport(const QRect& screenViewport);
     void adoptWidgetViewport();
@@ -838,6 +839,7 @@ protected:
     friend class QCPAbstractItem;
     friend class QCPLayerable;
     friend class QCPAlignmentGroup; // a member joining or leaving changes what the plot watches
+    friend class QCPLayout; // an element put back in the tree may be aligned
     friend class QCPLayoutElement; // marks the alignment unsettled during the layout pass
     friend class QCPEmissionScope;
     template <typename Sender, typename... SignalArgs, typename... Args>
