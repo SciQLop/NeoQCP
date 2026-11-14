@@ -106,6 +106,30 @@ QCPErrorBarsData::QCPErrorBarsData(double errorMinus, double errorPlus)
   This gap size can be controlled via \ref setSymbolGap.
 */
 
+/*! \fn void QCPErrorBars::dataPlottableChanged(QCPAbstractPlottable* dataPlottable)
+
+  This signal is emitted when \ref dataPlottable changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPErrorBars::errorTypeChanged(QCPErrorBars::ErrorType errorType)
+
+  This signal is emitted when \ref errorType changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPErrorBars::whiskerWidthChanged(double whiskerWidth)
+
+  This signal is emitted when \ref whiskerWidth changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPErrorBars::symbolGapChanged(double symbolGap)
+
+  This signal is emitted when \ref symbolGap changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start of documentation of inline functions */
 
 /*! \fn QSharedPointer<QCPErrorBarsDataContainer> QCPErrorBars::data() const
@@ -241,6 +265,8 @@ void QCPErrorBars::setDataPlottable(QCPAbstractPlottable* plottable)
         qcp::reportMisuse(Q_FUNC_INFO, "error bars need a data plottable in their area");
         return;
     }
+    if (plottable == mDataPlottable)
+        return;
 
     markDirty();
     if (QCPAbstractPlottable* previous = mDataPlottable.data())
@@ -249,6 +275,7 @@ void QCPErrorBars::setDataPlottable(QCPAbstractPlottable* plottable)
     // The whiskers follow the data plottable's values wherever their own layer is.
     if (plottable)
         plottable->addDependent(this);
+    qcpEmit(this, mParentPlot, &QCPErrorBars::dataPlottableChanged, plottable);
 }
 
 /*!
@@ -257,9 +284,13 @@ void QCPErrorBars::setDataPlottable(QCPAbstractPlottable* plottable)
 void QCPErrorBars::detachDataPlottable()
 {
     markDirty();
-    if (QCPAbstractPlottable* previous = mDataPlottable.data())
-        previous->removeDependent(this);
+    QCPAbstractPlottable* previous = mDataPlottable.data();
+    if (!previous)
+        return;
+    previous->removeDependent(this);
     mDataPlottable = nullptr;
+    qcpEmit(this, mParentPlot, &QCPErrorBars::dataPlottableChanged,
+            static_cast<QCPAbstractPlottable*>(nullptr));
 }
 
 /*!
@@ -272,6 +303,7 @@ void QCPErrorBars::setErrorType(ErrorType type)
         return;
     markDirty();
     mErrorType = type;
+    qcpEmit(this, mParentPlot, &QCPErrorBars::errorTypeChanged, errorType());
 }
 
 /*!
@@ -284,6 +316,7 @@ void QCPErrorBars::setWhiskerWidth(double pixels)
         return;
     markDirty();
     mWhiskerWidth = pixels;
+    qcpEmit(this, mParentPlot, &QCPErrorBars::whiskerWidthChanged, whiskerWidth());
 }
 
 /*!
@@ -297,6 +330,7 @@ void QCPErrorBars::setSymbolGap(double pixels)
         return;
     markDirty();
     mSymbolGap = pixels;
+    qcpEmit(this, mParentPlot, &QCPErrorBars::symbolGapChanged, symbolGap());
 }
 
 /*! \overload

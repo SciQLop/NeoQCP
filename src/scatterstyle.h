@@ -147,6 +147,9 @@ public:
     void setPixmap(const QPixmap& pixmap);
     void setCustomPath(const QPainterPath& customPath);
 
+    //! Same look: equal members, and a pixmap that is the same image (QPixmap has no operator==).
+    [[nodiscard]] bool operator==(const QCPScatterStyle& other) const;
+
     // non-property methods:
     [[nodiscard]] bool isNone() const { return mShape == ssNone; }
 

@@ -91,13 +91,17 @@ class QCP_LIB_DECL QCPStatisticalBox : public QCPAbstractPlottable1D<QCPStatisti
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(double width READ width WRITE setWidth)
-    Q_PROPERTY(double whiskerWidth READ whiskerWidth WRITE setWhiskerWidth)
-    Q_PROPERTY(QPen whiskerPen READ whiskerPen WRITE setWhiskerPen)
-    Q_PROPERTY(QPen whiskerBarPen READ whiskerBarPen WRITE setWhiskerBarPen)
-    Q_PROPERTY(bool whiskerAntialiased READ whiskerAntialiased WRITE setWhiskerAntialiased)
-    Q_PROPERTY(QPen medianPen READ medianPen WRITE setMedianPen)
-    Q_PROPERTY(QCPScatterStyle outlierStyle READ outlierStyle WRITE setOutlierStyle)
+    Q_PROPERTY(double width READ width WRITE setWidth NOTIFY widthChanged)
+    Q_PROPERTY(
+        double whiskerWidth READ whiskerWidth WRITE setWhiskerWidth NOTIFY whiskerWidthChanged)
+    Q_PROPERTY(QPen whiskerPen READ whiskerPen WRITE setWhiskerPen NOTIFY whiskerPenChanged)
+    Q_PROPERTY(
+        QPen whiskerBarPen READ whiskerBarPen WRITE setWhiskerBarPen NOTIFY whiskerBarPenChanged)
+    Q_PROPERTY(bool whiskerAntialiased READ whiskerAntialiased WRITE setWhiskerAntialiased NOTIFY
+                   whiskerAntialiasedChanged)
+    Q_PROPERTY(QPen medianPen READ medianPen WRITE setMedianPen NOTIFY medianPenChanged)
+    Q_PROPERTY(QCPScatterStyle outlierStyle READ outlierStyle WRITE setOutlierStyle NOTIFY
+                   outlierStyleChanged)
     /// \endcond
 
 public:
@@ -155,6 +159,15 @@ public:
                                  QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
     virtual QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                                    const QCPRange& inKeyRange = QCPRange()) const override;
+
+signals:
+    void widthChanged(double width);
+    void whiskerWidthChanged(double whiskerWidth);
+    void whiskerPenChanged(const QPen& whiskerPen);
+    void whiskerBarPenChanged(const QPen& whiskerBarPen);
+    void whiskerAntialiasedChanged(bool whiskerAntialiased);
+    void medianPenChanged(const QPen& medianPen);
+    void outlierStyleChanged(const QCPScatterStyle& outlierStyle);
 
 protected:
     // property members:

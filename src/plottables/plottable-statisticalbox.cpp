@@ -212,6 +212,48 @@ QCPStatisticalBoxData::QCPStatisticalBoxData(double key, double minimum, double 
   \snippet documentation/doc-code-snippets/mainwindow.cpp qcpstatisticalbox-creation-2
 */
 
+/*! \fn void QCPStatisticalBox::widthChanged(double width)
+
+  This signal is emitted when \ref width changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPStatisticalBox::whiskerWidthChanged(double whiskerWidth)
+
+  This signal is emitted when \ref whiskerWidth changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPStatisticalBox::whiskerPenChanged(const QPen& whiskerPen)
+
+  This signal is emitted when \ref whiskerPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPStatisticalBox::whiskerBarPenChanged(const QPen& whiskerBarPen)
+
+  This signal is emitted when \ref whiskerBarPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPStatisticalBox::whiskerAntialiasedChanged(bool whiskerAntialiased)
+
+  This signal is emitted when \ref whiskerAntialiased changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPStatisticalBox::medianPenChanged(const QPen& medianPen)
+
+  This signal is emitted when \ref medianPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPStatisticalBox::outlierStyleChanged(const QCPScatterStyle& outlierStyle)
+
+  This signal is emitted when \ref outlierStyle changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start documentation of inline functions */
 
 /*! \fn QSharedPointer<QCPStatisticalBoxDataContainer> QCPStatisticalBox::data() const
@@ -302,6 +344,7 @@ void QCPStatisticalBox::setWidth(double width)
         return;
     markDirty();
     mWidth = width;
+    qcpEmit(this, mParentPlot, &QCPStatisticalBox::widthChanged, this->width());
 }
 
 /*!
@@ -318,6 +361,7 @@ void QCPStatisticalBox::setWhiskerWidth(double width)
         return;
     markDirty();
     mWhiskerWidth = width;
+    qcpEmit(this, mParentPlot, &QCPStatisticalBox::whiskerWidthChanged, whiskerWidth());
 }
 
 /*!
@@ -337,6 +381,7 @@ void QCPStatisticalBox::setWhiskerPen(const QPen& pen)
         return;
     markDirty();
     mWhiskerPen = pen;
+    qcpEmit(this, mParentPlot, &QCPStatisticalBox::whiskerPenChanged, whiskerPen());
 }
 
 /*!
@@ -354,6 +399,7 @@ void QCPStatisticalBox::setWhiskerBarPen(const QPen& pen)
         return;
     markDirty();
     mWhiskerBarPen = pen;
+    qcpEmit(this, mParentPlot, &QCPStatisticalBox::whiskerBarPenChanged, whiskerBarPen());
 }
 
 /*!
@@ -368,6 +414,7 @@ void QCPStatisticalBox::setWhiskerAntialiased(bool enabled)
         return;
     markDirty();
     mWhiskerAntialiased = enabled;
+    qcpEmit(this, mParentPlot, &QCPStatisticalBox::whiskerAntialiasedChanged, whiskerAntialiased());
 }
 
 /*!
@@ -379,6 +426,7 @@ void QCPStatisticalBox::setMedianPen(const QPen& pen)
         return;
     markDirty();
     mMedianPen = pen;
+    qcpEmit(this, mParentPlot, &QCPStatisticalBox::medianPenChanged, medianPen());
 }
 
 /*!
@@ -390,8 +438,11 @@ void QCPStatisticalBox::setMedianPen(const QPen& pen)
 */
 void QCPStatisticalBox::setOutlierStyle(const QCPScatterStyle& style)
 {
+    if (style == mOutlierStyle)
+        return;
     markDirty();
     mOutlierStyle = style;
+    qcpEmit(this, mParentPlot, &QCPStatisticalBox::outlierStyleChanged, outlierStyle());
 }
 
 /*! \overload

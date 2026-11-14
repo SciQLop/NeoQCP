@@ -316,6 +316,8 @@ it instead of `property("name")`.
 | `QCPLayoutElement` | `layout`, `rect` | `layout()`, `rect()` |
 | `QCPLayoutGrid` | `rowCount`, `columnCount` | `rowCount()`, `columnCount()` |
 | `QCPAbstractLegendItem` | `parentLegend` | `parentLegend()` |
+| `QCPBars` | `barBelow`, `barAbove` | `barBelow()`, `barAbove()` |
+| `QCPErrorBars` | `data` | `data()` (a shared container, mutated in place with no signal) |
 
 ### Signals
 
@@ -328,3 +330,9 @@ it instead of `property("name")`.
 - A grid's stretch factor signals also fire when rows or columns are added, inserted or collapsed
   (`expandTo`, `insertRow`, `insertColumn`, `simplify`, `addElement`).
 - `QCPColorScale::labelChanged` is the colour axis's: `axis()->setLabel(...)` fires it too.
+- A plottable's `keyAxisChanged` / `valueAxisChanged` also fire when `setSystem` moves its axes.
+- `QCPAbstractLine::scatterStyleChanged` also fires on `setComponentScatterStyle(0, ...)`: `scatterStyle()` is
+  component 0's.
+- `QCPErrorBars::dataPlottableChanged(nullptr)` fires when a refused `setDataPlottable` detaches the old one.
+- `QCPScatterStyle` has an `operator==`. Equal writes of an outlier style, an error bars' data plottable, a
+  selection decorator or an axis no longer repaint or re-register.

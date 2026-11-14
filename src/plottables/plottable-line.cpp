@@ -4,6 +4,24 @@
 #include "../misuse.h"
 #include <algorithm>
 
+/*! \fn void QCPAbstractLine::lineStyleChanged(QCPAbstractLine::LineStyle lineStyle)
+
+  This signal is emitted when \ref setLineStyle changes \ref lineStyle, after the plot delivers its
+  deferred signals. A call that only restyles components that drifted emits nothing.
+*/
+
+/*! \fn void QCPAbstractLine::scatterStyleChanged(const QCPScatterStyle& scatterStyle)
+
+  This signal is emitted when \ref scatterStyle changes, by \ref setScatterStyle or by \ref
+  setComponentScatterStyle on component 0, after the plot delivers its deferred signals.
+*/
+
+/*! \fn void QCPAbstractLine::scatterSkipChanged(int scatterSkip)
+
+  This signal is emitted when \ref scatterSkip changes, after the plot delivers its deferred
+  signals.
+*/
+
 QCPAbstractLine::QCPAbstractLine(QCPAxis* keyAxis, QCPAxis* valueAxis,
                                  QCP::Capabilities required)
     : QCPAbstractColorMapped(keyAxis, valueAxis, false, required)
@@ -107,11 +125,16 @@ void QCPAbstractLine::setPen(const QPen& pen)
 // fill since the last call.
 void QCPAbstractLine::setBrush(const QBrush& brush)
 {
+    // brush() is mBrush: re-filling components that drifted repaints without a brushChanged.
+    const bool brushMoved = mBrush != brush;
     mBrush = brush;
     mExplicitBrush = brush;
     for (int i = 0; i < mComponents.size(); ++i)
         applyBrushToComponent(i, brush);
     lineChanged();
+    if (brushMoved)
+        qcpEmit(static_cast<QCPAbstractPlottable*>(this), mParentPlot,
+                &QCPAbstractPlottable::brushChanged, mBrush);
 }
 
 void QCPAbstractLine::applyRememberedStyle(int index)
@@ -172,10 +195,13 @@ void QCPAbstractLine::setLineStyle(LineStyle style)
         mComponents.cbegin(), mComponents.cend(), [style](const auto& c) { return c.lineStyle == style; });
     if (style == mLineStyle && allComponentsFollow)
         return;
+    const bool moved = style != mLineStyle;
     mLineStyle = style;
     for (auto& c : mComponents)
         c.lineStyle = style;
     lineChanged();
+    if (moved)
+        qcpEmit(this, mParentPlot, &QCPAbstractLine::lineStyleChanged, mLineStyle);
 }
 
 void QCPAbstractLine::setComponentLineStyle(int index, LineStyle style)
@@ -190,18 +216,28 @@ void QCPAbstractLine::setComponentLineStyle(int index, LineStyle style)
 
 void QCPAbstractLine::setScatterStyle(const QCPScatterStyle& style)
 {
+    const QCPScatterStyle before = scatterStyle();
     mExplicitScatterStyle = style;
     for (auto& c : mComponents)
         c.scatterStyle = style;
     lineChanged();
+    scatterStyleMoved(before);
 }
 
 void QCPAbstractLine::setComponentScatterStyle(int index, const QCPScatterStyle& style)
 {
     if (index < 0 || index >= mComponents.size())
         return;
+    const QCPScatterStyle before = scatterStyle();
     mComponents[index].scatterStyle = style;
     lineChanged();
+    scatterStyleMoved(before); // scatterStyle() is component 0's
+}
+
+void QCPAbstractLine::scatterStyleMoved(const QCPScatterStyle& before)
+{
+    if (scatterStyle() != before)
+        qcpEmit(this, mParentPlot, &QCPAbstractLine::scatterStyleChanged, scatterStyle());
 }
 
 void QCPAbstractLine::setScatterSkip(int skip)
@@ -211,6 +247,7 @@ void QCPAbstractLine::setScatterSkip(int skip)
         return;
     mScatterSkip = skip;
     lineChanged();
+    qcpEmit(this, mParentPlot, &QCPAbstractLine::scatterSkipChanged, mScatterSkip);
 }
 
 // --- Colour by scalar ---

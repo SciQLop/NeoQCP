@@ -116,8 +116,9 @@ class QCP_LIB_DECL QCPColorMap : public QCPAbstractColorMapped
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(bool interpolate READ interpolate WRITE setInterpolate)
-    Q_PROPERTY(bool tightBoundary READ tightBoundary WRITE setTightBoundary)
+    Q_PROPERTY(bool interpolate READ interpolate WRITE setInterpolate NOTIFY interpolateChanged)
+    Q_PROPERTY(
+        bool tightBoundary READ tightBoundary WRITE setTightBoundary NOTIFY tightBoundaryChanged)
     /// \endcond
 
 public:
@@ -150,6 +151,10 @@ public:
                                  QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
     virtual QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                                    const QCPRange& inKeyRange = QCPRange()) const override;
+
+signals:
+    void interpolateChanged(bool interpolate);
+    void tightBoundaryChanged(bool tightBoundary);
 
 protected:
     // property members:

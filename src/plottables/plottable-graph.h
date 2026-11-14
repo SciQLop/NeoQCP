@@ -40,7 +40,8 @@ class QCP_LIB_DECL QCPGraph : public QCPAbstractLine, public QCPPlottableInterfa
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(bool adaptiveSampling READ adaptiveSampling WRITE setAdaptiveSampling)
+    Q_PROPERTY(bool adaptiveSampling READ adaptiveSampling WRITE setAdaptiveSampling NOTIFY
+                   adaptiveSamplingChanged)
     /// \endcond
 public:
     template <typename T>
@@ -257,6 +258,9 @@ public:
     //! The row of a graph without data (no component yet): the pen line, marker and brush its
     //! first column will take, as 2.x drew an empty graph.
     void drawEmptyLegendIcon(QCPPainter* painter, const QLineF& line) const;
+
+signals:
+    void adaptiveSamplingChanged(bool adaptiveSampling);
 
 protected:
     //! Records the lines and the markers: the pixels come from the replay.

@@ -73,6 +73,18 @@
   \snippet documentation/doc-image-generator/mainwindow.cpp qcpbarsgroup-example
 */
 
+/*! \fn void QCPBarsGroup::spacingTypeChanged(QCPBarsGroup::SpacingType spacingType)
+
+  This signal is emitted when \ref spacingType changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPBarsGroup::spacingChanged(double spacing)
+
+  This signal is emitted when \ref spacing changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start of documentation of inline functions */
 
 /*!
@@ -138,6 +150,7 @@ void QCPBarsGroup::setSpacingType(SpacingType spacingType)
         bar->markDirty();
     mSpacingType = spacingType;
     bumpRevision();
+    qcpEmit(this, mParentPlot, &QCPBarsGroup::spacingTypeChanged, this->spacingType());
 }
 
 /*!
@@ -154,6 +167,7 @@ void QCPBarsGroup::setSpacing(double spacing)
         bar->markDirty();
     mSpacing = spacing;
     bumpRevision();
+    qcpEmit(this, mParentPlot, &QCPBarsGroup::spacingChanged, this->spacing());
 }
 
 /*!
@@ -182,6 +196,8 @@ QCPHandle<QCPBars> QCPBarsGroup::bars(int index) const
 */
 void QCPBarsGroup::clear()
 {
+    // Every member's barsGroupChanged waits for the loop: a slot may delete a member or the group.
+    const QCPEmissionScope scope(mParentPlot);
     const QList<QCPBars*> oldBars = mBars;
     for (QCPBars* bars : oldBars)
         bars->setBarsGroup(nullptr); // removes itself from mBars via removeBars
@@ -513,6 +529,36 @@ QCPBarsData::QCPBarsData(double key, double value) : key(key), value(value) { }
   \snippet documentation/doc-code-snippets/mainwindow.cpp qcpbars-creation-2
 */
 
+/*! \fn void QCPBars::widthChanged(double width)
+
+  This signal is emitted when \ref width changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPBars::widthTypeChanged(QCPBars::WidthType widthType)
+
+  This signal is emitted when \ref widthType changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPBars::barsGroupChanged(QCPBarsGroup* barsGroup)
+
+  This signal is emitted when \ref barsGroup changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPBars::baseValueChanged(double baseValue)
+
+  This signal is emitted when \ref baseValue changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPBars::stackingGapChanged(double stackingGap)
+
+  This signal is emitted when \ref stackingGap changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start of documentation of inline functions */
 
 /*! \fn QSharedPointer<QCPBarsDataContainer> QCPBars::data() const
@@ -627,6 +673,7 @@ void QCPBars::setWidth(double width)
     markDirty();
     mWidth = width;
     notifyGroupRevision();
+    qcpEmit(this, mParentPlot, &QCPBars::widthChanged, this->width());
 }
 
 /*!
@@ -644,6 +691,7 @@ void QCPBars::setWidthType(QCPBars::WidthType widthType)
     markDirty();
     mWidthType = widthType;
     notifyGroupRevision();
+    qcpEmit(this, mParentPlot, &QCPBars::widthTypeChanged, this->widthType());
 }
 
 /*!
@@ -675,6 +723,7 @@ void QCPBars::setBarsGroup(QCPBarsGroup* barsGroup)
     // register at new group:
     if (mBarsGroup)
         mBarsGroup->registerBars(this);
+    qcpEmit(this, mParentPlot, &QCPBars::barsGroupChanged, this->barsGroup());
 }
 
 /*!
@@ -695,6 +744,7 @@ void QCPBars::setBaseValue(double baseValue)
         return;
     markDirty();
     mBaseValue = baseValue;
+    qcpEmit(this, mParentPlot, &QCPBars::baseValueChanged, this->baseValue());
 }
 
 /*!
@@ -708,6 +758,7 @@ void QCPBars::setStackingGap(double pixels)
         return;
     markDirty();
     mStackingGap = pixels;
+    qcpEmit(this, mParentPlot, &QCPBars::stackingGapChanged, stackingGap());
 }
 
 /*! \overload

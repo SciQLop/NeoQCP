@@ -88,9 +88,11 @@ class QCP_LIB_DECL QCPCurve : public QCPAbstractPlottable1D<QCPCurveData, QCPAbs
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QCPScatterStyle scatterStyle READ scatterStyle WRITE setScatterStyle)
-    Q_PROPERTY(int scatterSkip READ scatterSkip WRITE setScatterSkip)
-    Q_PROPERTY(LineStyle lineStyle READ lineStyle WRITE setLineStyle)
+    Q_PROPERTY(QCPScatterStyle scatterStyle READ scatterStyle WRITE setScatterStyle NOTIFY
+                   scatterStyleChanged)
+    Q_PROPERTY(int scatterSkip READ scatterSkip WRITE setScatterSkip NOTIFY scatterSkipChanged)
+    Q_PROPERTY(
+        QCPCurve::LineStyle lineStyle READ lineStyle WRITE setLineStyle NOTIFY lineStyleChanged)
     /// \endcond
 
 public:

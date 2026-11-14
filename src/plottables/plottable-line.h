@@ -18,9 +18,10 @@ class QCP_LIB_DECL QCPAbstractLine : public QCPAbstractColorMapped
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(LineStyle lineStyle READ lineStyle WRITE setLineStyle)
-    Q_PROPERTY(QCPScatterStyle scatterStyle READ scatterStyle WRITE setScatterStyle)
-    Q_PROPERTY(int scatterSkip READ scatterSkip WRITE setScatterSkip)
+    Q_PROPERTY(LineStyle lineStyle READ lineStyle WRITE setLineStyle NOTIFY lineStyleChanged)
+    Q_PROPERTY(QCPScatterStyle scatterStyle READ scatterStyle WRITE setScatterStyle NOTIFY
+                   scatterStyleChanged)
+    Q_PROPERTY(int scatterSkip READ scatterSkip WRITE setScatterSkip NOTIFY scatterSkipChanged)
     /// \endcond
 public:
     enum LineStyle { lsNone, lsLine, lsStepLeft, lsStepRight, lsStepCenter, lsImpulse };
@@ -84,6 +85,9 @@ public:
 Q_SIGNALS:
     //! A component was shown or hidden: the legend group row draws one segment per visible one.
     void componentVisibilityChanged();
+    void lineStyleChanged(QCPAbstractLine::LineStyle lineStyle);
+    void scatterStyleChanged(const QCPScatterStyle& scatterStyle);
+    void scatterSkipChanged(int scatterSkip);
 
 protected:
     //! Gives component \a index the brush a component fill takes: NoBrush clears it, anything
@@ -119,6 +123,7 @@ protected:
     static QPen defaultSelectedPen(const QPen& pen);
     //! \a style as it draws for \a pen: a style with no pen of its own takes it.
     static QCPScatterStyle markerStyle(QCPScatterStyle style, const QPen& pen);
+    void scatterStyleMoved(const QCPScatterStyle& before);
 
     QVector<QCPGraphComponent> mComponents;
     LineStyle mLineStyle = lsLine;

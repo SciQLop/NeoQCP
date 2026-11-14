@@ -83,14 +83,16 @@ class QCP_LIB_DECL QCPFinancial : public QCPAbstractPlottable1D<QCPFinancialData
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(ChartStyle chartStyle READ chartStyle WRITE setChartStyle)
-    Q_PROPERTY(double width READ width WRITE setWidth)
-    Q_PROPERTY(WidthType widthType READ widthType WRITE setWidthType)
-    Q_PROPERTY(bool twoColored READ twoColored WRITE setTwoColored)
-    Q_PROPERTY(QBrush brushPositive READ brushPositive WRITE setBrushPositive)
-    Q_PROPERTY(QBrush brushNegative READ brushNegative WRITE setBrushNegative)
-    Q_PROPERTY(QPen penPositive READ penPositive WRITE setPenPositive)
-    Q_PROPERTY(QPen penNegative READ penNegative WRITE setPenNegative)
+    Q_PROPERTY(ChartStyle chartStyle READ chartStyle WRITE setChartStyle NOTIFY chartStyleChanged)
+    Q_PROPERTY(double width READ width WRITE setWidth NOTIFY widthChanged)
+    Q_PROPERTY(WidthType widthType READ widthType WRITE setWidthType NOTIFY widthTypeChanged)
+    Q_PROPERTY(bool twoColored READ twoColored WRITE setTwoColored NOTIFY twoColoredChanged)
+    Q_PROPERTY(
+        QBrush brushPositive READ brushPositive WRITE setBrushPositive NOTIFY brushPositiveChanged)
+    Q_PROPERTY(
+        QBrush brushNegative READ brushNegative WRITE setBrushNegative NOTIFY brushNegativeChanged)
+    Q_PROPERTY(QPen penPositive READ penPositive WRITE setPenPositive NOTIFY penPositiveChanged)
+    Q_PROPERTY(QPen penNegative READ penNegative WRITE setPenNegative NOTIFY penNegativeChanged)
     /// \endcond
 
 public:
@@ -182,6 +184,16 @@ public:
     static QCPFinancialDataContainer timeSeriesToOhlc(const QVector<double>& time,
                                                       const QVector<double>& value,
                                                       double timeBinSize, double timeBinOffset = 0);
+
+signals:
+    void chartStyleChanged(QCPFinancial::ChartStyle chartStyle);
+    void widthChanged(double width);
+    void widthTypeChanged(QCPFinancial::WidthType widthType);
+    void twoColoredChanged(bool twoColored);
+    void brushPositiveChanged(const QBrush& brushPositive);
+    void brushNegativeChanged(const QBrush& brushNegative);
+    void penPositiveChanged(const QPen& penPositive);
+    void penNegativeChanged(const QPen& penNegative);
 
 protected:
     // property members:

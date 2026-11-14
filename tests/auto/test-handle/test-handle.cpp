@@ -966,8 +966,6 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
     QCOMPARE(errors->property("dataPlottable").value<QCPAbstractPlottable*>(),
              errors->dataPlottable().get());
     QCOMPARE(bars->property("barsGroup").value<QCPBarsGroup*>(), bars->barsGroup().get());
-    QCOMPARE(below->property("barAbove").value<QCPBars*>(), below->barAbove().get());
-    QCOMPARE(above->property("barBelow").value<QCPBars*>(), above->barBelow().get());
     QCOMPARE(graph->property("keyAxis").value<QCPAxis*>(), graph->keyAxis().get());
     QCOMPARE(graph->property("valueAxis").value<QCPAxis*>(), graph->valueAxis().get());
     QCOMPARE(graph->property("selectionDecorator").value<QCPSelectionDecorator*>(),
@@ -1017,8 +1015,9 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
     // Off the surface (milestone 5e, E-11): read-only, they move with no signal. The accessors
     // stay.
     const std::pair<QObject*, const char*> dropped[] = {
-        { axis, "grid" },   { graph, "parentPlot" }, { graph, "parentLayerable" },
-        { rect, "layout" }, { row, "parentLegend" },
+        { axis, "grid" },      { graph, "parentPlot" }, { graph, "parentLayerable" },
+        { rect, "layout" },    { row, "parentLegend" }, { below, "barAbove" },
+        { above, "barBelow" }, { errors, "data" },
     };
     for (const auto& [object, name] : dropped)
         QVERIFY2(object->metaObject()->indexOfProperty(name) < 0, name);

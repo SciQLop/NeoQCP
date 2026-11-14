@@ -208,6 +208,13 @@ QCPScatterStyle::QCPScatterStyle(const QPainterPath& customPath, const QPen& pen
 {
 }
 
+bool QCPScatterStyle::operator==(const QCPScatterStyle& other) const
+{
+    return mSize == other.mSize && mShape == other.mShape && mPen == other.mPen
+        && mBrush == other.mBrush && mPixmap.cacheKey() == other.mPixmap.cacheKey()
+        && mCustomPath == other.mCustomPath && mPenDefined == other.mPenDefined;
+}
+
 /*!
   Copies the specified \a properties from the \a other scatter style to this scatter style.
 */

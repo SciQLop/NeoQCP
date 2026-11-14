@@ -43,8 +43,9 @@ class QCP_LIB_DECL QCPBarsGroup : public QObject
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(SpacingType spacingType READ spacingType WRITE setSpacingType)
-    Q_PROPERTY(double spacing READ spacing WRITE setSpacing)
+    Q_PROPERTY(
+        SpacingType spacingType READ spacingType WRITE setSpacingType NOTIFY spacingTypeChanged)
+    Q_PROPERTY(double spacing READ spacing WRITE setSpacing NOTIFY spacingChanged)
     /// \endcond
 
 public:
@@ -105,6 +106,10 @@ public:
     void append(QCPBars* bars);
     void insert(int i, QCPBars* bars);
     void remove(QCPBars* bars);
+
+signals:
+    void spacingTypeChanged(QCPBarsGroup::SpacingType spacingType);
+    void spacingChanged(double spacing);
 
 protected:
     // non-property members:
@@ -175,13 +180,11 @@ class QCP_LIB_DECL QCPBars : public QCPAbstractPlottable1D<QCPBarsData>
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(double width READ width WRITE setWidth)
-    Q_PROPERTY(WidthType widthType READ widthType WRITE setWidthType)
-    Q_PROPERTY(QCPBarsGroup* barsGroup READ barsGroup WRITE setBarsGroup)
-    Q_PROPERTY(double baseValue READ baseValue WRITE setBaseValue)
-    Q_PROPERTY(double stackingGap READ stackingGap WRITE setStackingGap)
-    Q_PROPERTY(QCPBars* barBelow READ barBelow)
-    Q_PROPERTY(QCPBars* barAbove READ barAbove)
+    Q_PROPERTY(double width READ width WRITE setWidth NOTIFY widthChanged)
+    Q_PROPERTY(WidthType widthType READ widthType WRITE setWidthType NOTIFY widthTypeChanged)
+    Q_PROPERTY(QCPBarsGroup* barsGroup READ barsGroup WRITE setBarsGroup NOTIFY barsGroupChanged)
+    Q_PROPERTY(double baseValue READ baseValue WRITE setBaseValue NOTIFY baseValueChanged)
+    Q_PROPERTY(double stackingGap READ stackingGap WRITE setStackingGap NOTIFY stackingGapChanged)
     /// \endcond
 
 public:
@@ -261,6 +264,13 @@ public:
 
     //! The recording's key: this bar's data, the bar it is stacked on, and its group.
     [[nodiscard]] quint64 dependencyRevision() const override;
+
+signals:
+    void widthChanged(double width);
+    void widthTypeChanged(QCPBars::WidthType widthType);
+    void barsGroupChanged(QCPBarsGroup* barsGroup);
+    void baseValueChanged(double baseValue);
+    void stackingGapChanged(double stackingGap);
 
 protected:
     // property members:

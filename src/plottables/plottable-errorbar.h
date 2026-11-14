@@ -71,11 +71,12 @@ class QCP_LIB_DECL QCPErrorBars : public QCPAbstractPlottable, public QCPPlottab
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QSharedPointer<QCPErrorBarsDataContainer> data READ data WRITE setData)
-    Q_PROPERTY(QCPAbstractPlottable* dataPlottable READ dataPlottable WRITE setDataPlottable)
-    Q_PROPERTY(ErrorType errorType READ errorType WRITE setErrorType)
-    Q_PROPERTY(double whiskerWidth READ whiskerWidth WRITE setWhiskerWidth)
-    Q_PROPERTY(double symbolGap READ symbolGap WRITE setSymbolGap)
+    Q_PROPERTY(QCPAbstractPlottable* dataPlottable READ dataPlottable WRITE setDataPlottable NOTIFY
+                   dataPlottableChanged)
+    Q_PROPERTY(ErrorType errorType READ errorType WRITE setErrorType NOTIFY errorTypeChanged)
+    Q_PROPERTY(
+        double whiskerWidth READ whiskerWidth WRITE setWhiskerWidth NOTIFY whiskerWidthChanged)
+    Q_PROPERTY(double symbolGap READ symbolGap WRITE setSymbolGap NOTIFY symbolGapChanged)
     /// \endcond
 
 public:
@@ -160,6 +161,12 @@ public:
 
     //! The bars depend on the plottable they are attached to: its identity, its data and its axes.
     [[nodiscard]] quint64 dependencyRevision() const override;
+
+signals:
+    void dataPlottableChanged(QCPAbstractPlottable* dataPlottable);
+    void errorTypeChanged(QCPErrorBars::ErrorType errorType);
+    void whiskerWidthChanged(double whiskerWidth);
+    void symbolGapChanged(double symbolGap);
 
 protected:
     // property members:

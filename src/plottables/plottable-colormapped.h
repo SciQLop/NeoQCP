@@ -13,7 +13,8 @@ class QCP_LIB_DECL QCPAbstractColorMapped : public QCPAbstractPlottable
     Q_PROPERTY(QCPAxis::ScaleType dataScaleType READ dataScaleType WRITE setDataScaleType NOTIFY
                    dataScaleTypeChanged)
     Q_PROPERTY(QCPColorGradient gradient READ gradient WRITE setGradient NOTIFY gradientChanged)
-    Q_PROPERTY(QCPColorScale* colorScale READ colorScale WRITE setColorScale)
+    Q_PROPERTY(
+        QCPColorScale* colorScale READ colorScale WRITE setColorScale NOTIFY colorScaleChanged)
     /// \endcond
 
 public:

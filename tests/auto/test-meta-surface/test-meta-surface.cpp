@@ -474,7 +474,8 @@ const QVector<Fixture>& fixtures()
         { "QCPAxisRect", [](QCustomPlot& plot) -> QObject* { return plot.axisRect().get(); } },
         // With a row: an empty legend has no stretch factor to change.
         { "QCPLegend",
-          [](QCustomPlot& plot) -> QObject* {
+          [](QCustomPlot& plot) -> QObject*
+          {
               graphOn(plot);
               return plot.legend.get();
           } },
@@ -489,6 +490,20 @@ const QVector<Fixture>& fixtures()
         { "QCPGraph", [](QCustomPlot& plot) -> QObject* { return graphOn(plot); } },
         { "QCPCurve", [](QCustomPlot& plot) -> QObject* { return curveOn(plot); } },
         { "QCPBars", [](QCustomPlot& plot) -> QObject* { return barsOn(plot); } },
+        { "QCPBarsGroup", [](QCustomPlot& plot) -> QObject* { return new QCPBarsGroup(&plot); } },
+        { "QCPColorMap",
+          [](QCustomPlot& plot) -> QObject* { return new QCPColorMap(plot.xAxis, plot.yAxis); } },
+        { "QCPErrorBars",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* errors = new QCPErrorBars(plot.xAxis, plot.yAxis);
+              errors->setDataPlottable(graphOn(plot));
+              return errors;
+          } },
+        { "QCPFinancial",
+          [](QCustomPlot& plot) -> QObject* { return new QCPFinancial(plot.xAxis, plot.yAxis); } },
+        { "QCPStatisticalBox", [](QCustomPlot& plot) -> QObject*
+          { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); } },
     };
     return list;
 }
@@ -610,6 +625,13 @@ const QVector<std::pair<QMetaType, Different>>& differentValues()
                 QCPLayer* grid = plot->layer(QStringLiteral("grid"));
                 return v == grid ? plot->layer(QStringLiteral("overlay")).get() : grid;
             }),
+        differentFor<QCPAbstractPlottable*>(
+            [](QCPAbstractPlottable* const&, QObject* object) -> QCPAbstractPlottable*
+            { return graphOn(*plotOf(object)); }),
+        differentFor<QCPBarsGroup*>([](QCPBarsGroup* const&, QObject* object) -> QCPBarsGroup*
+                                    { return new QCPBarsGroup(plotOf(object)); }),
+        differentFor<QCPColorScale*>([](QCPColorScale* const&, QObject* object) -> QCPColorScale*
+                                     { return colorScaleOn(*plotOf(object)); }),
         differentFor<QCPAxis*>(
             [](QCPAxis* const& v, QObject* object) -> QCPAxis*
             {
@@ -725,13 +747,7 @@ bool isNotifyProperty(const QMetaProperty& property)
 // its part of the list.
 const QSet<QByteArray>& pendingClasses()
 {
-    static const QSet<QByteArray> list { "QCPAbstractPlottable",
-                                         "QCPAbstractColorMapped",
-                                         "QCPArea",
-                                         "QCPAbstractLine",
-                                         "QCPGraph",
-                                         "QCPCurve",
-                                         "QCPBars" };
+    static const QSet<QByteArray> list { "QCPArea" };
     return list;
 }
 
@@ -898,6 +914,43 @@ const QVector<Writer>& writers()
           [](QObject* o) { qobject_cast<QCPColorScale*>(o)->setType(QCPAxis::atBottom); },
           { "type" },
           { "label", "rangeDrag", "rangeZoom" } },
+        { "QCPAbstractLine::setComponentScatterStyle on component 0",
+          [](QCustomPlot& plot) -> QObject* { return graphOn(plot); },
+          [](QObject* o)
+          {
+              qobject_cast<QCPGraph*>(o)->setComponentScatterStyle(
+                  0, QCPScatterStyle(QCPScatterStyle::ssDisc));
+          },
+          { "scatterStyle" },
+          { "lineStyle" } },
+        { "QCPErrorBars refusing a data plottable",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* errors = new QCPErrorBars(plot.xAxis, plot.yAxis);
+              errors->setDataPlottable(graphOn(plot));
+              return errors;
+          },
+          [](QObject* o)
+          {
+              auto* errors = qobject_cast<QCPErrorBars*>(o);
+              errors->setDataPlottable(errors); // error bars cannot carry error bars: detached
+          },
+          { "dataPlottable" },
+          { } },
+        { "QCPBarsGroup::clear",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              QCPBars* bars = barsOn(plot);
+              bars->setBarsGroup(new QCPBarsGroup(&plot));
+              return bars;
+          },
+          [](QObject* o)
+          {
+              if (QCPBarsGroup* group = qobject_cast<QCPBars*>(o)->barsGroup().get())
+                  group->clear();
+          },
+          { "barsGroup" },
+          { } },
         { "QCPColorScale's axis label",
           [](QCustomPlot& plot) -> QObject* { return colorScaleOn(plot); },
           [](QObject* o)
@@ -987,6 +1040,18 @@ bool probeOnce(Sender* sender, Signal signal, std::function<void()> write,
 const QVector<Nested>& nestedWriters()
 {
     static const QVector<Nested> list {
+        { "QCPBarsGroup::clear",
+          [](QCustomPlot& plot)
+          {
+              auto* group = new QCPBarsGroup(&plot);
+              QCPBars* first = barsOn(plot);
+              QCPBars* second = barsOn(plot);
+              first->setBarsGroup(group);
+              second->setBarsGroup(group);
+              return probeOnce(
+                  first, &QCPBars::barsGroupChanged, [&] { group->clear(); },
+                  [&] { return second->barsGroup().get() == nullptr; });
+          } },
         { "QCPLegend::setFont",
           [](QCustomPlot& plot)
           {
@@ -1191,6 +1256,14 @@ void TestMetaSurface::exceptionRulesHold()
             break;
         }
         case Rule::TakesOwnership:
-            QFAIL("the rule of this exception is not written");
+        {
+            const QVariant adopted = ex.accepted(object);
+            QVERIFY(meta.write(object, adopted));
+            QCOMPARE(spy.count(), 1);
+            QVERIFY(meta.write(object, adopted)); // the same one again: refused, as it is ours
+            QCOMPARE(meta.read(object), adopted);
+            QCOMPARE(spy.count(), 1);
+            break;
+        }
     }
 }

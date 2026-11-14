@@ -1117,6 +1117,8 @@ void QCPGraph::setSystem(QCPCoordinateSystem* system)
         QCP_CHECK_OR_RETURN(false,
                             "colour values on a non-rect area need an explicit colour scale");
     }
+    // The base's signals wait for the colour scale join below: a slot may delete this graph.
+    const QCPEmissionScope scope(mParentPlot);
     QCPAbstractLine::setSystem(system);
     // I6: colour values join the colour scale of the area they are on. A move inside one plot is
     // not an adoption, so the join has to be redone here; an explicit scale is the user's and stays.
@@ -1157,6 +1159,12 @@ void QCPGraph::setColorValues(std::vector<double> values)
     QCPAbstractLine::setColorValues(std::move(values));
 }
 
+/*! \fn void QCPGraph::adaptiveSamplingChanged(bool adaptiveSampling)
+
+  This signal is emitted when \ref adaptiveSampling changes, after the plot delivers its deferred
+  signals.
+*/
+
 void QCPGraph::setAdaptiveSampling(bool enabled)
 {
     if (mAdaptiveSampling == enabled)
@@ -1164,6 +1172,7 @@ void QCPGraph::setAdaptiveSampling(bool enabled)
     markDirty();
     mAdaptiveSampling = enabled;
     linesChanged();
+    qcpEmit(this, mParentPlot, &QCPGraph::adaptiveSamplingChanged, adaptiveSampling());
 }
 
 void QCPGraph::setGapThreshold(double threshold)

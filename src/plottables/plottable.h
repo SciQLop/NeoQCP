@@ -109,18 +109,20 @@ class QCP_LIB_DECL QCPAbstractPlottable : public QCPLayerable, public QCPDrawabl
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QString name READ name WRITE setName)
-    Q_PROPERTY(bool antialiasedFill READ antialiasedFill WRITE setAntialiasedFill)
-    Q_PROPERTY(bool antialiasedScatters READ antialiasedScatters WRITE setAntialiasedScatters)
+    Q_PROPERTY(QString name READ name WRITE setName NOTIFY nameChanged)
+    Q_PROPERTY(bool antialiasedFill READ antialiasedFill WRITE setAntialiasedFill NOTIFY
+                   antialiasedFillChanged)
+    Q_PROPERTY(bool antialiasedScatters READ antialiasedScatters WRITE setAntialiasedScatters NOTIFY
+                   antialiasedScattersChanged)
     Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
-    Q_PROPERTY(QBrush brush READ brush WRITE setBrush)
-    Q_PROPERTY(QCPAxis* keyAxis READ keyAxis WRITE setKeyAxis)
-    Q_PROPERTY(QCPAxis* valueAxis READ valueAxis WRITE setValueAxis)
+    Q_PROPERTY(QBrush brush READ brush WRITE setBrush NOTIFY brushChanged)
+    Q_PROPERTY(QCPAxis* keyAxis READ keyAxis WRITE setKeyAxis NOTIFY keyAxisChanged)
+    Q_PROPERTY(QCPAxis* valueAxis READ valueAxis WRITE setValueAxis NOTIFY valueAxisChanged)
     Q_PROPERTY(
         QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY selectableChanged)
     Q_PROPERTY(QCPDataSelection selection READ selection WRITE setSelection NOTIFY selectionChanged)
     Q_PROPERTY(QCPSelectionDecorator* selectionDecorator READ selectionDecorator WRITE
-                   setSelectionDecorator)
+                   setSelectionDecorator NOTIFY selectionDecoratorChanged)
     /// \endcond
 
 public:
@@ -318,6 +320,13 @@ signals:
     void selectableChanged();
     void busyChanged(bool busy);
     void visuallyBusyChanged(bool visuallyBusy);
+    void nameChanged(const QString& name);
+    void antialiasedFillChanged(bool antialiasedFill);
+    void antialiasedScattersChanged(bool antialiasedScatters);
+    void brushChanged(const QBrush& brush);
+    void keyAxisChanged(QCPAxis* keyAxis);
+    void valueAxisChanged(QCPAxis* valueAxis);
+    void selectionDecoratorChanged(QCPSelectionDecorator* selectionDecorator);
 
 protected:
     // The axis rect raw, for the per-draw, per-lane and per-bar paths (K8): the public
@@ -433,6 +442,7 @@ private:
     void onDebounceTimeout();
     //! The axis setters' shared body: the system of that pair, or an inert plottable.
     void resolveAxes(QCPAxis* key, QCPAxis* value);
+    void axesMoved(const QCPAxis* key, const QCPAxis* value);
     //! A plot that takes this plottable back clears its frame without the setSystem side effects.
     void forgetSystem()
     {

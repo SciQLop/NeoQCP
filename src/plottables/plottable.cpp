@@ -416,6 +416,49 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   \see setSelectable
 */
 
+/*! \fn void QCPAbstractPlottable::nameChanged(const QString& name)
+
+  This signal is emitted when \ref name changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAbstractPlottable::antialiasedFillChanged(bool antialiasedFill)
+
+  This signal is emitted when \ref antialiasedFill changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAbstractPlottable::antialiasedScattersChanged(bool antialiasedScatters)
+
+  This signal is emitted when \ref antialiasedScatters changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAbstractPlottable::brushChanged(const QBrush& brush)
+
+  This signal is emitted when \ref brush changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAbstractPlottable::keyAxisChanged(QCPAxis* keyAxis)
+
+  This signal is emitted when \ref keyAxis changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAbstractPlottable::valueAxisChanged(QCPAxis* valueAxis)
+
+  This signal is emitted when \ref valueAxis changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAbstractPlottable::selectionDecoratorChanged(QCPSelectionDecorator*
+  selectionDecorator)
+
+  This signal is emitted when \ref selectionDecorator changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* end of documentation of signals */
 
 /*!
@@ -767,6 +810,7 @@ void QCPAbstractPlottable::setName(const QString& name)
     if (mParentPlot) // an orphan plottable has no legend to mark, but still has a name
         markLegendRows(mParentPlot->plotLayout(), this);
     mName = name;
+    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::nameChanged, this->name());
 }
 
 /*!
@@ -781,6 +825,7 @@ void QCPAbstractPlottable::setAntialiasedFill(bool enabled)
         return;
     markDirty();
     mAntialiasedFill = enabled;
+    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::antialiasedFillChanged, antialiasedFill());
 }
 
 /*!
@@ -795,6 +840,8 @@ void QCPAbstractPlottable::setAntialiasedScatters(bool enabled)
         return;
     markDirty();
     mAntialiasedScatters = enabled;
+    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::antialiasedScattersChanged,
+            antialiasedScatters());
 }
 
 /*!
@@ -829,6 +876,7 @@ void QCPAbstractPlottable::setBrush(const QBrush& brush)
         return;
     markDirty();
     mBrush = brush;
+    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::brushChanged, this->brush());
 }
 
 /*!
@@ -857,6 +905,8 @@ void QCPAbstractPlottable::setValueAxis(QCPAxis* axis)
 void QCPAbstractPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
 {
     QCPCoordinateSystem* resolved = qcpSystemOfAxes(key, value);
+    const QCPAxis* keyBefore = keyAxisRaw();
+    const QCPAxis* valueBefore = valueAxisRaw();
     if (resolved == mSystem)
     {
         if (projectsOntoAxes(resolved))
@@ -866,7 +916,7 @@ void QCPAbstractPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
         }
         markDirty();
         systemChanged();
-        return;
+        return axesMoved(keyBefore, valueBefore);
     }
     if (!resolved)
     {
@@ -877,7 +927,7 @@ void QCPAbstractPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
         mValueAxis = value;
         markDirty();
         systemChanged();
-        return;
+        return axesMoved(keyBefore, valueBefore);
     }
     setSystem(resolved);
 }
@@ -894,6 +944,8 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
         if (!systemAdmits(system, requiredCapabilities()))
             return;
     }
+    const QCPAxis* keyBefore = keyAxisRaw();
+    const QCPAxis* valueBefore = valueAxisRaw();
     systemWillChange(system);
     mSystem = system;
     // The area it draws in is the one it hangs on: hiding the area it left must not hide it, and
@@ -912,6 +964,26 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
         mParentPlot->registerJoinedPlottable(this);
     contentChanged(); // the new frame's recording, then whatever follows an axis pair
     systemChanged();
+    axesMoved(keyBefore, valueBefore);
+}
+
+/*! \internal
+
+  Emits keyAxisChanged and valueAxisChanged for the axes that moved since \a key and \a value:
+  setKeyAxis, setValueAxis and setSystem all move them. Both wait for one scope, as a slot of the
+  first may delete this plottable.
+*/
+void QCPAbstractPlottable::axesMoved(const QCPAxis* key, const QCPAxis* value)
+{
+    const bool keyMoved = keyAxisRaw() != key;
+    const bool valueMoved = valueAxisRaw() != value;
+    if (!keyMoved && !valueMoved)
+        return;
+    const QCPEmissionScope scope(mParentPlot);
+    if (keyMoved)
+        qcpEmit(this, mParentPlot, &QCPAbstractPlottable::keyAxisChanged, keyAxisRaw());
+    if (valueMoved)
+        qcpEmit(this, mParentPlot, &QCPAbstractPlottable::valueAxisChanged, valueAxisRaw());
 }
 
 /*!
@@ -972,6 +1044,7 @@ void QCPAbstractPlottable::emitSelectionChanged()
 */
 void QCPAbstractPlottable::setSelectionDecorator(QCPSelectionDecorator* decorator)
 {
+    const QCPSelectionDecorator* before = mSelectionDecorator;
     if (decorator)
     {
         if (decorator->registerWithPlottable(this))
@@ -987,6 +1060,9 @@ void QCPAbstractPlottable::setSelectionDecorator(QCPSelectionDecorator* decorato
         delete mSelectionDecorator;
         mSelectionDecorator = nullptr;
     }
+    if (mSelectionDecorator != before)
+        qcpEmit(this, mParentPlot, &QCPAbstractPlottable::selectionDecoratorChanged,
+                mSelectionDecorator);
 }
 
 /*!

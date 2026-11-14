@@ -183,6 +183,54 @@ QCPFinancialData::QCPFinancialData(double key, double open, double high, double 
   series into a 24-hour binned open-high-low-close data series as QCPFinancial uses.
 */
 
+/*! \fn void QCPFinancial::chartStyleChanged(QCPFinancial::ChartStyle chartStyle)
+
+  This signal is emitted when \ref chartStyle changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPFinancial::widthChanged(double width)
+
+  This signal is emitted when \ref width changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPFinancial::widthTypeChanged(QCPFinancial::WidthType widthType)
+
+  This signal is emitted when \ref widthType changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPFinancial::twoColoredChanged(bool twoColored)
+
+  This signal is emitted when \ref twoColored changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPFinancial::brushPositiveChanged(const QBrush& brushPositive)
+
+  This signal is emitted when \ref brushPositive changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPFinancial::brushNegativeChanged(const QBrush& brushNegative)
+
+  This signal is emitted when \ref brushNegative changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPFinancial::penPositiveChanged(const QPen& penPositive)
+
+  This signal is emitted when \ref penPositive changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPFinancial::penNegativeChanged(const QPen& penNegative)
+
+  This signal is emitted when \ref penNegative changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start of documentation of inline functions */
 
 /*! \fn QCPFinancialDataContainer *QCPFinancial::data() const
@@ -271,6 +319,7 @@ void QCPFinancial::setChartStyle(QCPFinancial::ChartStyle style)
         return;
     markDirty();
     mChartStyle = style;
+    qcpEmit(this, mParentPlot, &QCPFinancial::chartStyleChanged, chartStyle());
 }
 
 /*!
@@ -284,6 +333,7 @@ void QCPFinancial::setWidth(double width)
         return;
     markDirty();
     mWidth = width;
+    qcpEmit(this, mParentPlot, &QCPFinancial::widthChanged, this->width());
 }
 
 /*!
@@ -300,6 +350,7 @@ void QCPFinancial::setWidthType(QCPFinancial::WidthType widthType)
         return;
     markDirty();
     mWidthType = widthType;
+    qcpEmit(this, mParentPlot, &QCPFinancial::widthTypeChanged, this->widthType());
 }
 
 /*!
@@ -317,6 +368,7 @@ void QCPFinancial::setTwoColored(bool twoColored)
         return;
     markDirty();
     mTwoColored = twoColored;
+    qcpEmit(this, mParentPlot, &QCPFinancial::twoColoredChanged, this->twoColored());
 }
 
 /*!
@@ -334,6 +386,7 @@ void QCPFinancial::setBrushPositive(const QBrush& brush)
         return;
     markDirty();
     mBrushPositive = brush;
+    qcpEmit(this, mParentPlot, &QCPFinancial::brushPositiveChanged, brushPositive());
 }
 
 /*!
@@ -351,6 +404,7 @@ void QCPFinancial::setBrushNegative(const QBrush& brush)
         return;
     markDirty();
     mBrushNegative = brush;
+    qcpEmit(this, mParentPlot, &QCPFinancial::brushNegativeChanged, brushNegative());
 }
 
 /*!
@@ -368,6 +422,7 @@ void QCPFinancial::setPenPositive(const QPen& pen)
         return;
     markDirty();
     mPenPositive = pen;
+    qcpEmit(this, mParentPlot, &QCPFinancial::penPositiveChanged, penPositive());
 }
 
 /*!
@@ -385,6 +440,7 @@ void QCPFinancial::setPenNegative(const QPen& pen)
         return;
     markDirty();
     mPenNegative = pen;
+    qcpEmit(this, mParentPlot, &QCPFinancial::penNegativeChanged, penNegative());
 }
 
 /*! \overload

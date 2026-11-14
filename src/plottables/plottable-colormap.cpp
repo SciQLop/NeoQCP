@@ -702,6 +702,18 @@ bool QCPColorMapData::createAlpha(bool initializeOpaque)
   QCPColorMapData::setCell.
 */
 
+/*! \fn void QCPColorMap::interpolateChanged(bool interpolate)
+
+  This signal is emitted when \ref interpolate changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPColorMap::tightBoundaryChanged(bool tightBoundary)
+
+  This signal is emitted when \ref tightBoundary changes, after the plot delivers its deferred
+  signals.
+*/
+
 /* start documentation of inline functions */
 
 /*! \fn QCPColorMapData *QCPColorMap::data() const
@@ -844,6 +856,7 @@ void QCPColorMap::setInterpolate(bool enabled)
     markDirty();
     mInterpolate = enabled;
     mMapImageInvalidated = true; // because oversampling factors might need to change
+    qcpEmit(this, mParentPlot, &QCPColorMap::interpolateChanged, interpolate());
 }
 
 /*!
@@ -863,6 +876,7 @@ void QCPColorMap::setTightBoundary(bool enabled)
         return;
     markDirty();
     mTightBoundary = enabled;
+    qcpEmit(this, mParentPlot, &QCPColorMap::tightBoundaryChanged, tightBoundary());
 }
 
 QCPRange QCPColorMap::colorDataBounds(bool& found) const
