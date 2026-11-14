@@ -41,6 +41,18 @@ void setShown(const QPointer<QCPAbstractPlottable>& plottable, bool shown)
 //////////////////// QCPPlottableGroup
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/*! \fn void QCPPlottableGroup::nameChanged(const QString& name)
+
+  This signal is emitted when \ref name changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPPlottableGroup::visibleChanged(bool visible)
+
+  This signal is emitted when \ref visible changes, after the plot delivers its deferred
+  signals.
+*/
+
 QCPPlottableGroup::QCPPlottableGroup(QCustomPlot* parentPlot, const QString& name)
         : QObject(parentPlot), mParentPlot(parentPlot), mName(name)
 {
@@ -68,6 +80,7 @@ void QCPPlottableGroup::setName(const QString& name)
     markRowDirty(); // the only surface a group draws: its legend row
     mName = name;
     markRowDirty();
+    qcpEmit(this, mParentPlot, &QCPPlottableGroup::nameChanged, mName);
 }
 
 QList<QCPAbstractPlottable*> QCPPlottableGroup::membersRaw() const
@@ -112,12 +125,16 @@ bool QCPPlottableGroup::addMember(QCPAbstractPlottable* plottable)
         plottable->mRowOnLeave = plottable->removeFromLegend();
     plottable->mGroup = this;
     mMembers.append(plottable);
-    connect(plottable, &QCPLayerable::visibleChanged, this, &QCPPlottableGroup::markRowDirty);
+    const auto shownChanged = [this]
+    {
+        markRowDirty();
+        noteVisibility();
+    };
+    connect(plottable, &QCPLayerable::visibleChanged, this, shownChanged);
     connect(plottable, &QCPAbstractPlottable::visuallyBusyChanged, this,
             &QCPPlottableGroup::markRowDirty);
     if (auto* graph = qobject_cast<QCPGraph*>(plottable))
-        connect(graph, &QCPGraph::componentVisibilityChanged, this,
-                &QCPPlottableGroup::markRowDirty);
+        connect(graph, &QCPGraph::componentVisibilityChanged, this, shownChanged);
     updateLegendRow();
 
     // Two groups are told, and a slot may delete either: deliver at the outermost call.
@@ -126,8 +143,10 @@ bool QCPPlottableGroup::addMember(QCPAbstractPlottable* plottable)
     {
         previous->updateLegendRow();
         qcpEmit(previous.data(), mParentPlot, &QCPPlottableGroup::membersChanged);
+        previous->noteVisibility();
     }
     qcpEmit(this, mParentPlot, &QCPPlottableGroup::membersChanged);
+    noteVisibility();
     return true;
 }
 
@@ -135,9 +154,12 @@ void QCPPlottableGroup::removeMember(QCPAbstractPlottable* plottable)
 {
     if (!plottable || plottable->mGroup != this)
         return;
+    // Two signals: a slot of the first may delete this group.
+    const QCPEmissionScope scope(mParentPlot);
     detach(plottable, true);
     updateLegendRow();
     qcpEmit(this, mParentPlot, &QCPPlottableGroup::membersChanged);
+    noteVisibility();
 }
 
 /*! \internal
@@ -168,8 +190,19 @@ void QCPPlottableGroup::setVisible(bool visible)
     for (const auto& member : snapshot)
         if (member)
             setShown(member, visible);
-    if (self)
-        markRowDirty();
+    if (!self)
+        return;
+    markRowDirty();
+    noteVisibility();
+}
+
+void QCPPlottableGroup::noteVisibility()
+{
+    const bool shown = visible();
+    if (shown == mShown)
+        return;
+    mShown = shown;
+    qcpEmit(this, mParentPlot, &QCPPlottableGroup::visibleChanged, shown);
 }
 
 void QCPPlottableGroup::updateLegendRow()

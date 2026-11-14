@@ -123,6 +123,8 @@ class QCP_LIB_DECL QCPAbstractPlottable : public QCPLayerable, public QCPDrawabl
     Q_PROPERTY(QCPDataSelection selection READ selection WRITE setSelection NOTIFY selectionChanged)
     Q_PROPERTY(QCPSelectionDecorator* selectionDecorator READ selectionDecorator WRITE
                    setSelectionDecorator NOTIFY selectionDecoratorChanged)
+    Q_PROPERTY(QCPCoordinateSystem* system READ system WRITE setSystem NOTIFY systemChanged)
+    Q_PROPERTY(bool wantsLegend READ wantsLegend WRITE setWantsLegend NOTIFY wantsLegendChanged)
     /// \endcond
 
 public:
@@ -327,6 +329,8 @@ signals:
     void keyAxisChanged(QCPAxis* keyAxis);
     void valueAxisChanged(QCPAxis* valueAxis);
     void selectionDecoratorChanged(QCPSelectionDecorator* selectionDecorator);
+    void systemChanged(QCPCoordinateSystem* system);
+    void wantsLegendChanged(bool wantsLegend);
 
 protected:
     // The axis rect raw, for the per-draw, per-lane and per-bar paths (K8): the public
@@ -347,7 +351,7 @@ protected:
     [[nodiscard]] virtual QList<QCPLayer*> dependentLayersRaw() const;
 
     //! Called after setSystem; not called by the constructor.
-    virtual void systemChanged() {}
+    virtual void systemDidChange() { }
     //! Called before setSystem adopts \a next: a plottable that ties itself to others (a stack, a
     //! group) unties itself unless \a next keeps it in the same area, while the old system is still
     //! the one it is drawn in.
@@ -401,7 +405,9 @@ protected:
 
     // non-virtual methods:
     bool legendAllowed() const { return mWantsLegend && !mGroup; }
-    void emitSelectionChanged();
+
+    //! Virtual: a plottable whose other properties read the selection signals them too.
+    virtual void emitSelectionChanged();
     //! False, and one misuse the first time, while the key or value axis is gone.
     bool drawableAxes() const;
     void dropSystem();

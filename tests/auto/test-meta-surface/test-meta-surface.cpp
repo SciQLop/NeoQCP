@@ -40,6 +40,33 @@ QCPGraph* twoColumnGraphOn(QCustomPlot& plot)
     return graph;
 }
 
+QCPIntervals* intervalsOn(QCustomPlot& plot)
+{
+    auto* layout = new QCPLaneLayout(&plot);
+    auto* intervals = new QCPIntervals(plot.xAxis, plot.yAxis, layout);
+    qcp::intervals::Columns columns;
+    columns.start = { 10, 60 };
+    columns.stop = { 40, 90 };
+    columns.lane
+        = { layout->laneIndex(QStringLiteral("A")), layout->laneIndex(QStringLiteral("B")) };
+    columns.category = { 0, 1 };
+    columns.ids = { 1, 2 };
+    intervals->setData(std::move(columns));
+    intervals->setSelectable(QCP::stMultipleDataRanges);
+    return intervals;
+}
+
+// A histogram whose binning has settled: the next rebinning makes it busy again.
+QCPHistogram* settledHistogramOn(QCustomPlot& plot)
+{
+    using Source = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
+    auto* histogram = new QCPHistogram(plot.xAxis, plot.yAxis);
+    histogram->setDataSource(std::make_shared<Source>(
+        std::vector<double> { 0, 1, 2 }, std::vector<std::vector<double>> { { 1, 2, 3 } }));
+    QTest::qWaitFor([histogram] { return !histogram->busy(); }, 5000);
+    return histogram;
+}
+
 QCPCurve* curveOn(QCustomPlot& plot)
 {
     auto* curve = new QCPCurve(plot.xAxis, plot.yAxis);
@@ -569,6 +596,22 @@ const QVector<Fixture>& fixtures()
           [](QCustomPlot& plot) -> QObject* { return new QCPFinancial(plot.xAxis, plot.yAxis); } },
         { "QCPStatisticalBox", [](QCustomPlot& plot) -> QObject*
           { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); } },
+        { "QCPColorMap2",
+          [](QCustomPlot& plot) -> QObject* { return new QCPColorMap2(plot.xAxis, plot.yAxis); } },
+        { "QCPHistogram",
+          [](QCustomPlot& plot) -> QObject* { return new QCPHistogram(plot.xAxis, plot.yAxis); } },
+        { "QCPHistogram2D", [](QCustomPlot& plot) -> QObject*
+          { return new QCPHistogram2D(plot.xAxis, plot.yAxis); } },
+        { "QCPIntervals", [](QCustomPlot& plot) -> QObject* { return intervalsOn(plot); } },
+        { "QCPWaterfallGraph", [](QCustomPlot& plot) -> QObject*
+          { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); } },
+        { "QCPPlottableGroup",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              QCPPlottableGroup* group = plot.addPlottableGroup(QStringLiteral("group")).get();
+              group->addMember(graphOn(plot));
+              return group;
+          } },
     };
     return list;
 }
@@ -729,6 +772,16 @@ const QVector<std::pair<QMetaType, Different>>& differentValues()
                 QCPPolarAxisRadial* first = area->radialAxis().get();
                 return v == first ? area->addRadialAxis().get() : first;
             }),
+        differentFor<QList<int>>([](const QList<int>& v, QObject*)
+                                 { return v.isEmpty() ? QList<int> { 0 } : QList<int> { }; }),
+        differentFor<QCPCoordinateSystem*>(
+            [](QCPCoordinateSystem* const& v, QObject* object) -> QCPCoordinateSystem*
+            {
+                QCustomPlot* plot = plotOf(object);
+                QCPAxisRect* rect = plot->axisRect().get();
+                QCPCoordinateSystem* other = rect->system(plot->xAxis2, plot->yAxis2).get();
+                return v == other ? rect->system(plot->xAxis, plot->yAxis).get() : other;
+            }),
         differentFor<QCPArea*>([](QCPArea* const&, QObject* object) -> QCPArea*
                                { return axisRectOn(*plotOf(object)); }),
         differentFor<QCPSelectionRect*>(
@@ -882,6 +935,22 @@ const QVector<Exception>& exceptions()
         { &QCPOverlay::staticMetaObject, "opacity", Rule::Clamps,
           [](QObject*) { return QVariant(qreal(0.5)); },
           [](QObject*) { return QVariant(qreal(-1.0)); }, "clamps to [0, 1] (overlay.cpp)" },
+        { &QCPHistogram::staticMetaObject, "bins", Rule::Refuses,
+          [](QObject*) { return QVariant(17); }, [](QObject*) { return QVariant(0); },
+          "needs at least one bin (plottable-histogram.cpp)", true },
+        { &QCPPolarGraph::staticMetaObject, "system", Rule::Refuses,
+          [](QObject* object)
+          {
+              QCPPolarArea* area = plotOf(object)->findChild<QCPPolarArea*>();
+              return QVariant::fromValue(
+                  area->system(area->angularAxis().get(), area->addRadialAxis().get()).get());
+          },
+          [](QObject* object)
+          {
+              QCustomPlot* plot = plotOf(object);
+              return QVariant::fromValue(plot->axisRect()->system(plot->xAxis, plot->yAxis).get());
+          },
+          "draws in a polar system only (polargraph.cpp)", true },
         { &QCPPolarAxisAngular::staticMetaObject, "scaleType", Rule::Refuses, nullptr,
           [](QObject*) { return QVariant::fromValue(QCPAxisBase::stLogarithmic); },
           "the ring has no logarithmic scale (angularaxis.cpp:938)", true },
@@ -1114,6 +1183,65 @@ const QVector<Writer>& writers()
           [](QObject* o) { qobject_cast<QCPOverlay*>(o)->setCollapsible(false); },
           { "collapsible", "collapsed" },
           { "opacity" } },
+        { "QCPAbstractPlottable::setKeyAxis dropping the system",
+          [](QCustomPlot& plot) -> QObject* { return graphOn(plot); },
+          [](QObject* o) { qobject_cast<QCPGraph*>(o)->setKeyAxis(nullptr); },
+          { "system", "keyAxis" },
+          { "valueAxis" } },
+        { "QCPPlottableGroup::removeMember of the last member",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              QCPPlottableGroup* group = plot.addPlottableGroup(QStringLiteral("group")).get();
+              group->addMember(graphOn(plot));
+              return group;
+          },
+          [](QObject* o)
+          {
+              auto* group = qobject_cast<QCPPlottableGroup*>(o);
+              group->removeMember(group->parentPlot()->plottable(0).get());
+          },
+          { "visible" },
+          { "name" } },
+        { "a group member hidden",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              QCPPlottableGroup* group = plot.addPlottableGroup(QStringLiteral("group")).get();
+              group->addMember(graphOn(plot));
+              return group;
+          },
+          [](QObject* o)
+          {
+              auto* group = qobject_cast<QCPPlottableGroup*>(o);
+              group->parentPlot()->plottable(0)->setVisible(false);
+          },
+          { "visible" },
+          { "name" } },
+        { "QCPColorMap2::setAutoContourLevels",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* map = new QCPColorMap2(plot.xAxis, plot.yAxis);
+              map->setContourLevels({ 1, 2 });
+              return map;
+          },
+          [](QObject* o) { qobject_cast<QCPColorMap2*>(o)->setAutoContourLevels(3); },
+          { "contourLevels" },
+          { "contourPen" } },
+        { "QCPHistogram2D::setAutoContourLevels",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* histogram = new QCPHistogram2D(plot.xAxis, plot.yAxis);
+              histogram->setContourLevels({ 1, 2 });
+              return histogram;
+          },
+          [](QObject* o) { qobject_cast<QCPHistogram2D*>(o)->setAutoContourLevels(3); },
+          { "contourLevels" },
+          { "contourPen" } },
+        { "QCPIntervals::setSelection",
+          [](QCustomPlot& plot) -> QObject* { return intervalsOn(plot); },
+          [](QObject* o)
+          { qobject_cast<QCPIntervals*>(o)->setSelection(QCPDataSelection(QCPDataRange(1, 2))); },
+          { "selectedRows", "selection" },
+          { "style" } },
         { "QCPAxisBase::setRangeLower",
           [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
           [](QObject* o) { qobject_cast<QCPAxis*>(o)->setRangeLower(-3); },
@@ -1694,6 +1822,38 @@ const QVector<Deleting>& deletingWriters()
               return std::pair<QObject*, const char*>(plot.overlay().get(), "collapsible");
           },
           [](QCustomPlot& plot) { plot.overlay()->setCollapsible(false); } },
+        { "QCPAbstractPlottable::setKeyAxis dropping the system", [](QCustomPlot& plot)
+          { return std::pair<QObject*, const char*>(graphOn(plot), "system"); },
+          [](QCustomPlot& plot) { plot.graph(0)->setKeyAxis(nullptr); } },
+        { "QCPAbstractPlottable::setWantsLegend",
+          [](QCustomPlot& plot)
+          {
+              graphOn(plot);
+              graphOn(plot);
+              return std::pair<QObject*, const char*>(plot.legend.get(), "rowStretchFactors");
+          },
+          [](QCustomPlot& plot) { plot.graph(0)->setWantsLegend(false); } },
+        { "QCPHistogram::setBins",
+          [](QCustomPlot& plot)
+          {
+              return std::pair<QObject*, const char*>(settledHistogramOn(plot),
+                                                      "busyChanged(bool)");
+          },
+          [](QCustomPlot& plot)
+          { qobject_cast<QCPHistogram*>(plot.plottable(0).get())->setBins(23); } },
+        { "QCPIntervals::setSelection", [](QCustomPlot& plot)
+          { return std::pair<QObject*, const char*>(intervalsOn(plot), "selection"); },
+          [](QCustomPlot& plot)
+          { plot.plottable(0)->setSelection(QCPDataSelection(QCPDataRange(1, 2))); } },
+        { "QCPPlottableGroup::removeMember",
+          [](QCustomPlot& plot)
+          {
+              QCPPlottableGroup* group = plot.addPlottableGroup(QStringLiteral("group")).get();
+              group->addMember(graphOn(plot));
+              return std::pair<QObject*, const char*>(group, "membersChanged()");
+          },
+          [](QCustomPlot& plot)
+          { plot.plottableGroups().first()->removeMember(plot.plottable(0).get()); } },
         { "QCPAxisRect::setupFullAxesBox", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(plot.xAxis2.get(), "visible"); },
           [](QCustomPlot& plot) { plot.axisRect()->setupFullAxesBox(); } },
@@ -1832,6 +1992,26 @@ const QVector<FormRow>& formRows()
         for (const char* name :
              { "type", "typeX", "typeY", "coords", "axisRect", "system", "area", "pixelPosition" })
             r += { { &QCPItemPosition::staticMetaObject, name, Form::Off } };
+        r += plainRows(&QCPAbstractPlottable::staticMetaObject, { "system", "wantsLegend" });
+        r += { { &QCPAbstractPlottable::staticMetaObject, "busy", Form::Off } };
+        r += plainRows(&QCPColorMap2::staticMetaObject,
+                       { "gapThreshold", "contourLevels", "contourPen", "contourLabelEnabled" });
+        r += plainRows(&QCPGraph::staticMetaObject, { "deferredDataSwap", "gapThreshold" });
+        r += plainRows(&QCPPlottableGroup::staticMetaObject, { "name", "visible" });
+        r += plainRows(&QCPHistogram::staticMetaObject,
+                       { "bins", "normalization", "style", "columnColors" });
+        r += plainRows(&QCPHistogram2D::staticMetaObject,
+                       { "normalization", "columnNormalized", "contourLevels", "contourPen",
+                         "contourLabelEnabled" });
+        r += plainRows(
+            &QCPIntervals::staticMetaObject,
+            { "stackMode", "forbidOverlap", "style", "selectedRows", "editable", "editModes" });
+        r += plainRows(&QCPWaterfallGraph::staticMetaObject,
+                       { "offsetMode", "uniformSpacing", "offsets", "normalize", "gain" });
+        for (const QMetaObject* meta :
+             { &QCPBars::staticMetaObject, &QCPCurve::staticMetaObject,
+               &QCPFinancial::staticMetaObject, &QCPStatisticalBox::staticMetaObject })
+            r += { { meta, "data", Form::Off } };
         r += plainRows(&QCPLayoutElement::staticMetaObject, { "autoMargins" });
         r += plainRows(&QCPGroupLegendItem::staticMetaObject, { "expanded", "selectedComponent" });
         r += plainRows(&QCPTextElement::staticMetaObject, { "textFlags" });

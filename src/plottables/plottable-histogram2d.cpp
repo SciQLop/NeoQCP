@@ -9,6 +9,36 @@
 #include <datasource/histogram-binner.h>
 #include <Profiling.hpp>
 
+/*! \fn void QCPHistogram2D::normalizationChanged(QCP::HistogramNormalization normalization)
+
+  This signal is emitted when \ref normalization changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPHistogram2D::columnNormalizedChanged(bool columnNormalized)
+
+  This signal is emitted when \ref columnNormalized changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPHistogram2D::contourLevelsChanged(const QVector<double>& contourLevels)
+
+  This signal is emitted when \ref contourLevels changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPHistogram2D::contourPenChanged(const QPen& contourPen)
+
+  This signal is emitted when \ref contourPen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPHistogram2D::contourLabelEnabledChanged(bool contourLabelEnabled)
+
+  This signal is emitted when \ref contourLabelEnabled changes, after the plot delivers its deferred
+  signals.
+*/
+
 QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
     : QCPAbstractColorMapped(keyAxis, valueAxis, true)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
@@ -133,6 +163,7 @@ void QCPHistogram2D::setNormalization(QCP::HistogramNormalization norm)
     markDirty();
     mNormalization = norm;
     invalidateShown();
+    qcpEmit(this, mParentPlot, &QCPHistogram2D::normalizationChanged, mNormalization);
 }
 
 void QCPHistogram2D::setColumnNormalized(bool normalized)
@@ -142,6 +173,7 @@ void QCPHistogram2D::setColumnNormalized(bool normalized)
     markDirty();
     mColumnNormalized = normalized;
     invalidateShown();
+    qcpEmit(this, mParentPlot, &QCPHistogram2D::columnNormalizedChanged, mColumnNormalized);
 }
 
 void QCPHistogram2D::colorMappingChanged()
@@ -340,23 +372,35 @@ void QCPHistogram2D::contoursChanged()
 
 void QCPHistogram2D::setContourLevels(const QVector<double>& levels)
 {
+    // Always applied: it also turns automatic levels off, which the levels alone do not show.
+    const QVector<double> before = contourLevels();
     markDirty();
     mContours.setLevels(levels);
     contoursChanged();
+    if (contourLevels() == before)
+        return;
+    qcpEmit(this, mParentPlot, &QCPHistogram2D::contourLevelsChanged, contourLevels());
 }
 
 void QCPHistogram2D::setAutoContourLevels(int count)
 {
+    // Automatic levels drop the explicit ones.
+    const QVector<double> before = contourLevels();
     markDirty();
     mContours.setAutoLevels(count);
     contoursChanged();
+    if (contourLevels() != before)
+        qcpEmit(this, mParentPlot, &QCPHistogram2D::contourLevelsChanged, contourLevels());
 }
 
 void QCPHistogram2D::setContourPen(const QPen& pen)
 {
+    if (pen == contourPen())
+        return;
     markDirty();
     mContours.setPen(pen);
     contoursChanged();
+    qcpEmit(this, mParentPlot, &QCPHistogram2D::contourPenChanged, contourPen());
 }
 
 void QCPHistogram2D::setContourLabelEnabled(bool enabled)
@@ -366,6 +410,7 @@ void QCPHistogram2D::setContourLabelEnabled(bool enabled)
     markDirty();
     mContours.setLabelsEnabled(enabled);
     contoursChanged();
+    qcpEmit(this, mParentPlot, &QCPHistogram2D::contourLabelEnabledChanged, contourLabelEnabled());
 }
 
 QCPRange QCPHistogram2D::getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const

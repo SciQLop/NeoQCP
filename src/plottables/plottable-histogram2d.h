@@ -23,6 +23,17 @@ class QCPHistogram2DOps;
 class QCP_LIB_DECL QCPHistogram2D : public QCPAbstractColorMapped
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(QCP::HistogramNormalization normalization READ normalization WRITE setNormalization
+                   NOTIFY normalizationChanged)
+    Q_PROPERTY(bool columnNormalized READ columnNormalized WRITE setColumnNormalized NOTIFY
+                   columnNormalizedChanged)
+    Q_PROPERTY(QVector<double> contourLevels READ contourLevels WRITE setContourLevels NOTIFY
+                   contourLevelsChanged)
+    Q_PROPERTY(QPen contourPen READ contourPen WRITE setContourPen NOTIFY contourPenChanged)
+    Q_PROPERTY(bool contourLabelEnabled READ contourLabelEnabled WRITE setContourLabelEnabled NOTIFY
+                   contourLabelEnabledChanged)
+    /// \endcond
     friend class TestColorMap;
     friend class TestPipeline;
 public:
@@ -117,11 +128,19 @@ public Q_SLOTS:
     QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override;
 
+signals:
+    void normalizationChanged(QCP::HistogramNormalization normalization);
+    void columnNormalizedChanged(bool columnNormalized);
+    void contourLevelsChanged(const QVector<double>& contourLevels);
+    void contourPenChanged(const QPen& contourPen);
+    void contourLabelEnabledChanged(bool contourLabelEnabled);
+
 protected:
     void draw(QCPDrawContext& context) const override;
     void drawLegendIcon(QCPDrawContext& icon) const override;
     void colorMappingChanged() override;
-    void systemChanged() override { followAxisScales(); }
+
+    void systemDidChange() override { followAxisScales(); }
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
     bool canProduceContent() const override;

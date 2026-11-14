@@ -25,6 +25,10 @@ class QCPPlottableGroupOps;
 class QCP_LIB_DECL QCPPlottableGroup : public QObject
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(QString name READ name WRITE setName NOTIFY nameChanged)
+    Q_PROPERTY(bool visible READ visible WRITE setVisible NOTIFY visibleChanged)
+    /// \endcond
 
 public:
     template <typename T>
@@ -49,6 +53,8 @@ public:
 signals:
     void membersChanged();
     void doubleClicked();
+    void nameChanged(const QString& name);
+    void visibleChanged(bool visible);
 
 private:
     QCPPlottableGroup(QCustomPlot* parentPlot, const QString& name);
@@ -57,11 +63,14 @@ private:
     void detach(QCPAbstractPlottable* plottable, bool restoreRow);
     void updateLegendRow();
     void markRowDirty();
+    //! Signals visible() when it moved since the last signal: members change it from outside.
+    void noteVisibility();
 
     QCustomPlot* mParentPlot;
     QString mName;
     QList<QPointer<QCPAbstractPlottable>> mMembers;
     QPointer<QCPPlottableGroupLegendItem> mLegendRow;
+    bool mShown = false; // visible() as last signalled
 
     friend class QCustomPlot;
     friend class QCPPlottableGroupLegendItem; // reads membersRaw() per legend-row draw

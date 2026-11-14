@@ -128,7 +128,7 @@ public:
         return { keyAxisRaw(), valueAxisRaw() };
     }
 
-    void systemChanged() override
+    void systemDidChange() override
     {
         ++mSystemChanges;
         if (onSystemChanged)
@@ -141,7 +141,7 @@ public:
     //! How many frames it was drawn in: zero while the area it hangs on is hidden.
     [[nodiscard]] int draws() const { return mDraws; }
 
-    //! Runs inside systemChanged(), where a user slot may delete another plottable of the system.
+    //! Runs inside systemDidChange(), where a user slot may delete another plottable of the system.
     std::function<void()> onSystemChanged;
     bool readsTransform = false;
     bool coversItsClip = false;

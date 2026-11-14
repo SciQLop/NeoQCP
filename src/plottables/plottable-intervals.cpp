@@ -67,6 +67,42 @@ QCPLayer* layerAbove(QCustomPlot* plot, QCPLayer* base)
 }
 } // namespace
 
+/*! \fn void QCPIntervals::stackModeChanged(QCPIntervals::StackMode stackMode)
+
+  This signal is emitted when \ref stackMode changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPIntervals::forbidOverlapChanged(bool forbidOverlap)
+
+  This signal is emitted when \ref forbidOverlap changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPIntervals::styleChanged(QCPIntervals::Style style)
+
+  This signal is emitted when \ref style changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPIntervals::selectedRowsChanged(const QVector<int>& selectedRows)
+
+  This signal is emitted when \ref selectedRows changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPIntervals::editableChanged(bool editable)
+
+  This signal is emitted when \ref editable changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPIntervals::editModesChanged(QCPIntervals::EditModes editModes)
+
+  This signal is emitted when \ref editModes changes, after the plot delivers its deferred
+  signals.
+*/
+
 QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* layout,
                            QCP::Capabilities required)
         : QCPAbstractPlottable(keyAxis, valueAxis, required), mLayout(layout)
@@ -418,6 +454,22 @@ void QCPIntervals::deselectEvent(bool* selectionStateChanged)
     setSelection(QCPDataSelection());
     if (selectionStateChanged)
         *selectionStateChanged = had;
+}
+
+/*! \internal
+
+  The selected rows are read from the selection: every selection change may move them. Two
+  signals, so a slot of the first may delete these intervals.
+*/
+void QCPIntervals::emitSelectionChanged()
+{
+    const QCPEmissionScope scope(mParentPlot);
+    QCPAbstractPlottable::emitSelectionChanged();
+    QVector<int> rows = selectedRows();
+    if (rows == mNotifiedRows)
+        return;
+    mNotifiedRows = std::move(rows);
+    qcpEmit(this, mParentPlot, &QCPIntervals::selectedRowsChanged, mNotifiedRows);
 }
 
 QVector<int> QCPIntervals::selectedRows() const
@@ -828,6 +880,7 @@ void QCPIntervals::setEditable(bool editable)
     mEditable = editable;
     if (!editable)
         mGesture.reset();
+    qcpEmit(this, mParentPlot, &QCPIntervals::editableChanged, mEditable);
 }
 
 void QCPIntervals::setEditModes(EditModes modes) {
@@ -835,6 +888,7 @@ void QCPIntervals::setEditModes(EditModes modes) {
         return;
     markDirty();
     mEditModes = modes;
+    qcpEmit(this, mParentPlot, &QCPIntervals::editModesChanged, mEditModes);
 }
 
 void QCPIntervals::setSnap(SnapMode mode, double step)
@@ -850,11 +904,14 @@ void QCPIntervals::setStackMode(StackMode mode)
 {
     if (mStack == mode)
         return;
+    // Outlives the batch: the lane layout's signal and this one are delivered together.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     const QCPLaneLayout::Batch lanesChangedLast(mLayout);
     mStack = mode;
     updateSubRows();
     markLayersDirty();
+    qcpEmit(this, mParentPlot, &QCPIntervals::stackModeChanged, mStack);
 }
 
 void QCPIntervals::setCategoryOrder(std::vector<int> order)
@@ -1208,12 +1265,21 @@ QColor QCPIntervals::fillColor(int category) const
     return c;
 }
 
+void QCPIntervals::setForbidOverlap(bool forbid)
+{
+    if (forbid == mForbid)
+        return;
+    mForbid = forbid;
+    qcpEmit(this, mParentPlot, &QCPIntervals::forbidOverlapChanged, mForbid);
+}
+
 void QCPIntervals::setStyle(Style style)
 {
     if (mStyle == style)
         return;
     markDirty(); // it marks the label layer too
     mStyle = style;
+    qcpEmit(this, mParentPlot, &QCPIntervals::styleChanged, mStyle);
 }
 
 void QCPIntervals::drawLabels(QCPPainter* painter)

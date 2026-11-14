@@ -240,7 +240,7 @@ Plot-wide settings:
 | Overriding `QCPStatisticalBox::drawStatisticalBox()` | override `draw(QCPDrawContext&)` |
 | `QCPPolarAxisAngular` as a layout element (`addElement`, its background, inset layout, drag and wheel, `addRadialAxis`, `add<QCPPolarGraph>`) | `QCPPolarArea`, which owns the angular axis, the radial axes and the grid |
 | `QCPPolarAxisRadial::ScaleType`, the polar axes' `SelectablePart(s)`, `rangeDrag`/`rangeZoom` | `QCPAxisBase::ScaleType`, `QCPAxisBase::SelectablePart(s)`, `rangeDraggable`/`rangeZoomable` |
-| Overriding `QCPAbstractPlottable::axesChanged()` (NeoQCP 3.0 preview) | override `systemChanged()`: a plottable now moves between coordinate systems |
+| Overriding `QCPAbstractPlottable::axesChanged()` (NeoQCP 3.0 preview) | override `systemDidChange()`: a plottable now moves between coordinate systems |
 | `QCPGraph2`, `QCPMultiGraph`, `QCPGraph::data()` (NeoQCP 3.0 preview) | see "One graph" above |
 | `QCPPolarArea::removeGraph(graph)` | `plot.remove(graph)`: the plot owns polar graphs; the area no longer deletes them |
 | `QCPPolarLegendItem`, `QCPPolarGraph::addToLegend`/`removeFromLegend` (polar overloads) | the plottable ones: a polar graph has a `QCPPlottableLegendItem` row |

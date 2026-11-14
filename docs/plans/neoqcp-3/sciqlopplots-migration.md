@@ -390,3 +390,21 @@ signal. Nothing that compiled stops compiling; the rows below are the behaviour 
   on the row goes through it. `QCPOverlay::setOpacity` / `setFont` and `QCPSelectionRect::setPen` / `setBrush`
   return on an equal value (the clamped one for the opacity).
 - `QCPOverlay::setCollapsible(false)` on a collapsed overlay signals `collapsibleChanged` and `collapsedChanged`.
+- Plottables: `QCPAbstractPlottable::system` / `wantsLegend`, the colour map 2's gap threshold and contours, the
+  graph's `deferredDataSwap` / `gapThreshold`, `QCPPlottableGroup::name` / `visible`, the histograms' binning,
+  style and contours, the intervals' stacking, overlap, style, selected rows and editing, and the waterfall's
+  offsets, normalisation and gain. The shared data containers (`data` of bars, curve, financial, statistical box,
+  polar graph) and `busy` stay off.
+- **Break:** the protected virtual hook `QCPAbstractPlottable::systemChanged()` is now `systemDidChange()`; the
+  name is the `system` property's signal. A subclass overriding the hook fails to compile (`override`) until
+  renamed.
+- `systemChanged(nullptr)` also fires when `setKeyAxis` / `setValueAxis` leave the plottable without a system.
+  A plottable taken out of the plot (`take`) loses its system without a signal, as its axes do.
+- `QCPPlottableGroup::visibleChanged` fires whenever `visible()` moves: `setVisible`, a member shown or hidden on
+  its own, a member added or removed.
+- `QCPIntervals::selectedRowsChanged` fires with every selection change that moves the rows.
+  `emitSelectionChanged()` (protected) is virtual for it. `StackMode`, `Style` and `EditModes` are registered
+  (`Q_ENUM` / `Q_FLAG`). `setForbidOverlap` moved out of line.
+- `setContourLevels` and `setAutoContourLevels` of the colour map 2 and the 2D histogram signal `contourLevelsChanged`
+  only when the levels move; `setContourPen` returns on an equal pen. `QCPHistogram::setStyle` and
+  `setColumnColors`, `QCPPolarGraph::setScatterStyle` return on an equal value.

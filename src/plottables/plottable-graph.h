@@ -42,6 +42,10 @@ class QCP_LIB_DECL QCPGraph : public QCPAbstractLine, public QCPPlottableInterfa
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(bool adaptiveSampling READ adaptiveSampling WRITE setAdaptiveSampling NOTIFY
                    adaptiveSamplingChanged)
+    Q_PROPERTY(bool deferredDataSwap READ deferredDataSwap WRITE setDeferredDataSwap NOTIFY
+                   deferredDataSwapChanged)
+    Q_PROPERTY(
+        double gapThreshold READ gapThreshold WRITE setGapThreshold NOTIFY gapThresholdChanged)
     /// \endcond
 public:
     template <typename T>
@@ -261,6 +265,8 @@ public:
 
 signals:
     void adaptiveSamplingChanged(bool adaptiveSampling);
+    void deferredDataSwapChanged(bool deferredDataSwap);
+    void gapThresholdChanged(double gapThreshold);
 
 protected:
     //! Records the lines and the markers: the pixels come from the replay.
@@ -278,7 +284,7 @@ protected:
 
     using QCPAbstractLine::drawLegendIcon;
     void drawLegendIcon(QCPDrawContext& icon) const override;
-    void systemChanged() override;
+    void systemDidChange() override;
 
     //! B5: the graph draws through its system's transform when that system is not cartesian.
     [[nodiscard]] bool drawsInDataSpace() const;

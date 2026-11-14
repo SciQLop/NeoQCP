@@ -27,6 +27,18 @@ static void ensureL1Transform(QCPGraphPipeline& pipeline, int sourceSize, int co
                               std::shared_ptr<std::atomic<bool>> wantOrigin);
 static bool isAboveResampleThreshold(const QCPAbstractMultiDataSource& src);
 
+/*! \fn void QCPGraph::deferredDataSwapChanged(bool deferredDataSwap)
+
+  This signal is emitted when \ref deferredDataSwap changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPGraph::gapThresholdChanged(double gapThreshold)
+
+  This signal is emitted when \ref gapThreshold changes, after the plot delivers its deferred
+  signals.
+*/
+
 QCPGraph::QCPGraph(QCPAxis* keyAxis, QCPAxis* valueAxis, QCP::Capabilities required)
         : QCPAbstractLine(keyAxis, valueAxis, required)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
@@ -137,7 +149,7 @@ void QCPGraph::followAxes()
     mL2Dirty = mL1Cache != nullptr; // nor do the bins resampled for the old key range
 }
 
-void QCPGraph::systemChanged()
+void QCPGraph::systemDidChange()
 {
     // B2: the pipeline belongs to the cartesian branch. Entering a user system drops its L1/L2 and
     // starts nothing; leaving one re-arms it for the displayed source. An axis change within the
@@ -513,15 +525,17 @@ void QCPGraph::setDeferredDataSwap(bool enabled)
         return;
     const QCPEmissionScope scope(mParentPlot);
     mDeferredDataSwap = enabled;
+    const QPointer<QCPGraph> alive(this);
     if (!enabled && mPendingSource && !commitPendingData())
     {
         // Not ready yet: apply it now, with the colours set for it, which applySourceNow() drops.
         auto colours = std::move(mPendingColorValues);
-        const QPointer<QCPGraph> alive(this);
         applySourceNow(std::move(mPendingSource));
         if (alive && colours)
             setColorValues(std::move(colours));
     }
+    if (alive)
+        qcpEmit(this, mParentPlot, &QCPGraph::deferredDataSwapChanged, mDeferredDataSwap);
 }
 
 void QCPGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> source)
@@ -1190,6 +1204,7 @@ void QCPGraph::setGapThreshold(double threshold)
     if (mL2Result)
         mL2Result->setGapThreshold(threshold);
     linesChanged();
+    qcpEmit(this, mParentPlot, &QCPGraph::gapThresholdChanged, mGapThreshold);
 }
 
 void QCPGraph::lineChanged()

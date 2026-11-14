@@ -52,6 +52,15 @@ class QCPWaterfallGraphOps;
 
 class QCP_LIB_DECL QCPWaterfallGraph : public QCPGraph {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(OffsetMode offsetMode READ offsetMode WRITE setOffsetMode NOTIFY offsetModeChanged)
+    Q_PROPERTY(double uniformSpacing READ uniformSpacing WRITE setUniformSpacing NOTIFY
+                   uniformSpacingChanged)
+    Q_PROPERTY(QVector<double> offsets READ offsets WRITE setOffsets NOTIFY offsetsChanged)
+    Q_PROPERTY(bool normalize READ normalize WRITE setNormalize NOTIFY normalizeChanged)
+    Q_PROPERTY(double gain READ gain WRITE setGain NOTIFY gainChanged)
+    /// \endcond
+
 public:
     template <typename T>
     using OpsFor = QCPWaterfallGraphOps<T>;
@@ -76,6 +85,13 @@ public:
     void setGain(double gain);
 
     void invalidateNormalization();
+
+signals:
+    void offsetModeChanged(QCPWaterfallGraph::OffsetMode offsetMode);
+    void uniformSpacingChanged(double uniformSpacing);
+    void offsetsChanged(const QVector<double>& offsets);
+    void normalizeChanged(bool normalize);
+    void gainChanged(double gain);
 
 protected:
     void dataChanged() override;

@@ -20,6 +20,15 @@ class QCPHistogramOps;
 class QCP_LIB_DECL QCPHistogram : public QCPAbstractPlottable
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(int bins READ bins WRITE setBins NOTIFY binsChanged)
+    Q_PROPERTY(QCP::HistogramNormalization normalization READ normalization WRITE setNormalization
+                   NOTIFY normalizationChanged)
+    Q_PROPERTY(Style style READ style WRITE setStyle NOTIFY styleChanged)
+    Q_PROPERTY(QList<QColor> columnColors READ columnColors WRITE setColumnColors NOTIFY
+                   columnColorsChanged)
+    /// \endcond
+
 public:
     template <typename T>
     using OpsFor = QCPHistogramOps<T>;
@@ -64,6 +73,12 @@ Q_SIGNALS:
     //! Emitted when a re-bin lands, after the data or an axis scale changed.
     void histogramReady();
 
+signals:
+    void binsChanged(int bins);
+    void normalizationChanged(QCP::HistogramNormalization normalization);
+    void styleChanged(QCPHistogram::Style style);
+    void columnColorsChanged(const QList<QColor>& columnColors);
+
 protected:
     void draw(QCPDrawContext& context) const override;
     void drawLegendIcon(QCPDrawContext& icon) const override;
@@ -72,7 +87,8 @@ protected:
     bool canProduceContent() const override;
     //! An export bins synchronously, so the screen and export recordings differ.
     [[nodiscard]] bool resolvesForTheExport() const override { return true; }
-    void systemChanged() override { followKeyAxis(); }
+
+    void systemDidChange() override { followKeyAxis(); }
 
 private:
     void followKeyAxis();

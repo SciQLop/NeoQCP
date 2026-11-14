@@ -22,6 +22,15 @@ class QCPColorMap2Ops;
 class QCP_LIB_DECL QCPColorMap2 : public QCPAbstractColorMapped
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(
+        double gapThreshold READ gapThreshold WRITE setGapThreshold NOTIFY gapThresholdChanged)
+    Q_PROPERTY(QVector<double> contourLevels READ contourLevels WRITE setContourLevels NOTIFY
+                   contourLevelsChanged)
+    Q_PROPERTY(QPen contourPen READ contourPen WRITE setContourPen NOTIFY contourPenChanged)
+    Q_PROPERTY(bool contourLabelEnabled READ contourLabelEnabled WRITE setContourLabelEnabled NOTIFY
+                   contourLabelEnabledChanged)
+    /// \endcond
     friend class TestColorMap;
     friend class TestPipeline;
 
@@ -117,6 +126,12 @@ public Q_SLOTS:
     QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override;
 
+signals:
+    void gapThresholdChanged(double gapThreshold);
+    void contourLevelsChanged(const QVector<double>& contourLevels);
+    void contourPenChanged(const QPen& contourPen);
+    void contourLabelEnabledChanged(bool contourLabelEnabled);
+
 protected:
     void draw(QCPDrawContext& context) const override;
     void drawLegendIcon(QCPDrawContext& icon) const override;
@@ -124,7 +139,8 @@ protected:
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
     bool canProduceContent() const override;
-    void systemChanged() override { followAxes(); }
+
+    void systemDidChange() override { followAxes(); }
 
 private:
     [[nodiscard]] bool needsAnImageOfTheNewSize() const;

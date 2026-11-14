@@ -516,6 +516,18 @@ bool QCPAbstractPlottable::systemAdmits(const QCPCoordinateSystem* system,
     return true;
 }
 
+/*! \fn void QCPAbstractPlottable::systemChanged(QCPCoordinateSystem* system)
+
+  This signal is emitted when \ref system changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPAbstractPlottable::wantsLegendChanged(bool wantsLegend)
+
+  This signal is emitted when \ref wantsLegend changes, after the plot delivers its deferred
+  signals.
+*/
+
 QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system, QCP::Capabilities required)
         : QCPLayerable(system && system->area() ? system->area()->parentPlot() : nullptr, QString(),
                        system ? static_cast<QCPLayerable*>(system->area()) : nullptr)
@@ -915,18 +927,24 @@ void QCPAbstractPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
             mValueAxis = value;
         }
         markDirty();
-        systemChanged();
+        systemDidChange();
         return axesMoved(keyBefore, valueBefore);
     }
     if (!resolved)
     {
-        if (mSystem)
+        // The system and the axes signal: a slot of the first may delete this plottable.
+        const QCPEmissionScope scope(mParentPlot);
+        const bool hadSystem = mSystem;
+        if (hadSystem)
             systemWillChange(nullptr);
         mSystem = nullptr;
         mKeyAxis = key;
         mValueAxis = value;
         markDirty();
-        systemChanged();
+        systemDidChange();
+        if (hadSystem)
+            qcpEmit(this, mParentPlot, &QCPAbstractPlottable::systemChanged,
+                    static_cast<QCPCoordinateSystem*>(nullptr));
         return axesMoved(keyBefore, valueBefore);
     }
     setSystem(resolved);
@@ -966,7 +984,8 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
     if (mSystem && !mRegisteredPlot && mParentPlot)
         mParentPlot->registerJoinedPlottable(this);
     contentChanged(); // the new frame's recording, then whatever follows an axis pair
-    systemChanged();
+    systemDidChange();
+    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::systemChanged, mSystem.data());
     axesMoved(keyBefore, valueBefore);
 }
 
@@ -1370,6 +1389,8 @@ void QCPAbstractPlottable::setWantsLegend(bool wants)
 {
     if (mWantsLegend == wants)
         return;
+    // The legend's rows signal before this one: a slot of theirs may delete this plottable.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mWantsLegend = wants;
     if (mGroup)
@@ -1378,6 +1399,7 @@ void QCPAbstractPlottable::setWantsLegend(bool wants)
         addToLegend();
     else
         removeFromLegend();
+    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::wantsLegendChanged, mWantsLegend);
 }
 
 /*! \overload

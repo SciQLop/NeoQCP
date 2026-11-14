@@ -69,6 +69,30 @@ double largest(const std::vector<std::vector<double>>& heights)
 
 } // namespace
 
+/*! \fn void QCPHistogram::binsChanged(int bins)
+
+  This signal is emitted when \ref bins changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPHistogram::normalizationChanged(QCP::HistogramNormalization normalization)
+
+  This signal is emitted when \ref normalization changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPHistogram::styleChanged(QCPHistogram::Style style)
+
+  This signal is emitted when \ref style changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPHistogram::columnColorsChanged(const QList<QColor>& columnColors)
+
+  This signal is emitted when \ref columnColors changes, after the plot delivers its deferred
+  signals.
+*/
+
 QCPHistogram::QCPHistogram(QCPAxis* keyAxis, QCPAxis* valueAxis)
     : QCPAbstractPlottable(keyAxis, valueAxis)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
@@ -221,9 +245,12 @@ void QCPHistogram::setBins(int bins)
     QCP_CHECK_OR_RETURN(bins > 0, "a histogram needs at least one bin", );
     if (bins == mBins)
         return;
+    // The rebinning may signal busyChanged: a slot may delete this histogram.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mBins = bins;
     refreshBinning();
+    qcpEmit(this, mParentPlot, &QCPHistogram::binsChanged, mBins);
 }
 
 void QCPHistogram::setFixedRange(std::optional<QCPRange> range)
@@ -242,21 +269,30 @@ void QCPHistogram::setNormalization(QCP::HistogramNormalization norm)
 {
     if (norm == mNormalization)
         return;
+    // The rebinning may signal busyChanged: a slot may delete this histogram.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mNormalization = norm;
     refreshBinning();
+    qcpEmit(this, mParentPlot, &QCPHistogram::normalizationChanged, mNormalization);
 }
 
 void QCPHistogram::setStyle(Style style)
 {
+    if (style == mStyle)
+        return;
     mStyle = style;
     requestReplot();
+    qcpEmit(this, mParentPlot, &QCPHistogram::styleChanged, mStyle);
 }
 
 void QCPHistogram::setColumnColors(const QList<QColor>& colors)
 {
+    if (colors == mColors)
+        return;
     mColors = colors;
     requestReplot();
+    qcpEmit(this, mParentPlot, &QCPHistogram::columnColorsChanged, mColors);
 }
 
 void QCPHistogram::resetEdges()

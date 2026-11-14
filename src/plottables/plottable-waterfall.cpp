@@ -86,6 +86,36 @@ std::vector<QPointF> QCPWaterfallDataAdapter::linesInData(int column, int begin,
 
 // --- QCPWaterfallGraph ---
 
+/*! \fn void QCPWaterfallGraph::offsetModeChanged(QCPWaterfallGraph::OffsetMode offsetMode)
+
+  This signal is emitted when \ref offsetMode changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPWaterfallGraph::uniformSpacingChanged(double uniformSpacing)
+
+  This signal is emitted when \ref uniformSpacing changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPWaterfallGraph::offsetsChanged(const QVector<double>& offsets)
+
+  This signal is emitted when \ref offsets changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPWaterfallGraph::normalizeChanged(bool normalize)
+
+  This signal is emitted when \ref normalize changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPWaterfallGraph::gainChanged(double gain)
+
+  This signal is emitted when \ref gain changes, after the plot delivers its deferred
+  signals.
+*/
+
 QCPWaterfallGraph::QCPWaterfallGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
     : QCPGraph(keyAxis, valueAxis, QCP::capRectangular | QCP::capStraightKey)
 {
@@ -110,42 +140,57 @@ void QCPWaterfallGraph::setOffsetMode(OffsetMode mode)
 {
     if (mode == mOffsetMode)
         return;
+    // The new source restarts the pipeline, which may signal: a slot may delete this graph.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mOffsetMode = mode;
     rebuildAdapter();
+    qcpEmit(this, mParentPlot, &QCPWaterfallGraph::offsetModeChanged, mOffsetMode);
 }
 void QCPWaterfallGraph::setUniformSpacing(double spacing)
 {
     if (spacing == mUniformSpacing)
         return;
+    // The new source restarts the pipeline, which may signal: a slot may delete this graph.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mUniformSpacing = spacing;
     rebuildAdapter();
+    qcpEmit(this, mParentPlot, &QCPWaterfallGraph::uniformSpacingChanged, mUniformSpacing);
 }
 void QCPWaterfallGraph::setOffsets(const QVector<double>& offsets)
 {
     if (offsets == mUserOffsets)
         return;
+    // The new source restarts the pipeline, which may signal: a slot may delete this graph.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mUserOffsets = offsets;
     rebuildAdapter();
+    qcpEmit(this, mParentPlot, &QCPWaterfallGraph::offsetsChanged, mUserOffsets);
 }
 void QCPWaterfallGraph::setNormalize(bool enabled)
 {
     if (enabled == mNormalize)
         return;
+    // The new source restarts the pipeline, which may signal: a slot may delete this graph.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mNormalize = enabled;
     mNormDirty = true;
     rebuildAdapter();
+    qcpEmit(this, mParentPlot, &QCPWaterfallGraph::normalizeChanged, mNormalize);
 }
 void QCPWaterfallGraph::setGain(double gain)
 {
     if (gain == mGain)
         return;
+    // The new source restarts the pipeline, which may signal: a slot may delete this graph.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     mGain = gain;
     rebuildAdapter();
+    qcpEmit(this, mParentPlot, &QCPWaterfallGraph::gainChanged, mGain);
 }
 void QCPWaterfallGraph::invalidateNormalization() { mNormDirty = true; rebuildAdapter(); }
 

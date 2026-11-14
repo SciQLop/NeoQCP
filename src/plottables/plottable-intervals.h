@@ -21,6 +21,17 @@ class QCPIntervalsOps;
 class QCP_LIB_DECL QCPIntervals : public QCPAbstractPlottable, public QCPPlottableInterface1D
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(StackMode stackMode READ stackMode WRITE setStackMode NOTIFY stackModeChanged)
+    Q_PROPERTY(
+        bool forbidOverlap READ forbidOverlap WRITE setForbidOverlap NOTIFY forbidOverlapChanged)
+    Q_PROPERTY(Style style READ style WRITE setStyle NOTIFY styleChanged)
+    Q_PROPERTY(QVector<int> selectedRows READ selectedRows WRITE setSelectedRows NOTIFY
+                   selectedRowsChanged)
+    Q_PROPERTY(bool editable READ editable WRITE setEditable NOTIFY editableChanged)
+    Q_PROPERTY(EditModes editModes READ editModes WRITE setEditModes NOTIFY editModesChanged)
+    /// \endcond
+
 public:
     template <typename T>
     using OpsFor = QCPIntervalsOps<T>;
@@ -69,15 +80,18 @@ public:
 
     enum EditMode { emMove = 0x01, emResize = 0x02, emChangeLane = 0x04, emCreate = 0x08, emDelete = 0x10 };
     Q_DECLARE_FLAGS(EditModes, EditMode)
+    Q_FLAG(EditModes)
 
     enum SnapMode { snNone, snEdges, snStep, snTimes };
     //! stBars: plain coloured bars. stWave: a logic-analyzer look, with angled bus-value ends,
     //! an idle line through each lane and every other lane shaded.
     enum Style { stBars, stWave };
+    Q_ENUM(Style)
     //! How a lane's intervals are split into sub-rows. skNone: one row, overlaps drawn over each
     //! other. skTime: overlapping intervals go into the first free sub-row. skCategory: one
     //! fixed sub-row per category, ordered by setCategoryOrder() then first seen.
     enum StackMode { skNone, skTime, skCategory };
+    Q_ENUM(StackMode)
     void setStackMode(StackMode mode);
     [[nodiscard]] StackMode stackMode() const { return mStack; }
     //! Category indices to stack first, in this order (skCategory).
@@ -85,7 +99,7 @@ public:
     [[nodiscard]] const std::vector<int>& categoryOrder() const { return mCategoryOrder; }
     //! Move, resize, create and nudges stop at the neighbouring block's edge in the same row
     //! (same lane; same lane and category with skCategory), so an edit never overlaps one.
-    void setForbidOverlap(bool forbid) { mForbid = forbid; }
+    void setForbidOverlap(bool forbid);
     [[nodiscard]] bool forbidOverlap() const { return mForbid; }
     //! Each sub-row's name and box when stacking by category, for drawing and tests.
     [[nodiscard]] const std::vector<std::pair<QRectF, QString>>& rowNames() const { return mRowNames; }
@@ -152,9 +166,18 @@ Q_SIGNALS:
     void intervalCreated(double start, double stop, int lane, int category);
     void deleteRequested(const QVector<qint64>& ids);
 
+signals:
+    void stackModeChanged(QCPIntervals::StackMode stackMode);
+    void forbidOverlapChanged(bool forbidOverlap);
+    void styleChanged(QCPIntervals::Style style);
+    void selectedRowsChanged(const QVector<int>& selectedRows);
+    void editableChanged(bool editable);
+    void editModesChanged(QCPIntervals::EditModes editModes);
+
 protected:
     void draw(QCPDrawContext& context) const override;
     void drawLegendIcon(QCPDrawContext& icon) const override;
+    void emitSelectionChanged() override;
 
     void regroupIfLanesWereAdded();
     void updateSubRows();
@@ -273,6 +296,7 @@ protected:
     Style mStyle = stBars;
     StackMode mStack = skNone;
     bool mForbid = false;
+    QVector<int> mNotifiedRows; // selectedRows() as last signalled
     std::vector<int> mCategoryOrder;
     std::vector<int> mSubRow; // per row, when stacking
     std::vector<std::vector<int>> mRowCategories; // per lane, the category of each sub-row (skCategory)
