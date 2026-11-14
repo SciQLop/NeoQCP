@@ -659,6 +659,8 @@ protected:
     bool mRepaintAskedDuringReplot = false;
     // An aligned element's layout moved an edge its margin was computed from (settleAlignment).
     bool mAlignmentUnsettled = false;
+    // The widgets between this plot and its window, filtered while an element is aligned.
+    QList<QPointer<QWidget>> mWatchedAncestors;
     // Layout updates in a row that ended unsettled: the second one stops asking for more.
     int mUnsettledLayouts = 0;
     quint64 mRepaintTicket = 0;
@@ -711,6 +713,7 @@ protected:
                            const QSize& outputSize);
     virtual void resizeEvent(QResizeEvent* event) override;
     virtual void moveEvent(QMoveEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
     virtual void showEvent(QShowEvent* event) override;
     virtual void hideEvent(QHideEvent* event) override;
     virtual void mouseDoubleClickEvent(QMouseEvent* event) override;
@@ -753,6 +756,9 @@ protected:
     virtual void updateLayout();
     void settleAlignment(QCPLayoutGrid* layout);
     void notifyAlignmentGroups();
+    static bool isAligned(const QCPLayoutElement* element);
+    bool hasAlignedElements() const;
+    void watchAncestors();
     void relayoutAlignmentGroups();
     void restoreViewportAfterExport(const QRect& screenViewport);
     void adoptWidgetViewport();
@@ -831,6 +837,7 @@ protected:
     friend class QCPGraph;
     friend class QCPAbstractItem;
     friend class QCPLayerable;
+    friend class QCPAlignmentGroup; // a member joining or leaving changes what the plot watches
     friend class QCPLayoutElement; // marks the alignment unsettled during the layout pass
     friend class QCPEmissionScope;
     template <typename Sender, typename... SignalArgs, typename... Args>

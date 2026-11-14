@@ -126,6 +126,7 @@ void QCPAlignmentGroup::add(QCPLayoutElement* element)
     for (QCP::MarginSide side : everySide)
         if (mSides.testFlag(side))
             element->mAlignmentGroups[QCPLayoutElement::alignmentSlot(side)] = this;
+    element->parentPlot()->watchAncestors();
     invalidate();
     qcpEmit(this, nullptr, &QCPAlignmentGroup::membersChanged);
 }
@@ -151,6 +152,8 @@ void QCPAlignmentGroup::leave(QCPLayoutElement* element, QCP::MarginSides sides)
         mMembers.erase(member);
         mUsedEdges.remove(element);
     }
+    if (plot)
+        plot->watchAncestors();
     invalidate();
     qcpEmit(this, nullptr, &QCPAlignmentGroup::membersChanged);
     if (mMembers.isEmpty())

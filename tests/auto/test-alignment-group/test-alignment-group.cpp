@@ -1,5 +1,7 @@
 #include "test-alignment-group.h"
 
+#include <functional>
+
 #include <QHBoxLayout>
 #include <QSignalSpy>
 #include <QVBoxLayout>
@@ -92,6 +94,43 @@ QWidget* makeFreeStack(const QList<QCustomPlot*>& plots, int left = 0)
     window->resize(400, top);
     return window;
 }
+
+//! A window holding each plot in a container widget of its own, placed by geometry only.
+QWidget* makeContainedStack(const QList<QCustomPlot*>& plots, int left = 0)
+{
+    auto* window = new QWidget;
+    int top = 0;
+    for (auto* plot : plots)
+    {
+        auto* container = new QWidget(window);
+        container->setGeometry(left, top, 300, 100);
+        plot->setParent(container);
+        plot->setGeometry(0, 0, 300, 100);
+        plot->show();
+        container->show();
+        top += 120;
+    }
+    window->resize(400, top);
+    return window;
+}
+
+//! Calls \a action for each event of \a type the watched object receives.
+class EventSpy : public QObject
+{
+public:
+    EventSpy(QEvent::Type type, std::function<void()> action)
+        : mType(type), mAction(std::move(action)) { }
+    bool eventFilter(QObject*, QEvent* event) override
+    {
+        if (event->type() == mType && mAction)
+            std::exchange(mAction, nullptr)();
+        return false;
+    }
+
+private:
+    QEvent::Type mType;
+    std::function<void()> mAction;
+};
 
 /*! Replots the plots until a round causes no extra repaint, so a group that marks its peers has
   settled. Returns false when that did not happen within maxRounds; roundsUsed gets the rounds. */
@@ -630,6 +669,164 @@ void TestAlignmentGroup::aPeerSidewaysMoveRealigns()
     b->move(b->x() + 30, b->y());
     QVERIFY(settle({ a, b }));
     QCOMPARE(innerLeft(a), innerLeft(b));
+}
+
+void TestAlignmentGroup::aContainerSidewaysMoveRealigns()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    QScopedPointer<QWidget> window(makeContainedStack({ a, b }, 24));
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
+    QVERIFY(group);
+    QVERIFY(settle({ a, b }));
+    QCOMPARE(innerLeft(a), innerLeft(b));
+
+    QWidget* container = b->parentWidget();
+    container->move(container->x() + 30, container->y());
+    QTest::qWait(200); // no replot by hand: the group must hear the move itself
+    QCOMPARE(innerLeft(a), innerLeft(b));
+}
+
+void TestAlignmentGroup::aWindowMoveRepaintsNoPlot()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    QScopedPointer<QWidget> window(makeContainedStack({ a, b }, 24));
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
+    QVERIFY(group);
+    QVERIFY(settle({ a, b }));
+
+    int repaints = 0;
+    const auto counted = connect(a, &QCustomPlot::afterReplot, a, [&repaints] { ++repaints; });
+    const auto countedB = connect(b, &QCustomPlot::afterReplot, b, [&repaints] { ++repaints; });
+    window->move(window->x() + 40, window->y() + 10);
+    QTest::qWait(200);
+    disconnect(counted);
+    disconnect(countedB);
+    QCOMPARE(repaints, 0);
+}
+
+void TestAlignmentGroup::aReparentedContainerIsHeard()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    QScopedPointer<QWidget> window(makeContainedStack({ a, b }, 24));
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
+    QVERIFY(group);
+
+    // The chain changes above the plot: b's container goes into a new middle widget.
+    auto* middle = new QWidget(window.data());
+    middle->setGeometry(0, 120, 400, 100);
+    middle->show();
+    QWidget* container = b->parentWidget();
+    container->setParent(middle);
+    container->move(24, 0);
+    container->show();
+    QVERIFY(settle({ a, b }));
+    QCOMPARE(innerLeft(a), innerLeft(b));
+
+    middle->move(middle->x() + 30, middle->y());
+    QTest::qWait(200);
+    QCOMPARE(innerLeft(a), innerLeft(b));
+
+    // And the plot itself changes parent.
+    auto* other = new QWidget(window.data());
+    other->setGeometry(0, 120, 400, 100);
+    other->show();
+    b->setParent(other);
+    b->setGeometry(24, 0, 300, 100);
+    b->show();
+    QVERIFY(settle({ a, b }));
+    QCOMPARE(innerLeft(a), innerLeft(b));
+    other->move(other->x() + 30, other->y());
+    QTest::qWait(200);
+    QCOMPARE(innerLeft(a), innerLeft(b));
+}
+
+void TestAlignmentGroup::aPlotThatLeftItsGroupIgnoresItsContainer()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    QScopedPointer<QWidget> window(makeContainedStack({ a, b }, 24));
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
+    QVERIFY(group);
+    group->remove(b->axisRect());
+    QVERIFY(settle({ a, b }));
+
+    int repaints = 0;
+    const auto counted = connect(b, &QCustomPlot::afterReplot, b, [&repaints] { ++repaints; });
+    QWidget* container = b->parentWidget();
+    container->move(container->x() + 30, container->y());
+    QTest::qWait(200);
+    disconnect(counted);
+    QCOMPARE(repaints, 0);
+}
+
+void TestAlignmentGroup::aPlotDeletedDuringItsContainerMoveIsSafe()
+{
+    for (const bool spyFirst : { true, false })
+    {
+        auto* a = makePlot();
+        auto* b = makePlot(false);
+        QScopedPointer<QWidget> window(makeContainedStack({ a, b }, 24));
+        window->show();
+        QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+        QWidget* container = b->parentWidget();
+        QPointer<QCustomPlot> watched(b);
+        // A filter installed later sees the event first: try the plot's filter on either side.
+        EventSpy spy(QEvent::Move, [&watched] { delete watched.data(); });
+        if (spyFirst)
+            container->installEventFilter(&spy);
+        const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
+        QVERIFY(group);
+        if (!spyFirst)
+            container->installEventFilter(&spy);
+        QVERIFY(settle({ a, b }));
+
+        container->move(container->x() + 30, container->y());
+        QTest::qWait(100);
+        QVERIFY(!watched);
+        QVERIFY(settle({ a }));
+        container->move(container->x() + 30, container->y()); // nothing left watching it
+        QTest::qWait(50);
+    }
+}
+
+void TestAlignmentGroup::aContainerDeletedAfterItsMoveIsSafe()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    QScopedPointer<QWidget> window(makeContainedStack({ a, b }, 24));
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
+    QVERIFY(group);
+    QVERIFY(settle({ a, b }));
+
+    // The move queues b's relayout; its container goes before that relayout runs.
+    QPointer<QWidget> container(b->parentWidget());
+    container->move(container->x() + 30, container->y());
+    delete container.data();
+    QTest::qWait(100);
+    QVERIFY(settle({ a }));
+
+    // A container deleted from the slot of the relayout its move caused.
+    QPointer<QWidget> containerA(a->parentWidget());
+    connect(a, &QCustomPlot::afterReplot, containerA.data(), [containerA] {
+        if (containerA)
+            containerA->deleteLater();
+    });
+    containerA->move(containerA->x() + 30, containerA->y());
+    QTest::qWait(100);
+    QVERIFY(!containerA);
 }
 
 void TestAlignmentGroup::sideBySideRectsAlignAndSettle()

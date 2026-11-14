@@ -24,6 +24,12 @@ private slots:
     void aPeerMoveRepaintsNoOtherPlot();
     void aPeerHeightChangeRepaintsNoOtherPlot();
     void aPeerSidewaysMoveRealigns();
+    void aContainerSidewaysMoveRealigns();
+    void aWindowMoveRepaintsNoPlot();
+    void aReparentedContainerIsHeard();
+    void aPlotThatLeftItsGroupIgnoresItsContainer();
+    void aPlotDeletedDuringItsContainerMoveIsSafe();
+    void aContainerDeletedAfterItsMoveIsSafe();
   void aMemberResizedRealigns();
     void sideBySideRectsAlignAndSettle();
 

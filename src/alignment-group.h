@@ -25,8 +25,9 @@
   part. A member in another plot takes part while both plots are shown; a member in the plot being
   laid out always does, so a plot that was never shown (an export) aligns its own elements. Edges
   are compared in window coordinates relative to one member's origin, so moving a whole window does
-  not realign anything, and the group never replots: when the shared edge moves it marks its other
-  members' plots dirty.
+  not realign anything, while moving a plot or one of its ancestors inside the window does (a plot
+  with an aligned element watches its ancestors for that). The group never replots: when the shared
+  edge moves it marks its other members' plots dirty.
 
   \see QCPLayoutElement::alignmentGroup
 */

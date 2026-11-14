@@ -686,6 +686,7 @@ QCustomPlot::QCustomPlot(QWidget* parent)
 QCustomPlot::~QCustomPlot()
 {
     mBeingDestroyed = true;
+    watchAncestors(); // stops filtering the ancestors, which outlive this plot
     if (mEmissions.insideWidgetEvent())
         qcp::reportMisuse(Q_FUNC_INFO, "QCustomPlot deleted inside its own resize, show or "
                                        "paint event (a replot signal's slot?): use deleteLater()");
@@ -4102,16 +4103,79 @@ void QCustomPlot::moveEvent(QMoveEvent* event)
 
 /*! \internal
 
+  Watches the ancestors below the window for a move: a container moved inside the window (a
+  splitter handle, a dock) moves this plot in window coordinates without moving it in its parent.
+  An ancestor's resize moves this plot only through a move of a widget in between, which is
+  watched too. A reparent anywhere in the chain changes the chain, so it is watched afresh.
+*/
+bool QCustomPlot::eventFilter(QObject* watched, QEvent* event)
+{
+    switch (event->type())
+    {
+    case QEvent::Move:
+        // A whole window moving does not move anything relative to the window.
+        if (!mBeingDestroyed && !static_cast<QWidget*>(watched)->isWindow())
+            notifyAlignmentGroups();
+        break;
+    case QEvent::ParentChange:
+        if (!mBeingDestroyed)
+        {
+            watchAncestors();
+            notifyAlignmentGroups();
+        }
+        break;
+    default:
+        break;
+    }
+    return QRhiWidget::eventFilter(watched, event);
+}
+
+bool QCustomPlot::isAligned(const QCPLayoutElement* element)
+{
+    return element && std::ranges::any_of(element->mAlignmentGroups, [](const auto& group) {
+        return !group.isNull();
+    });
+}
+
+bool QCustomPlot::hasAlignedElements() const
+{
+    const QCPLayoutGrid* layout = plotLayoutRaw();
+    return layout && std::ranges::any_of(layout->elementsRaw(true), isAligned);
+}
+
+/*! \internal
+
+  Filters the events of the widgets from this plot's parent up to its window while one of its
+  elements is in an alignment group, and of none otherwise: an unaligned plot costs its ancestors
+  nothing.
+*/
+void QCustomPlot::watchAncestors()
+{
+    for (const QPointer<QWidget>& ancestor : std::exchange(mWatchedAncestors, {}))
+        if (ancestor)
+            ancestor->removeEventFilter(this);
+    if (mBeingDestroyed || !hasAlignedElements())
+        return;
+    for (QWidget* ancestor = parentWidget(); ancestor; ancestor = ancestor->parentWidget())
+    {
+        ancestor->installEventFilter(this);
+        mWatchedAncestors.append(ancestor);
+        if (ancestor->isWindow()) // its own move does not count, its reparent does
+            break;
+    }
+}
+
+/*! \internal
+
   Relays out this plot's grouped elements, which recompute the shared edges from their new
   geometry. Peers are left alone unless a shared edge changed, so moving or resizing one plot of a
-  splitter does not repaint the whole stack.
+  splitter does not repaint the whole stack. The relayout is a queued repaint, so several moves in
+  one event-loop turn relay out once.
 */
 void QCustomPlot::notifyAlignmentGroups()
 {
     for (QCPLayoutElement* element : plotLayoutRaw()->elementsRaw(true))
-        if (element && std::ranges::any_of(element->mAlignmentGroups, [](const auto& group) {
-                return !group.isNull();
-            }))
+        if (isAligned(element))
             element->markLayoutAppearanceDirty();
 }
 
@@ -4461,6 +4525,11 @@ bool QCustomPlot::handleInScope(QEvent* event)
 
 bool QCustomPlot::handleEvent(QEvent* event)
 {
+    if (event->type() == QEvent::ParentChange)
+    {
+        watchAncestors();
+        notifyAlignmentGroups();
+    }
     if (mInteractions.testFlag(QCP::iGestures))
     {
         switch (event->type())

@@ -102,9 +102,6 @@ user would see and where the code is. Fixed items are deleted, not ticked.
   (`QCPAxis::refreshFromLink`, `src/axis/axis.cpp`). No drag or zoom reads that range.
 - **The colour scale asks its rect for the drag and zoom axis twice per event**, building two short
   lists (`QCPColorScale::rangeDrag()`/`rangeZoom()`, `layoutelement-colorscale.cpp`). Negligible.
-- **An alignment group hears a plot's own move, not an ancestor's move inside the window**
-  (`simplify:` in `src/alignment-group.cpp`; upgrade: an event filter on the ancestors). A plot moved
-  sideways by its container keeps its old edge until its next layout.
 
 ## From milestone 4c (colour maps and the colour scale)
 
