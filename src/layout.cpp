@@ -1543,6 +1543,8 @@ void QCPLayoutGrid::setFillOrder(FillOrder order, bool rearrange)
     const QCPEmissionScope scope(mParentPlot);
     const bool moved = order != mFillOrder;
     markLayoutAppearanceDirty();
+    const QList<double> columns = mColumnStretchFactors, rows = mRowStretchFactors;
+    mRearranging = rearrange;
     // if rearranging, take all elements via linear index of old fill order:
     const int elCount = elementCount();
     QVector<QCPLayoutElement*> tempElements;
@@ -1564,6 +1566,8 @@ void QCPLayoutGrid::setFillOrder(FillOrder order, bool rearrange)
         for (QCPLayoutElement* tempElement : tempElements)
             addElement(tempElement);
     }
+    mRearranging = false;
+    stretchFactorsMoved(columns, rows);
     if (moved)
         qcpEmit(this, mParentPlot, &QCPLayoutGrid::fillOrderChanged, mFillOrder);
 }
@@ -1903,6 +1907,8 @@ void QCPLayoutGrid::simplify()
 */
 void QCPLayoutGrid::stretchFactorsMoved(const QList<double>& columns, const QList<double>& rows)
 {
+    if (mRearranging)
+        return;
     const bool columnsMoved = columns != mColumnStretchFactors;
     const bool rowsMoved = rows != mRowStretchFactors;
     if (!columnsMoved && !rowsMoved)

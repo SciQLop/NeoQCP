@@ -17,6 +17,8 @@ private slots:
   void deselectSlotDeletingTheLegendIsSafe();
   void clickAwayDeletingTheLegendFromItsDeselectionIsSafe();
   void clickAwayDeletingTheLegendFromAnItemDeselectionIsSafe();
+  void removingAnItemSignalsTheStretchFactorsOnce();
+  void aStretchSlotDeletingTheLegendOnRemovalIsSafe();
   
 private:
   QCustomPlot *mPlot;

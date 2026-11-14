@@ -51,9 +51,11 @@ QCPGraph::QCPGraph(QCPAxis* keyAxis, QCPAxis* valueAxis, QCP::Capabilities requi
 
     // Base constructor auto-adds a QCPPlottableLegendItem (vtable not yet set up
     // for virtual addToLegend). Replace it with our group legend item. A refused object has no
-    // system and no row to replace.
+    // system and no row to replace. The plain row leaves its cell empty (no re-wrap) and the group
+    // row takes that cell: the legend's shape, and its stretch factors, move once, not three times.
     if (mSystem && mParentPlot && mParentPlot->autoAddPlottableToLegend() && mParentPlot->legend) {
-        QCPAbstractPlottable::removeFromLegend(mParentPlot->legend);
+        if (const auto plain = mParentPlot->legend->itemWithPlottable(this))
+            mParentPlot->legend->remove(plain.get());
         addToLegend();
     }
 

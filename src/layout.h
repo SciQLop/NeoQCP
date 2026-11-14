@@ -348,6 +348,8 @@ protected:
 
 private:
     void stretchFactorsMoved(const QList<double>& columns, const QList<double>& rows);
+    //! setFillOrder() takes every element out and back: it signals the lists once, at the end.
+    bool mRearranging = false;
 
     Q_DISABLE_COPY_MOVE(QCPLayoutGrid)
 };

@@ -192,3 +192,41 @@ void TestQCPLegend::clickAwayDeletingTheLegendFromAnItemDeselectionIsSafe()
   QVERIFY(ran);
   QCOMPARE(mPlot->legend, nullptr);
 }
+
+// Removing a row re-wraps the legend: the grid's stretch factors signal once, with the final list,
+// and a list that ends where it started does not signal at all. A new graph swaps the base's plain
+// row for its group row: that is one row added, so one signal too.
+void TestQCPLegend::removingAnItemSignalsTheStretchFactorsOnce()
+{
+  for (int i = 0; i < 3; ++i)
+    mPlot->addGraph();
+  QCOMPARE(mPlot->legend->itemCount(), 3);
+  QSignalSpy rows(mPlot->legend, &QCPLayoutGrid::rowStretchFactorsChanged);
+  QSignalSpy columns(mPlot->legend, &QCPLayoutGrid::columnStretchFactorsChanged);
+
+  QVERIFY(mPlot->legend->removeItem(0));
+  QCOMPARE(rows.count(), 1);
+  QCOMPARE(rows.at(0).at(0).value<QList<double>>(), (QList<double> { 1, 1 }));
+  QCOMPARE(columns.count(), 0);
+
+  rows.clear();
+  mPlot->addGraph();
+  QCOMPARE(rows.count(), 1);
+  QCOMPARE(rows.at(0).at(0).value<QList<double>>(), (QList<double> { 1, 1, 1 }));
+  QCOMPARE(columns.count(), 0);
+}
+
+void TestQCPLegend::aStretchSlotDeletingTheLegendOnRemovalIsSafe()
+{
+  for (int i = 0; i < 3; ++i)
+    mPlot->addGraph();
+  bool ran = false;
+  connect(mPlot->legend, &QCPLayoutGrid::rowStretchFactorsChanged, mPlot, [this, &ran] {
+    ran = true;
+    delete mPlot->legend;
+  }, Qt::SingleShotConnection);
+  QVERIFY(mPlot->legend->removeItem(0));
+  QVERIFY(ran);
+  QCOMPARE(mPlot->legend, nullptr);
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+}
