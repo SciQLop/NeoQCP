@@ -21,6 +21,7 @@ private slots:
   void selectedSegmentUsesTheSelectedPen();
   void clickOnASegmentSelectsTheCurve();
   void nanBreaksTheCurveLine();
+  void nanSplitsTheCurveFill();
   void noSetterIsIgnored_data();
   void noSetterIsIgnored();
   

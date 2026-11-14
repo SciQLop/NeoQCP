@@ -477,16 +477,8 @@ void QCPCurve::draw(QCPDrawContext& context) const
     if (!comp.visible)
         return;
 
-    // The fill is one polygon of the whole curve, in data space: a self-crossing curve needs the
-    // rasteriser's rule, not a triangulation.
     if (mBrush.style() != Qt::NoBrush && mBrush.color().alpha() != 0)
-    {
-        std::vector<QCP::Position> polygon;
-        polygon.reserve(static_cast<std::size_t>(mDataContainer->size()));
-        for (auto it = mDataContainer->constBegin(); it != mDataContainer->constEnd(); ++it)
-            polygon.push_back(QCP::Data { it->key, it->value });
-        context.polygon(polygon, QPen(Qt::NoPen), mBrush);
-    }
+        recordFill(context);
 
     // Values set for other data, of another size, would colour the wrong points.
     const bool coloured = mColor.hasValues() && mColor.size() == mDataContainer->size();
@@ -505,6 +497,26 @@ void QCPCurve::draw(QCPDrawContext& context) const
                 if (mSelectionDecorator)
                     mSelectionDecorator->drawDecoration(&painter, selection());
             });
+}
+
+// The fill is one polygon per finite run, in data space: a NaN row is a gap, as it is in the line,
+// and a self-crossing run needs the rasteriser's rule, not a triangulation.
+void QCPCurve::recordFill(QCPDrawContext& context) const
+{
+    std::vector<QCP::Position> polygon;
+    const auto flush = [&] {
+        if (!polygon.empty())
+            context.polygon(polygon, QPen(Qt::NoPen), mBrush);
+        polygon.clear();
+    };
+    for (auto it = mDataContainer->constBegin(); it != mDataContainer->constEnd(); ++it)
+    {
+        if (std::isfinite(it->key) && std::isfinite(it->value))
+            polygon.push_back(QCP::Data { it->key, it->value });
+        else
+            flush();
+    }
+    flush();
 }
 
 /*! \internal

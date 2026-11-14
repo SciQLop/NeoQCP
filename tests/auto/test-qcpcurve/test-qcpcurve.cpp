@@ -444,6 +444,47 @@ void TestQCPCurve::nanBreaksTheCurveLine()
   QCOMPARE(inspectable(mCurve)->polylineNaNs(), 1);
 }
 
+// A NaN row splits a filled curve: each side fills as its own shape, the same pixels as the curve
+// split in two, with no spike to a NaN vertex and no fill bridging the gap.
+void TestQCPCurve::nanSplitsTheCurveFill()
+{
+  const QBrush brush(QColor(0, 160, 255));
+  const auto frame = [](QCustomPlot* plot) {
+      plot->xAxis->setRange(0, 9);
+      plot->yAxis->setRange(0, 5);
+  };
+  mCurve->setPen(QPen(Qt::NoPen));
+  mCurve->setBrush(brush);
+  mCurve->setData(QVector<double> { 0, 1, 2, 3, 4, 5, 6 },
+                  QVector<double> { 1, 3, 2, 4.5, 6, 8, 7 },
+                  QVector<double> { 1, 1, 4, qQNaN(), 1, 1, 4 });
+  frame(mPlot);
+  const QImage withNaN = renderOf(mPlot);
+
+  QCustomPlot split;
+  split.resize(400, 300);
+  for (const auto& [keys, values] :
+       { std::pair { QVector<double> { 1, 3, 2 }, QVector<double> { 1, 1, 4 } },
+         std::pair { QVector<double> { 6, 8, 7 }, QVector<double> { 1, 1, 4 } } })
+  {
+      auto* half = new QCPCurve(split.xAxis, split.yAxis);
+      half->setPen(QPen(Qt::NoPen));
+      half->setBrush(brush);
+      half->setData(keys, values);
+  }
+  frame(&split);
+  const QImage reference = renderOf(&split);
+
+  const auto at = [&](const QImage& image, double key, double value) {
+      return QColor(image.pixel(QPoint(int(mPlot->xAxis->coordToPixel(key)),
+                                       int(mPlot->yAxis->coordToPixel(value)))));
+  };
+  QCOMPARE(at(withNaN, 2, 2), brush.color());
+  QCOMPARE(at(withNaN, 7, 2), brush.color());
+  QCOMPARE(at(withNaN, 4.5, 2.4), at(reference, 4.5, 2.4));
+  QVERIFY(withNaN == reference);
+}
+
 void TestQCPCurve::noSetterIsIgnored_data()
 {
   QTest::addColumn<QString>("setter");

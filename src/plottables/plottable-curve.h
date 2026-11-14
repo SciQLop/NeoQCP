@@ -146,6 +146,7 @@ protected:
     virtual void drawLegendIcon(QCPDrawContext& icon) const override;
 
     // non-virtual methods:
+    void recordFill(QCPDrawContext& context) const;
     void recordSegments(QCPDrawContext& context, const QList<QCPDataRange>& segments, bool selected,
                         bool coloured) const;
     void recordLine(QCPDrawContext& context, const QCPDataRange& range, const QPen& pen,
