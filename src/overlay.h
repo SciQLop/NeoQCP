@@ -9,6 +9,13 @@ class QCPPainter;
 class QCP_LIB_DECL QCPOverlay : public QCPLayerable
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(bool collapsible READ isCollapsible WRITE setCollapsible NOTIFY collapsibleChanged)
+    Q_PROPERTY(bool collapsed READ isCollapsed WRITE setCollapsed NOTIFY collapsedChanged)
+    Q_PROPERTY(qreal opacity READ opacity WRITE setOpacity NOTIFY opacityChanged)
+    Q_PROPERTY(QFont font READ font WRITE setFont NOTIFY fontChanged)
+    /// \endcond
+
 public:
     enum Level { Info, Warning, Error };
     Q_ENUM(Level)
@@ -45,6 +52,9 @@ public:
 signals:
     void messageChanged(const QString& text, QCPOverlay::Level level);
     void collapsedChanged(bool collapsed);
+    void collapsibleChanged(bool collapsible);
+    void opacityChanged(qreal opacity);
+    void fontChanged(const QFont& font);
 
 protected:
     void applyDefaultAntialiasingHint(QCPPainter* painter) const override;

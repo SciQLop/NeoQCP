@@ -50,6 +50,7 @@ class QCP_LIB_DECL QCPTextElement : public QCPLayoutElement
     Q_PROPERTY(
         QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY selectableChanged)
     Q_PROPERTY(bool selected READ selected WRITE setSelected NOTIFY selectionChanged)
+    Q_PROPERTY(int textFlags READ textFlags WRITE setTextFlags NOTIFY textFlagsChanged)
     /// \endcond
 
 public:
@@ -107,6 +108,7 @@ signals:
     void textColorChanged(const QColor& textColor);
     void selectedFontChanged(const QFont& selectedFont);
     void selectedTextColorChanged(const QColor& selectedTextColor);
+    void textFlagsChanged(int textFlags);
 
 protected:
     // property members:

@@ -10,6 +10,12 @@ class QCPGraph;
 class QCP_LIB_DECL QCPGroupLegendItem : public QCPPlottableLegendItem
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(bool expanded READ expanded WRITE setExpanded NOTIFY expandedChanged)
+    Q_PROPERTY(int selectedComponent READ selectedComponent WRITE setSelectedComponent NOTIFY
+                   selectedComponentChanged)
+    /// \endcond
+
 public:
     QCPGroupLegendItem(QCPLegend* parent, QCPGraph* graph);
 
@@ -18,7 +24,8 @@ public:
     bool expanded() const { return mExpanded; }
     void setExpanded(bool expanded);
     int selectedComponent() const { return mSelectedComponent; }
-    void setSelectedComponent(int index) { mSelectedComponent = index; }
+
+    void setSelectedComponent(int index);
 
     QSize minimumOuterSizeHint() const override;
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
@@ -33,6 +40,8 @@ public:
 
 signals:
     void componentClicked(int componentIndex);
+    void expandedChanged(bool expanded);
+    void selectedComponentChanged(int selectedComponent);
 
 protected:
     void draw(QCPPainter* painter) override;

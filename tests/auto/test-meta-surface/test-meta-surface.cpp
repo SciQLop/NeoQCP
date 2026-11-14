@@ -879,6 +879,9 @@ const QVector<Exception>& exceptions()
           },
           [](QObject*) { return QVariant(1); },
           "selects a column of its graph: none without a graph (item-tracer.cpp)" },
+        { &QCPOverlay::staticMetaObject, "opacity", Rule::Clamps,
+          [](QObject*) { return QVariant(qreal(0.5)); },
+          [](QObject*) { return QVariant(qreal(-1.0)); }, "clamps to [0, 1] (overlay.cpp)" },
         { &QCPPolarAxisAngular::staticMetaObject, "scaleType", Rule::Refuses, nullptr,
           [](QObject*) { return QVariant::fromValue(QCPAxisBase::stLogarithmic); },
           "the ring has no logarithmic scale (angularaxis.cpp:938)", true },
@@ -1101,6 +1104,16 @@ const QVector<Writer>& writers()
           },
           { "graph", "component" },
           { "graphKey" } },
+        { "QCPOverlay::setCollapsible uncollapsing",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              plot.overlay()->setCollapsible(true);
+              plot.overlay()->setCollapsed(true);
+              return plot.overlay().get();
+          },
+          [](QObject* o) { qobject_cast<QCPOverlay*>(o)->setCollapsible(false); },
+          { "collapsible", "collapsed" },
+          { "opacity" } },
         { "QCPAxisBase::setRangeLower",
           [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
           [](QObject* o) { qobject_cast<QCPAxis*>(o)->setRangeLower(-3); },
@@ -1673,6 +1686,14 @@ const QVector<Deleting>& deletingWriters()
               QCPAxisRect* rect = axisRectOn(plot);
               plot.findChild<QCPItemLine*>()->setClipArea(rect);
           } },
+        { "QCPOverlay::setCollapsible uncollapsing",
+          [](QCustomPlot& plot)
+          {
+              plot.overlay()->setCollapsible(true);
+              plot.overlay()->setCollapsed(true);
+              return std::pair<QObject*, const char*>(plot.overlay().get(), "collapsible");
+          },
+          [](QCustomPlot& plot) { plot.overlay()->setCollapsible(false); } },
         { "QCPAxisRect::setupFullAxesBox", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(plot.xAxis2.get(), "visible"); },
           [](QCustomPlot& plot) { plot.axisRect()->setupFullAxesBox(); } },
@@ -1811,6 +1832,12 @@ const QVector<FormRow>& formRows()
         for (const char* name :
              { "type", "typeX", "typeY", "coords", "axisRect", "system", "area", "pixelPosition" })
             r += { { &QCPItemPosition::staticMetaObject, name, Form::Off } };
+        r += plainRows(&QCPLayoutElement::staticMetaObject, { "autoMargins" });
+        r += plainRows(&QCPGroupLegendItem::staticMetaObject, { "expanded", "selectedComponent" });
+        r += plainRows(&QCPTextElement::staticMetaObject, { "textFlags" });
+        r += plainRows(&QCPOverlay::staticMetaObject,
+                       { "collapsible", "collapsed", "opacity", "font" });
+        r += plainRows(&QCPSelectionRect::staticMetaObject, { "pen", "brush" });
         r += { { &QCustomPlot::staticMetaObject, "theme", Form::Plain, "themeChanged" },
                { &QCustomPlot::staticMetaObject, "itemCreator", Form::Off },
                { &QCustomPlot::staticMetaObject, "itemPositioner", Form::Off } };

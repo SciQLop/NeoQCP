@@ -383,3 +383,10 @@ signal. Nothing that compiled stops compiling; the rows below are the behaviour 
   Name lookups are unchanged.
 - `QCPItemRichText::setCornerRadius` moved out of line, returns on an equal value and repaints.
 - `QCPItemTracer::componentChanged` also fires when `setGraph(graph, component)` moves the component.
+- Layout and overlay: `QCPLayoutElement::autoMargins`, `QCPGroupLegendItem::expanded` / `selectedComponent`,
+  `QCPTextElement::textFlags`, `QCPOverlay::collapsible` / `collapsed` / `opacity` / `font` and
+  `QCPSelectionRect::pen` / `brush`.
+- `QCPGroupLegendItem::setSelectedComponent` moved out of line, returns on an equal value and repaints; a click
+  on the row goes through it. `QCPOverlay::setOpacity` / `setFont` and `QCPSelectionRect::setPen` / `setBrush`
+  return on an equal value (the clamped one for the opacity).
+- `QCPOverlay::setCollapsible(false)` on a collapsed overlay signals `collapsibleChanged` and `collapsedChanged`.

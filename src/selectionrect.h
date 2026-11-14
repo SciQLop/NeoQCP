@@ -35,6 +35,10 @@ class QCPAxis;
 class QCP_LIB_DECL QCPSelectionRect : public QCPLayerable
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
+    Q_PROPERTY(QBrush brush READ brush WRITE setBrush NOTIFY brushChanged)
+    /// \endcond
 
 public:
     explicit QCPSelectionRect(QCustomPlot* parentPlot);
@@ -63,6 +67,8 @@ signals:
     void changed(const QRect& rect, QMouseEvent* event);
     void canceled(const QRect& rect, QInputEvent* event);
     void accepted(const QRect& rect, QMouseEvent* event);
+    void penChanged(const QPen& pen);
+    void brushChanged(const QBrush& brush);
 
 protected:
     // property members:

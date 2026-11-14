@@ -1,7 +1,8 @@
 #include "layoutelement-legend-group.h"
-#include "../plottables/plottable-graph.h"
-#include "../painting/painter.h"
 #include "../axis/labelrenderer.h"
+#include "../core.h"
+#include "../painting/painter.h"
+#include "../plottables/plottable-graph.h"
 
 namespace {
 
@@ -19,6 +20,18 @@ void drawLabel(QCPPainter* painter, const QRectF& rect, const QString& text)
 }
 
 } // namespace
+
+/*! \fn void QCPGroupLegendItem::expandedChanged(bool expanded)
+
+  This signal is emitted when \ref expanded changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPGroupLegendItem::selectedComponentChanged(int selectedComponent)
+
+  This signal is emitted when \ref selectedComponent changes, after the plot delivers its deferred
+  signals.
+*/
 
 QCPGroupLegendItem::QCPGroupLegendItem(QCPLegend* parent, QCPGraph* graph)
     : QCPPlottableLegendItem(parent, graph)
@@ -44,6 +57,19 @@ void QCPGroupLegendItem::setExpanded(bool expanded)
         return;
     markDirty();
     mExpanded = expanded;
+    qcpEmit(this, mParentPlot, &QCPGroupLegendItem::expandedChanged, mExpanded);
+}
+
+/*!
+  Sets the component whose row is drawn selected, -1 for the whole group.
+*/
+void QCPGroupLegendItem::setSelectedComponent(int index)
+{
+    if (index == mSelectedComponent)
+        return;
+    markDirty();
+    mSelectedComponent = index;
+    qcpEmit(this, mParentPlot, &QCPGroupLegendItem::selectedComponentChanged, mSelectedComponent);
 }
 
 // One component has nothing to expand to: its row would repeat the header. It is drawn like a plain
@@ -159,12 +185,12 @@ void QCPGroupLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event,
 
     if (componentIndex < 0) {
         // Header click: toggle expand/collapse
-        mSelectedComponent = -1;
+        setSelectedComponent(-1);
         setExpanded(!mExpanded); // last: it replots, which reaches user slots
     } else {
         // Component click: select that component
         bool selBefore = mSelected;
-        mSelectedComponent = componentIndex;
+        setSelectedComponent(componentIndex);
         const QPointer<QCPGroupLegendItem> alive(this);
         setSelected(true);
         if (selectionStateChanged)

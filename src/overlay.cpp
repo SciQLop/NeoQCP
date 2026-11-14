@@ -3,6 +3,24 @@
 #include "painting/painter.h"
 #include <QApplication>
 
+/*! \fn void QCPOverlay::collapsibleChanged(bool collapsible)
+
+  This signal is emitted when \ref isCollapsible changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPOverlay::opacityChanged(qreal opacity)
+
+  This signal is emitted when \ref opacity changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPOverlay::fontChanged(const QFont& font)
+
+  This signal is emitted when \ref font changes, after the plot delivers its deferred
+  signals.
+*/
+
 QCPOverlay::QCPOverlay(QCustomPlot* parentPlot)
     : QCPLayerable(parentPlot)
 {
@@ -38,11 +56,14 @@ void QCPOverlay::setCollapsible(bool enabled)
 {
     if (mCollapsible == enabled)
         return;
+    // Two signals: a slot of the first may delete the overlay.
+    const QCPEmissionScope scope(mParentPlot);
     mCollapsible = enabled;
     const bool unsetting = !mCollapsible && mCollapsed;
     if (unsetting)
         mCollapsed = false;
     redraw();
+    qcpEmit(this, mParentPlot, &QCPOverlay::collapsibleChanged, mCollapsible);
     if (unsetting)
         qcpEmit(this, mParentPlot, &QCPOverlay::collapsedChanged, false);
 }
@@ -58,16 +79,22 @@ void QCPOverlay::setCollapsed(bool collapsed)
 
 void QCPOverlay::setOpacity(qreal opacity)
 {
+    if (qBound(0.0, opacity, 1.0) == mOpacity)
+        return;
     mOpacity = qBound(0.0, opacity, 1.0);
     if (visible())
         redraw();
+    qcpEmit(this, mParentPlot, &QCPOverlay::opacityChanged, mOpacity);
 }
 
 void QCPOverlay::setFont(const QFont& font)
 {
+    if (font == mFont)
+        return;
     mFont = font;
     if (visible())
         redraw();
+    qcpEmit(this, mParentPlot, &QCPOverlay::fontChanged, mFont);
 }
 
 // The notification layer is buffered: a replot alone repaints the old message.

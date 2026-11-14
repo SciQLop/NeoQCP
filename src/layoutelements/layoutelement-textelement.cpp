@@ -107,6 +107,12 @@
 
 /* end documentation of signals */
 
+/*! \fn void QCPTextElement::textFlagsChanged(int textFlags)
+
+  This signal is emitted when \ref textFlags changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*! \overload
 
   Creates a new QCPTextElement instance and sets default values. The initial text is empty (\ref
@@ -275,6 +281,7 @@ void QCPTextElement::setTextFlags(int flags)
         return;
     markDirty();
     mTextFlags = flags;
+    qcpEmit(this, mParentPlot, &QCPTextElement::textFlagsChanged, textFlags());
 }
 
 /*!

@@ -134,6 +134,12 @@ QCPHandle<QCPLayout> QCPLayoutElement::layout() const
 
 /* end documentation of inline functions */
 
+/*! \fn void QCPLayoutElement::autoMarginsChanged(QCP::MarginSides autoMargins)
+
+  This signal is emitted when \ref autoMargins changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates an instance of QCPLayoutElement and sets default values.
 */
@@ -247,6 +253,7 @@ void QCPLayoutElement::setAutoMargins(QCP::MarginSides sides)
         return;
     markLayoutAppearanceDirty();
     mAutoMargins = sides;
+    qcpEmit(this, mParentPlot, &QCPLayoutElement::autoMarginsChanged, autoMargins());
 }
 
 /*!

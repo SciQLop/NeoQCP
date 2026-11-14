@@ -49,6 +49,8 @@ class QCP_LIB_DECL QCPLayoutElement : public QCPLayerable
     Q_PROPERTY(QSize maximumSize READ maximumSize WRITE setMaximumSize NOTIFY maximumSizeChanged)
     Q_PROPERTY(SizeConstraintRect sizeConstraintRect READ sizeConstraintRect WRITE
                    setSizeConstraintRect NOTIFY sizeConstraintRectChanged)
+    Q_PROPERTY(QCP::MarginSides autoMargins READ autoMargins WRITE setAutoMargins NOTIFY
+                   autoMarginsChanged)
     /// \endcond
 
 public:
@@ -141,6 +143,7 @@ signals:
     void minimumSizeChanged(const QSize& minimumSize);
     void maximumSizeChanged(const QSize& maximumSize);
     void sizeConstraintRectChanged(QCPLayoutElement::SizeConstraintRect sizeConstraintRect);
+    void autoMarginsChanged(QCP::MarginSides autoMargins);
 
 protected:
     // property members:

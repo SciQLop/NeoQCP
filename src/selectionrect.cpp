@@ -106,6 +106,18 @@
 
 /* end documentation of signals */
 
+/*! \fn void QCPSelectionRect::penChanged(const QPen& pen)
+
+  This signal is emitted when \ref pen changes, after the plot delivers its deferred
+  signals.
+*/
+
+/*! \fn void QCPSelectionRect::brushChanged(const QBrush& brush)
+
+  This signal is emitted when \ref brush changes, after the plot delivers its deferred
+  signals.
+*/
+
 /*!
   Creates a new QCPSelectionRect instance. To make QCustomPlot use the selection rect instance,
   pass it to \ref QCustomPlot::setSelectionRect. \a parentPlot should be set to the same
@@ -161,7 +173,10 @@ QCPRange QCPSelectionRect::range(const QCPAxis* axis) const
 */
 void QCPSelectionRect::setPen(const QPen& pen)
 {
+    if (pen == mPen)
+        return;
     mPen = pen;
+    qcpEmit(this, mParentPlot, &QCPSelectionRect::penChanged, mPen);
 }
 
 /*!
@@ -172,7 +187,10 @@ void QCPSelectionRect::setPen(const QPen& pen)
 */
 void QCPSelectionRect::setBrush(const QBrush& brush)
 {
+    if (brush == mBrush)
+        return;
     mBrush = brush;
+    qcpEmit(this, mParentPlot, &QCPSelectionRect::brushChanged, mBrush);
 }
 
 /*!
