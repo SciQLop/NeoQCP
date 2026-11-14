@@ -52,7 +52,7 @@ Totals over the 477 rows of sections 2 and 3.1: plain 387, constant 3, dropped 1
 | property | type | form | NOTIFY | note |
 |---|---|---|---|---|
 | `axisType` | `AxisType` | constant | - | fixed at construction (E-11) |
-| `axisRect` | `QCPAxisRect*` | dropped | - | read-only, no signal (E-11 keeps CONSTANT to its three); accessor stays |
+| `axisRect` | `QCPAxisRect*` | constant | - | an axis never changes rect (E-11's rule: fixed for the object's life); READ the handle getter (E-6) |
 | `ticks` | `bool` | plain | `ticksChanged(bool)` |  |
 | `tickLabels` | `bool` | plain | `tickLabelsChanged(bool)` |  |
 | `tickLabelPadding` | `int` | plain | `tickLabelPaddingChanged(int)` |  |
@@ -955,9 +955,9 @@ Each also emits the signal of every property it moves. Task 2 lists the rest per
 
 Decided above; listed so the review can overturn them.
 
-1. `QCPAxis::axisRect` is **dropped**, although an axis never changes rect. E-11 names its three constants and this is
-   not one of them. `constant` is the alternative. (`grid` and `plotLayout` are remade when deleted, so they cannot be
-   constant.)
+1. `QCPAxis::axisRect` is **constant** (task review): E-11's rule is "fixed for the object's life"; its three named
+   constants are the section-2 examples, and section 3.3 applies the same rule to the 3.0 classes. (`grid` and
+   `plotLayout` are remade when deleted, so they cannot be constant.)
 2. The **existing signals keep their signatures**: `selectionChanged()`, `selectableChanged()`,
    `colorScaleChanged()` carry no value, `rangeChanged` carries two. E-4's `xChanged(T)` applies to new signals; a
    rename would break every user connection for no binding gain (`QBindable` ignores the arguments).
