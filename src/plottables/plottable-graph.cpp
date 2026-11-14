@@ -470,16 +470,20 @@ void QCPGraph::addData(const QVector<double>& keys, std::vector<QVector<double>>
 
 void QCPGraph::removeDataBefore(double key)
 {
+    QCP_CHECK_OR_RETURN(!std::isnan(key), "a NaN key bounds no rows: nothing to remove");
     removeOwnedRows([key](QCPGrowableMultiDataSource& source) { return source.removeBefore(key); });
 }
 
 void QCPGraph::removeDataAfter(double key)
 {
+    QCP_CHECK_OR_RETURN(!std::isnan(key), "a NaN key bounds no rows: nothing to remove");
     removeOwnedRows([key](QCPGrowableMultiDataSource& source) { return source.removeAfter(key); });
 }
 
 void QCPGraph::removeData(double fromKey, double toKey)
 {
+    QCP_CHECK_OR_RETURN(!std::isnan(fromKey) && !std::isnan(toKey),
+                        "a NaN key bounds no rows: nothing to remove");
     removeOwnedRows([fromKey, toKey](QCPGrowableMultiDataSource& source)
                     { return source.removeBetween(fromKey, toKey); });
 }

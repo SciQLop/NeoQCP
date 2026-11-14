@@ -27,6 +27,7 @@ private slots:
     void aBusyAppendGoesThroughTheDeferredSwap();
     void removeDataBeforeKeepsTheRest();
     void removeDataAfterKeepsTheRest();
+    void removingAtANaNKeyIsAMisuse();
     void removeDataRangeKeepsTheRest();
     void removeOnAViewIsAMisuse();
     void aRollingWindowStaysBounded();

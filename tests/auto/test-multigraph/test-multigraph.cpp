@@ -629,6 +629,19 @@ void TestMultiGraph::removeDataAfterKeepsTheRest()
     QCOMPARE(keysOf(mg), (QVector<double>{7}));
 }
 
+// A NaN key compares with nothing, so it would remove nothing and say nothing.
+void TestMultiGraph::removingAtANaNKeyIsAMisuse()
+{
+    const MisuseScope misuse;
+    auto* mg = rampGraph(mPlot, 6);
+    mg->removeDataBefore(qQNaN());
+    mg->removeDataAfter(qQNaN());
+    mg->removeData(qQNaN(), 3.0);
+    mg->removeData(1.0, qQNaN());
+    QCOMPARE(MisuseScope::count(), std::size_t(4));
+    QCOMPARE(mg->dataCount(), 6);
+}
+
 void TestMultiGraph::removeDataRangeKeepsTheRest()
 {
     auto* mg = rampGraph(mPlot, 6, 2);
