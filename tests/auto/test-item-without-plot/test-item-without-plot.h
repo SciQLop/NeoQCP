@@ -21,6 +21,7 @@ private slots:
     void plotAddStillUsesTheFirstRect();
     void aRectAddBindsTheRectsAxes();
     void aSystemGivenBeforeTheAddIsKept();
+    void aClipFlagGivenBeforeTheAddIsKept();
     void aRectAddWithoutBothAxesRefusesTheItem();
     void aSpanOrientationReachesTheRectAdd();
 

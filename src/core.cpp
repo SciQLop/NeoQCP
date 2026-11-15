@@ -1893,10 +1893,10 @@ bool QCustomPlot::detach(QCPItem* item)
 
 /*! \internal
 
-  QCustomPlot::add(std::unique_ptr) for an item: the item joins this plot, clipped to \a rect, on
-  the annotations layer (see registerItem). A position that names no system is bound to \a rect's
-  first bottom and left axes; a position that names one keeps it, and a position that already has an
-  area keeps it too.
+  QCustomPlot::add(std::unique_ptr) for an item: the item joins this plot, clipped to \a rect unless
+  it asked not to be, on the annotations layer (see registerItem). A position that names no system is
+  bound to \a rect's first bottom and left axes; a position that names one keeps it, and a position
+  that already has an area keeps it too.
 */
 bool QCustomPlot::adopt(QCPItem* item, QCPAxisRect* rect)
 {
@@ -1929,10 +1929,7 @@ bool QCustomPlot::adopt(QCPItem* item, QCPAxisRect* rect)
         return false;
     item->mRegisteredPlot = this;
     if (rect)
-    {
-        item->setClipAxisRect(rect);
-        item->setClipToAxisRect(true);
-    }
+        item->setClipAxisRect(rect); // re-parents the layerable when the item clips
     return true;
 }
 

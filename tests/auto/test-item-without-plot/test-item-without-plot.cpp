@@ -54,6 +54,26 @@ public:
     QCPItemPosition* const mFree;
 };
 
+//! Counts its instances, so a refused add can prove the object is gone.
+class CountedItem : public QCPItem
+{
+public:
+    CountedItem()
+            : mPosition(createPosition(QStringLiteral("position")))
+    {
+        ++live;
+    }
+
+    ~CountedItem() override { --live; }
+
+    void draw(QCPDrawContext&) const override {}
+
+    static int live;
+    QCPItemPosition* const mPosition;
+};
+
+int CountedItem::live = 0;
+
 //! Every built-in item, built with no plot.
 QList<QCPItem*> builtInItems()
 {
@@ -154,10 +174,17 @@ void TestItemWithoutPlot::everyBuiltInItemIsBuiltWithoutAPlot()
         {
             position->setCoords(2, 3);
             QCOMPARE(position->pixelPosition(), QPointF(0, 0));
+            // A pixel write lands on a viewport the item does not have yet: it is inert, not a
+            // crash, whatever the slot type reads beside it.
+            position->setType(QCPItemPosition::ptViewportRatio);
+            position->setPixelPosition(QPointF(320, 240));
+            position->setType(QCPItemPosition::ptAxisRectAbsolute);
+            position->setPixelPosition(QPointF(12, 34));
+            position->setType(QCPItemPosition::ptPlotCoords);
+            position->setCoords(2, 3);
         }
         for (QCPItemAnchor* anchor : item->anchors())
             anchor->pixelPosition();
-        item->setClipToAxisRect(true);
         item->setSelected(true);
         item->update();
         item->selectTest(QPointF(5, 5), false);
@@ -169,10 +196,15 @@ void TestItemWithoutPlot::everyBuiltInItemIsBuiltWithoutAPlot()
         QCOMPARE(item->parentPlot(), mPlot);
         QCOMPARE(item->layer()->name(), QStringLiteral("annotations"));
         QCOMPARE(item->clipAxisRect(), mPlot->axisRect());
+        QVERIFY(item->clipToAxisRect());
+        QVERIFY(item->selected());
         for (QCPItemPosition* position : item->positions())
+        {
             QCOMPARE(position->system(),
                      mPlot->axisRect()->system(mPlot->axisRect()->xAxis(),
                                                mPlot->axisRect()->yAxis()));
+            QCOMPARE(position->coords(), QPointF(2, 3));
+        }
     }
     QCOMPARE(gMisuses, 0);
 }
@@ -218,15 +250,38 @@ void TestItemWithoutPlot::aSystemGivenBeforeTheAddIsKept()
     QCOMPARE(gMisuses, 0);
 }
 
+void TestItemWithoutPlot::aClipFlagGivenBeforeTheAddIsKept()
+{
+    auto* item = new QCPItemText();
+    item->setClipToAxisRect(false);
+    auto text = mPlot->add(std::unique_ptr<QCPItemText>(item));
+    QVERIFY(text);
+    QVERIFY(!text->clipToAxisRect());
+    QCOMPARE(text->clipAxisRect(), mPlot->axisRect());
+
+    std::unique_ptr<QCPItemText> taken = mPlot->take(text);
+    QVERIFY(taken);
+    QVERIFY(!taken->clipToAxisRect());
+    auto again = mPlot->add(std::move(taken));
+    QVERIFY(again);
+    QVERIFY(!again->clipToAxisRect()); // the take/add round trip keeps it off
+
+    auto plain = mPlot->add<QCPItemLine>();
+    QVERIFY(plain->clipToAxisRect()); // a new item clips to the area it is placed in
+    QCOMPARE(gMisuses, 0);
+}
+
 void TestItemWithoutPlot::aRectAddWithoutBothAxesRefusesTheItem()
 {
     QCPAxisRect* second = addSecondRect(mPlot);
     const int before = mPlot->itemCount();
     QVERIFY(second->removeAxis(second->xAxis()));
     gMisuses = 0;
+    CountedItem::live = 0;
 
-    auto text = second->add<QCPItemText>();
-    QVERIFY(!text);
+    auto counted = second->add<CountedItem>();
+    QVERIFY(!counted);
+    QCOMPARE(CountedItem::live, 0); // the refused item was destroyed, not leaked
     QCOMPARE(mPlot->itemCount(), before);
     QCOMPARE(gMisuses, 1);
 }

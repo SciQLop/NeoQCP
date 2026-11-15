@@ -590,9 +590,12 @@ Milestone 6b (plot-free construction). Breaking, in the 3.0 preview line.
         refused: empty handle, one report, no object.
   - A plot with no axis rect still takes items (a polar-only scene, or pixel-positioned annotations):
         they join unbound and unclipped.
+  - An item keeps the clipToAxisRect choice it was given: a new item is clipped to the area it lands
+        in, and one built or taken with setClipToAxisRect(false) stays unclipped.
   - QCPNumberRange (a std::ranges input range of numbers) names the number ranges the data forms take.
   - Fix: an item outside a plot (built but not placed, or taken) has no viewport to clip to; its hit test
-        no longer reads one, and spans and text use no selection tolerance there.
+        no longer reads one, spans and text use no selection tolerance there, and a pixel write with
+        setPixelPosition() is inert instead of dereferencing the missing viewport.
 
 Milestone 6a (names). Breaking, in the 3.0 preview line.
   - The base classes drop "Abstract": QCPAbstractPlottable is QCPPlottable, QCPAbstractPlottable1D is

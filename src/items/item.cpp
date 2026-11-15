@@ -1019,6 +1019,10 @@ void QCPItemPosition::setAxisRect(QCPAxisRect* axisRect)
 */
 void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
 {
+    // A detached position has no viewport to invert into, and its pixel reads are (0, 0) by the same
+    // rule: the write is inert until the item is placed (see pixelPosition()).
+    if (!mParentPlot)
+        return;
     const QPointF current = this->pixelPosition();
     if (qFuzzyCompare(current.x() + 1.0, pixelPosition.x() + 1.0)
         && qFuzzyCompare(current.y() + 1.0, pixelPosition.y() + 1.0))
@@ -1509,8 +1513,10 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
   places it and binds them to the area it lands in.
 */
 QCPItem::QCPItem()
-        : QCPLayerable(nullptr), mClipToAxisRect(false), mSelectable(true), mSelected(false)
+        : QCPLayerable(nullptr), mClipToAxisRect(true), mSelectable(true), mSelected(false)
 {
+    // An item is clipped to the area it lands in (adopt()); a caller that wants it to draw over the
+    // axis margins turns the flag off, before or after placing it, and keeps that choice.
 }
 
 QCPItem::~QCPItem()

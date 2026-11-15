@@ -420,7 +420,7 @@ public:
     // depends on T's family (qcp::Construct<T>, construct.h):
     //  - plottable: add<QCPGraph>(keys, values): created on the default axis rect's bottom and left
     //    axes and the current layer; args go to the handle's setData;
-    //  - item: add<QCPItemLine>(): no args;
+    //  - item: add<QCPItemLine>(args...): its constructor arguments, placed on the default axis rect;
     //  - layout part: add<QCPTextElement>(row, column, text): inserted in the plot layout; the
     //    arguments after the cell go to the constructor after the plot;
     //  - group: add<QCPBarsGroup>(), add<QCPPlottableGroup>(name);
@@ -432,12 +432,14 @@ public:
     qcp::HandleFor<T> add(Args&&... args);
 
     // Hands over an object built outside the plot (or taken from one) with the ownership of the
-    // plot: reparents it, attaches it to the default axes and its kind's default layer (the
-    // current layer for plottables, "annotations" for items; re-target with the
-    // returned handle's setters) and adds the legend row as addGraph() does. Plottables and items.
+    // plot: reparents it, gives it its kind's default layer (the current layer for plottables,
+    // "annotations" for items; re-target with the returned handle's setters). A plottable attaches
+    // to the default axes and adds the legend row as addGraph() does; an item lands in the default
+    // axis rect, which binds the positions that name no system and clips the item, and a plot
+    // without an axis rect holds it unbound.
     // An empty pointer, an object that already belongs to a plot, a plot being destroyed or one
-    // without axes: one misuse and an empty handle. A refused add DESTROYS the object (it was moved
-    // in): keep no raw pointer to it.
+    // whose axes cannot take a plottable: one misuse and an empty handle. A refused add DESTROYS the
+    // object (it was moved in): keep no raw pointer to it.
     template <typename T>
     qcp::HandleFor<T> add(std::unique_ptr<T> object);
 
@@ -1000,7 +1002,7 @@ qcp::HandleFor<T> QCustomPlot::add(std::unique_ptr<T> object)
     const bool joined = [&]
     {
         if constexpr (std::derived_from<T, QCPItem>)
-            return adopt(object.get(), axisRect());
+            return adopt(object.get(), firstAxisRect());
         else
             return adopt(object.get());
     }();

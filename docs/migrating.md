@@ -364,6 +364,10 @@ Where the item lands decides what it is bound to:
 - A position that names a system, or already has an area, before the add keeps it. Only the positions
   that name none take the target's pair.
 
+An item is clipped to the area it lands in unless it was told otherwise: `setClipToAxisRect(false)`
+before or after the add, and across a `take()`/`add()` round trip, keeps an item that draws over the
+axis margins unclipped.
+
 An item outside a plot — built and not placed yet, or taken with `QCustomPlot::take()` — answers
 `(0, 0)` from its positions' `pixelPosition()`, and its hit test uses no selection tolerance. Nothing
 warns.
