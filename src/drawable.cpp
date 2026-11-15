@@ -1059,41 +1059,11 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
             notePainted(view);
             return;
         }
-        // Spec 5: an export stacks like the screen - this layer's painter content first, then the
-        // GPU commands' QPainter forms over it, at the end of the layer's pass. Another object's
-        // draw can delete this one before then, so the callback asks whether the recording is
-        // still there: an object deleted mid-pass draws nothing more.
-        qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly, nullptr,
-                             true, false, QCPReplayState::AlreadySaved);
-        if (view.layer)
-        {
-            // The deferred pass paints with the antialiasing this object drew with: the layer's
-            // painter is in whatever state the last layerable left, and a GPU command's QPainter
-            // form must look like the command did on screen. QCPPainter::setAntialiasing also
-            // restores the half-pixel shift the off state carried.
-            // The busy fade the layer put on this object is part of that state too: the deferred
-            // pass runs after the layer's restore(), where the painter is opaque again.
-            // The busy fade the layer put on this object is part of that state too: the deferred
-            // pass runs after the layer's restore(), where the painter is opaque again.
-            const bool antialiased = painter.renderHints().testFlag(QPainter::Antialiasing);
-            const qreal opacity = painter.opacity();
-            view.layer->deferGpuPainter(
-                [list = &mState->recording, state = std::weak_ptr<State>(mState), frame,
-                 antialiased, opacity, shape = qcpSystemClipShape(view)](QCPPainter& target)
-                {
-                    if (state.expired())
-                        return;
-                    target.save();
-                    target.setOpacity(opacity);
-                    // The deferred pass runs after this draw's clip is restored: it sets the
-                    // system's shape again, or a disc's content would square off at the rim.
-                    if (!shape.isEmpty())
-                        target.setClipPath(shape, Qt::IntersectClip);
-                    qcpReplayWithPainter(*list, target, frame, QCPReplayKinds::GpuOnly, nullptr,
-                                         true, antialiased);
-                    target.restore();
-                });
-        }
+        // Spec 5: an export stacks like the screen, so the recording replays in call order here
+        // too. The layer brackets this draw with save()/restore() and carries this object's clip,
+        // antialiasing hint and busy fade, so the inline replay inherits them.
+        qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::All, nullptr, true,
+                             false, QCPReplayState::AlreadySaved);
         return;
     }
     qcpReplayWithRhi(mState->recording, *plottables, *scatter, frame, mState->resolve,

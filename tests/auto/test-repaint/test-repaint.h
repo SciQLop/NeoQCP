@@ -19,6 +19,10 @@ private slots:
     void syncReplotCancelsTheQueuedOne();
     void exportSettlesFirst_data();
     void exportSettlesFirst();
+
+    void anExportStacksACallOrderInsideOneRecording();
+    void anExportStacksTwoItemsInAddOrder();
+    void anExportDrawsAPainterCallbackOverAPolyline();
     void exportShowsReadyStagedData();
     void legendShowsAddedGraphAndItsName();
     void setLayerRepaintsTheLayerLeft();

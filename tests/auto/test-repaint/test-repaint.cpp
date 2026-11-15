@@ -35,6 +35,7 @@
 #include "polar/angularaxis.h"
 #include "polar/polar-area.h"
 #include "polar/polargrid.h"
+#include "reference-image.h"
 #include <QTemporaryDir>
 #include <QtWidgets/qtestsupport_widgets.h>
 #include <algorithm>
@@ -4194,4 +4195,165 @@ void TestRepaint::busyFadeCoversTheGpuCommandsInAnExport()
     const int fadedInk = faded.pixelColor(at).lightness();
     QVERIFY2(solidInk < 120, "the bar is not drawn where the test looks");
     QVERIFY2(fadedInk > solidInk, "the busy fade does not cover the exported GPU commands");
+}
+
+namespace
+{
+//! What a CallOrderItem records, and in which order.
+enum class CallOrderParts
+{
+    RectThenText,
+    TextThenRect,
+    Rect,
+    Text,
+    LineThenPainter
+};
+
+//! One recording whose call order decides what a replay paints last: a filled rect, a text over it,
+//! or a line a painter callback covers.
+class CallOrderItem : public QCPItemRect
+{
+public:
+    using QCPItemRect::QCPItemRect;
+
+    CallOrderParts parts = CallOrderParts::RectThenText;
+
+protected:
+    void draw(QCPDrawContext& context) const override
+    {
+        switch (parts)
+        {
+            case CallOrderParts::RectThenText:
+                recordRect(context);
+                recordText(context);
+                break;
+            case CallOrderParts::TextThenRect:
+                recordText(context);
+                recordRect(context);
+                break;
+            case CallOrderParts::Rect:
+                recordRect(context);
+                break;
+            case CallOrderParts::Text:
+                recordText(context);
+                break;
+            case CallOrderParts::LineThenPainter:
+                context.line(QCP::Data { 2.0, 0.5 }, QCP::Data { 8.0, 0.5 },
+                             QPen(QColor(20, 40, 160), 6.0));
+                context.painter([](QCPPainter& painter, const QCPTransform&)
+                                { painter.fillRect(QRectF(150, 100, 80, 80), QColor(20, 160, 40)); });
+                break;
+        }
+    }
+
+private:
+    static void recordRect(QCPDrawContext& context)
+    {
+        context.rect(QCP::Data { 2.0, 0.15 }, QCP::Data { 8.0, 0.85 }, QPen(Qt::NoPen),
+                     QBrush(QColor(220, 30, 30)));
+    }
+
+    static void recordText(QCPDrawContext& context)
+    {
+        QCPTextStyle style;
+        style.font = qcp::test::referenceFont(20);
+        style.color = QColor(20, 20, 20);
+        context.text(QCP::Data { 3.0, 0.72 }, QStringLiteral("MMMM"), style);
+    }
+};
+
+void prepareCallOrderPlot(QCustomPlot& plot)
+{
+    plot.resize(400, 300);
+    QFont font = qcp::test::referenceFont();
+    font.setPixelSize(10);
+    plot.setFont(font);
+    for (QCPAxis* axis : plot.axisRect()->axes())
+    {
+        axis->setTickLabelFont(font);
+        axis->setLabelFont(font);
+    }
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 1);
+}
+
+//! The pixels inside the rect that are darker than any red: the text's ink, when it is over it.
+int textInkInsideTheRect(const QCustomPlot& plot, const QImage& image)
+{
+    const QPointF corner(plot.xAxis->coordToPixel(2.2), plot.yAxis->coordToPixel(0.8));
+    const QPointF opposite(plot.xAxis->coordToPixel(7.8), plot.yAxis->coordToPixel(0.2));
+    const QRect area = QRectF(corner, opposite).normalized().toRect();
+    int ink = 0;
+    for (int y = area.top(); y <= area.bottom(); ++y)
+        for (int x = area.left(); x <= area.right(); ++x)
+            if (image.rect().contains(x, y) && image.pixelColor(x, y).lightness() < 120)
+                ++ink;
+    return ink;
+}
+} // namespace
+
+// C-4: a recording replays in call order, so a text recorded after a rect paints over it, and a
+// text recorded before the rect is covered by it. Both are exports: the GPU side is checked by the
+// repaint tests.
+void TestRepaint::anExportStacksACallOrderInsideOneRecording()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const auto inkOf = [&dir](CallOrderParts parts)
+    {
+        QCustomPlot plot;
+        prepareCallOrderPlot(plot);
+        auto item = plot.add<CallOrderItem>();
+        item->parts = parts;
+        plot.replot();
+        const QImage image = exportWith(plot, QStringLiteral("toPixmap"), dir.path());
+        return textInkInsideTheRect(plot, image);
+    };
+
+    QVERIFY2(inkOf(CallOrderParts::RectThenText) > 20,
+             "the text recorded after the rect is not drawn over it");
+    QCOMPARE(inkOf(CallOrderParts::TextThenRect), 0);
+}
+
+// Two items on one layer stack in the order they were added, each recording in call order.
+void TestRepaint::anExportStacksTwoItemsInAddOrder()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const auto inkOf = [&dir](bool textAddedLast)
+    {
+        QCustomPlot plot;
+        prepareCallOrderPlot(plot);
+        auto first = plot.add<CallOrderItem>();
+        auto second = plot.add<CallOrderItem>();
+        first->parts = textAddedLast ? CallOrderParts::Rect : CallOrderParts::Text;
+        second->parts = textAddedLast ? CallOrderParts::Text : CallOrderParts::Rect;
+        plot.replot();
+        const QImage image = exportWith(plot, QStringLiteral("toPixmap"), dir.path());
+        return textInkInsideTheRect(plot, image);
+    };
+
+    QVERIFY2(inkOf(true) > 20, "the text item added last is not drawn over the rect item");
+    QCOMPARE(inkOf(false), 0);
+}
+
+// A painter() callback recorded after a line covers it, in an export as on screen.
+void TestRepaint::anExportDrawsAPainterCallbackOverAPolyline()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QCustomPlot plot;
+    prepareCallOrderPlot(plot);
+    auto item = plot.add<CallOrderItem>();
+    item->parts = CallOrderParts::LineThenPainter;
+    plot.replot();
+
+    const QImage image = exportWith(plot, QStringLiteral("toPixmap"), dir.path());
+    const QPoint onTheLine(190, qRound(plot.yAxis->coordToPixel(0.5)));
+    const QColor covered = image.pixelColor(onTheLine);
+    QVERIFY2(covered.green() > 120 && covered.red() < 100,
+             qPrintable(QStringLiteral("the painter callback did not cover the line: %1,%2,%3")
+                            .arg(covered.red())
+                            .arg(covered.green())
+                            .arg(covered.blue())));
 }
