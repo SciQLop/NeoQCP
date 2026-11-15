@@ -19,6 +19,10 @@ QCP::Position pinnedToRatio(const QCPItemPosition* edge, Qt::Orientation orienta
             return QCP::DataXRatioY { pinned->x, ratio };
         if (const auto* data = std::get_if<QCP::Data>(&at))
             return QCP::DataXRatioY { data->x, ratio };
+        // The covered side is the axis rect edge, which no pixel offset can shift: the data point
+        // is kept and the offset is dropped, so the band still spans the rect as a span does.
+        if (const auto* offset = std::get_if<QCP::DataOffset>(&at))
+            return QCP::DataXRatioY { offset->at.x, ratio };
     }
     else
     {
@@ -26,6 +30,8 @@ QCP::Position pinnedToRatio(const QCPItemPosition* edge, Qt::Orientation orienta
             return QCP::RatioXDataY { ratio, pinned->y };
         if (const auto* data = std::get_if<QCP::Data>(&at))
             return QCP::RatioXDataY { ratio, data->y };
+        if (const auto* offset = std::get_if<QCP::DataOffset>(&at))
+            return QCP::RatioXDataY { ratio, offset->at.y };
     }
     return at;
 }

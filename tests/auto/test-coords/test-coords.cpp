@@ -1,16 +1,25 @@
 #include "test-coords.h"
 
 #include <coords.h>
+#include <painting/draw-commands.h>
+#include <painting/draw-context.h>
 #include <qcustomplot.h>
 
+#include <cmath>
 #include <memory>
 #include <random>
+#include <type_traits>
 #include <vector>
+
+using namespace QCP::Literals;
 
 namespace
 {
 template <typename A, typename B>
 concept Addable = requires(A a, B b) { a + b; };
+
+template <typename A, typename B>
+concept Subtractable = requires(A a, B b) { a - b; };
 
 // A laid-out plot: coordToPixel reads the axis rect, which only exists after one layout pass.
 std::unique_ptr<QCustomPlot> layoutPlot()
@@ -32,6 +41,41 @@ QPointF pixelsOf(const QCPTransform& transform, double key, double value)
 {
     const QCP::Pixels pixel = transform.map(QCP::Data { key, value });
     return QPointF(pixel.x, pixel.y);
+}
+
+constexpr int kCanvasWidth = 200;
+constexpr int kCanvasHeight = 150;
+
+// A plot whose axis rect covers the whole 200x150 canvas, so data (x, y) lands at pixel (x, 150 -
+// y) and an image read back shows exactly what a recording drew.
+std::unique_ptr<QCustomPlot> canvasPlot()
+{
+    auto plot = std::make_unique<QCustomPlot>();
+    plot->resize(kCanvasWidth, kCanvasHeight);
+    plot->axisRect()->setAutoMargins(QCP::msNone);
+    plot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
+    plot->xAxis->setRange(0, kCanvasWidth);
+    plot->yAxis->setRange(0, kCanvasHeight);
+    plot->replot();
+    return plot;
+}
+
+QCPDrawFrame frameOf(const QCustomPlot& plot)
+{
+    return QCPDrawFrame { QCPTransform(plot.xAxis, plot.yAxis), QCPRatioTransform(plot.axisRect()),
+                          QRectF(plot.axisRect()->rect()) };
+}
+
+QImage replayed(const QCPDrawList& list, const QCPDrawFrame& frame)
+{
+    QImage image(kCanvasWidth, kCanvasHeight, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    {
+        QCPPainter painter(&image);
+        painter.setAntialiasing(false);
+        qcpReplayWithPainter(list, painter, frame);
+    }
+    return image;
 }
 
 struct ScaleCase
@@ -460,6 +504,15 @@ void TestCoords::mixingSpacesDoesNotCompile()
     static_assert(!Addable<QCP::Pixels, QCP::Data>);
     static_assert(Addable<QCP::Pixels, QCP::PixelOffset>);
     static_assert(Addable<QCPItemAnchor*, QCP::PixelOffset>);
+    // A pixel offset is the one thing that joins a space: it rides on a data point instead of
+    // mapping it, which is what DataOffset is. Two points of one space still do not add up, and
+    // only pixels subtract into the offset between them.
+    static_assert(Addable<QCP::Data, QCP::PixelOffset>);
+    static_assert(Addable<QCP::DataOffset, QCP::PixelOffset>);
+    static_assert(!Addable<QCP::Pixels, QCP::Pixels>);
+    static_assert(!Addable<QCP::DataOffset, QCP::Data>);
+    static_assert(Subtractable<QCP::Pixels, QCP::Pixels>);
+    static_assert(!Subtractable<QCP::Data, QCP::Data>);
     QVERIFY(true);
 }
 
@@ -481,4 +534,197 @@ void TestCoords::anchorOffsetIsPixelsWhateverTheOldType()
     QCOMPARE(item->start->pixelPosition(), expected);
     QCOMPARE(item->start->typeX(), QCPItemPosition::ptAbsolute);
     QCOMPARE(item->start->typeY(), QCPItemPosition::ptAbsolute);
+}
+
+void TestCoords::pixelLengthLiteralIsAPixelLength()
+{
+    static_assert(std::is_same_v<decltype(5_px), QCP::PixelLength>,
+                  "the literal must produce the unit type, not a bare double");
+    static_assert(std::is_same_v<decltype(2.5_px), QCP::PixelLength>);
+    QCOMPARE((5_px).px, 5.0);
+    QCOMPARE((2.5_px).px, 2.5);
+    // A default-constructed length is zero, so a width left out draws nothing rather than anything.
+    QCOMPARE(QCP::PixelLength {}.px, 0.0);
+}
+
+void TestCoords::offsetsAddUp()
+{
+    const QCP::PixelOffset delta = QCP::Pixels { 10, 20 } - QCP::Pixels { 4, 5 };
+    QCOMPARE(delta.dx, 6.0);
+    QCOMPARE(delta.dy, 15.0);
+
+    const QCP::DataOffset once = QCP::Data { 1, 2 } + QCP::PixelOffset { 3, 4 };
+    QCOMPARE(once.at.x, 1.0);
+    QCOMPARE(once.at.y, 2.0);
+    QCOMPARE(once.offset.dx, 3.0);
+    QCOMPARE(once.offset.dy, 4.0);
+
+    const QCP::DataOffset twice = once + QCP::PixelOffset { 1, 1 };
+    QCOMPARE(twice.at.x, 1.0);
+    QCOMPARE(twice.at.y, 2.0);
+    QCOMPARE(twice.offset.dx, 4.0);
+    QCOMPARE(twice.offset.dy, 5.0);
+
+    // It is a position alternative, so a command can carry it like any other.
+    const QCP::Position position = twice;
+    QVERIFY(std::holds_alternative<QCP::DataOffset>(position));
+}
+
+void TestCoords::dataOffsetRecordingFollowsTheData()
+{
+    auto plot = canvasPlot();
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+
+    const QCP::Position topLeft = QCP::Data { 50, 100 } + QCP::PixelOffset { -20, 10 };
+    const QCP::Position bottomRight = QCP::Data { 80, 120 } + QCP::PixelOffset { 10, -5 };
+    context.rect(topLeft, bottomRight, Qt::NoPen, QBrush(Qt::red));
+
+    const QCPDrawList& list = context.drawList();
+    QCOMPARE(list.commands.size(), std::size_t(1));
+    const qcp::CommandKind kind = qcp::commandKind(list.commands.front());
+    QVERIFY2(kind.dataOnly, "a DataOffset recording moves with the data: a pan may reuse it as is");
+    QVERIFY2(!kind.staticOnly, "the offset is pixels, but the added data point still moves");
+
+    // The resolution the layout promises: the data point's pixel, plus the offset.
+    const QPointF resolvedTopLeft = qcpResolvePosition(context.frame(), topLeft);
+    QVERIFY(nearlyEqual(resolvedTopLeft.x(), pixelsOf(context.transform(), 50, 100).x() - 20));
+    QVERIFY(nearlyEqual(resolvedTopLeft.y(), pixelsOf(context.transform(), 50, 100).y() + 10));
+
+    // Inside the offset box only: without the offset this pixel would be outside it.
+    const QImage recorded = replayed(list, context.frame());
+    QCOMPARE(recorded.pixelColor(35, 55), QColor(Qt::red));
+    QCOMPARE(recorded.pixelColor(5, 5), QColor(Qt::white));
+
+    // A pan of ten keys to the left moves the box with it, and the offset stays what it was.
+    plot->xAxis->setRange(10, 210);
+    plot->replot();
+    const QCPDrawFrame panned = frameOf(*plot);
+    const QPointF pannedTopLeft = qcpResolvePosition(panned, topLeft);
+    QCOMPARE(pannedTopLeft - resolvedTopLeft, QPointF(-10, 0));
+
+    const QImage afterPan = replayed(list, panned);
+    QCOMPARE(afterPan.pixelColor(30, 56), QColor(Qt::red));
+    QCOMPARE(afterPan.pixelColor(86, 55), QColor(Qt::white));
+}
+
+void TestCoords::dataOffsetItemPositionFollowsTheData()
+{
+    auto plot = layoutPlot();
+    auto item = plot->add<QCPItemLine>();
+    QCPItemPosition* position = item->start;
+    position->setAxisRect(plot->axisRect());
+    position->setAxes(plot->xAxis, plot->yAxis);
+    plot->xAxis->setRange(0, 200);
+    plot->yAxis->setRange(0, 150);
+    plot->replot();
+
+    const QCP::DataOffset at = QCP::Data { 40, 60 } + QCP::PixelOffset { 7, -9 };
+    position->set(at);
+    auto expectedPixel
+        = [&] { return pixelsOf(QCPTransform(plot->xAxis, plot->yAxis), 40, 60) + QPointF(7, -9); };
+    QCOMPARE(position->pixelPosition(), expectedPixel());
+
+    const QCP::Position back = position->asPosition();
+    QVERIFY2(std::holds_alternative<QCP::DataOffset>(back),
+             "the item must hand the recording a DataOffset, or the annotation freezes on a pan");
+    const QCP::DataOffset roundTrip = std::get<QCP::DataOffset>(back);
+    QCOMPARE(roundTrip.at.x, 40.0);
+    QCOMPARE(roundTrip.at.y, 60.0);
+    QCOMPARE(roundTrip.offset.dx, 7.0);
+    QCOMPARE(roundTrip.offset.dy, -9.0);
+
+    const QPointF beforePan = position->pixelPosition();
+    const QPointF dataBeforePan = pixelsOf(QCPTransform(plot->xAxis, plot->yAxis), 40, 60);
+    plot->xAxis->setRange(20, 220);
+    plot->replot();
+    const QPointF dataAfterPan = pixelsOf(QCPTransform(plot->xAxis, plot->yAxis), 40, 60);
+    QVERIFY2(dataAfterPan != dataBeforePan, "the pan must move where the data point lands");
+    // The position moved by exactly what the data moved by: the offset it carries did not change.
+    QCOMPARE(position->pixelPosition() - beforePan, dataAfterPan - dataBeforePan);
+    QCOMPARE(position->pixelPosition(), expectedPixel());
+
+    // The plain setters speak for the data point alone: the next position is a plain Data.
+    position->setCoords(10, 10);
+    QVERIFY(std::holds_alternative<QCP::Data>(position->asPosition()));
+}
+
+void TestCoords::dataOffsetSurvivesAwkwardAxes()
+{
+    // Log, reversed and vertical-key axes change the mapping; the offset is pixels whatever the map
+    // does, so the resolution is the plain Data resolution plus the offset.
+    for (const ScaleCase& testCase : kCases)
+    {
+        auto plot = layoutPlot();
+        QCPAxis* keyAxis = plot->xAxis;
+        QCPAxis* valueAxis = plot->yAxis;
+        if (testCase.verticalKey)
+        {
+            keyAxis = plot->axisRect()->addAxis(QCPAxis::atLeft);
+            valueAxis = plot->axisRect()->addAxis(QCPAxis::atBottom);
+        }
+        configureLogAxes(keyAxis, valueAxis, testCase);
+        plot->replot();
+
+        const QCPDrawFrame frame { QCPTransform(keyAxis, valueAxis),
+                                   QCPRatioTransform(plot->axisRect()),
+                                   QRectF(plot->axisRect()->rect()) };
+        const QCP::PixelOffset offset { 5, -7 };
+        for (const double sample : { 1.0, 10.0, 100.0, 1000.0 })
+        {
+            const QPointF plain = qcpResolvePosition(frame, QCP::Data { sample, sample });
+            const QPointF shifted
+                = qcpResolvePosition(frame, QCP::Data { sample, sample } + offset);
+            QVERIFY2(nearlyEqual(shifted.x(), plain.x() + offset.dx), testCase.name);
+            QVERIFY2(nearlyEqual(shifted.y(), plain.y() + offset.dy), testCase.name);
+            QVERIFY2(std::isfinite(shifted.x()) && std::isfinite(shifted.y()),
+                     "a point inside the range stays finite");
+        }
+    }
+
+    // A polar area maps through its system's transform, the offset last.
+    {
+        auto plot = std::make_unique<QCustomPlot>();
+        plot->resize(640, 480);
+        plot->plotLayout()->clear();
+        auto* area = new QCPPolarArea(plot.get());
+        plot->plotLayout()->addElement(0, 0, area);
+        area->angularAxis()->setRange(0, 360);
+        area->radialAxis()->setRange(0, 1);
+        plot->replot();
+
+        QCPCoordinateSystem* system = area->system(area->angularAxis(), area->radialAxis());
+        const QCP::DataOffset at = QCP::Data { 45, 0.4 } + QCP::PixelOffset { 4, 6 };
+        auto item = plot->add<QCPItemLine>();
+        item->start->setSystem(system);
+        item->start->set(at);
+        const QPointF expected = pixelsOf(system->transform(), 45, 0.4) + QPointF(4, 6);
+        QVERIFY2(nearlyEqual(item->start->pixelPosition().x(), expected.x()), "polar key");
+        QVERIFY2(nearlyEqual(item->start->pixelPosition().y(), expected.y()), "polar value");
+
+        const QCPDrawFrame frame { system->transform(), QCPRatioTransform { },
+                                   QRectF(area->rect()) };
+        const QPointF resolved = qcpResolvePosition(frame, at);
+        QVERIFY(nearlyEqual(resolved.x(), expected.x()));
+        QVERIFY(nearlyEqual(resolved.y(), expected.y()));
+    }
+
+    // A data point that is not a number stays not a number: the offset cannot rescue it, so no
+    // point at infinity is drawn, exactly as for a NaN Data.
+    {
+        auto plot = canvasPlot();
+        QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+        context.rect(QCP::Data { qQNaN(), 100 }, QCP::Data { 80, 120 }, Qt::NoPen, QBrush(Qt::red));
+        const QPointF nowhere = qcpResolvePosition(
+            context.frame(), QCP::Data { qQNaN(), 100 } + QCP::PixelOffset { 3, 3 });
+        QVERIFY(qIsNaN(nowhere.x()));
+        QVERIFY(!std::isinf(nowhere.x()) && !std::isinf(nowhere.y()));
+
+        QCPDrawContext shifted(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+        shifted.rect(QCP::Data { qQNaN(), 100 } + QCP::PixelOffset { 3, 3 }, QCP::Data { 80, 120 },
+                     Qt::NoPen, QBrush(Qt::red));
+        // The NaN corner keeps the whole box undrawable, as a NaN Data corner does today.
+        const QImage nanData = replayed(context.drawList(), context.frame());
+        QCOMPARE(nanData, replayed(shifted.drawList(), shifted.frame()));
+        QCOMPARE(nanData.pixelColor(40, 40), QColor(Qt::white));
+    }
 }

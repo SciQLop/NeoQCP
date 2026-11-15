@@ -35,7 +35,10 @@ struct QCPAxisLink;
 
   A position lives in exactly one space: data coordinates (key, value), widget pixels, or a fraction
   of the axis rect. The types are distinct, so a pixel cannot be passed where a data coordinate is
-  expected, and no operator joins two spaces: a value leaves its space only through a transform.
+  expected, and no operator maps one space into another: a value leaves its space only through a
+  transform. A pixel offset is the one thing two spaces share without either being mapped: added to
+  a data point it makes a DataOffset, a data point an offset in pixels rides on, and a recording of
+  it follows the data through every transform while keeping the offset.
 */
 
 namespace QCP
@@ -68,10 +71,26 @@ struct PixelOffset
     double dy = 0;
 };
 
+//! A length in pixels, for the shape and pen arguments that are distances rather than points. The
+//! `_px` literal of \ref QCP::Literals builds one, so a bare number cannot pass for a length.
+struct PixelLength
+{
+    double px = 0;
+};
+
 //! Pixels relative to an anchor: the item position type ptAbsolute with a parent anchor.
 struct AnchorOffset
 {
     QCPItemAnchor* anchor = nullptr;
+    PixelOffset offset;
+};
+
+//! A data point with an offset in pixels riding on it: where the data maps, plus the offset. A
+//! recording of it moves with the data and keeps its offset; a pixel snapshot of the same point
+//! would freeze where the frame first put it.
+struct DataOffset
+{
+    Data at;
     PixelOffset offset;
 };
 
@@ -90,7 +109,8 @@ struct RatioXDataY
 };
 
 //! A position in any of the modelled spaces.
-using Position = std::variant<Data, Pixels, AxisRatio, AnchorOffset, DataXRatioY, RatioXDataY>;
+using Position
+    = std::variant<Data, Pixels, AxisRatio, AnchorOffset, DataOffset, DataXRatioY, RatioXDataY>;
 
 //! Pixels relative to an anchor: the 2.x spelling of an anchored position.
 [[nodiscard]] inline AnchorOffset operator+(QCPItemAnchor* anchor, PixelOffset offset)
@@ -103,6 +123,42 @@ using Position = std::variant<Data, Pixels, AxisRatio, AnchorOffset, DataXRatioY
 {
     return Pixels { pixels.x + offset.dx, pixels.y + offset.dy };
 }
+
+//! The displacement from \a b to \a a.
+[[nodiscard]] inline PixelOffset operator-(Pixels a, Pixels b)
+{
+    return PixelOffset { a.x - b.x, a.y - b.y };
+}
+
+//! A data point with a pixel offset on it: a label pinned to data but nudged off the point.
+[[nodiscard]] inline DataOffset operator+(Data data, PixelOffset offset)
+{
+    return DataOffset { data, offset };
+}
+
+//! Nudges the offset of \a at; the data point stays where it is.
+[[nodiscard]] inline DataOffset operator+(DataOffset at, PixelOffset offset)
+{
+    return DataOffset { at.at, PixelOffset { at.offset.dx + offset.dx, at.offset.dy + offset.dy } };
+}
+
+/*!
+  The `_px` literal: `3_px` is a \ref PixelLength, the unit the shape and pen arguments that name a
+  distance take. Spelled like Qt::Literals, and useful for the same reason: a bare number cannot
+  stand in for a length, and a length cannot pass for a coordinate.
+*/
+namespace Literals
+{
+    constexpr PixelLength operator""_px(long double length)
+    {
+        return PixelLength { static_cast<double>(length) };
+    }
+
+    constexpr PixelLength operator""_px(unsigned long long length)
+    {
+        return PixelLength { static_cast<double>(length) };
+    }
+} // namespace Literals
 } // namespace QCP
 
 // The custom mapping is written in the position types above: it comes after them, not before.

@@ -260,6 +260,14 @@ struct CommandKind
     bool staticOnly = false;
 };
 
+//! True when \a position moves with the data: a data point, with or without a pixel offset riding
+//! on it. One predicate, because every question below must agree on it.
+inline bool qcpMovesWithData(const QCP::Position& position)
+{
+    return std::holds_alternative<QCP::Data>(position)
+        || std::holds_alternative<QCP::DataOffset>(position);
+}
+
 //! True when every position of \a positions is a \a Space.
 template <class Space>
 bool allPositionsIn(const std::vector<QCP::Position>& positions)
@@ -267,6 +275,12 @@ bool allPositionsIn(const std::vector<QCP::Position>& positions)
     return std::all_of(positions.begin(), positions.end(),
                        [](const QCP::Position& position)
                        { return std::holds_alternative<Space>(position); });
+}
+
+//! True when every position of \a positions moves with the data.
+inline bool allPositionsMoveWithData(const std::vector<QCP::Position>& positions)
+{
+    return std::all_of(positions.begin(), positions.end(), qcpMovesWithData);
 }
 
 inline CommandKind commandKind(const QCPDrawCommand& command)
@@ -283,20 +297,18 @@ inline CommandKind commandKind(const QCPDrawCommand& command)
                                || std::is_same_v<T, PainterCmd>)
                 return CommandKind { false, true, false, false };
             else if constexpr (std::is_same_v<T, ImageCmd>)
-                // Two data corners make a textured quad a pan moves; any other corner keeps the
-                // picture the painter's, as before.
-                return std::holds_alternative<QCP::Data>(cmd.a)
-                        && std::holds_alternative<QCP::Data>(cmd.b)
+                // Two corners that move with the data make a textured quad a pan moves; any other
+                // corner keeps the picture the painter's, as before.
+                return qcpMovesWithData(cmd.a) && qcpMovesWithData(cmd.b)
                     ? CommandKind { true, false, true, false }
                     : CommandKind { false, true, false, false };
             else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>)
                 return CommandKind { true, false,
-                                     std::holds_alternative<QCP::Data>(cmd.a)
-                                         && std::holds_alternative<QCP::Data>(cmd.b),
+                                     qcpMovesWithData(cmd.a) && qcpMovesWithData(cmd.b),
                                      std::holds_alternative<QCP::Pixels>(cmd.a)
                                          && std::holds_alternative<QCP::Pixels>(cmd.b) };
             else
-                return CommandKind { true, false, allPositionsIn<QCP::Data>(cmd.points),
+                return CommandKind { true, false, allPositionsMoveWithData(cmd.points),
                                      allPositionsIn<QCP::Pixels>(cmd.points) };
         },
         command);
@@ -312,8 +324,7 @@ inline bool isGpuCommand(const QCPDrawCommand& command)
         {
             using T = std::decay_t<decltype(cmd)>;
             if constexpr (std::is_same_v<T, ImageCmd>)
-                return std::holds_alternative<QCP::Data>(cmd.a)
-                    && std::holds_alternative<QCP::Data>(cmd.b);
+                return qcpMovesWithData(cmd.a) && qcpMovesWithData(cmd.b);
             else
                 return !(std::is_same_v<T, TextCmd> || std::is_same_v<T, PathCmd>
                          || std::is_same_v<T, PainterCmd>);
@@ -323,15 +334,15 @@ inline bool isGpuCommand(const QCPDrawCommand& command)
 
 /*!
   Whether replaying \a command needs a key and a value axis: it holds a position the transform maps,
-  a data one or a half data and half ratio one, or it is data by construction. Pixels, axis-rect
-  fractions and anchor offsets replay on a plot whose layout holds no axis at all.
+  a data one (with or without a pixel offset) or a half data and half ratio one, or it is data by
+  construction. Pixels, axis-rect fractions and anchor offsets replay on a plot whose layout holds
+  no axis at all.
 */
 inline bool qcpCommandNeedsAxes(const QCPDrawCommand& command)
 {
     const auto needsAxes = [](const QCP::Position& position)
     {
-        return std::holds_alternative<QCP::Data>(position)
-            || std::holds_alternative<QCP::DataXRatioY>(position)
+        return qcpMovesWithData(position) || std::holds_alternative<QCP::DataXRatioY>(position)
             || std::holds_alternative<QCP::RatioXDataY>(position);
     };
     return std::visit(

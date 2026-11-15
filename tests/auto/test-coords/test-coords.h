@@ -16,6 +16,11 @@ private slots:
     void positionSetMatchesSetters();
     void refusedAnchorLeavesPositionUntouched();
     void anchorOffsetIsPixelsWhateverTheOldType();
+    void pixelLengthLiteralIsAPixelLength();
+    void offsetsAddUp();
+    void dataOffsetRecordingFollowsTheData();
+    void dataOffsetItemPositionFollowsTheData();
+    void dataOffsetSurvivesAwkwardAxes();
     void ratioTransformMatchesPixels();
     void mixingSpacesDoesNotCompile();
 };

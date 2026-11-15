@@ -576,6 +576,27 @@ Behaviour changes for 2.1 polar users:
   - Clicking inside a polar graph's fill selects it, as for cartesian graphs.
   - setSystem() with a non-polar system is refused as misuse.
 
+Milestone 6c (the drawing context): units and positions. Additive, except where noted.
+  - QCP::PixelLength and the `_px` literal (namespace QCP::Literals, spelled like Qt::Literals):
+        8_px is a QCP::PixelLength{8}, so a distance is a type of its own and a bare number cannot
+        stand in for one.
+  - QCP::Pixels subtract: Pixels{10, 20} - Pixels{4, 5} is a QCP::PixelOffset{6, 15}, the
+        displacement between them. Two data points do not subtract: a pixel offset is not a data
+        length.
+  - QCP::DataOffset{Data at, PixelOffset offset}, a data point with a pixel offset riding on it,
+        written Data{1, 2} + PixelOffset{3, 4}, and a further + PixelOffset{1, 1} on it adds to
+        the offset, not to the data point.
+        QCP::Position gains the alternative, so a recording made of one follows the data through a
+        pan or a zoom and keeps its offset, where a pixel snapshot would freeze it.
+  - QCPItemPosition accepts a QCP::DataOffset in set(): the position follows the data and
+        asPosition() hands the same DataOffset back. Every setter that speaks about the coordinates
+        alone (setCoords, setType, setPixelPosition, a parent anchor) drops the offset, as it drops
+        every other space.
+  - Breaking for out-of-tree code: a std::visit over QCP::Position, or a chain of std::get_if and
+        std::holds_alternative, must handle QCP::DataOffset. The in-tree visitors do: a recording of
+        one resolves as its data point plus the offset, contributes its data point to the data
+        extent and leaves the item index unbounded, as a text at a data position does.
+
 Milestone 6b (plot-free construction). Breaking, in the 3.0 preview line.
   - The three annotations an axis rect can make in one call: ax->line(keys, values, options), with
         QCPLineOptions{pen, name, scatterStyle} feeding setPen/setName/setScatterStyle (the data goes

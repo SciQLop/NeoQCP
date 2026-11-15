@@ -100,6 +100,13 @@ Extent extentOf(std::span<const QCP::Position> positions)
             extent.key(data->x);
             extent.value(data->y);
         }
+        else if (const auto* offset = std::get_if<QCP::DataOffset>(&position))
+        {
+            // The data point is the only data here: the offset is a pixel displacement, and no data
+            // box can hold it.
+            extent.key(offset->at.x);
+            extent.value(offset->at.y);
+        }
         else if (const auto* mixed = std::get_if<QCP::DataXRatioY>(&position))
         {
             extent.valueBounded = false;
@@ -149,6 +156,13 @@ Extent extentOfPosition(const QCP::Position& position)
         extent.settle();
         return extent;
     }
+    if (const auto* offset = std::get_if<QCP::DataOffset>(&position))
+    {
+        extent.key(offset->at.x); // the offset is pixels: the data box knows only the point
+        extent.value(offset->at.y);
+        extent.settle();
+        return extent;
+    }
     return neutralExtent();
 }
 
@@ -195,6 +209,39 @@ bool holdsAnchor(const qcp::QCPDrawCommand& command)
         command);
 }
 
+//! True when a command names a data point with a pixel offset riding on it. The offset moves the
+//! command away from the point its box names, so that box can feed the data extent but never the
+//! index: an index that bounded it would cull a command that is still visible.
+bool holdsDataOffset(const qcp::QCPDrawCommand& command)
+{
+    const auto anyOffset = [](std::span<const QCP::Position> positions)
+    {
+        return std::any_of(positions.begin(), positions.end(), [](const QCP::Position& position)
+                           { return std::holds_alternative<QCP::DataOffset>(position); });
+    };
+    const auto offset = [](const QCP::Position& position)
+    { return std::holds_alternative<QCP::DataOffset>(position); };
+    return std::visit(
+        [&anyOffset, &offset](const auto& value) -> bool
+        {
+            using Command = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<Command, qcp::PolylinePositionsCmd>
+                          || std::is_same_v<Command, qcp::PolygonCmd>)
+                return anyOffset(value.points);
+            else if constexpr (std::is_same_v<Command, qcp::RectCmd>
+                               || std::is_same_v<Command, qcp::EllipseCmd>
+                               || std::is_same_v<Command, qcp::ImageCmd>)
+                return offset(value.a) || offset(value.b);
+            else if constexpr (std::is_same_v<Command, qcp::TextCmd>)
+                return offset(value.at);
+            else if constexpr (std::is_same_v<Command, qcp::PathCmd>)
+                return offset(value.origin);
+            else
+                return false;
+        },
+        command);
+}
+
 //! An unbounded side of \a extent says nothing about \a box: boxOf() leaves it at ±inf, so merging
 //! keeps the recording's side unbounded too. A neutral extent never touches the box.
 void mergeExtent(QCPDrawList::Box& box, const Extent& extent)
@@ -221,7 +268,11 @@ void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& data,
 
 void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& extent)
 {
-    record(list, std::move(command), extent, extent);
+    // A data point with a pixel offset moves the command away from the point this box names: the
+    // box feeds the data extent, and the index stays unbounded, as it does for a text at a data
+    // anchor.
+    const bool offThePoint = holdsDataOffset(command);
+    record(list, std::move(command), extent, offThePoint ? unboundedExtent() : extent);
 }
 
 /*!
@@ -382,6 +433,13 @@ QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& posit
         const QPointF anchor = anchored->anchor ? anchored->anchor->pixelPosition() : QPointF();
         return anchor + QPointF(anchored->offset.dx, anchored->offset.dy);
     }
+    if (const auto* offset = std::get_if<QCP::DataOffset>(&position))
+    {
+        // The data point maps through the frame like a plain Data, and the offset is added in
+        // pixels: a pan moves the point, the offset stays what it was.
+        return qcpResolvePosition(frame, offset->at, report)
+            + QPointF(offset->offset.dx, offset->offset.dy);
+    }
     // A mixed position is a key and a value, like QCP::Data, one of them a fraction of the axis
     // rect. A vertical key axis runs along screen y, so each number takes the screen axis of its
     // own side.
@@ -402,9 +460,12 @@ QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& posit
     if (const auto* mixed = std::get_if<QCP::DataXRatioY>(&position))
         return keyAndValue(frame.transform.map(QCP::Data { mixed->x, 0.0 }),
                            frame.ratio.map(QCP::AxisRatio { mixed->y, mixed->y }));
-    const auto& mixed = std::get<QCP::RatioXDataY>(position);
-    return keyAndValue(frame.ratio.map(QCP::AxisRatio { mixed.x, mixed.x }),
-                       frame.transform.map(QCP::Data { 0.0, mixed.y }));
+    if (const auto* mixed = std::get_if<QCP::RatioXDataY>(&position))
+        return keyAndValue(frame.ratio.map(QCP::AxisRatio { mixed->x, mixed->x }),
+                           frame.transform.map(QCP::Data { 0.0, mixed->y }));
+    // Every alternative has its branch above: a new one must land there, not fall through to a
+    // std::get that would throw in the middle of a paint.
+    Q_UNREACHABLE_RETURN(QPointF());
 }
 
 QCPDrawFrame qcpMakeFrame(const QCPAxis* keyAxis, const QCPAxis* valueAxis,

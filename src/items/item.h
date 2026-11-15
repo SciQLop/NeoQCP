@@ -225,6 +225,11 @@ private:
     // rect, null on any other area. Only setSystem, setAxes and setArea write them.
     QPointer<QCPAxis> mKeyAxis, mValueAxis;
     QPointer<QCPAxisRect> mAxisRect;
+    //! The pixels a QCP::DataOffset adds to its data point, zero otherwise. Only set() writes it:
+    //! every setter that speaks about the coordinates alone clears it, because the 2.x slots hold a
+    //! data point and nothing else. The tracer's silent coordinate write keeps it, for the same
+    //! reason: it writes the data point the offset rides on.
+    QCP::PixelOffset mPixelOffset;
     // K8: the per-item-per-frame paths read the frame raw instead of building a handle per
     // position. keyAxisRaw and valueAxisRaw are inline; the other three are out of line.
     [[nodiscard]] QCPAxis* keyAxisRaw() const { return mKeyAxis.data(); }

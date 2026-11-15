@@ -543,6 +543,7 @@ void QCPItemPosition::setTypeX(QCPItemPosition::PositionType type)
         if (retainPixelPosition)
             pixel = pixelPosition();
 
+        mPixelOffset = QCP::PixelOffset {}; // a type is not a QCP::DataOffset: the offset is gone
         mPositionTypeX = type;
 
         if (retainPixelPosition)
@@ -586,6 +587,7 @@ void QCPItemPosition::setTypeY(QCPItemPosition::PositionType type)
         if (retainPixelPosition)
             pixel = pixelPosition();
 
+        mPixelOffset = QCP::PixelOffset {}; // a type is not a QCP::DataOffset: the offset is gone
         mPositionTypeY = type;
 
         if (retainPixelPosition)
@@ -804,6 +806,7 @@ std::optional<QCPEmissionScope> QCPItemPosition::signallingScope() const
 
 void QCPItemPosition::setCoords(double key, double value)
 {
+    mPixelOffset = QCP::PixelOffset {}; // the coordinates speak for the data point alone
     if (key == mKey && value == mValue)
         return;
     if (mParentItem)
@@ -957,7 +960,9 @@ QPointF QCPItemPosition::pixelPosition() const
         result.rx() = 0;
     if (qIsNaN(result.y()))
         result.ry() = 0;
-    return result;
+    // The offset a QCP::DataOffset added rides on top of the data point the slots placed, whatever
+    // the axes did to it.
+    return result + QPointF(mPixelOffset.dx, mPixelOffset.dy);
 }
 
 /*!
@@ -1023,6 +1028,7 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
     // rule: the write is inert until the item is placed (see pixelPosition()).
     if (!mParentPlot)
         return;
+    mPixelOffset = QCP::PixelOffset {}; // the pixel the caller names includes any offset
     const QPointF current = this->pixelPosition();
     if (qFuzzyCompare(current.x() + 1.0, pixelPosition.x() + 1.0)
         && qFuzzyCompare(current.y() + 1.0, pixelPosition.y() + 1.0))
@@ -1255,6 +1261,15 @@ void QCPItemPosition::set(const QCP::Position& position)
     setType(ptAbsolute);
     setCoords(anchored->offset.dx, anchored->offset.dy);
   }
+  else if (const auto* offset = std::get_if<QCP::DataOffset>(&position))
+  {
+    // The slots hold a data point: the pixel offset rides beside them in mPixelOffset, so the
+    // position follows the data on a pan and keeps the offset (the callout target).
+    detachFromParent(this);
+    setType(ptPlotCoords);
+    setCoords(offset->at.x, offset->at.y);
+    mPixelOffset = offset->offset;
+  }
   else if (const auto* mixed = std::get_if<QCP::DataXRatioY>(&position))
   {
     detachFromParent(this);
@@ -1273,8 +1288,9 @@ void QCPItemPosition::set(const QCP::Position& position)
 
 /*! \internal
 
-  Reads the position back in the space it was written in. The variant models data, pixels, an axis-rect
-  fraction, an anchor offset and the two half-data/half-ratio spaces; every other 2.x combination
+  Reads the position back in the space it was written in. The variant models data, pixels, an
+  axis-rect fraction, an anchor offset, a data point with a pixel offset on it, and the two half-data,
+  half-ratio spaces; every other 2.x combination
   (ptViewportRatio, ptAxisRectAbsolute, an anchor on one axis only, an anchored data or ratio type)
   comes back as the pixels the position has now, and \a snapshot says so: those pixels are this
   frame's, and nothing in a recording that holds them moves them.
@@ -1294,7 +1310,11 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
   if (!anchored)
   {
     if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
+    {
+      if (mPixelOffset.dx != 0 || mPixelOffset.dy != 0)
+        return QCP::DataOffset { QCP::Data { mKey, mValue }, mPixelOffset };
       return QCP::Data { mKey, mValue };
+    }
     if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptAxisRectRatio)
       return QCP::AxisRatio { mKey, mValue };
     if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptAxisRectRatio)

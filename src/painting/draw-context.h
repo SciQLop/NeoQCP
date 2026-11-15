@@ -255,6 +255,7 @@ private:
     QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis, const QCPArea* area,
                    const QCPTheme* theme, bool exporting = false, const QRectF& clip = { },
                    const QCPCoordinateSystem* system = nullptr);
+    friend class TestCoords; //!< records a position without going through an item
     friend class TestDrawContext;
     friend class TestRepaint; //!< the GPU replay tests record through the same door
     friend class Benchmark; //!< records through the same door to time the replay

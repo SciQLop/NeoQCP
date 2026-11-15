@@ -409,6 +409,26 @@ ellipse corner in data coordinates and the other in pixels is two arguments, and
 should sit. A text style field left at its default leaves the item's own (its alignment, and the colour the plot
 themes), so `ax->text(at, "t")` is a plain annotation.
 
+## A position can carry a pixel offset
+
+`QCP::DataOffset` is a new alternative of `QCP::Position`: a data point with a pixel offset riding on
+it, written `QCP::Data { 1, 2 } + QCP::PixelOffset { 5, -3 }`. A recording made of one follows the data
+through a pan or a zoom and keeps the offset, where a snapshot in pixels would freeze where the frame
+first put it.
+
+| 2.x code | What to write |
+|---|---|
+| a label nudged off its data point, with a pixel write or a `QCP::AnchorOffset` that needs an anchor | `QCP::Data { key, value } + QCP::PixelOffset { dx, dy }` |
+| a `std::visit`, `std::get_if` or `std::holds_alternative` chain over `QCP::Position` | handle `QCP::DataOffset` too: it resolves as its data point plus the offset |
+
+`QCPItemPosition::set()` takes it, and `asPosition()` hands the same `DataOffset` back: the position
+follows the data on a pan. Any setter that speaks about the coordinates alone — `setCoords()`,
+`setType()`, `setPixelPosition()`, a parent anchor — drops the offset, as it drops every other space.
+
+Two more units came with it. `QCP::PixelLength` and the literal `8_px` (`QCP::Literals`, spelled like
+`Qt::Literals`) make a distance a type of its own, and `QCP::Pixels - QCP::Pixels` gives the
+`QCP::PixelOffset` between two pixels.
+
 ## Plottables are built without axes
 
 A plottable's constructor takes the plottable's own arguments only. It no longer takes the key and

@@ -26,6 +26,7 @@
 #include "item-rect.h"
 
 #include "../core.h"
+#include "../painting/draw-commands.h"
 #include "../painting/draw-context.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -160,8 +161,8 @@ void QCPItemRect::draw(QCPDrawContext& context) const
     const QCP::Position to = bottomRight->asPosition(&snapshot);
     if (snapshot)
         context.recordEveryFrame();
-    // Both corners in data coordinates: the recording is data, so a pan only shifts it.
-    if (std::holds_alternative<QCP::Data>(from) && std::holds_alternative<QCP::Data>(to))
+    // Both corners move with the data: the recording is data, so a pan only shifts it.
+    if (qcp::qcpMovesWithData(from) && qcp::qcpMovesWithData(to))
     {
         context.rect(from, to, mainPen(), mainBrush());
         return;
