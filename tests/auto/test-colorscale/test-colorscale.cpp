@@ -5,7 +5,7 @@ namespace
 // A 2x2 map whose values span [zMin, zMax].
 QCPColorMap* mapWithRange(QCPAxis* keyAxis, QCPAxis* valueAxis, double zMin, double zMax)
 {
-    auto* map = new QCPColorMap(keyAxis, valueAxis);
+    auto* map = keyAxis->axisRect()->add<QCPColorMap>(keyAxis, valueAxis).get();
     map->data()->setSize(2, 2);
     map->data()->setCell(0, 0, zMin);
     map->data()->setCell(1, 0, zMin);
@@ -181,7 +181,7 @@ void TestColorScale::aSecondMapTakesTheRectsGradient()
 
     mPlot->xAxis->setRange(0, 1);
     mPlot->yAxis->setRange(0, 1);
-    auto* map = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* map = mPlot->add<QCPColorMap2>().get();
     QCOMPARE(map->gradient(), scale->gradient());
     QCOMPARE(map->dataRange(), scale->dataRange());
     map->setData(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 },

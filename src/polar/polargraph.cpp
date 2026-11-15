@@ -57,12 +57,6 @@ constexpr double kClampFraction = 1.05;
 // degrees.
 constexpr double kBeyondStep = 15.0;
 
-QCPCoordinateSystem* systemOfAxes(QCPPolarAxisAngular* angular, QCPPolarAxisRadial* radial)
-{
-    if (!angular || !radial || !angular->area())
-        return nullptr;
-    return angular->area()->system(angular, radial);
-}
 } // namespace
 
 /*! \fn void QCPPolarGraph::periodicChanged(bool periodic)
@@ -83,15 +77,9 @@ QCPCoordinateSystem* systemOfAxes(QCPPolarAxisAngular* angular, QCPPolarAxisRadi
   signals.
 */
 
-QCPPolarGraph::QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* valueAxis,
-                             QCP::Capabilities required)
-        : QCPPolarGraph(systemOfAxes(keyAxis, valueAxis), required)
-{
-}
-
-QCPPolarGraph::QCPPolarGraph(QCPCoordinateSystem* system, QCP::Capabilities required)
+QCPPolarGraph::QCPPolarGraph(QCP::Capabilities required)
         // The polar system is enough: a polar graph needs nothing of the cartesian five.
-        : QCPPlottable1D<QCPGraphData>(system, required)
+        : QCPPlottable1D<QCPGraphData>(required)
         , mLineStyle(lsLine)
         , mScatterStyle()
         , mPeriodic(true)

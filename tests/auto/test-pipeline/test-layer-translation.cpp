@@ -23,7 +23,7 @@ bool showAndHasRhiLT(QCustomPlot* plot)
 
 void TestPipeline::stallPixelOffsetMultiGraphBusy()
 {
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     QVector<double> keys(200000), values(200000);
     for (int i = 0; i < 200000; ++i) {
         keys[i] = i;
@@ -54,7 +54,7 @@ void TestPipeline::stallPixelOffsetMultiGraphBusy()
 
 void TestPipeline::stallPixelOffsetIdleIsZero()
 {
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     QVector<double> keys(100), values(100);
     for (int i = 0; i < 100; ++i) {
         keys[i] = i;
@@ -74,7 +74,7 @@ void TestPipeline::stallPixelOffsetIdleIsZero()
 
 void TestPipeline::layerPixelOffsetFromBusyChild()
 {
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     QVector<double> keys(200000), values(200000);
     for (int i = 0; i < 200000; ++i) {
         keys[i] = i;
@@ -121,7 +121,7 @@ void TestPipeline::layerTranslationClippedToAxisRect()
     // GPU scissor clipping is hardware-enforced and cannot be verified via toPixmap()
     // (which uses the QPainter export path, bypassing RHI). This test is a smoke test:
     // verify that a large pan with layer translation enabled doesn't crash or assert.
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     QVector<double> keys(200000), values(200000);
     for (int i = 0; i < 200000; ++i) {
         keys[i] = i;
@@ -152,7 +152,7 @@ void TestPipeline::layerTranslationClippedToAxisRect()
 
 void TestPipeline::bufferedMainLayerRendersSameAsLogical()
 {
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     QVector<double> keys(100), values(100);
     for (int i = 0; i < 100; ++i) {
         keys[i] = i;
@@ -175,7 +175,7 @@ void TestPipeline::bufferedMainLayerRendersSameAsLogical()
 
 void TestPipeline::existingMultiGraphTranslationUnaffected()
 {
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     QVector<double> keys(200000), values(200000);
     for (int i = 0; i < 200000; ++i) {
         keys[i] = i;
@@ -212,7 +212,7 @@ void TestPipeline::hiddenElementDoesNotBlockTranslation()
     colorScale->setVisible(false);
     QCOMPARE(qcp::pointers(mPlot->layer("main")->children()).contains(colorScale), true);
 
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     QVector<double> keys(200000), values(200000);
     for (int i = 0; i < 200000; ++i)
     {
@@ -241,7 +241,7 @@ void TestPipeline::visibleElementStillBlocksTranslation()
     mPlot->plotLayout()->addElement(0, 1, colorScale);
     colorScale->setVisible(true);
 
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     QVector<double> keys(200000), values(200000);
     for (int i = 0; i < 200000; ++i)
     {
@@ -267,7 +267,7 @@ void TestPipeline::colormapQuadFollowsPanWhileTranslating()
     // it with the axes: the recording is reused, not rebuilt, and nothing lags.
     if (!showAndHasRhiLT(mPlot)) QSKIP("No QRhi available — quad geometry needs draw()");
 
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
     const int nx = 4000, ny = 64;
     std::vector<double> x(nx), y(ny), z(static_cast<size_t>(nx) * ny, 1.0);
     for (int i = 0; i < nx; ++i) x[i] = i;
@@ -318,7 +318,7 @@ void TestPipeline::plottableOffsetsRefreshedAtRenderTime()
     if (!showAndHasRhiLT(mPlot))
         QSKIP("No QRhi available — translation offsets need render frames");
 
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     QVector<double> keys(1000), values(1000);
     for (int i = 0; i < 1000; ++i)
     {
@@ -363,7 +363,7 @@ void TestPipeline::visibilityToggleForcesLayerRepaint()
     // After a pan the layer may repaint by translating its old GPU entries. Showing a
     // graph again must not take that shortcut: its entries were not kept while it was
     // hidden, so a translated layer would stay empty until the next real repaint.
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     QVector<double> keys(1000), values(1000);
     for (int i = 0; i < 1000; ++i)
     {
@@ -401,14 +401,14 @@ void TestPipeline::pannedReuseKeepsBarsUnderTheirKeys()
     mPlot->xAxis->grid()->setVisible(false);
     mPlot->yAxis->grid()->setVisible(false);
 
-    auto* bars = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+    auto* bars = mPlot->add<QCPBars>().get();
     bars->setWidthType(QCPBars::wtPlotCoords);
     bars->setWidth(6.0);
     bars->setPen(Qt::NoPen);
     bars->setBrush(QColor(0, 0, 255));
     bars->setData(QVector<double> { 50.0 }, QVector<double> { 0.1 });
 
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     graph->setPen(QPen(QColor(200, 0, 0), 2));
     QVector<double> keys(101), values(101);
     for (int i = 0; i < 101; ++i)

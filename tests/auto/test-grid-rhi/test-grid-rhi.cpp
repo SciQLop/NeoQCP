@@ -45,7 +45,7 @@ void TestGridRhi::colorScaleTicksAreDrawnOnScreen()
 {
     if (!showAndHasRhiGrid(mPlot))
         QSKIP("No QRhi available — the GPU grid needs a real backend");
-    auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+    auto* map = mPlot->add<QCPColorMap>().get();
     map->data()->setSize(4, 4);
     map->data()->setRange(QCPRange(-5, 5), QCPRange(-5, 5));
     map->setColorScale(mPlot->axisRect()->colorScale());

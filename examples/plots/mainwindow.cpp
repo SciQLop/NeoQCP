@@ -1233,7 +1233,8 @@ void MainWindow::setupAdvancedAxesDemo(QCustomPlot *customPlot)
   subGraphRandom->setPen(QPen(QColor("#FFA100"), 1.5));
   subGraphRandom->rescaleAxes();
   
-  QCPBars *subBars = new QCPBars(subRectRight->axis(QCPAxis::atBottom), subRectRight->axis(QCPAxis::atRight));
+  QCPBars *subBars = subRectRight->axis(QCPAxis::atBottom)->axisRect()->add<QCPBars>(
+          subRectRight->axis(QCPAxis::atBottom), subRectRight->axis(QCPAxis::atRight)).get();
   subBars->setWidth(3/(double)x3.size());
   subBars->setData(x3, y3);
   subBars->setPen(QPen(Qt::black));
@@ -1355,8 +1356,10 @@ void MainWindow::setupFinancialDemo(QCustomPlot *customPlot)
   volumeAxisRect->setMargins(QMargins(0, 0, 0, 0));
   // create two bar plottables, for positive (green) and negative (red) volume bars:
   customPlot->setAutoAddPlottableToLegend(false);
-  QCPBars *volumePos = new QCPBars(volumeAxisRect->axis(QCPAxis::atBottom), volumeAxisRect->axis(QCPAxis::atLeft));
-  QCPBars *volumeNeg = new QCPBars(volumeAxisRect->axis(QCPAxis::atBottom), volumeAxisRect->axis(QCPAxis::atLeft));
+  QCPBars *volumePos = volumeAxisRect->axis(QCPAxis::atBottom)->axisRect()->add<QCPBars>(
+          volumeAxisRect->axis(QCPAxis::atBottom), volumeAxisRect->axis(QCPAxis::atLeft)).get();
+  QCPBars *volumeNeg = volumeAxisRect->axis(QCPAxis::atBottom)->axisRect()->add<QCPBars>(
+          volumeAxisRect->axis(QCPAxis::atBottom), volumeAxisRect->axis(QCPAxis::atLeft)).get();
   for (int i=0; i<n/5; ++i)
   {
     int v = std::rand()%20000+std::rand()%20000+std::rand()%20000-10000*3;
@@ -1415,8 +1418,8 @@ void MainWindow::setupPolarPlotDemo(QCustomPlot *customPlot)
   area->grid()->setAngularPen(QPen(QColor(200, 200, 200), 0, Qt::SolidLine));
   area->grid()->setSubGridType(QCPPolarGrid::gtAll);
   
-  QCPPolarGraph *g1 = new QCPPolarGraph(angularAxis, area->radialAxis());
-  QCPPolarGraph *g2 = new QCPPolarGraph(angularAxis, area->radialAxis());
+  QCPPolarGraph *g1 = area->add<QCPPolarGraph>().get();
+  QCPPolarGraph *g2 = area->add<QCPPolarGraph>().get();
   g2->setPen(QPen(QColor(255, 150, 20)));
   g2->setBrush(QColor(255, 150, 20, 50));
   g1->setScatterStyle(QCPScatterStyle::ssDisc);

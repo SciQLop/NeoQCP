@@ -302,7 +302,7 @@ void MainWindow::setupExportMapTest(QCustomPlot *customPlot)
   s->setGradient(QCPColorGradient::gpPolar);
   QCPAlignmentGroup::create({s, mCustomPlot->axisRect()}, QCP::msBottom|QCP::msTop);
   
-  QCPColorMap *m = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
+  QCPColorMap *m = customPlot->add<QCPColorMap>().get();
   m->data()->setSize(3, 3);
   m->data()->setRange(QCPRange(10, 100), QCPRange(10, 1000));
   m->data()->setCell(0, 0, 1);
@@ -348,11 +348,11 @@ void MainWindow::setupLogErrorsTest(QCustomPlot *customPlot)
   customPlot->graph()->setScatterStyle(QCPScatterStyle::ssCross);
   customPlot->graph()->setData(x, y);
   
-  QCPErrorBars *keyErrors = new QCPErrorBars(customPlot->xAxis, customPlot->yAxis);
+  QCPErrorBars *keyErrors = customPlot->add<QCPErrorBars>().get();
   keyErrors->setErrorType(QCPErrorBars::etKeyError);
   keyErrors->setDataPlottable(customPlot->graph());
   keyErrors->setData(xerr);
-  QCPErrorBars *valueErrors = new QCPErrorBars(customPlot->xAxis, customPlot->yAxis);
+  QCPErrorBars *valueErrors = customPlot->add<QCPErrorBars>().get();
   valueErrors->setErrorType(QCPErrorBars::etValueError);
   valueErrors->setDataPlottable(customPlot->graph());
   valueErrors->setData(yerr);
@@ -372,7 +372,7 @@ void MainWindow::setupLogCurveTest(QCustomPlot *customPlot)
   customPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
   customPlot->xAxis2->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
   
-  QCPCurve *curve =  new QCPCurve(customPlot->xAxis, customPlot->yAxis);
+  QCPCurve *curve =  customPlot->add<QCPCurve>().get();
   curve->addData(3, 1);
   curve->addData(2, 30);
   curve->addData(1, 1);
@@ -447,7 +447,7 @@ void MainWindow::setupSelectTest(QCustomPlot *customPlot)
   bracket->setLength(22);
   
   // QCPFinancial:
-  QCPFinancial *f = new QCPFinancial(customPlot->xAxis, customPlot->yAxis);
+  QCPFinancial *f = customPlot->add<QCPFinancial>().get();
   QVector<double> key, open, high, low, close;
   open <<190.16<<184.67<<182.26<<178.59<<201.35<<207.28<<216.61<<210.91<<207.73<<207.89<<206.92<<198.51<<199.85<<207.86<<207.99<<218.64<<204.38<<198.12<<199.11<<193.91;
   high <<191.34<<187.19<<183.4<<194.4<<210.2<<218.6596<<217.69<<211.36<<214.02<<208.16<<207.149<<203.7899<<206.7<<212.8<<216.74<<219.33<<206.2<<202.29<<199.99<<199.29;
@@ -569,7 +569,7 @@ void MainWindow::setupLayoutTest(QCustomPlot *customPlot)
     rects.at(i)->axis(QCPAxis::atBottom)->grid()->setVisible(true);
   }
   
-  QCPCurve *c = new QCPCurve(customPlot->xAxis, customPlot->yAxis);
+  QCPCurve *c = customPlot->add<QCPCurve>().get();
   
   QCPCurveDataMap *d1 = new QCPCurveDataMap;
   d1->insert(0, QCPCurveData(0, 2, 1));
@@ -740,7 +740,7 @@ void MainWindow::setupColorMapTest(QCustomPlot *customPlot)
 {
   customPlot->legend->setVisible(true);
   presetInteractive(customPlot);
-  QCPColorMap *colorMap = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
+  QCPColorMap *colorMap = customPlot->add<QCPColorMap>().get();
   colorMap->setName("Color Map");
   customPlot->addLayer("maplayer", customPlot->layer("grid"), QCustomPlot::limAbove);
   colorMap->setLayer("maplayer");
@@ -812,17 +812,17 @@ void MainWindow::setupBarsTest(QCustomPlot *customPlot)
   // stacked bars:
   keyAxis = customPlot->xAxis;
   valueAxis = customPlot->yAxis;
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay1);
   bars->setWidthType(QCPBars::wtAbsolute);
   bars->setWidth(50);
   bars->setBrush(QColor(255, 0, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay2);
   bars->setWidthType(QCPBars::wtAxisRectRatio);
   bars->setWidth(0.05);
   bars->setBrush(QColor(0, 255, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay3);
   bars->setWidthType(QCPBars::wtPlotCoords);
   bars->setWidth(0.25);
@@ -832,17 +832,17 @@ void MainWindow::setupBarsTest(QCustomPlot *customPlot)
   // stacked negative bars:
   keyAxis = customPlot->xAxis;
   valueAxis = customPlot->yAxis;
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay1n);
   bars->setWidthType(QCPBars::wtAbsolute);
   bars->setWidth(50);
   bars->setBrush(QColor(255, 0, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay2n);
   bars->setWidthType(QCPBars::wtAxisRectRatio);
   bars->setWidth(0.05);
   bars->setBrush(QColor(0, 255, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay3n);
   bars->setWidthType(QCPBars::wtPlotCoords);
   bars->setWidth(0.25);
@@ -853,17 +853,17 @@ void MainWindow::setupBarsTest(QCustomPlot *customPlot)
   // stacked bars with swapped x and y axis:
   keyAxis = customPlot->yAxis;
   valueAxis = customPlot->xAxis;
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay1);
   bars->setWidthType(QCPBars::wtAbsolute);
   bars->setWidth(50);
   bars->setBrush(QColor(255, 0, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay2);
   bars->setWidthType(QCPBars::wtAxisRectRatio);
   bars->setWidth(0.05);
   bars->setBrush(QColor(0, 255, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay3);
   bars->setWidthType(QCPBars::wtPlotCoords);
   bars->setWidth(0.25);
@@ -873,17 +873,17 @@ void MainWindow::setupBarsTest(QCustomPlot *customPlot)
   // stacked negative bars with swapped x and y axis:
   keyAxis = customPlot->yAxis;
   valueAxis = customPlot->xAxis;
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay1n);
   bars->setWidthType(QCPBars::wtAbsolute);
   bars->setWidth(50);
   bars->setBrush(QColor(255, 0, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay2n);
   bars->setWidthType(QCPBars::wtAxisRectRatio);
   bars->setWidth(0.05);
   bars->setBrush(QColor(0, 255, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay3n);
   bars->setWidthType(QCPBars::wtPlotCoords);
   bars->setWidth(0.25);
@@ -894,18 +894,18 @@ void MainWindow::setupBarsTest(QCustomPlot *customPlot)
   // stacked bars with base value offset:
   keyAxis = customPlot->xAxis;
   valueAxis = customPlot->yAxis;
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay1);
   bars->setBaseValue(2);
   bars->setWidthType(QCPBars::wtAbsolute);
   bars->setWidth(50);
   bars->setBrush(QColor(255, 0, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay2);
   bars->setWidthType(QCPBars::wtAxisRectRatio);
   bars->setWidth(0.05);
   bars->setBrush(QColor(0, 255, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay3);
   bars->setWidthType(QCPBars::wtPlotCoords);
   bars->setWidth(0.25);
@@ -915,18 +915,18 @@ void MainWindow::setupBarsTest(QCustomPlot *customPlot)
   // stacked negative bars with base value offset:
   keyAxis = customPlot->xAxis;
   valueAxis = customPlot->yAxis;
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay1n);
   bars->setBaseValue(2);
   bars->setWidthType(QCPBars::wtAbsolute);
   bars->setWidth(50);
   bars->setBrush(QColor(255, 0, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay2n);
   bars->setWidthType(QCPBars::wtAxisRectRatio);
   bars->setWidth(0.05);
   bars->setBrush(QColor(0, 255, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay3n);
   bars->setWidthType(QCPBars::wtPlotCoords);
   bars->setWidth(0.25);
@@ -937,18 +937,18 @@ void MainWindow::setupBarsTest(QCustomPlot *customPlot)
   // stacked bars with negative base value offset:
   keyAxis = customPlot->xAxis;
   valueAxis = customPlot->yAxis;
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay1);
   bars->setBaseValue(-2);
   bars->setWidthType(QCPBars::wtAbsolute);
   bars->setWidth(50);
   bars->setBrush(QColor(255, 0, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay2);
   bars->setWidthType(QCPBars::wtAxisRectRatio);
   bars->setWidth(0.05);
   bars->setBrush(QColor(0, 255, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay3);
   bars->setWidthType(QCPBars::wtPlotCoords);
   bars->setWidth(0.25);
@@ -958,18 +958,18 @@ void MainWindow::setupBarsTest(QCustomPlot *customPlot)
   // stacked negative bars with negative base value offset:
   keyAxis = customPlot->xAxis;
   valueAxis = customPlot->yAxis;
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay1n);
   bars->setBaseValue(-2);
   bars->setWidthType(QCPBars::wtAbsolute);
   bars->setWidth(50);
   bars->setBrush(QColor(255, 0, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay2n);
   bars->setWidthType(QCPBars::wtAxisRectRatio);
   bars->setWidth(0.05);
   bars->setBrush(QColor(0, 255, 0, 50));
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay3n);
   bars->setWidthType(QCPBars::wtPlotCoords);
   bars->setWidth(0.25);
@@ -995,15 +995,15 @@ void MainWindow::setupBarsGroupTest(QCustomPlot *customPlot)
   // 3 stacked bars:
   keyAxis = customPlot->xAxis;
   valueAxis = customPlot->yAxis;
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay1);
   bars->setBrush(QColor(255, 0, 0, 50));
   bars->setBarsGroup(group1);
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay2);
   bars->setBrush(QColor(0, 255, 0, 50));
   bars->setBarsGroup(group1);
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay3);
   bars->setBrush(QColor(0, 0, 255, 50));
   bars->setBarsGroup(group1);
@@ -1012,15 +1012,15 @@ void MainWindow::setupBarsGroupTest(QCustomPlot *customPlot)
   // 3 stacked bars:
   keyAxis = customPlot->xAxis;
   valueAxis = customPlot->yAxis;
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay1);
   bars->setBrush(QColor(255, 0, 0, 50));
   bars->setBarsGroup(group1);
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay2);
   bars->setBrush(QColor(0, 255, 0, 50));
   bars->setBarsGroup(group1);
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay3);
   bars->setBrush(QColor(0, 0, 255, 50));
   bars->setBarsGroup(group1);
@@ -1029,15 +1029,15 @@ void MainWindow::setupBarsGroupTest(QCustomPlot *customPlot)
   // 3 stacked bars:
   keyAxis = customPlot->xAxis;
   valueAxis = customPlot->yAxis;
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay1);
   bars->setBrush(QColor(255, 0, 0, 50));
   bars->setBarsGroup(group1);
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay2);
   bars->setBrush(QColor(0, 255, 0, 50));
   bars->setBarsGroup(group1);
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay3);
   bars->setBrush(QColor(0, 0, 255, 50));
   bars->setBarsGroup(group1);
@@ -1047,12 +1047,12 @@ void MainWindow::setupBarsGroupTest(QCustomPlot *customPlot)
   // 2 stacked bars:
   keyAxis = customPlot->xAxis;
   valueAxis = customPlot->yAxis;
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay1);
   bars->setBrush(QColor(255, 0, 0, 50));
   bars->setBarsGroup(group2);
   bars->setBaseValue(1);
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay3);
   bars->setBrush(QColor(0, 255, 0, 50));
   bars->setBarsGroup(group2);
@@ -1060,12 +1060,12 @@ void MainWindow::setupBarsGroupTest(QCustomPlot *customPlot)
   // 2 stacked bars:
   keyAxis = customPlot->xAxis;
   valueAxis = customPlot->yAxis;
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay3);
   bars->setBrush(QColor(255, 0, 0, 50));
   bars->setBarsGroup(group2);
   bars->setBaseValue(1);
-  bars = new QCPBars(keyAxis, valueAxis);
+  bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
   bars->setData(datax, datay2);
   bars->setBrush(QColor(0, 255, 0, 50));
   bars->setBarsGroup(group2);
@@ -1145,15 +1145,15 @@ void MainWindow::setupErrorBarTest(QCustomPlot *customPlot)
   QCPAxis *keyAxis = customPlot->xAxis;
   QCPAxis *valueAxis = customPlot->yAxis;
   
-  QCPCurve *graph = new QCPCurve(keyAxis, valueAxis);
+  QCPCurve *graph = keyAxis->axisRect()->add<QCPCurve>(keyAxis, valueAxis).get();
   graph->setData(QVector<double>() << 1 << 2 << 3 << 4 << 2.5 << -2, QVector<double>() << -2 << 0 << 1 << 2 << 1.5 << 1.2);
   //graph->setScatterStyle(QCPScatterStyle::ssCircle);
   
-  QCPErrorBars *keyErrors = new QCPErrorBars(keyAxis, valueAxis);
+  QCPErrorBars *keyErrors = keyAxis->axisRect()->add<QCPErrorBars>(keyAxis, valueAxis).get();
   keyErrors->setDataPlottable(graph);
   keyErrors->setData(QVector<double>() << 0.2 << 0.4 << 1.6 << 0.8 << 0.2 << 0.2, QVector<double>() << 0.2 << 0.2 << 2.2 << 0.2 << 0.2 << 0.2);
   keyErrors->setErrorType(QCPErrorBars::etKeyError);
-  QCPErrorBars *valueErrors = new QCPErrorBars(keyAxis, valueAxis);
+  QCPErrorBars *valueErrors = keyAxis->axisRect()->add<QCPErrorBars>(keyAxis, valueAxis).get();
   valueErrors->setDataPlottable(graph);
   valueErrors->setData(QVector<double>() << 0.2 << 0.4 << 1.6 << 0.8 << 0.2 << 0.2, QVector<double>() << 0.2 << 0.2 << 2.2 << 0.2 << 0.2 << 0.2);
   valueErrors->setErrorType(QCPErrorBars::etValueError);
@@ -1201,7 +1201,7 @@ void MainWindow::setupDataSelectTest(QCustomPlot *customPlot)
   //g->setBrush(QBrush(QColor(100, 0, 255, 90)));
   //g->selectionDecorator()->setBrush(QBrush(QColor(255, 0, 50, 60)));
   
-  QCPCurve *curve = new QCPCurve(customPlot->xAxis, customPlot->yAxis);
+  QCPCurve *curve = customPlot->add<QCPCurve>().get();
   curve->addData(QVector<double>() << 1 << 2 << 3 << 4 << 3 << 2 << 1, QVector<double>() << 5 << 4 << 7 << 8 << 2 << 1 << 1);
   curve->setScatterStyle(QCPScatterStyle::ssPlus);
   curve->selectionDecorator()->setPen(QPen(Qt::red));
@@ -1209,19 +1209,19 @@ void MainWindow::setupDataSelectTest(QCustomPlot *customPlot)
   curve->selectionDecorator()->setUsedScatterProperties(QCPScatterStyle::spPen|QCPScatterStyle::spShape);
   curve->setSelectable(QCP::stMultipleDataRanges);
   
-  QCPStatisticalBox *statBox = new QCPStatisticalBox(customPlot->xAxis, customPlot->yAxis);
+  QCPStatisticalBox *statBox = customPlot->add<QCPStatisticalBox>().get();
   statBox->addData(10, 1, 3, 3.5, 5, 7);
   statBox->addData(11, 2, 3.5, 5, 6, 7.5, QVector<double>() << 0 << 0.5 << 7.9 << 9 << 11);
   statBox->addData(12, 3, 4, 5, 6.5, 9);
   statBox->setSelectable(QCP::stMultipleDataRanges);
   
-  QCPBars *bars = new QCPBars(customPlot->xAxis, customPlot->yAxis);
+  QCPBars *bars = customPlot->add<QCPBars>().get();
   bars->addData(13, 1);
   bars->addData(14, 2);
   bars->addData(15, 3);
   bars->setSelectable(QCP::stMultipleDataRanges);
   
-  QCPFinancial *financial = new QCPFinancial(customPlot->xAxis, customPlot->yAxis);
+  QCPFinancial *financial = customPlot->add<QCPFinancial>().get();
   financial->addData(16, 1, 3, 0, 2.2);
   financial->addData(17, 2, 3.5, 1.2, 3.2);
   financial->addData(18, 3, 7, 2, 6);
@@ -1234,7 +1234,7 @@ void MainWindow::setupDataSelectTest(QCustomPlot *customPlot)
 
 void MainWindow::setupScatterSkipTest(QCustomPlot *customPlot)
 {
-  QCPCurve *c = new QCPCurve(customPlot->xAxis, customPlot->yAxis);
+  QCPCurve *c = customPlot->add<QCPCurve>().get();
   c->setLineStyle(QCPCurve::lsLine);
   c->setScatterStyle(QCPScatterStyle::ssPlus);
   c->setScatterSkip(4);
@@ -1242,7 +1242,7 @@ void MainWindow::setupScatterSkipTest(QCustomPlot *customPlot)
   for (int i=0; i<n; ++i)
     c->addData(qCos(i/double(n)*10*M_PI)*i/double(n)*2+2, qSin(i/double(n)*10*M_PI)*i/double(n)*2);
   
-  QCPGraph *g = new QCPGraph(customPlot->xAxis, customPlot->yAxis);
+  QCPGraph *g = customPlot->add<QCPGraph>().get();
   n = 10000;
   QVector<double> x, y;
   x << -6;
@@ -1308,8 +1308,8 @@ void MainWindow::setupPolarAxisTest(QCustomPlot *customPlot)
   area->grid()->setSubGridType(QCPPolarGrid::gtAll);
   //area->radialAxis()->setRangeReversed(true);
   
-  QCPPolarGraph *g1 = new QCPPolarGraph(polarAxis, area->radialAxis());
-  QCPPolarGraph *g2 = new QCPPolarGraph(polarAxis, area->radialAxis());
+  QCPPolarGraph *g1 = area->add<QCPPolarGraph>().get();
+  QCPPolarGraph *g2 = area->add<QCPPolarGraph>().get();
   g2->setPen(QPen(QColor(255, 150, 20)));
   g2->setBrush(QColor(255, 150, 20, 50));
   g1->setScatterStyle(QCPScatterStyle::ssStar);
@@ -1372,7 +1372,7 @@ void MainWindow::setupOneColumnMultiGraphTest(QCustomPlot *customPlot)
   const int n = 500000;
 
   // Graph 1: one-column QCPGraph with owning std::vector<double>
-  auto *g1 = new QCPGraph(customPlot->xAxis, customPlot->yAxis);
+  auto *g1 = customPlot->add<QCPGraph>().get();
   {
     std::vector<double> keys(n), values(n);
     for (int i = 0; i < n; ++i) {
@@ -1384,7 +1384,7 @@ void MainWindow::setupOneColumnMultiGraphTest(QCustomPlot *customPlot)
   g1->setPen(QPen(Qt::blue, 1.5));
 
   // Graph 2: one-column QCPGraph with float values (no double conversion)
-  auto *g2 = new QCPGraph(customPlot->xAxis, customPlot->yAxis);
+  auto *g2 = customPlot->add<QCPGraph>().get();
   {
     std::vector<double> keys(n);
     std::vector<float> values(n);
@@ -1411,7 +1411,7 @@ void MainWindow::setupOneColumnMultiGraphTest(QCustomPlot *customPlot)
     return std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<int>>>(
         std::move(keys), std::move(columns));
   }();
-  auto *g3 = new QCPGraph(customPlot->xAxis, customPlot->yAxis);
+  auto *g3 = customPlot->add<QCPGraph>().get();
   g3->setDataSource(shared);
   g3->setPen(QPen(QColor(0, 180, 0), 1.0));
 
@@ -1470,7 +1470,7 @@ void MainWindow::setupColorMap2Test(QCustomPlot *customPlot)
     return qExp(-(xv - 45.0) * (xv - 45.0) / 20.0) * qSin(yv * 0.5);
   });
 
-  auto *cm = new QCPColorMap2(customPlot->xAxis, customPlot->yAxis);
+  auto *cm = customPlot->add<QCPColorMap2>().get();
   cm->setData(std::move(x), std::move(y), std::move(z));
   cm->setGapThreshold(3.0);
   cm->rescaleDataRange(true);
@@ -1853,8 +1853,8 @@ void MainWindow::setupMultiGraphComparisonTest(QCustomPlot *customPlot)
 
     // --- Left plot: 10 separate one-column QCPGraph ---
     for (int c = 0; c < numComponents; ++c) {
-        auto* graph = new QCPGraph(leftRect->axis(QCPAxis::atBottom),
-                                        leftRect->axis(QCPAxis::atLeft));
+        auto* graph = leftRect->axis(QCPAxis::atBottom)->axisRect()->add<QCPGraph>(
+                leftRect->axis(QCPAxis::atBottom), leftRect->axis(QCPAxis::atLeft)).get();
         graph->setData(std::vector<double>(keys), std::vector<double>(allValues[c]));
         graph->setPen(QPen(colors[c], 1.0));
         graph->setName(QString("comp %1").arg(c));
@@ -1864,8 +1864,8 @@ void MainWindow::setupMultiGraphComparisonTest(QCustomPlot *customPlot)
     leftRect->axis(QCPAxis::atLeft)->setRange(-5, 5);
 
     // --- Right plot: 1 QCPGraph ---
-    auto* mg = new QCPGraph(rightRect->axis(QCPAxis::atBottom),
-                                  rightRect->axis(QCPAxis::atLeft));
+    auto* mg = rightRect->axis(QCPAxis::atBottom)->axisRect()->add<QCPGraph>(
+            rightRect->axis(QCPAxis::atBottom), rightRect->axis(QCPAxis::atLeft)).get();
     mg->setData(std::vector<double>(keys), std::vector<std::vector<double>>(allValues));
     mg->setComponentColors(colors);
     QStringList names;
@@ -1934,7 +1934,7 @@ void MainWindow::setupWaterfallTest(QCustomPlot *customPlot)
         }
     }
 
-    auto* wf = new QCPWaterfallGraph(customPlot->xAxis, customPlot->yAxis);
+    auto* wf = customPlot->add<QCPWaterfallGraph>().get();
     wf->setData(std::move(keys), std::move(vals));
     wf->setOffsetMode(QCPWaterfallGraph::omCustom);
     wf->setOffsets(stationDistances);

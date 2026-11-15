@@ -26,6 +26,7 @@
 /*! \file */
 
 #include "alignment-group.h"
+#include "construct.h"
 #include "core.h"
 #include <memory>
 #include <algorithm>
@@ -1797,10 +1798,6 @@ bool QCustomPlot::adopt(QCPPlottable* plottable)
         return false;
     QCPCoordinateSystem* system = keyAxis->axisRect()->system(keyAxis, valueAxis);
     QCP_CHECK_OR_RETURN(system, "the default axes have no coordinate system", false);
-    // Checked before the object is touched: a refusal leaves it exactly as it was, and the caller
-    // gets an empty handle, as the area add forms do.
-    if (!QCPPlottable::systemAdmits(system, plottable->requiredCapabilities()))
-        return false;
     return adoptPlottable(plottable, system, keyAxis->axisRect());
 }
 
@@ -1814,6 +1811,11 @@ bool QCustomPlot::adoptPlottable(QCPPlottable* plottable, QCPCoordinateSystem* s
                                  QCPArea* area)
 {
     QCP_CHECK_OR_RETURN(system && area, "the object has no coordinate system to join", false);
+    // The one capability gate of adoption, for every add form: checked before the object is
+    // touched, so a refusal leaves it exactly as it was, reports once (setSystem would report the
+    // same mismatch a second time) and lets the caller delete it.
+    if (!QCPPlottable::systemAdmits(system, plottable->requiredCapabilities()))
+        return false;
     // Its setters emit: every signal waits for the scope, so a slot that deletes the plottable or
     // the plot runs once this call is done with it.
     const QCPEmissionScope scope(this);
@@ -2189,9 +2191,11 @@ QCPGraphOps<QCPGraph> QCustomPlot::addGraph(QCPAxis* keyAxis, QCPAxis* valueAxis
         return {};
     }
 
-    auto* newGraph = new QCPGraph(keyAxis, valueAxis);
+    auto newGraph = keyAxis->axisRect()->add<QCPGraph>(keyAxis, valueAxis);
+    if (!newGraph)
+        return { };
     newGraph->setName(QLatin1String("Graph ") + QString::number(mGraphs.size()));
-    return qcp::makeHandle<QCPGraphOps<QCPGraph>>(newGraph);
+    return newGraph;
 }
 
 /*!

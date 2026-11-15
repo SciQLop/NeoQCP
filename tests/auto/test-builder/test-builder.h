@@ -42,8 +42,8 @@ private slots:
     void takeForeignObject();
     void takeDuringTeardown();
     void addUserBuilt();
-    void addRefusesObjectOfAPlot();
-    void axesOfTwoPlotsAreRefused();
+    void aPlotWithoutAnAxisRectRefusesAPlottable();
+    void aTakenPlottableJoinsTheNextPlot();
     void tracerGraphIsClearedOnTake();
     void takenPointerDeletedIsClean();
     void addIntervalsWithBadColumnsLeavesThePlotUnchanged();

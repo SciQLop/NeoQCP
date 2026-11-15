@@ -708,7 +708,7 @@ void TestDataSource2D::resampleZoomedOutNotBlack()
     // Fix: pipeline clamps grid to intersection of viewport and data extent,
     // so the resampled result covers only the data and has bounded dimensions.
     mPlot->resize(400, 300);
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
 
     std::vector<double> x = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     std::vector<double> y = {0.0, 1.0};
@@ -764,7 +764,7 @@ void TestDataSource2D::resampleLogYResolutionNotCoarse()
     // Fix: use log-space fraction for log-scaled axes.
     mPlot->resize(800, 600);
     mPlot->replot(QCustomPlot::rpImmediateRefresh); // force layout so axisRect has correct size
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
 
     const int nChannels = 32;
     std::vector<double> x, y(nChannels), z;
@@ -893,7 +893,7 @@ void TestDataSource2D::colormap2LogZResamplesInLogSpace()
     // both. A log colour scale must re-resample with log averaging, so no bin
     // gets near the linear mean (>= 3333).
     mPlot->resize(400, 300);
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
     const int nx = 20000;
     std::vector<double> x(nx), z(nx * 2);
     for (int i = 0; i < nx; ++i)
@@ -923,7 +923,7 @@ void TestDataSource2D::colormap2NanHandling()
     // Bug #2: Default NaN handling was nhNone, causing UB when colorizing
     // resampled data (which naturally contains NaN for empty bins).
     // After fix, QCPColorMap2 sets nhTransparent by default.
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
     QCOMPARE(cm->gradient().nanHandling(), QCPColorGradient::nhTransparent);
 }
 
@@ -931,7 +931,7 @@ void TestDataSource2D::colormap2DataScaleTypeSync()
 {
     // Bug #3: colorize() was always called with logarithmic=false.
     // Verify that dataScaleType propagates from QCPColorScale.
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
     auto* cs = new QCPColorScale(mPlot);
     mPlot->plotLayout()->addElement(0, 1, cs);
 
@@ -958,7 +958,7 @@ void TestDataSource2D::colormap2DataScaleTypeSync()
 
 void TestDataSource2D::colormap2Creation()
 {
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
     QVERIFY(cm->dataSource() == nullptr);
     QCOMPARE(cm->gapThreshold(), 1.5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -966,7 +966,7 @@ void TestDataSource2D::colormap2Creation()
 
 void TestDataSource2D::colormap2SetDataOwning()
 {
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
 
     std::vector<double> x = {0.0, 1.0, 2.0};
     std::vector<double> y = {0.0, 1.0};
@@ -981,7 +981,7 @@ void TestDataSource2D::colormap2SetDataOwning()
 
 void TestDataSource2D::colormap2ViewData()
 {
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
 
     double x[] = {0.0, 1.0};
     float y[] = {0.0f, 1.0f, 2.0f};
@@ -1001,7 +1001,7 @@ void TestDataSource2D::colormap2ViewData()
 void TestDataSource2D::colormap2Render()
 {
     mPlot->resize(400, 300);
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
 
     std::vector<double> x = {0.0, 1.0, 2.0, 3.0, 4.0};
     std::vector<double> y = {0.0, 1.0, 2.0};
@@ -1031,7 +1031,7 @@ void TestDataSource2D::colormap2Render()
 
 void TestDataSource2D::colormap2AxisRescale()
 {
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
 
     std::vector<double> x = {1.0, 2.0, 3.0};
     std::vector<double> y = {10.0, 20.0};
@@ -1053,7 +1053,7 @@ void TestDataSource2D::colormap2AxisRescale()
 
 void TestDataSource2D::colormap2ColorScaleSync()
 {
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
     auto* cs = new QCPColorScale(mPlot);
     mPlot->plotLayout()->addElement(0, 1, cs);
 
@@ -1084,7 +1084,7 @@ void TestDataSource2D::colormap2ExportToPixmap()
     // Regression test: toPixmap() must render QCPColorMap2 even when the async
     // pipeline hasn't delivered yet (synchronous fallback path).
     mPlot->resize(400, 300);
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
 
     std::vector<double> x = {0.0, 1.0, 2.0, 3.0, 4.0};
     std::vector<double> y = {0.0, 1.0, 2.0};
@@ -1112,7 +1112,7 @@ void TestDataSource2D::colormap2ExportToPdf()
 {
     // Regression test: savePdf() must render QCPColorMap2 via synchronous fallback.
     mPlot->resize(400, 300);
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
 
     std::vector<double> x = {0.0, 1.0, 2.0, 3.0, 4.0};
     std::vector<double> y = {0.0, 1.0, 2.0};

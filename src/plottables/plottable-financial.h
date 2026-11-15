@@ -129,7 +129,21 @@ public:
     };
     Q_ENUM(ChartStyle)
 
-    explicit QCPFinancial(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    QCPFinancial();
+    //! Keys, open, high, low and close, as setData() takes them: one candle per key.
+    template <QCPNumberRange K, QCPNumberRange O, QCPNumberRange H, QCPNumberRange L,
+              QCPNumberRange C>
+    QCPFinancial(const K& keys, const O& open, const H& high, const L& low, const C& close,
+                 bool alreadySorted = false)
+        : QCPFinancial()
+    {
+        setData(QVector<double>(std::ranges::begin(keys), std::ranges::end(keys)),
+                QVector<double>(std::ranges::begin(open), std::ranges::end(open)),
+                QVector<double>(std::ranges::begin(high), std::ranges::end(high)),
+                QVector<double>(std::ranges::begin(low), std::ranges::end(low)),
+                QVector<double>(std::ranges::begin(close), std::ranges::end(close)),
+                alreadySorted);
+    }
     virtual ~QCPFinancial() override;
 
     // getters:

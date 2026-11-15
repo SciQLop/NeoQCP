@@ -187,7 +187,7 @@ void renderOnce(QCustomPlot& plot, QSize size)
 QList<QCPLayoutElement*> jointDensity(QCustomPlot& plot, Grouping grouping)
 {
     QCPAxisRect* main = plot.axisRect();
-    auto* density = new QCPColorMap(plot.xAxis, plot.yAxis); // its scale widens main's right
+    auto* density = plot.add<QCPColorMap>().get(); // its scale widens main's right
     density->data()->setSize(2, 2);
     main->colorScale()->setDataRange(QCPRange(0, 250));
     plot.xAxis->setRange(-4, 4);
@@ -394,7 +394,7 @@ void TestAlignmentGroup::rightEdgesAlignWithAColourScale()
 {
     auto* a = makePlot(false);
     auto* b = makePlot(false);
-    auto* map = new QCPColorMap(b->xAxis, b->yAxis);
+    auto* map = b->add<QCPColorMap>().get();
     map->data()->setSize(2, 2);
     b->axisRect()->colorScale()->setDataRange(QCPRange(0, 1));
     QScopedPointer<QWidget> window(makeStack({ a, b }));

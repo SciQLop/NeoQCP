@@ -30,7 +30,7 @@ bool hitsContain(const QList<QCPHit>& hits, const QCPLayerable* layerable)
 
 QCPGraph* addDiagonalMultiGraph(QCustomPlot* plot)
 {
-    auto* graph = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* graph = plot->add<QCPGraph>().get();
     graph->setData(std::vector<double> { 0, 10 }, std::vector<std::vector<double>> { { 0, 10 } });
     return graph;
 }
@@ -176,10 +176,10 @@ void TestHitRule::spanDragStillBeatsRangeDrag()
 // the error bars by it, or a click on a whisker tip is culled before the hit test runs.
 void TestHitRule::aWhiskerTipIsHitThroughTheIndex()
 {
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     graph->setData(std::vector<double> { 5 }, std::vector<std::vector<double>> { { 5 } });
     graph->setLineStyle(QCPGraph::lsNone);
-    auto* bars = new QCPErrorBars(mPlot->xAxis, mPlot->yAxis);
+    auto* bars = mPlot->add<QCPErrorBars>().get();
     bars->setDataPlottable(graph);
     bars->setData(QVector<double> { 2 });
     bars->setWhiskerWidth(40);

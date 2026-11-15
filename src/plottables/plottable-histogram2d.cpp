@@ -39,10 +39,8 @@
   signals.
 */
 
-QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPColorMapped(keyAxis, valueAxis, true)
-    , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
-    , mRenderer(this)
+QCPHistogram2D::QCPHistogram2D()
+    : QCPColorMapped(true), mPipeline(nullptr, this), mRenderer(this)
 {
     installTransform();
 
@@ -55,10 +53,6 @@ QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
             });
     connect(&mPipeline, &QCPHistogramPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
-
-    followAxisScales();
-
-    followKeyAxisRectScale();
 }
 
 // The renderer can't reposition cells itself: a log/linear toggle needs a re-bin.

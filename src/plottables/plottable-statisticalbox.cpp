@@ -275,8 +275,8 @@ QCPStatisticalBoxData::QCPStatisticalBoxData(double key, double minimum, double 
   from \a keyAxis. This QCustomPlot instance takes ownership of the QCPStatisticalBox, so do not
   delete it manually but use QCustomPlot::removePlottable() instead.
 */
-QCPStatisticalBox::QCPStatisticalBox(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPPlottable1D<QCPStatisticalBoxData>(keyAxis, valueAxis)
+QCPStatisticalBox::QCPStatisticalBox()
+        : QCPPlottable1D<QCPStatisticalBoxData>()
         , mWidth(0.5)
         , mWhiskerWidth(0.2)
         , mWhiskerPen(Qt::black, 0, Qt::DashLine, Qt::FlatCap)

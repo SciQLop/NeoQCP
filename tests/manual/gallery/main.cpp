@@ -219,7 +219,7 @@ static QWidget* createGraphTab()
     g1->setName("QCPGraph");
 
     // QCPGraph with one column
-    auto* g2 = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* g2 = plot->add<QCPGraph>().get();
     std::vector<double> x2(n), y2(n);
     for (int i = 0; i < n; ++i) {
         x2[i] = i / double(n) * 10 - 5;
@@ -230,7 +230,7 @@ static QWidget* createGraphTab()
     g2->setName("QCPGraph");
 
     // QCPCurve (parametric)
-    auto* curve = new QCPCurve(plot->xAxis, plot->yAxis);
+    auto* curve = plot->add<QCPCurve>().get();
     QVector<double> ct(500), cx(500), cy(500);
     for (int i = 0; i < 500; ++i) {
         ct[i] = i;
@@ -278,7 +278,7 @@ static QWidget* createColorMapTab()
         return qExp(-(xv - 45.0) * (xv - 45.0) / 20.0) * qSin(yv * 0.5);
     });
 
-    auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis);
+    auto* cm = plot->add<QCPColorMap2>().get();
     cm->setData(std::move(x), std::move(y), std::move(z));
     cm->setGapThreshold(3.0);
 
@@ -313,7 +313,7 @@ static QWidget* createContourTab()
         for (int j = 0; j < ny; ++j)
             z[i * ny + j] = qSin(x[i]) * qCos(y[j]) + 0.3 * qSin(2 * x[i] + y[j]);
 
-    auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis);
+    auto* cm = plot->add<QCPColorMap2>().get();
     cm->setData(std::vector(x), std::vector(y), std::vector(z));
 
     auto* scale = new QCPColorScale(plot);
@@ -368,7 +368,7 @@ static QWidget* createColorMapLogTab()
     // gap: 30 to 50
     addSegment(50.0, 100.0, 0.5);  // segment 2
 
-    auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis);
+    auto* cm = plot->add<QCPColorMap2>().get();
     cm->setData(std::move(x), std::move(y), std::move(z));
     cm->setGapThreshold(3.0);
 
@@ -430,7 +430,7 @@ static QWidget* createColorMapVariableYTab()
         }
     }
 
-    auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis);
+    auto* cm = plot->add<QCPColorMap2>().get();
     cm->setData(std::move(x), std::move(y), std::move(z));
 
     plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
@@ -472,7 +472,7 @@ static QWidget* createMultiGraphTab()
         QColor(214, 39, 40), QColor(148, 103, 189), QColor(140, 86, 75)
     };
 
-    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* mg = plot->add<QCPGraph>().get();
     mg->setData(std::move(keys), std::move(vals));
     mg->setComponentColors(colors);
     QStringList names;
@@ -490,7 +490,7 @@ static QWidget* createMultiGraphTab()
 static QWidget* createColoredMultiGraphTab()
 {
     auto* plot = new QCustomPlot();
-    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* mg = plot->add<QCPGraph>().get();
     const int n = 2'000'000;   // large enough for L1 + L2
     std::vector<double> keys(n), a(n), b(n), scalar(n);
     for (int i = 0; i < n; ++i)
@@ -547,7 +547,7 @@ static QWidget* createWaterfallTab()
     auto source = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
         std::move(keys), std::move(vals));
 
-    auto* wf = new QCPWaterfallGraph(plot->xAxis, plot->yAxis);
+    auto* wf = plot->add<QCPWaterfallGraph>().get();
     wf->setDataSource(source);
     wf->setNormalize(true);
     wf->setUniformSpacing(1.5);
@@ -684,13 +684,13 @@ static QWidget* createBarsTab()
 {
     auto* plot = makePlot();
 
-    auto* bars1 = new QCPBars(plot->xAxis, plot->yAxis);
+    auto* bars1 = plot->add<QCPBars>().get();
     bars1->setName("Sales");
     bars1->setPen(QPen(QColor(0, 100, 200)));
     bars1->setBrush(QColor(0, 100, 200, 80));
     bars1->setData({1, 2, 3, 4, 5, 6}, {42, 58, 35, 72, 50, 63});
 
-    auto* bars2 = new QCPBars(plot->xAxis, plot->yAxis);
+    auto* bars2 = plot->add<QCPBars>().get();
     bars2->setName("Returns");
     bars2->setPen(QPen(QColor(200, 50, 50)));
     bars2->setBrush(QColor(200, 50, 50, 80));
@@ -698,7 +698,7 @@ static QWidget* createBarsTab()
     bars2->moveAbove(bars1);
 
     // error bars on bars1
-    auto* errBars = new QCPErrorBars(plot->xAxis, plot->yAxis);
+    auto* errBars = plot->add<QCPErrorBars>().get();
     errBars->setDataPlottable(bars1);
     errBars->setData({5, 8, 4, 10, 6, 7});
     errBars->setPen(QPen(Qt::black));
@@ -799,7 +799,7 @@ static QWidget* createFinancialTab()
 {
     auto* plot = makePlot();
 
-    auto* candlestick = new QCPFinancial(plot->xAxis, plot->yAxis);
+    auto* candlestick = plot->add<QCPFinancial>().get();
     candlestick->setName("ACME Corp");
     candlestick->setChartStyle(QCPFinancial::csCandlestick);
     candlestick->setBrushPositive(QColor(0, 150, 0, 120));
@@ -845,7 +845,7 @@ static QWidget* createStatBoxTab()
     };
 
     for (int i = 0; i < 5; ++i) {
-        auto* box = new QCPStatisticalBox(plot->xAxis, plot->yAxis);
+        auto* box = plot->add<QCPStatisticalBox>().get();
         double center = 50 + i * 10 + std::sin(i) * 5;
         double spread = 8 + i * 2;
         box->addData(i + 1,
@@ -888,7 +888,7 @@ static QWidget* createRealtimeColorMapTab()
     for (int j = 0; j < ny; ++j)
         (*y)[j] = j * (20.0 / ny); // frequency axis 0..20 Hz
 
-    auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis);
+    auto* cm = plot->add<QCPColorMap2>().get();
     cm->setGapThreshold(0);
 
     auto* scale = new QCPColorScale(plot);
@@ -949,11 +949,11 @@ static QWidget* createRealtimeGraphTab()
     auto y1 = std::make_shared<std::vector<double>>();
     auto y2 = std::make_shared<std::vector<double>>();
 
-    auto* g1 = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* g1 = plot->add<QCPGraph>().get();
     g1->setPen(QPen(QColor(31, 119, 180), 1.5));
     g1->setName("Signal");
 
-    auto* g2 = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* g2 = plot->add<QCPGraph>().get();
     g2->setPen(QPen(QColor(214, 39, 40), 1.5));
     g2->setName("Envelope");
 
@@ -1028,7 +1028,7 @@ static QWidget* createMassiveGraphTab()
             auto* plot = makePlot();
             std::vector<std::vector<double>> columns(1);
             columns[0] = std::move(data->vals);
-            auto* g = new QCPGraph(plot->xAxis, plot->yAxis);
+            auto* g = plot->add<QCPGraph>().get();
             g->setData(std::move(data->keys), std::move(columns));
             g->setPen(QPen(QColor(31, 119, 180), 1));
             g->setName("500M points");
@@ -1069,7 +1069,7 @@ static QWidget* createHistogram2DTab()
         vals[i] = rho * u + std::sqrt(1.0 - rho * rho) * v;
     }
 
-    auto* hist = new QCPHistogram2D(plot->xAxis, plot->yAxis);
+    auto* hist = plot->add<QCPHistogram2D>().get();
     hist->setData(std::move(keys), std::move(vals));
     hist->setBins(80, 80);
     hist->setColumnNormalized(true);
@@ -1111,7 +1111,7 @@ static QWidget* createHistogram2DLogTab()
         vals[i] = valDist(rng);
     }
 
-    auto* hist = new QCPHistogram2D(plot->xAxis, plot->yAxis);
+    auto* hist = plot->add<QCPHistogram2D>().get();
     hist->setData(std::move(keys), std::move(vals));
     hist->setBins(60, 60);
     hist->setColumnNormalized(true);
@@ -1275,7 +1275,7 @@ static QWidget* createDualYAxisTab()
     auto* plot = makePlot();
 
     // --- QCPGraph on left Y axis (linear) ---
-    auto* g = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* g = plot->add<QCPGraph>().get();
     const int nPts = 2000;
     std::vector<double> gx(nPts), gy(nPts);
     for (int i = 0; i < nPts; ++i) {
@@ -1310,7 +1310,7 @@ static QWidget* createDualYAxisTab()
         }
     }
 
-    auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis2);
+    auto* cm = plot->xAxis->axisRect()->add<QCPColorMap2>(plot->xAxis, plot->yAxis2).get();
     cm->setData(std::move(x), std::move(y), std::move(z));
     cm->setName("Spectrogram");
 
@@ -1343,14 +1343,14 @@ static QWidget* createBusyIndicatorTab()
     plot->setTheme(QCPTheme::dark(plot));
     plot->legend->setVisible(true);
 
-    auto* g1 = new QCPGraph(plot->xAxis, plot->yAxis);
-    auto* g2 = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* g1 = plot->add<QCPGraph>().get();
+    auto* g2 = plot->add<QCPGraph>().get();
     g1->setName("Magnetic Field Bx");
     g1->setPen(QPen(QColor("#e74c3c"), 2));
     g2->setName("Magnetic Field By");
     g2->setPen(QPen(QColor("#3498db"), 2));
 
-    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* mg = plot->add<QCPGraph>().get();
     mg->setName("Plasma Velocity");
 
     {

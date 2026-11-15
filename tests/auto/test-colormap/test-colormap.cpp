@@ -13,7 +13,7 @@
 void TestColorMap::init()
 {
   mPlot = new QCustomPlot(0);
-  mColorMap = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+  mColorMap = mPlot->add<QCPColorMap>().get();
 }
 
 void TestColorMap::QCPColorScale_rescaleDataRange()
@@ -21,8 +21,8 @@ void TestColorMap::QCPColorScale_rescaleDataRange()
   QCPColorScale *scale = new QCPColorScale(mPlot);
   mPlot->plotLayout()->addElement(0, 1, scale);
   
-  QCPColorMap *map1 = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
-  QCPColorMap *map2 = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+  QCPColorMap *map1 = mPlot->add<QCPColorMap>().get();
+  QCPColorMap *map2 = mPlot->add<QCPColorMap>().get();
   map1->setColorScale(scale);
   map2->setColorScale(scale);
   map1->data()->setSize(2, 2);
@@ -160,7 +160,7 @@ static void checkGrayscaleLegendIcon(QCustomPlot* plot)
     using Plottable::Plottable;
     using Plottable::drawLegendIcon;
   };
-  auto* p = new Iconed(plot->xAxis, plot->yAxis);
+  auto p = plot->add<Iconed>();
   p->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
   QImage icon(40, 10, QImage::Format_ARGB32);
   icon.fill(Qt::transparent);
@@ -192,7 +192,7 @@ void TestColorMap::QCPColorMap2_selectTestHitSetsDetails()
   mPlot->xAxis->setRange(0, 4);
   mPlot->yAxis->setRange(0, 4);
 
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   std::vector<double> x = {0, 1, 2, 3, 4};
   std::vector<double> y = {0, 1, 2, 3, 4};
   std::vector<double> z(25, 1.0);
@@ -217,7 +217,7 @@ void TestColorMap::QCPColorMap2_selectTestMissReturnsNegativeOne()
   mPlot->xAxis->setRange(0, 4);
   mPlot->yAxis->setRange(0, 4);
 
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   std::vector<double> x = {0, 1, 2, 3, 4};
   std::vector<double> y = {0, 1, 2, 3, 4};
   std::vector<double> z(25, 1.0);
@@ -244,7 +244,7 @@ void TestColorMap::QCPColorMap2_contourSettersScheduleReplot()
   mPlot->xAxis->setRange(0, 4);
   mPlot->yAxis->setRange(0, 4);
 
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   std::vector<double> x = {0, 1, 2, 3, 4};
   std::vector<double> y = {0, 1, 2, 3, 4};
   std::vector<double> z(25, 1.0);
@@ -295,7 +295,7 @@ void TestColorMap::QCPColorMap2_hidesStaleQuadWhenPannedPastData()
   mPlot->xAxis->setRange(0, 4);
   mPlot->yAxis->setRange(0, 4);
 
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   std::vector<double> x = {0, 1, 2, 3, 4};
   std::vector<double> y = {0, 1, 2, 3, 4};
   std::vector<double> z(25, 1.0);
@@ -418,7 +418,7 @@ int countRedPixels(const QImage& img)
 
 QCPColorMap* classicColorMap(QCustomPlot* plot, int size = 10)
 {
-  auto* map = new QCPColorMap(plot->xAxis, plot->yAxis);
+  auto* map = plot->add<QCPColorMap>().get();
   map->data()->setSize(size, size);
   map->data()->setRange(QCPRange(0, 10), QCPRange(0, 10));
   for (int k = 0; k < size; ++k)
@@ -445,7 +445,7 @@ void TestColorMap::QCPColorMap2_contourMirrorsReversedAxis()
     for (int vi = 0; vi < 5; ++vi)
       z[ki * 5 + vi] = double(ki); // z = x -> vertical contours
 
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   cm->setData(x, y, z);
   settleColorMap(mPlot, cm);
   cm->setContourLevels({1.0});
@@ -506,7 +506,7 @@ void TestColorMap::QCPColorMap2_contourExportDrawsFallback()
     for (int vi = 0; vi < 5; ++vi)
       z[ki * 5 + vi] = double(ki); // z = x -> vertical contours
 
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   cm->setData(x, y, z);
   settleColorMap(mPlot, cm);
   cm->setContourLevels({1.0, 2.0, 3.0});
@@ -536,7 +536,7 @@ void TestColorMap::QCPColorMap2_contourExportFollowsALogValueAxis()
   for (int ki = 0; ki < 5; ++ki)
     for (int vi = 0; vi < ny; ++vi)
       z[ki * ny + vi] = std::log10(y[vi]); // horizontal contours at y = 10^level
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   cm->setData(x, y, z);
   settleColorMap(mPlot, cm);
   cm->setContourLevels({1.0, 2.0});
@@ -584,7 +584,7 @@ void TestColorMap::QCPColorMap2_exportDrawsTheImageOnAReversedAxis()
   for (int ki = 0; ki < 5; ++ki)
     for (int vi = 0; vi < 5; ++vi)
       z[ki * 5 + vi] = ki; // dark at x = 0, bright at x = 4
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   cm->setData(x, y, z);
   cm->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
   cm->setDataRange(QCPRange(0, 4));
@@ -609,7 +609,7 @@ void TestColorMap::QCPColorMap2_contourLabelsFollowAColourScaleToggle()
   for (int ki = 0; ki < n; ++ki)
     for (int vi = 0; vi < n; ++vi)
       z[ki * n + vi] = std::pow(10.0, 3.0 * ki / (n - 1)); // 1..1000 along x
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   cm->setData(x, y, z);
   settleColorMap(mPlot, cm);
   cm->setAutoContourLevels(3);
@@ -637,7 +637,7 @@ void TestColorMap::QCPColorMap2_contourDegenerateDataClearsLines()
     for (int vi = 0; vi < 5; ++vi)
       z[ki * 5 + vi] = double(ki); // z = x -> vertical contours
 
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   cm->setData(x, y, z);
   settleColorMap(mPlot, cm);
   cm->setContourLevels({1.0, 2.0, 3.0});
@@ -677,7 +677,7 @@ void TestColorMap::QCPColorMap2_autoContourLevelsGeometricInLogScale()
     for (int ki = 0; ki < 5; ++ki)
       z[ki * 5 + vi] = std::pow(10.0, 3.0 * (ki * 5 + vi) / 24.0);
 
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   cm->setData(x, y, z);
   settleColorMap(mPlot, cm);
   cm->setDataScaleType(QCPAxis::stLogarithmic);
@@ -727,7 +727,7 @@ void TestColorMap::QCPColorMap2_contourExportAfterRhiDraw()
     for (int vi = 0; vi < 5; ++vi)
       z[ki * 5 + vi] = double(ki); // z = x -> vertical contours
 
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   cm->setData(x, y, z);
   cm->setContourLevels({1.0, 2.0, 3.0});
   cm->setContourPen(QPen(Qt::red, 2));
@@ -762,7 +762,7 @@ void TestColorMap::QCPColorMap2_contourExportCachesFallback()
     for (int vi = 0; vi < 5; ++vi)
       z[ki * 5 + vi] = double(ki); // z = x -> vertical contours
 
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   cm->setData(x, y, z);
   cm->setContourLevels({1.0, 2.0, 3.0});
   cm->setContourPen(QPen(Qt::red, 2));
@@ -803,7 +803,7 @@ void TestColorMap::QCPColorScale_rescaleDataRangeIncludesColorMap2()
 {
   auto* scale = new QCPColorScale(mPlot);
   mPlot->plotLayout()->addElement(0, 1, scale);
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   cm->setColorScale(scale);
   std::vector<double> x = {0, 1, 2};
   std::vector<double> y = {0, 1};
@@ -849,7 +849,7 @@ void TestColorMap::QCPColorMap2_drawEmitsNoBusyChange()
   mPlot->resize(400, 300);
   mPlot->xAxis->setRange(0, 4);
   mPlot->yAxis->setRange(0, 4);
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   std::vector<double> x = {0, 1, 2, 3, 4}, y = {0, 1, 2, 3, 4}, z(25, 1.0);
   cm->setData(x, y, z);
   settleColorMap(mPlot, cm);
@@ -882,7 +882,7 @@ template <typename Map>
 void colourSettersSurviveADeletingSlot(QCustomPlot* plot)
 {
   const auto check = [plot](auto signal, auto apply) {
-    auto* map = new Map(plot->xAxis, plot->yAxis);
+    auto* map = plot->add<Map>().get();
     map->setDataRange(QCPRange(-1, 10));
     removeOn(map, signal);
     apply(map);
@@ -951,7 +951,7 @@ void TestColorMap::colourMap2HonoursAVerticalKeyAxis()
   mPlot->yAxis->setRange(0, 7);
   mPlot->xAxis->setRange(0, 3);
 
-  auto* map = new QCPColorMap2(mPlot->yAxis, mPlot->xAxis);
+  auto* map = mPlot->axisRect()->add<QCPColorMap2>(mPlot->yAxis, mPlot->xAxis).get();
   std::vector<double> keys, values, z;
   for (int k = 0; k < 8; ++k)
     keys.push_back(k);
@@ -989,7 +989,7 @@ void TestColorMap::colourMap2ExportWaitsForNoJobOfItsSize()
   mPlot->xAxis->setRange(0, 7);
   mPlot->yAxis->setRange(0, 1);
 
-  auto* map = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* map = mPlot->add<QCPColorMap2>().get();
   map->pipeline().setScheduler(nullptr); // jobs run at once; only their delivery waits
   std::vector<double> keys, values, z;
   for (int k = 0; k < 8; ++k)
@@ -1025,7 +1025,7 @@ void TestColorMap::colourMap2KeepsTheExportsImageOverAnOlderJob()
   mPlot->resize(200, 200);
   mPlot->xAxis->setRange(0, 7);
   mPlot->yAxis->setRange(0, 1);
-  auto* map = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* map = mPlot->add<QCPColorMap2>().get();
   map->pipeline().setScheduler(nullptr); // jobs run at once; only their delivery waits
   std::vector<double> keys, values = { 0.0, 1.0 }, z(16, 0.0);
   for (int k = 0; k < 8; ++k)
@@ -1058,7 +1058,7 @@ void TestColorMap::histogram2dHonoursAVerticalKeyAxis()
   mPlot->axisRect()->setAutoMargins(QCP::msNone);
   mPlot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
 
-  auto* hist = new QCPHistogram2D(mPlot->yAxis, mPlot->xAxis);
+  auto* hist = mPlot->axisRect()->add<QCPHistogram2D>(mPlot->yAxis, mPlot->xAxis).get();
   hist->setBins(4, 2);
   std::vector<double> keys, values;
   for (int k = 0; k < 4; ++k)
@@ -1091,7 +1091,7 @@ void TestColorMap::histogram2dHonoursAVerticalKeyAxis()
 void TestColorMap::contourLabelsFollowAVerticalKeyAxis()
 {
   QVERIFY(mPlot->removePlottable(mColorMap));
-  auto* hist = new QCPHistogram2D(mPlot->yAxis, mPlot->xAxis);
+  auto* hist = mPlot->axisRect()->add<QCPHistogram2D>(mPlot->yAxis, mPlot->xAxis).get();
   hist->setBins(3, 2);
   const double keyOfColumn[3] = { 1.0, 11.0, 21.0 };
   const int samplesOfColumn[3] = { 1, 3, 3 };
@@ -1144,7 +1144,7 @@ void TestColorMap::contourLabelsFollowAVerticalKeyAxis()
 void TestColorMap::colourMap2JoinsItsNewPlotsScaleWhenAdded()
 {
   QVERIFY(mPlot->removePlottable(mColorMap)); // the fixture's map shares the rect's scale
-  auto* map = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* map = mPlot->add<QCPColorMap2>().get();
   const auto oldScale = mPlot->axisRect()->colorScale();
   QVERIFY(oldScale);
   QVERIFY(qcp::pointers(oldScale->users()).contains(map));
@@ -1168,7 +1168,7 @@ void TestColorMap::QCPColorScale_gradientSlotDeletingTheScaleIsSafe()
 {
   auto* scale = new QCPColorScale(mPlot);
   scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
-  auto* map = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* map = mPlot->add<QCPColorMap2>().get();
   map->setColorScale(scale);
   const QPointer<QCPColorScale> alive(scale);
   QCPColorGradient seen = map->gradient();
@@ -1208,12 +1208,12 @@ void forgetsADeletedColorScale(QCustomPlot* plot, Map* map)
 
 void TestColorMap::QCPColorMap2_forgetsADeletedColorScale()
 {
-  forgetsADeletedColorScale(mPlot, new QCPColorMap2(mPlot->xAxis, mPlot->yAxis));
+  forgetsADeletedColorScale(mPlot, mPlot->add<QCPColorMap2>().get());
 }
 
 void TestColorMap::QCPHistogram2D_forgetsADeletedColorScale()
 {
-  forgetsADeletedColorScale(mPlot, new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis));
+  forgetsADeletedColorScale(mPlot, mPlot->add<QCPHistogram2D>().get());
 }
 
 void TestColorMap::QCPColorMap_forgetsADeletedColorScale()
@@ -1239,18 +1239,18 @@ void TestColorMap::QCPColorScale_rescaleSeesEveryUser()
     auto* scale = new QCPColorScale(mPlot);
     mPlot->plotLayout()->addElement(0, 1, scale);
 
-    auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+    auto* map = mPlot->add<QCPColorMap>().get();
     map->setColorScale(scale);
     map->data()->setSize(1, 1);
     map->data()->setCell(0, 0, 1.0);
     map->data()->recalculateDataBounds();
 
-    auto* map2 = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* map2 = mPlot->add<QCPColorMap2>().get();
     map2->setColorScale(scale);
     map2->setData(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 },
                   std::vector<double>(4, 5.0));
 
-    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    auto* hist = mPlot->add<QCPHistogram2D>().get();
     hist->setColorScale(scale);
     hist->setBins(1, 1);
     hist->setData(std::vector<double>(9, 0.5), std::vector<double>(9, 0.5));
@@ -1269,8 +1269,8 @@ void TestColorMap::QCPColorScale_rescaleSeesEveryUser()
 void TestColorMap::QCPColorScale_aSetterOnOneUserReachesTheOthers()
 {
     auto* scale = new QCPColorScale(mPlot);
-    auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
-    auto* map2 = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* map = mPlot->add<QCPColorMap>().get();
+    auto* map2 = mPlot->add<QCPColorMap2>().get();
     map->setColorScale(scale);
     map2->setColorScale(scale);
 
@@ -1307,9 +1307,9 @@ void TestColorMap::QCPColorScale_attachingTakesTheScaleValues()
 void TestColorMap::QCPColorScale_deletingTheScaleIsNoticed()
 {
     auto* scale = new QCPColorScale(mPlot);
-    auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
-    auto* map2 = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
-    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    auto* map = mPlot->add<QCPColorMap>().get();
+    auto* map2 = mPlot->add<QCPColorMap2>().get();
+    auto* hist = mPlot->add<QCPHistogram2D>().get();
     map->setColorScale(scale);
     map2->setColorScale(scale);
     hist->setColorScale(scale);
@@ -1338,8 +1338,8 @@ void TestColorMap::QCPColorScale_deletingTheScaleIsNoticed()
 void TestColorMap::QCPColorScale_deletingAUserLeavesTheScaleList()
 {
     auto* scale = new QCPColorScale(mPlot);
-    auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
-    auto* map2 = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* map = mPlot->add<QCPColorMap>().get();
+    auto* map2 = mPlot->add<QCPColorMap2>().get();
     map->setColorScale(scale);
     map2->setColorScale(scale);
     QCOMPARE(scale->users().size(), 2);
@@ -1372,7 +1372,7 @@ void TestColorMap::QCPColorMap2_contourLabelsShowOnTheGpuFrame()
   for (int ki = 0; ki < n; ++ki)
     for (int vi = 0; vi < n; ++vi)
       z[ki * n + vi] = x[ki];
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   cm->setData(x, y, z);
   cm->setContourLevels({1.0, 2.0, 3.0});
   cm->setContourPen(QPen(Qt::red, 1));
@@ -1411,7 +1411,7 @@ QCPColorMap2* contouredGpuMap(QCustomPlot* plot)
   for (int ki = 0; ki < n; ++ki)
     for (int vi = 0; vi < n; ++vi)
       z[ki * n + vi] = x[ki];
-  auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis);
+  auto* cm = plot->add<QCPColorMap2>().get();
   cm->setData(x, y, z);
   // A grayscale image and a red pen: red pixels are the contour lines, nothing else.
   cm->setGradient(QCPColorGradient::gpGrayscale);
@@ -1475,7 +1475,7 @@ void TestColorMap::QCPColorMap2_contourLabelsDrawSpacedInsideThePlot()
   for (int ki = 0; ki < n; ++ki)
     for (int vi = 0; vi < n; ++vi)
       z[ki * n + vi] = x[ki]; // z = x -> vertical contours
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   cm->setData(x, y, z);
   settleColorMap(mPlot, cm);
   cm->setContourLevels({1.0, 2.0, 3.0});
@@ -1515,7 +1515,7 @@ void TestColorMap::QCPColorMap2_contourLabelsDrawSpacedInsideThePlot()
 // Called through the base, as generic code does.
 void TestColorMap::QCPColorMap2_rescaleKeepsItsViewMeaning()
 {
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   std::vector<double> manyX(4000), twoY = {0, 1}, ramp(4000 * 2);
   for (int i = 0; i < 4000; ++i)
   {
@@ -1538,7 +1538,7 @@ void TestColorMap::QCPColorMap2_rescaleKeepsItsViewMeaning()
 // A maximum lowered after the bounds were cached is only seen when the call asks to recalculate.
 void TestColorMap::QCPColorMap_rescaleThroughTheBaseRecalculates()
 {
-  auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+  auto* map = mPlot->add<QCPColorMap>().get();
   map->data()->setSize(2, 2);
   map->data()->setRange(QCPRange(0, 1), QCPRange(0, 1));
   map->data()->setCell(0, 0, 1);
@@ -1596,7 +1596,7 @@ void TestColorMap::verticalKeyAxisMapMatchesTheExport()
   if (!QTest::qWaitForWindowExposed(mPlot) || (QCoreApplication::processEvents(), !mPlot->rhi()))
     QSKIP("no QRhi available in this environment");
 
-  auto* map = new QCPColorMap(mPlot->yAxis, mPlot->xAxis);
+  auto* map = mPlot->axisRect()->add<QCPColorMap>(mPlot->yAxis, mPlot->xAxis).get();
   map->data()->setSize(40, 30);
   map->data()->setRange(QCPRange(0, 10), QCPRange(0, 12));
   for (int k = 0; k < 40; ++k)
@@ -1726,7 +1726,7 @@ void TestColorMap::exportMatchesTheOldCode()
   mPlot->xAxis->setVisible(false);
   mPlot->yAxis->setVisible(false);
 
-  auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+  auto* map = mPlot->add<QCPColorMap>().get();
   map->data()->setSize(399, 399);
   map->data()->setRange(QCPRange(0, 10), QCPRange(0, 10));
   for (int k = 0; k < 399; ++k)
@@ -1776,7 +1776,7 @@ void TestColorMap::theHotCellLandsInItsCornerOnEveryAxisLayout()
     QCPAxis* valueAxis = layout.keyIsVertical ? mPlot->xAxis : mPlot->yAxis;
     keyAxis->setRangeReversed(layout.keyReversed);
     valueAxis->setRangeReversed(layout.valueReversed);
-    auto* map = new QCPColorMap(keyAxis, valueAxis);
+    auto* map = keyAxis->axisRect()->add<QCPColorMap>(keyAxis, valueAxis).get();
     map->data()->setSize(2, 2);
     map->data()->setRange(QCPRange(0, 1), QCPRange(0, 1));
     map->data()->setCell(1, 0, 1.0);
@@ -1808,7 +1808,7 @@ void TestColorMap::colourMap2IsOneImageCommand()
   mPlot->resize(400, 300);
   mPlot->xAxis->setRange(0, 4);
   mPlot->yAxis->setRange(0, 4);
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   std::vector<double> x = { 0, 1, 2, 3, 4 };
   std::vector<double> y = { 0, 1, 2, 3, 4 };
   std::vector<double> z(25);
@@ -1844,7 +1844,7 @@ void TestColorMap::aPanDoesNotRecolour()
   mPlot->xAxis->setRange(0, 4);
   mPlot->yAxis->setRange(0, 4);
 
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   std::vector<double> x(50), y(50);
   std::vector<double> z(2500);
   for (int i = 0; i < 50; ++i)
@@ -1869,7 +1869,7 @@ void TestColorMap::aPanDoesNotRecolour()
   QCOMPARE(cm->mCore.recordingCount(), recordings);
   QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
 
-  auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+  auto* hist = mPlot->add<QCPHistogram2D>().get();
   std::vector<double> keys(5000), values(5000);
   for (int i = 0; i < 5000; ++i)
   {
@@ -1902,7 +1902,7 @@ void TestColorMap::contoursAreDataPolylines()
   mPlot->resize(400, 300);
   mPlot->xAxis->setRange(0, 4);
   mPlot->yAxis->setRange(0, 4);
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   std::vector<double> x = { 0, 1, 2, 3, 4 };
   std::vector<double> y = { 0, 1, 2, 3, 4 };
   std::vector<double> z(25);
@@ -1954,7 +1954,7 @@ void TestColorMap::contoursDrawOverTheImageOnTheGpu()
   mPlot->xAxis->setRange(0, 4);
   mPlot->yAxis->setRange(0, 4);
 
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   std::vector<double> x(41), y(41);
   std::vector<double> z(41 * 41);
   for (int i = 0; i < 41; ++i)
@@ -1983,7 +1983,7 @@ void TestColorMap::histogram2DExportBeforeTheFirstBinHasTheImage()
   mPlot->resize(400, 300);
   mPlot->xAxis->setRange(0, 100);
   mPlot->yAxis->setRange(0, 100);
-  auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+  auto* hist = mPlot->add<QCPHistogram2D>().get();
   std::vector<double> keys(2000), values(2000);
   for (int i = 0; i < 2000; ++i)
   {
@@ -2012,7 +2012,7 @@ void TestColorMap::noColourMapLayerIsCreated()
   mPlot->resize(400, 300);
   mPlot->xAxis->setRange(0, 4);
   mPlot->yAxis->setRange(0, 4);
-  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  auto* cm = mPlot->add<QCPColorMap2>().get();
   std::vector<double> x = { 0, 1, 2, 3, 4 };
   std::vector<double> y = { 0, 1, 2, 3, 4 };
   std::vector<double> z(25, 1.0);

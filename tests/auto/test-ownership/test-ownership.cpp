@@ -43,7 +43,7 @@ QCPGraph* TestOwnership::addRedGraph()
     mPlot->legend->setVisible(false); // its icon would be red too
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     graph->setPen(QPen(Qt::red, 6));
     graph->setData(QVector<double> { 1, 9 }, QVector<double> { 5, 5 });
     return graph;
@@ -73,7 +73,7 @@ void TestOwnership::showAndExpose()
 void TestOwnership::deletePlottableLeavesLists()
 {
     QCPGraph* graph = mPlot->addGraph();
-    new QCPCurve(mPlot->xAxis, mPlot->yAxis);
+    mPlot->add<QCPCurve>().get();
     QCOMPARE(mPlot->plottableCount(), 2);
     QCOMPARE(mPlot->legend->itemCount(), 2);
 
@@ -88,7 +88,7 @@ void TestOwnership::deletePlottableLeavesLists()
 void TestOwnership::deleteLaterPlottable()
 {
     QCPGraph* graph = mPlot->addGraph();
-    new QCPCurve(mPlot->xAxis, mPlot->yAxis);
+    mPlot->add<QCPCurve>().get();
 
     graph->deleteLater();
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
@@ -125,9 +125,9 @@ protected:
 void TestOwnership::deletingAPlottableFromAnotherDrawKeepsTheDeferredPainterSafe()
 {
     mPlot->legend->setVisible(false);
-    auto* doomed = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+    auto* doomed = mPlot->add<QCPBars>().get();
     doomed->setData({ 1.0, 2.0, 3.0 }, { 1.0, 2.0, 1.5 });
-    auto* deleter = new DeletingBars(mPlot->xAxis, mPlot->yAxis);
+    auto* deleter = mPlot->add<DeletingBars>().get();
     deleter->victim = doomed;
     deleter->setData({ 4.0, 5.0 }, { 1.0, 2.0 });
     mPlot->rescaleAxes();
@@ -138,7 +138,7 @@ void TestOwnership::deletingAPlottableFromAnotherDrawKeepsTheDeferredPainterSafe
 
 void TestOwnership::deleteMultiGraphLeavesItsRow()
 {
-    auto* multiGraph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* multiGraph = mPlot->add<QCPGraph>().get();
     QVERIFY(qobject_cast<QCPGroupLegendItem*>(mPlot->legend->item(0)));
 
     delete multiGraph;
@@ -162,7 +162,7 @@ Row* findRow(QCPLegend* legend)
 QCPIntervals* intervalsInLegend(QCustomPlot* plot, QCPLaneLayout* layout)
 {
     layout->laneIndices({ "A" });
-    auto* intervals = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    auto* intervals = plot->add<QCPIntervals>(layout).get();
     (void)intervals->addToLegend(plot->legend);
     return intervals;
 }
@@ -170,7 +170,7 @@ QCPIntervals* intervalsInLegend(QCustomPlot* plot, QCPLaneLayout* layout)
 
 void TestOwnership::deleteMultiGraphLeavesSecondLegend()
 {
-    auto* multiGraph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* multiGraph = mPlot->add<QCPGraph>().get();
     auto* second = addSecondLegend();
     QVERIFY(second->addItem(findRow<QCPGroupLegendItem>(mPlot->legend)));
     second->setVisible(true);
@@ -202,7 +202,7 @@ void TestOwnership::deleteIntervalsLeavesItsRows()
 void TestOwnership::detachedRowsOutliveTheirPlottables()
 {
     QCPLaneLayout layout;
-    auto* multiGraph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* multiGraph = mPlot->add<QCPGraph>().get();
     auto* intervals = intervalsInLegend(mPlot, &layout);
     auto* groupRow = findRow<QCPGroupLegendItem>(mPlot->legend);
     auto* intervalsRow = findRow<QCPIntervalsLegendItem>(mPlot->legend);
@@ -257,23 +257,22 @@ void TestOwnership::removePlottableStillDeletes()
     QVERIFY(!mPlot->removePlottable(graph.data()));
 }
 
-void TestOwnership::nullAxisPlottableIsDetachedHalfAxedIsRefused()
+void TestOwnership::aPlottableBuiltWithoutAxesIsDetached()
 {
-    auto* orphan = new QCPCurve(nullptr, nullptr);
-    QCOMPARE(gMisuses, 0);
-    QVERIFY(orphan->parentPlot() == nullptr);
-
-    auto* halfAxed = new QCPCurve(mPlot->xAxis, nullptr);
-    QCOMPARE(gMisuses, 1);
-    QVERIFY(halfAxed->parentPlot() == nullptr);
-
-    auto* graph = new QCPGraph(nullptr, nullptr);
-    auto* histogram = new QCPHistogram2D(nullptr, nullptr);
-    QCOMPARE(gMisuses, 1);
-
+    // A plottable is built without axes and belongs to nobody until a plot adopts it: the half-axed
+    // constructor this slot used to pin is gone with the axes arguments.
+    auto* orphan = new QCPCurve();
+    auto* graph = new QCPGraph();
+    auto* histogram = new QCPHistogram2D();
     QCPLaneLayout lanes;
-    auto* intervals = new QCPIntervals(nullptr, nullptr, &lanes);
-    QCOMPARE(gMisuses, 1);
+    auto* intervals = new QCPIntervals(&lanes);
+    QCOMPARE(gMisuses, 0);
+    for (QCPPlottable* plottable :
+         std::initializer_list<QCPPlottable*> { orphan, graph, histogram, intervals })
+    {
+        QVERIFY(plottable->parentPlot() == nullptr);
+        QVERIFY(!plottable->isRegistered());
+    }
     QVERIFY(intervals->labelLayer() == nullptr);
 
     QCOMPARE(mPlot->plottableCount(), 0);
@@ -281,7 +280,6 @@ void TestOwnership::nullAxisPlottableIsDetachedHalfAxedIsRefused()
     QCOMPARE(mPlot->legend->itemCount(), 0);
     draw();
     delete orphan;
-    delete halfAxed;
     delete graph;
     delete histogram;
     delete intervals;
@@ -496,7 +494,8 @@ void TestOwnership::plottablesOfAnotherRectAfterAxisRemoval()
     mPlot->setSelectionRectMode(QCP::srmSelect);
     auto* second = new QCPAxisRect(mPlot);
     mPlot->plotLayout()->addElement(1, 0, second);
-    auto* graph = new QCPGraph(second->axis(QCPAxis::atBottom), second->axis(QCPAxis::atLeft));
+    auto* graph = second->axis(QCPAxis::atBottom)->axisRect()->add<QCPGraph>(
+            second->axis(QCPAxis::atBottom), second->axis(QCPAxis::atLeft)).get();
     graph->setData(QVector<double> { 1, 9 }, QVector<double> { 5, 5 });
     auto line = mPlot->add<QCPItemLine>();
     line->start->setAxes(second->axis(QCPAxis::atBottom), second->axis(QCPAxis::atLeft));
@@ -697,7 +696,7 @@ void TestOwnership::deleteTracedGraph()
 
 void TestOwnership::deleteColorScaleOfMap()
 {
-    auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+    auto* map = mPlot->add<QCPColorMap>().get();
     map->data()->setSize(4, 4);
     map->data()->setRange(QCPRange(0, 10), QCPRange(0, 10));
     for (int x = 0; x < 4; ++x)
@@ -721,7 +720,7 @@ void TestOwnership::deleteColorScaleOfMap()
 void TestOwnership::deleteBarsInGroup()
 {
     const auto barsIn = [this](QCPBarsGroup* group) {
-        auto* bars = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+        auto* bars = mPlot->add<QCPBars>().get();
         bars->setData(QVector<double> { 1, 2 }, QVector<double> { 3, 4 });
         bars->setBarsGroup(group);
         return bars;
@@ -756,8 +755,8 @@ void TestOwnership::polarRemoveGraphUnlistsFirst()
     auto* area = new QCPPolarArea(mPlot);
     mPlot->plotLayout()->addElement(0, 0, area);
     QCPPolarAxisAngular* angular = area->angularAxis();
-    auto* first = new QCPPolarGraph(angular, area->radialAxis());
-    auto* second = new QCPPolarGraph(angular, area->radialAxis());
+    auto* first = area->add<QCPPolarGraph>().get();
+    auto* second = area->add<QCPPolarGraph>().get();
     first->setData(QVector<double> { 0, 90 }, QVector<double> { 1, 2 });
     second->setData(QVector<double> { 0, 90 }, QVector<double> { 2, 1 });
     const QPointer<QCPPolarGraph> firstAlive(first), secondAlive(second);
@@ -847,7 +846,7 @@ void TestOwnership::intervalsWithoutLaneLayout()
     mPlot->xAxis->setRange(0, 100);
     mPlot->setInteractions(QCP::iSelectPlottables | QCP::iMultiSelect);
 
-    auto* unlaid = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, nullptr);
+    auto* unlaid = mPlot->add<QCPIntervals>(nullptr).get();
     QVERIFY(unlaid->laneLayout() == nullptr);
     QCOMPARE(gMisuses, 1);
     exerciseIntervals(unlaid, mPlot);
@@ -857,7 +856,7 @@ void TestOwnership::intervalsWithoutLaneLayout()
     gMisuses = 0;
     auto* layout = new QCPLaneLayout;
     layout->laneIndices({ "A", "B" });
-    auto* orphaned = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, layout);
+    auto* orphaned = mPlot->add<QCPIntervals>(layout).get();
     orphaned->setData(twoIntervals());
     orphaned->setEditable(true);
     mPlot->replot();
@@ -875,8 +874,9 @@ void TestOwnership::intervalsWithoutLaneLayout()
     QCOMPARE(gMisuses, 1);
 
     gMisuses = 0;
-    auto* inert = new OpenIntervals(nullptr, nullptr, nullptr);
-    QVERIFY(gMisuses >= 1); // the null axis, and the missing layout
+    auto* inert = new OpenIntervals();
+    exerciseIntervals(inert, mPlot);
+    QVERIFY(gMisuses >= 1); // the missing layout, on every path that needs it
     inert->requestRepaint();
     delete inert;
 }
@@ -886,7 +886,7 @@ void TestOwnership::deletePolarGraphInLegend()
     auto* area = new QCPPolarArea(mPlot);
     mPlot->plotLayout()->addElement(0, 1, area);
     const int rows = mPlot->legend->itemCount();
-    auto* graph = new QCPPolarGraph(area->angularAxis(), area->radialAxis());
+    auto* graph = area->add<QCPPolarGraph>().get();
     graph->setName("polar");
     graph->setData(QVector<double> { 0, 90 }, QVector<double> { 1, 2 });
     QCOMPARE(mPlot->legend->itemCount(), rows + 1);
@@ -902,7 +902,7 @@ void TestOwnership::intervalsWithoutAxes()
 {
     QCPLaneLayout layout;
     layout.laneIndices({ "A", "B" });
-    auto* inert = new QCPIntervals(nullptr, nullptr, &layout);
+    auto* inert = new QCPIntervals(&layout);
     QCOMPARE(gMisuses, 0);
     exerciseIntervals(inert, mPlot);
     QCOMPARE(gMisuses, 0);
@@ -911,7 +911,7 @@ void TestOwnership::intervalsWithoutAxes()
     gMisuses = 0;
     mPlot->xAxis->setRange(0, 100);
     mPlot->setInteractions(QCP::iSelectPlottables | QCP::iMultiSelect);
-    auto* bereft = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* bereft = mPlot->add<QCPIntervals>(&layout).get();
     bereft->setData(twoIntervals());
     bereft->setEditable(true);
     mPlot->replot();
@@ -938,9 +938,9 @@ void TestOwnership::deletePolarAreaWithGraphs()
     QCPPolarAxisAngular* angular = area->angularAxis();
     mPlot->plotLayout()->addElement(0, 1, area);
     mPlot->plotLayout()->addElement(0, 2, other);
-    auto* survivor = new QCPPolarGraph(angular, area->radialAxis());
+    auto* survivor = area->add<QCPPolarGraph>().get();
     survivor->setData(QVector<double> { 0, 90 }, QVector<double> { 1, 2 });
-    auto* moved = new QCPPolarGraph(angular, area->radialAxis());
+    auto* moved = area->add<QCPPolarGraph>().get();
     moved->setSystem(other->system(other->angularAxis(), other->radialAxis()));
     delete moved;
     area->rescale(); // walks its graph list: the moved graph left it
@@ -956,7 +956,7 @@ void TestOwnership::deletePolarAreaWithGraphs()
     auto* plot = new QCustomPlot;
     auto* held = new QCPPolarArea(plot);
     plot->plotLayout()->addElement(0, 1, held);
-    new QCPPolarGraph(held->angularAxis(), held->radialAxis());
+    held->add<QCPPolarGraph>().get();
     delete plot;
 }
 
@@ -967,7 +967,7 @@ void TestOwnership::movePolarGraphKeepsOneLegendRow()
     QCPPolarAxisAngular* angular = area->angularAxis();
     mPlot->plotLayout()->addElement(0, 1, area);
     mPlot->plotLayout()->addElement(0, 2, other);
-    auto* graph = new QCPPolarGraph(angular, area->radialAxis());
+    auto* graph = area->add<QCPPolarGraph>().get();
     const int rows = mPlot->legend->itemCount();
 
     graph->setSystem(other->system(other->angularAxis(), other->radialAxis()));
@@ -1000,7 +1000,7 @@ void TestOwnership::destroyedSlotConstructsDuringTeardown()
     auto* plot = new QCustomPlot;
     QCPGraph* graph = plot->addGraph();
     connect(graph, &QObject::destroyed, [plot] {
-        new QCPCurve(plot->xAxis, plot->yAxis);
+        plot->add<QCPCurve>().get();
         plot->add<QCPItemText>();
     });
 

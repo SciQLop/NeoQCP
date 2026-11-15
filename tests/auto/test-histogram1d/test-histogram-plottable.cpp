@@ -143,7 +143,7 @@ void TestHistogramPlottable::cleanup() { delete mPlot; mPlot = nullptr; }
 
 void TestHistogramPlottable::binsInTheBackground()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(4);
     h->setDataSource(values({0, 1, 2, 3, 4}));
     QVERIFY(waitForResult(h));
@@ -154,7 +154,7 @@ void TestHistogramPlottable::binsInTheBackground()
 // The bins follow the key axis scale: no histogram-specific scale setting.
 void TestHistogramPlottable::binsFollowALogKeyAxis()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(3);
     mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
     h->setDataSource(values({1, 10, 100, 1000}));
@@ -168,7 +168,7 @@ void TestHistogramPlottable::binsFollowALogKeyAxis()
 }
 void TestHistogramPlottable::preBinnedNeedsNoPipeline()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1, 2}, {{3, 5}});
     QVERIFY(h->histogram());
     bool found = false;
@@ -178,14 +178,14 @@ void TestHistogramPlottable::preBinnedNeedsNoPipeline()
 
 void TestHistogramPlottable::preBinnedWithBadEdgesIsIgnored()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1}, {{3, 5}});
     QVERIFY(!h->histogram());
 }
 
 void TestHistogramPlottable::autoEdgesStayWhenNewDataFitsInside()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setDataSource(values({0, 10}));
     QVERIFY(waitForResult(h));
     const auto first = h->histogram()->edges;
@@ -196,7 +196,7 @@ void TestHistogramPlottable::autoEdgesStayWhenNewDataFitsInside()
 
 void TestHistogramPlottable::autoEdgesWidenForDataOutside()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setDataSource(values({0, 10}));
     QVERIFY(waitForResult(h));
     h->setDataSource(values({-5, 8}));
@@ -207,7 +207,7 @@ void TestHistogramPlottable::autoEdgesWidenForDataOutside()
 
 void TestHistogramPlottable::emptyDataAfterDataHasNoRangeAndNoCrash()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setDataSource(values({0, 10}));
     QVERIFY(waitForResult(h));
     QSignalSpy ready(h, &QCPHistogram::histogramReady);
@@ -226,7 +226,7 @@ void TestHistogramPlottable::emptyDataAfterDataHasNoRangeAndNoCrash()
 
 void TestHistogramPlottable::exportBinsSynchronously()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setDataSource(values({0, 1, 2, 3}));
     const QImage img = mPlot->toPixmap(400, 300).toImage();
     QVERIFY(h->histogram()); // drawn without waiting for the pipeline
@@ -235,7 +235,7 @@ void TestHistogramPlottable::exportBinsSynchronously()
 
 void TestHistogramPlottable::logValueAxisRangeSkipsZeroHeights()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1, 2, 3}, {{0, 4, 16}});
     bool found = false;
     const QCPRange r = h->getValueRange(found, QCP::sdPositive);
@@ -245,7 +245,7 @@ void TestHistogramPlottable::logValueAxisRangeSkipsZeroHeights()
 
 void TestHistogramPlottable::allZeroHeightsHaveNoValueRange()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1, 2}, {{0, 0}});
     bool found = true;
     h->getValueRange(found);
@@ -255,7 +255,7 @@ void TestHistogramPlottable::allZeroHeightsHaveNoValueRange()
 void TestHistogramPlottable::nonPositiveFixedRangeIsRejectedOnLogBins()
 {
     mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     QTest::ignoreMessage(QtWarningMsg, QRegularExpression("log"));
     h->setFixedRange(QCPRange(0, 10));
     h->setDataSource(values({1, 100}));
@@ -265,7 +265,7 @@ void TestHistogramPlottable::nonPositiveFixedRangeIsRejectedOnLogBins()
 
 void TestHistogramPlottable::nonPositiveFixedRangeFallsBackToAutoWhenTheAxisTurnsLog()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setFixedRange(QCPRange(-1, 100));
     h->setDataSource(values({1, 100}));
     QVERIFY(waitForResult(h));
@@ -280,7 +280,7 @@ void TestHistogramPlottable::nonPositiveFixedRangeFallsBackToAutoWhenTheAxisTurn
 // The constructor's scaleTypeChanged link is to the first axis only: draw() notices the rest.
 void TestHistogramPlottable::rebinsForTheScaleOfANewKeyAxis()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(3);
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
@@ -301,7 +301,7 @@ void TestHistogramPlottable::rebinsForTheScaleOfANewKeyAxis()
 // Nothing may emit during a paint: the re-bin draw() asks for runs from the event loop.
 void TestHistogramPlottable::rebinForANewScaleEmitsNothingDuringPaint()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(3);
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
@@ -317,7 +317,7 @@ void TestHistogramPlottable::rebinForANewScaleEmitsNothingDuringPaint()
 // No draw is asked for: only the axis signal can notice the new scale.
 void TestHistogramPlottable::rebinsForANewKeyAxisScaleWithoutADraw()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(3);
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
@@ -330,7 +330,7 @@ void TestHistogramPlottable::rebinsForANewKeyAxisScaleWithoutADraw()
 
 void TestHistogramPlottable::theAxisItLeftIsNoLongerListenedTo()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(3);
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
@@ -347,7 +347,7 @@ void TestHistogramPlottable::theAxisItLeftIsNoLongerListenedTo()
 // runs is exportWhileBinningShowsTheNewData, and the late job only re-applies the same bars.
 void TestHistogramPlottable::exportRightAfterAScaleChangeBinsForTheNewScale()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(3);
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
@@ -364,7 +364,7 @@ void TestHistogramPlottable::exportRightAfterAScaleChangeBinsForTheNewScale()
 // auto edges that are still right.
 void TestHistogramPlottable::queuedResetIsDroppedWhenTheScaleIsFreshAgain()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(3);
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
@@ -384,7 +384,7 @@ void TestHistogramPlottable::queuedResetIsDroppedWhenTheScaleIsFreshAgain()
 // edges, which reinstalls the transform for the new scale. Its own linear bars must not stay.
 void TestHistogramPlottable::resultOfTheOldScaleIsNotShownUnderTheNewOne()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(3);
     auto gate = std::make_shared<Gate>();
     h->setDataSource(gated({1, 10, 100, 1000}, gate));
@@ -402,7 +402,7 @@ void TestHistogramPlottable::resultOfTheOldScaleIsNotShownUnderTheNewOne()
 // before it, so under a steady replot stream the new bars would never land.
 void TestHistogramPlottable::staleScaleIsResetOnceUnderAReplotStream()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(3);
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
@@ -427,7 +427,7 @@ void TestHistogramPlottable::staleScaleIsResetOnceUnderAReplotStream()
 
 void TestHistogramPlottable::autoEdgesNeverShrinkWhileJobsOverlap()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setDataSource(values({0, 10}));
     QVERIFY(waitForResult(h));
     EdgeLog log(h);
@@ -450,7 +450,7 @@ void TestHistogramPlottable::autoEdgesNeverShrinkWhileJobsOverlap()
 // The last result is narrower than the edges and re-bins from finished(): that job must land.
 void TestHistogramPlottable::rebinningAfterOverlappingJobsShowsTheLastSource()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     auto gate = std::make_shared<Gate>();
     h->setDataSource(gated({0, 10}, gate));
     QVERIFY(gate->waitEntered());
@@ -464,7 +464,7 @@ void TestHistogramPlottable::rebinningAfterOverlappingJobsShowsTheLastSource()
 
 void TestHistogramPlottable::preBinnedBarsDropAnOlderSourcesResultAndRange()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setDataSource(values({-100, -90}));
     QVERIFY(waitForResult(h));
     auto gate = std::make_shared<Gate>();
@@ -483,7 +483,7 @@ void TestHistogramPlottable::preBinnedBarsDropAnOlderSourcesResultAndRange()
 
 void TestHistogramPlottable::resetEdgesDropsAResultBinnedBeforeTheReset()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setDataSource(values({-100, -90}));
     QVERIFY(waitForResult(h));
     auto gate = std::make_shared<Gate>();
@@ -501,7 +501,7 @@ void TestHistogramPlottable::resetEdgesDropsAResultBinnedBeforeTheReset()
 
 void TestHistogramPlottable::clearingTheSourceClearsTheBars()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setDataSource(values({0, 10}));
     QVERIFY(waitForResult(h));
     QSignalSpy ready(h, &QCPHistogram::histogramReady);
@@ -512,7 +512,7 @@ void TestHistogramPlottable::clearingTheSourceClearsTheBars()
 
 void TestHistogramPlottable::clearingTheSourceDropsAnInFlightResult()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     auto gate = std::make_shared<Gate>();
     h->setDataSource(gated({0, 10}, gate));
     QVERIFY(gate->waitEntered());
@@ -524,7 +524,7 @@ void TestHistogramPlottable::clearingTheSourceDropsAnInFlightResult()
 
 void TestHistogramPlottable::exportBinningEmitsNothing()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     QSignalSpy ready(h, &QCPHistogram::histogramReady);
     h->setDataSource(values({0, 1, 2, 3}));
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
@@ -534,7 +534,7 @@ void TestHistogramPlottable::exportBinningEmitsNothing()
 
 void TestHistogramPlottable::exportWhileBinningShowsTheNewData()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(1);
     h->setFixedRange(QCPRange(0, 10));
     h->setDataSource(values({1, 2}));
@@ -548,7 +548,7 @@ void TestHistogramPlottable::exportWhileBinningShowsTheNewData()
 
 void TestHistogramPlottable::exportAfterAScreenFrameWhileBinningShowsTheNewBars()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(1);
     h->setFixedRange(QCPRange(0, 10));
     h->setColumnColors({ Qt::red });
@@ -573,7 +573,7 @@ static bool isRedish(QColor c) { return c.red() > 150 && c.green() < 120 && c.bl
 
 void TestHistogramPlottable::barsAreDrawnUpToTheirHeight()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setColumnColors({Qt::red});
     h->setBinned({0, 1, 2}, {{3, 6}});
     mPlot->xAxis->setRange(0, 2);
@@ -590,7 +590,7 @@ void TestHistogramPlottable::barsAreDrawnUpToTheirHeight()
 
 void TestHistogramPlottable::barsRecordFillAndOutline()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     h->setColumnColors({Qt::red});
     h->setBinned({0, 1, 2}, {{3, 6}});
     mPlot->xAxis->setRange(0, 2);
@@ -604,7 +604,7 @@ void TestHistogramPlottable::barsRecordFillAndOutline()
 
 void TestHistogramPlottable::barsRecordAtTheirAxisCoordinates()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     h->setBinned({0, 1, 2}, {{3, 6}});
     mPlot->xAxis->setRange(0, 2);
     mPlot->yAxis->setRange(0, 8);
@@ -619,7 +619,7 @@ void TestHistogramPlottable::barsRecordAtTheirAxisCoordinates()
 
 void TestHistogramPlottable::histogramColumnIsOneBatch()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     h->setBinned({0, 1, 2, 3}, {{3, 6, 2}});
     mPlot->xAxis->setRange(0, 3);
     mPlot->yAxis->setRange(0, 8);
@@ -632,7 +632,7 @@ void TestHistogramPlottable::histogramColumnIsOneBatch()
 
 void TestHistogramPlottable::aPanKeepsTheRecording()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     h->setBinned({0, 1, 2}, {{3, 6}});
     mPlot->xAxis->setRange(0, 2);
     mPlot->yAxis->setRange(0, 8);
@@ -646,7 +646,7 @@ void TestHistogramPlottable::aPanKeepsTheRecording()
 
 void TestHistogramPlottable::stepIsOnePolylinePerColumn()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     h->setColumnColors({Qt::red, Qt::blue});
     h->setStyle(QCPHistogram::sStep);
     h->setBinned({0, 1, 2}, {{3, 6}, {1, 2}});
@@ -659,7 +659,7 @@ void TestHistogramPlottable::stepIsOnePolylinePerColumn()
 
 void TestHistogramPlottable::stepRecordsOnlyAPolyline()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     h->setColumnColors({Qt::red});
     h->setStyle(QCPHistogram::sStep);
     h->setBinned({0, 1, 2}, {{3, 6}});
@@ -679,7 +679,7 @@ void TestHistogramPlottable::stepRecordsOnlyAPolyline()
 // at every inner edge (that would draw one box per bin).
 void TestHistogramPlottable::stepDropsToTheBaseOnlyAtRunEnds()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     h->setColumnColors({Qt::red});
     h->setStyle(QCPHistogram::sStep);
     h->setBinned({0, 1, 2, 3}, {{3, 6, 2}});
@@ -694,7 +694,7 @@ void TestHistogramPlottable::stepDropsToTheBaseOnlyAtRunEnds()
 
 void TestHistogramPlottable::logValueAxisDrawsOnlyPositiveHeights()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->yAxis->setRange(1, 10);
     h->setBinned({0, 1, 2, 3, 4, 5}, {{1, 0, -3, qQNaN(), 4}});
@@ -710,9 +710,9 @@ void TestHistogramPlottable::logValueAxisDrawsOnlyPositiveHeights()
 // that axis moves the bound, so the recording follows it instead of keeping a stale base.
 void TestHistogramPlottable::logValueAxisBaseFollowsTheAxisBottom()
 {
-    auto* bars = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* bars = mPlot->add<Probe>().get();
     bars->setBinned({0, 1, 2}, {{20, 50}});
-    auto* step = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* step = mPlot->add<Probe>().get();
     step->setStyle(QCPHistogram::sStep);
     step->setBinned({0, 1, 2}, {{20, 50}});
     mPlot->xAxis->setRange(0, 2);
@@ -729,7 +729,7 @@ void TestHistogramPlottable::logValueAxisBaseFollowsTheAxisBottom()
 
 void TestHistogramPlottable::stepBreaksAtAnAbsentBar()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     h->setStyle(QCPHistogram::sStep);
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->yAxis->setRange(1, 10);
@@ -741,7 +741,7 @@ void TestHistogramPlottable::stepBreaksAtAnAbsentBar()
 
 void TestHistogramPlottable::emptyBinsOnALogAxisHaveNoBoxes()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     h->setBinned({0, 1, 2, 3}, {{4, 0, 4}});
     mPlot->xAxis->setRange(0, 3);
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
@@ -754,7 +754,7 @@ void TestHistogramPlottable::emptyBinsOnALogAxisHaveNoBoxes()
 // Drawing ignores the selection state, so a click must not select something that looks the same.
 void TestHistogramPlottable::aHistogramIsNotSelectable()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1, 2}, {{3, 6}});
     mPlot->xAxis->setRange(0, 2);
     mPlot->yAxis->setRange(0, 8);
@@ -766,7 +766,7 @@ void TestHistogramPlottable::aHistogramIsNotSelectable()
 
 void TestHistogramPlottable::verticalKeyAxisGrowsBarsAlongX()
 {
-    auto* h = new QCPHistogram(mPlot->yAxis, mPlot->xAxis);
+    auto* h = mPlot->axisRect()->add<QCPHistogram>(mPlot->yAxis, mPlot->xAxis).get();
     h->setColumnColors({Qt::red});
     h->setBinned({0, 1, 2}, {{6, 2}});
     mPlot->yAxis->setRange(0, 2);
@@ -800,7 +800,7 @@ void TestHistogramPlottable::barsAreDrawnOnTheGpu()
 {
     if (!showWithRhi(mPlot))
         QSKIP("no QRhi available in this environment");
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setColumnColors({Qt::red});
     h->setBinned({0, 1, 2}, {{3, 6}});
     mPlot->xAxis->setRange(0, 2);
@@ -818,7 +818,7 @@ void TestHistogramPlottable::barsAreDrawnOnTheGpu()
 
 void TestHistogramPlottable::emptyBinOnALinearAxisKeepsTheStepLine()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     h->setStyle(QCPHistogram::sStep);
     h->setBinned({0, 1, 2, 3}, {{4, 0, 4}});
     mPlot->xAxis->setRange(0, 3);
@@ -837,7 +837,7 @@ bool isLightRed(QColor c) { return c.red() > 200 && c.green() > 150 && c.green()
 
 void TestHistogramPlottable::stepWithOneColumnIsTheOutlineOnly()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setColumnColors({Qt::red});
     h->setStyle(QCPHistogram::sStep);
     h->setBinned({0, 1, 2}, {{3, 6}});
@@ -849,7 +849,7 @@ void TestHistogramPlottable::stepWithOneColumnIsTheOutlineOnly()
 
 void TestHistogramPlottable::stepWithSeveralColumnsHasALightFill()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setColumnColors({Qt::red, Qt::blue});
     h->setStyle(QCPHistogram::sStep);
     h->setBinned({0, 1, 2}, {{3, 6}, {0, 0}});
@@ -861,7 +861,7 @@ void TestHistogramPlottable::stepWithSeveralColumnsHasALightFill()
 
 void TestHistogramPlottable::barsKeepATranslucentUserColour()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setColumnColors({QColor(255, 0, 0, 64)});
     h->setBinned({0, 1, 2}, {{3, 6}});
     mPlot->xAxis->setRange(0, 2);
@@ -886,7 +886,7 @@ void removeOn(QCustomPlot* plot, QCPHistogram* h, Signal signal)
 
 void TestHistogramPlottable::readySlotRemovingTheHistogramIsSafe()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     removeOn(mPlot, h, &QCPHistogram::histogramReady);
     h->setDataSource(values({0, 1, 2, 3, 4}));
     QTRY_COMPARE_WITH_TIMEOUT(mPlot->plottableCount(), 0, 5000);
@@ -895,7 +895,7 @@ void TestHistogramPlottable::readySlotRemovingTheHistogramIsSafe()
 
 void TestHistogramPlottable::preBinnedReadySlotRemovingTheHistogramIsSafe()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     removeOn(mPlot, h, &QCPHistogram::histogramReady);
     h->setBinned({0, 1, 2}, {{3, 5}});
     QCOMPARE(mPlot->plottableCount(), 0);
@@ -925,7 +925,7 @@ bool isDark(QColor c) { return c.red() < 100 && c.green() < 100 && c.blue() < 10
 void TestHistogramPlottable::logBinsHonourAFixedRangeStartingAtOne()
 {
     mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setFixedRange(QCPRange(1, 100));
     h->setDataSource(values({5, 50}));
     QVERIFY(waitForResult(h));
@@ -935,7 +935,7 @@ void TestHistogramPlottable::logBinsHonourAFixedRangeStartingAtOne()
 
 void TestHistogramPlottable::fixedRangeStartingAtZeroFallsBackWhenTheAxisTurnsLog()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setFixedRange(QCPRange(0, 100));
     h->setDataSource(values({1, 100}));
     QVERIFY(waitForResult(h));
@@ -949,7 +949,7 @@ void TestHistogramPlottable::fixedRangeStartingAtZeroFallsBackWhenTheAxisTurnsLo
 
 void TestHistogramPlottable::flatDataGetsAWidenedRange()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setDataSource(values({5, 5}));
     QVERIFY(waitForResult(h));
     QVERIFY(h->histogram()->edges.front() < 5.0);
@@ -958,21 +958,21 @@ void TestHistogramPlottable::flatDataGetsAWidenedRange()
 
 void TestHistogramPlottable::aSingleBinCanBePreBinned()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1}, {{3}});
     QVERIFY(h->histogram());
 }
 
 void TestHistogramPlottable::preBinnedCountsNothing()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1, 2}, {{3, 5}, {1, 2}});
     QCOMPARE(h->histogram()->counted, (std::vector<int>{0, 0}));
 }
 
 void TestHistogramPlottable::positiveValueRangeStartsAtTheSmallestHeight()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1, 2, 3}, {{0.5, 4, 16}});
     bool found = false;
     QCOMPARE(h->getValueRange(found, QCP::sdPositive).lower, 0.5);
@@ -982,7 +982,7 @@ void TestHistogramPlottable::positiveValueRangeStartsAtTheSmallestHeight()
 // Hidden, so no draw notices the scale: only the axis signal can trigger the re-bin.
 void TestHistogramPlottable::keyAxisScaleChangeRebinsWithoutADraw()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setVisible(false);
     h->setBins(3);
     h->setDataSource(values({1, 10, 100, 1000}));
@@ -998,7 +998,7 @@ void TestHistogramPlottable::keyAxisScaleChangeRebinsWithoutADraw()
 // from the old one.
 void TestHistogramPlottable::shownResultOfTheOtherScaleIsStaleEvenWhenTheTransformIsFresh()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(3);
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
@@ -1022,7 +1022,7 @@ void TestHistogramPlottable::shownResultOfTheOtherScaleIsStaleEvenWhenTheTransfo
 void TestHistogramPlottable::logAxisFromTheStartIsNotStale()
 {
     mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(3);
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
@@ -1041,7 +1041,7 @@ void TestHistogramPlottable::logAxisFromTheStartIsNotStale()
 
 void TestHistogramPlottable::normalizationIsAppliedToTheBars()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(2);
     h->setNormalization(QCP::HistogramNormalization::Probability);
     h->setDataSource(values({0, 1, 2, 3}));
@@ -1053,7 +1053,7 @@ void TestHistogramPlottable::normalizationIsAppliedToTheBars()
 // xAxis2 is log before each move, so both log re-bins go through draw(), not the scale signal.
 void TestHistogramPlottable::staleScaleIsResetAgainAfterAJobDelivered()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(3);
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
@@ -1077,7 +1077,7 @@ void TestHistogramPlottable::staleScaleIsResetAgainAfterAJobDelivered()
 // A job of the old scale lands on a hidden plot: nothing but its own check can ask for the new bars.
 void TestHistogramPlottable::resultOfTheOldScaleIsResetWithoutADraw()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setVisible(false);
     h->setKeyAxis(mPlot->xAxis2);
     h->setBins(3);
@@ -1095,7 +1095,7 @@ void TestHistogramPlottable::nonPositiveBinCountsAreIgnored()
     gRefusals = 0;
     const auto previous = qcp::setMisuseHandler(countRefusal);
     const auto restore = qScopeGuard([previous] { qcp::setMisuseHandler(previous); });
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(4);
     h->setBins(0);
     QCOMPARE(h->bins(), 4);
@@ -1106,7 +1106,7 @@ void TestHistogramPlottable::nonPositiveBinCountsAreIgnored()
 
 void TestHistogramPlottable::theSameBinCountDoesNotRebin()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(4);
     h->setDataSource(values({0, 1, 2, 3}));
     QVERIFY(waitForResult(h));
@@ -1130,21 +1130,21 @@ bool TestHistogramPlottable::repaintFollows(QCPHistogram* h, const std::function
 
 void TestHistogramPlottable::changingTheStyleRequestsARepaint()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1, 2}, {{3, 6}});
     QVERIFY(repaintFollows(h, [&] { h->setStyle(QCPHistogram::sStep); }));
 }
 
 void TestHistogramPlottable::changingTheColoursRequestsARepaint()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1, 2}, {{3, 6}});
     QVERIFY(repaintFollows(h, [&] { h->setColumnColors({Qt::red}); }));
 }
 
 void TestHistogramPlottable::newBarsRequestARepaint()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1, 2}, {{3, 6}});
     QVERIFY(repaintFollows(h, [&] { h->setBinned({0, 1, 2}, {{4, 5}}); }));
 }
@@ -1152,7 +1152,7 @@ void TestHistogramPlottable::newBarsRequestARepaint()
 // No source, so there is nothing to bin for the other scale: the export itself must not re-bin.
 void TestHistogramPlottable::exportOfPreBinnedBarsDoesNotRebin()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1, 2}, {{3, 6}});
     h->setKeyAxis(mPlot->xAxis2);
     mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
@@ -1166,7 +1166,7 @@ void TestHistogramPlottable::exportOfPreBinnedBarsDoesNotRebin()
 // The export paints a stale scale, which queues the one reset; a fresh transform would drop it.
 void TestHistogramPlottable::exportOfPreBinnedBarsOnAStaleScaleQueuesOneReset()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1, 2}, {{3, 6}});
     h->setKeyAxis(mPlot->xAxis2);
     setScaleTypeSilently(mPlot->xAxis2, QCPAxis::stLogarithmic);
@@ -1180,7 +1180,7 @@ void TestHistogramPlottable::exportOfPreBinnedBarsOnAStaleScaleQueuesOneReset()
 // The new axis is log before the move, so only the export can notice the scale.
 void TestHistogramPlottable::exportOfAStaleScaleForgetsTheAutoRange()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBins(3);
     h->setDataSource(values({1, 1000}));
     QVERIFY(waitForResult(h));
@@ -1199,7 +1199,7 @@ void TestHistogramPlottable::exportOfAStaleScaleForgetsTheAutoRange()
 
 void TestHistogramPlottable::emptyHistogramHasNoContent()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     QVERIFY(!h->canProduceContent());
     h->setBinned({0, 1, 2}, {{3, 5}});
     QVERIFY(h->canProduceContent());
@@ -1207,7 +1207,7 @@ void TestHistogramPlottable::emptyHistogramHasNoContent()
 
 void TestHistogramPlottable::withoutBarsThereIsNoKeyRange()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     bool found = true;
     h->getKeyRange(found);
     QVERIFY(!found);
@@ -1215,7 +1215,7 @@ void TestHistogramPlottable::withoutBarsThereIsNoKeyRange()
 
 void TestHistogramPlottable::noPositiveEdgeMeansNoPositiveKeyRange()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({-2, -1, 0}, {{1, 1}});
     bool found = true;
     h->getKeyRange(found, QCP::sdPositive);
@@ -1224,7 +1224,7 @@ void TestHistogramPlottable::noPositiveEdgeMeansNoPositiveKeyRange()
 
 void TestHistogramPlottable::positiveKeyRangeStartsAtTheFirstPositiveEdge()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({-1, 0, 0.5, 2}, {{1, 1, 1}});
     bool found = false;
     const QCPRange r = h->getKeyRange(found, QCP::sdPositive);
@@ -1235,7 +1235,7 @@ void TestHistogramPlottable::positiveKeyRangeStartsAtTheFirstPositiveEdge()
 
 void TestHistogramPlottable::keyRangeSpansTheEdges()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({-2, -1, 0}, {{1, 1}});
     bool found = false;
     const QCPRange r = h->getKeyRange(found);
@@ -1246,7 +1246,7 @@ void TestHistogramPlottable::keyRangeSpansTheEdges()
 
 void TestHistogramPlottable::valueRangeOfSmallHeightsStartsAtZero()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setBinned({0, 1}, {{0.5}});
     bool found = false;
     const QCPRange r = h->getValueRange(found);
@@ -1257,7 +1257,7 @@ void TestHistogramPlottable::valueRangeOfSmallHeightsStartsAtZero()
 
 void TestHistogramPlottable::barsHaveADarkerOutlineAroundTheBase()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setColumnColors({Qt::red});
     h->setBinned({0, 1, 2}, {{3, 6}});
     mPlot->xAxis->setRange(0, 2);
@@ -1269,7 +1269,7 @@ void TestHistogramPlottable::barsHaveADarkerOutlineAroundTheBase()
 
 void TestHistogramPlottable::stepOutlineIsOnePixelThick()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setColumnColors({Qt::red});
     h->setStyle(QCPHistogram::sStep);
     h->setBinned({0, 1, 2}, {{3, 6}});
@@ -1282,7 +1282,7 @@ void TestHistogramPlottable::stepOutlineIsOnePixelThick()
 
 void TestHistogramPlottable::stepOutlineHasNoBase()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setColumnColors({Qt::red});
     h->setStyle(QCPHistogram::sStep);
     h->setBinned({0, 1, 2}, {{3, 6}});
@@ -1295,7 +1295,7 @@ void TestHistogramPlottable::stepOutlineHasNoBase()
 
 void TestHistogramPlottable::fillHasNoBorderWhateverPenThePainterHad()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     h->setColumnColors({Qt::red, Qt::blue});
     h->setStyle(QCPHistogram::sStep);
     h->setBinned({0, 1, 2}, {{3, 6}, {0, 0}});
@@ -1320,7 +1320,7 @@ void TestHistogramPlottable::fillHasNoBorderWhateverPenThePainterHad()
 
 void TestHistogramPlottable::anAlmostTransparentFillStillPaints()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<QCPHistogram>().get();
     h->setColumnColors({QColor(255, 0, 0, 1)});
     h->setBinned({0, 1, 2}, {{3, 6}});
     mPlot->xAxis->setRange(0, 2);
@@ -1334,7 +1334,7 @@ void TestHistogramPlottable::anAlmostTransparentFillStillPaints()
 
 void TestHistogramPlottable::anAlmostTransparentFillIsRecorded()
 {
-    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    auto* h = mPlot->add<Probe>().get();
     h->setColumnColors({QColor(255, 0, 0, 1)});
     h->setBinned({0, 1, 2}, {{3, 6}});
     mPlot->xAxis->setRange(0, 2);

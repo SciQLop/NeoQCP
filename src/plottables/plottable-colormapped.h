@@ -19,8 +19,9 @@ class QCP_LIB_DECL QCPColorMapped : public QCPPlottable
     /// \endcond
 
 public:
-    explicit QCPColorMapped(QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                    bool transparentNan = false, QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale);
+    explicit QCPColorMapped(bool transparentNan = false,
+                            QCP::Capabilities required = QCP::capRectangular
+                                | QCP::capStraightKey | QCP::capColourScale);
     ~QCPColorMapped() override;
 
     // getters:

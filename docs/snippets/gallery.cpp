@@ -73,7 +73,8 @@ DOC_SNIPPET(gallery_space_weather, 800, 560)
     scale->axis()->setNumberFormat("eb");
     scale->axis()->setNumberPrecision(0);
     scale->setLabel("flux");
-    auto* spectra = new QCPColorMap2(spectraRect->axis(QCPAxis::atBottom), energyAxis);
+    auto* spectra = spectraRect->axis(QCPAxis::atBottom)->axisRect()->add<QCPColorMap2>(
+            spectraRect->axis(QCPAxis::atBottom), energyAxis).get();
     spectra->setColorScale(scale);
     spectra->setGradient(QCPColorGradient::gpTurbo);
     spectra->setData(std::move(minutes), std::move(energy), std::move(flux));
@@ -150,7 +151,8 @@ DOC_SNIPPET(gallery_ten_million_points, 800, 520)
 
     auto* detailRect = new QCPAxisRect(customPlot);
     customPlot->plotLayout()->addElement(1, 0, detailRect);
-    auto* detail = new QCPGraph(detailRect->axis(QCPAxis::atBottom), detailRect->axis(QCPAxis::atLeft));
+    auto* detail = detailRect->axis(QCPAxis::atBottom)->axisRect()->add<QCPGraph>(
+            detailRect->axis(QCPAxis::atBottom), detailRect->axis(QCPAxis::atLeft)).get();
     detail->setDataSource(source);
     detail->setPen(QPen(QColor(214, 39, 40), 1.5));
     const QCPRange window(7108, 7112);   // four seconds around a burst
@@ -301,9 +303,11 @@ DOC_SNIPPET(gallery_joint_density, 640, 640)
     layout->setRowStretchFactors({ 1, 4 });
     layout->setColumnStretchFactors({ 4, 1 });
 
-    auto* xBars = new QCPBars(top->axis(QCPAxis::atBottom), top->axis(QCPAxis::atLeft));
+    auto* xBars = top->axis(QCPAxis::atBottom)->axisRect()->add<QCPBars>(
+            top->axis(QCPAxis::atBottom), top->axis(QCPAxis::atLeft)).get();
     xBars->setData(xCentres, xCounts);
-    auto* yBars = new QCPBars(right->axis(QCPAxis::atLeft), right->axis(QCPAxis::atBottom));
+    auto* yBars = right->axis(QCPAxis::atLeft)->axisRect()->add<QCPBars>(
+            right->axis(QCPAxis::atLeft), right->axis(QCPAxis::atBottom)).get();
     yBars->setData(yCentres, yCounts);
     xBars->setWidth(xRange.size() / bins);
     yBars->setWidth(yRange.size() / bins);
@@ -423,7 +427,8 @@ DOC_SNIPPET(gallery_stock_chart, 800, 520)
     for (auto [keys, values, color] : { std::tuple { upDays, volumeUp, QColor(38, 166, 154, 160) },
                                         std::tuple { downDays, volumeDown, QColor(239, 83, 80, 160) } })
     {
-        auto* bars = new QCPBars(volumeTime, volumeRect->axis(QCPAxis::atLeft));
+        auto* bars = volumeTime->axisRect()->add<QCPBars>(
+                volumeTime, volumeRect->axis(QCPAxis::atLeft)).get();
         bars->setData(keys, values);
         bars->setWidth(0.7 * day);
         bars->setPen(Qt::NoPen);
@@ -488,10 +493,10 @@ DOC_SNIPPET(gallery_antenna_pattern, 600, 600)
         return std::pow(std::sin(std::numbers::pi * (n + 0.5) / elements), 2);
     });
 
-    auto* plain = new QCPPolarGraph(angular, radial);
+    auto* plain = area->add<QCPPolarGraph>().get();
     plain->setData(angle, uniform);
     plain->setPen(QPen(QColor(31, 119, 180), 1.5));
-    auto* tapered = new QCPPolarGraph(angular, radial);
+    auto* tapered = area->add<QCPPolarGraph>().get();
     tapered->setData(angle, hann);
     tapered->setPen(QPen(QColor(214, 39, 40), 2));
 

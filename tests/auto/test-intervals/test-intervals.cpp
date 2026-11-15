@@ -270,7 +270,7 @@ void TestIntervals::millionIntervalsScanQuickly()
 namespace {
 QCPIntervals* twoBars(QCustomPlot* plot, QCPLaneLayout* layout)
 {
-    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    auto* iv = plot->add<QCPIntervals>(layout).get();
     auto c = columns({10, 60}, {40, 90}, { layout->laneIndex("A"), layout->laneIndex("B") });
     c.category = { 0, 1 };
     iv->setData(std::move(c));
@@ -345,7 +345,7 @@ QCPIntervals* laidOutTwoBars(QCustomPlot* plot, QCPLaneLayout* layout)
 void TestIntervals::setDataRejectsInvalidColumns()
 {
     QCPLaneLayout layout;
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     QVERIFY_THROWS_EXCEPTION(std::invalid_argument, iv->setData(columns({2}, {1}, {0})));
     QCOMPARE(iv->rowCount(), 0);
 }
@@ -353,7 +353,7 @@ void TestIntervals::setDataRejectsInvalidColumns()
 void TestIntervals::emptyDataDrawsNothing()
 {
     QCPLaneLayout layout;
-    new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    mPlot->add<QCPIntervals>(&layout).get();
     mPlot->toPixmap(400, 300); // must not crash
 }
 
@@ -386,7 +386,7 @@ void TestIntervals::keyRangeSpansAllIntervals()
 void TestIntervals::categoryColorFallsBackBeyondTheTable()
 {
     QCPLaneLayout layout;
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     iv->setCategoryColors({ Qt::red });
     QCOMPARE(iv->categoryColor(0), QColor(Qt::red));
     QVERIFY(iv->categoryColor(1).isValid());
@@ -422,7 +422,7 @@ void TestIntervals::labelIsDrawnOnlyWhenItFits()
     QCPLaneLayout layout;
     layout.setPlacement(QCPLaneLayout::plLanes);
     layout.setLaneHeight(20);
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     auto c = columns({ 0, 99.5 }, { 60, 99.6 }, { layout.laneIndex("A"), 0 });
     c.labels = QStringList { "wide label", "narrow label" };
     iv->setData(std::move(c));
@@ -437,7 +437,7 @@ void TestIntervals::stripDrawsLaneNamesOnce()
 {
     QCPLaneLayout layout;
     auto* first = twoBars(mPlot, &layout);
-    auto* second = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* second = mPlot->add<QCPIntervals>(&layout).get();
     QVERIFY(first->drawsLaneNames());
     QVERIFY(!second->drawsLaneNames());
     layout.setPlacement(QCPLaneLayout::plLanes);
@@ -455,7 +455,7 @@ void TestIntervals::barsAndLabelsShowOnTheGpu()
     QCPLaneLayout layout;
     layout.setPlacement(QCPLaneLayout::plLanes);
     layout.setLaneHeight(24);
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     iv->setCategoryColors({ Qt::red });
     mPlot->xAxis->setRange(0, 100);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -478,7 +478,7 @@ QCPIntervals* drawnLabelledBar(QCustomPlot* plot, QCPLaneLayout* layout)
 {
     layout->setPlacement(QCPLaneLayout::plLanes);
     layout->setLaneHeight(24);
-    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    auto* iv = plot->add<QCPIntervals>(layout).get();
     iv->setCategoryColors({ Qt::red });
     plot->xAxis->setRange(0, 100);
     plot->replot(QCustomPlot::rpImmediateRefresh);
@@ -532,7 +532,7 @@ void TestIntervals::selectionOutlineShowsOnTheGpu()
 void TestIntervals::mergedBarsGetNoLabel()
 {
     QCPLaneLayout layout;
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     auto c = columns({ 0, 20 }, { 30, 50 }, { layout.laneIndex("A"), layout.laneIndex("A") });
     c.labels = QStringList { "a", "b" };
     iv->setData(std::move(c));
@@ -545,7 +545,7 @@ void TestIntervals::mergedBarsGetNoLabel()
 void TestIntervals::labelLayerFollowsThePlottablesLayer()
 {
     QCPLaneLayout layout;
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     QVERIFY(mPlot->addLayer(QStringLiteral("custom")));
     QVERIFY(iv->setLayer(QStringLiteral("custom")));
     QCOMPARE(iv->labelLayer(), mPlot->layer(QStringLiteral("custom.intervals-labels")));
@@ -617,7 +617,7 @@ void TestIntervals::recordedIntervalsMatchTheirReferences()
         layout.setPlacement(QCPLaneLayout::plLanes);
     plot.xAxis->setRange(0, 6);
     plot.yAxis->setRange(-0.5, 2.5);
-    auto* intervals = new QCPIntervals(plot.xAxis, plot.yAxis, &layout);
+    auto* intervals = plot.add<QCPIntervals>(&layout).get();
     intervals->setData(intervalColumns(layout));
     intervals->setCategoryNames(QStringList { QStringLiteral("A") });
     intervals->setCategoryColors(QVector<QColor> { QColor(70, 130, 200) });
@@ -638,7 +638,7 @@ void TestIntervals::aPannedIntervalStaysCorrect()
     QCPLaneLayout layout;
     layout.setPlacement(QCPLaneLayout::plLanes);
     layout.setLaneHeight(24);
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     iv->setData(columns({ 10, 150 }, { 40, 190 }, { layout.laneIndex("A"), layout.laneIndex("A") }));
     iv->setCategoryColors({ Qt::red });
     mPlot->xAxis->setRange(0, 100);
@@ -667,7 +667,7 @@ void TestIntervals::labelsStayAboveTheBars()
     QCPLaneLayout layout;
     layout.setPlacement(QCPLaneLayout::plLanes);
     layout.setLaneHeight(24);
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     iv->setCategoryColors({ Qt::red });
     mPlot->xAxis->setRange(0, 100);
     mPlot->replot();
@@ -718,7 +718,7 @@ void TestIntervals::labelsAndLaneNamesUseThePlotFont()
     QCPLaneLayout lanes;
     lanes.setPlacement(QCPLaneLayout::plLanes);
     lanes.setLaneHeight(40);
-    auto* labelled = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &lanes);
+    auto* labelled = mPlot->add<QCPIntervals>(&lanes).get();
     labelled->setCategoryColors({ Qt::red });
     mPlot->replot();
     auto c = columns({ 0 }, { 100 }, { lanes.laneIndex("A") });
@@ -735,7 +735,7 @@ void TestIntervals::labelsAndLaneNamesUseThePlotFont()
 
     // A strip's lane is thinner than the font: the name's top is clipped, its width is not.
     QCPLaneLayout strip; // plStrip: the lane names are drawn at the left edge
-    auto* named = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &strip);
+    auto* named = mPlot->add<QCPIntervals>(&strip).get();
     named->setData(columns({ 60 }, { 90 }, { strip.laneIndex("A") }));
     const QImage withName = mPlot->toPixmap(400, 300).toImage();
     const int name = darkColumns(withName, QRect(rect.left() + 2, rect.top() + 1, 60, rect.height() - 2));
@@ -749,7 +749,7 @@ void TestIntervals::aDataChangeRedrawsTheLabels()
     QCPLaneLayout layout;
     layout.setPlacement(QCPLaneLayout::plLanes);
     layout.setLaneHeight(24);
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     iv->setCategoryColors({ Qt::red });
     mPlot->xAxis->setRange(0, 100);
     mPlot->replot(); // lay the axes out before measuring a label that must fit
@@ -769,7 +769,7 @@ void TestIntervals::aDataChangeRedrawsTheLabels()
 void TestIntervals::hitTestOnEmptyPlottable()
 {
     QCPLaneLayout layout;
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     mPlot->replot();
     QCOMPARE(iv->hitTest(QPointF(100, 100)).part, QCPIntervals::hpNone);
 }
@@ -792,7 +792,7 @@ void TestIntervals::hitTestFindsBodyAndEdges()
 void TestIntervals::narrowBarResizesFromJustOutside()
 {
     QCPLaneLayout layout;
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     iv->setData(columns({ 50 }, { 50.5 }, { layout.laneIndex("A") }));
     mPlot->xAxis->setRange(0, 100);
     mPlot->replot();
@@ -806,7 +806,7 @@ void TestIntervals::narrowBarResizesFromJustOutside()
 void TestIntervals::instantEventHasOnlyBody()
 {
     QCPLaneLayout layout;
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     iv->setData(columns({ 50 }, { 50 }, { layout.laneIndex("A") }));
     mPlot->xAxis->setRange(0, 100);
     mPlot->replot();
@@ -1173,7 +1173,7 @@ namespace {
 //! A second timeline on the same layout with one bar at [60,90] on lane A.
 QCPIntervals* siblingOnLaneA(QCustomPlot* plot, QCPLaneLayout* layout)
 {
-    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    auto* iv = plot->add<QCPIntervals>(layout).get();
     iv->setData(columns({ 60 }, { 90 }, { layout->laneIndex("A") }));
     return iv;
 }
@@ -1286,7 +1286,7 @@ void TestIntervals::firstVisibleTimelineDrawsLaneNames()
 {
     QCPLaneLayout layout;
     auto* first = twoBars(mPlot, &layout);
-    auto* second = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* second = mPlot->add<QCPIntervals>(&layout).get();
     first->setVisible(false);
     QVERIFY(!first->drawsLaneNames());
     QVERIFY(second->drawsLaneNames());
@@ -1307,7 +1307,7 @@ void TestIntervals::labelCentresInTheVisiblePart()
 {
     QCPLaneLayout layout;
     layout.setPlacement(QCPLaneLayout::plLanes);
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     auto c = columns({ -400 }, { 60 }, { layout.laneIndex("A") });
     c.labels = QStringList { "long interval" };
     iv->setData(std::move(c));
@@ -1324,7 +1324,7 @@ namespace {
 QImage waveImage(QCustomPlot* plot, QCPLaneLayout* layout, QCPIntervals::Style style)
 {
     layout->setPlacement(QCPLaneLayout::plLanes);
-    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    auto* iv = plot->add<QCPIntervals>(layout).get();
     iv->setStyle(style);
     iv->setCategoryColors({ Qt::red });
     iv->setData(columns({ 20 }, { 80 }, { layout->laneIndex("A") }));
@@ -1387,7 +1387,7 @@ QCPIntervals* forbiddingBars(QCustomPlot* plot, QCPLaneLayout* layout,
                              bool forbid = true)
 {
     layout->setPlacement(QCPLaneLayout::plLanes);
-    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    auto* iv = plot->add<QCPIntervals>(layout).get();
     const int a = layout->laneIndex("A"), b = layout->laneIndex("B");
     iv->setData(columns({ 10, 50, 40 }, { 30, 70, 60 }, { a, a, b }));
     iv->setEditable(true);
@@ -1515,7 +1515,7 @@ void TestIntervals::stackPutsOverlapsInSubRows()
 {
     QCPLaneLayout layout;
     layout.setPlacement(QCPLaneLayout::plLanes);
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     const int a = layout.laneIndex("A"), b = layout.laneIndex("B");
     iv->setData(columns({ 10, 30, 10 }, { 50, 70, 50 }, { a, a, b }));
     mPlot->xAxis->setRange(0, 100);
@@ -1534,7 +1534,7 @@ void TestIntervals::stackedLaneHasAnIdleLinePerRow()
 {
     QCPLaneLayout layout;
     layout.setPlacement(QCPLaneLayout::plLanes);
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     iv->setStyle(QCPIntervals::stWave);
     iv->setStackMode(QCPIntervals::skTime);
     iv->setCategoryColors({ Qt::red });
@@ -1551,7 +1551,7 @@ void TestIntervals::stackedLaneHasAnIdleLinePerRow()
 void TestIntervals::legendListsTheUsedCategories()
 {
     QCPLaneLayout layout;
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     auto c = columns({ 0, 10, 20 }, { 5, 15, 25 }, { layout.laneIndex("A"), 0, 0 });
     c.category = { 2, 0, 2 };
     iv->setData(std::move(c));
@@ -1569,7 +1569,7 @@ void TestIntervals::legendListsTheUsedCategories()
 void TestIntervals::legendItemHasARowPerCategory()
 {
     QCPLaneLayout layout;
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     auto c = columns({ 0, 10 }, { 5, 15 }, { layout.laneIndex("A"), 0 });
     c.category = { 0, 1 };
     iv->setData(std::move(c));
@@ -1596,7 +1596,7 @@ void TestIntervals::autoAddedLegendItemIsTheCategoryList()
 {
     mPlot->legend->clearItems();
     QCPLaneLayout layout;
-    new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    mPlot->add<QCPIntervals>(&layout).get();
     QCOMPARE(mPlot->legend->itemCount(), 1);
     QVERIFY(qobject_cast<QCPIntervalsLegendItem*>(mPlot->legend->item(0)));
 }
@@ -1626,7 +1626,7 @@ QCPIntervals* modes(QCustomPlot* plot, QCPLaneLayout* layout, std::vector<double
                     std::vector<double> stop, std::vector<int> category)
 {
     layout->setPlacement(QCPLaneLayout::plLanes);
-    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    auto* iv = plot->add<QCPIntervals>(layout).get();
     const int a = layout->laneIndex("A");
     auto c = columns(std::move(start), std::move(stop), std::vector<int>(category.size(), a));
     c.category = std::move(category);
@@ -1743,7 +1743,7 @@ void removeOnLanesChanged(QCustomPlot* plot, QCPLaneLayout* layout, QCPIntervals
 
 QCPIntervals* twoOverlapsOnLaneA(QCustomPlot* plot, QCPLaneLayout* layout)
 {
-    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    auto* iv = plot->add<QCPIntervals>(layout).get();
     const int a = layout->laneIndex("A");
     iv->setData(columns({ 10, 30 }, { 50, 70 }, { a, a }));
     return iv;
@@ -1774,7 +1774,7 @@ void TestIntervals::lanesChangedSlotDeletingARegroupedTimelineIsSafe()
 {
     QCPLaneLayout layout;
     layout.laneIndex("A");
-    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* iv = mPlot->add<QCPIntervals>(&layout).get();
     iv->setStackMode(QCPIntervals::skTime);
     iv->setData(columns({ 10, 30 }, { 50, 70 }, { 1, 1 })); // lane 1 is not known yet
     removeOnLanesChanged(mPlot, &layout, iv);
@@ -1864,7 +1864,7 @@ void TestIntervals::aTickLabelColourChangeReInksTheWaveBackdrop()
 void TestIntervals::theLegendIconIsRecorded()
 {
     QCPLaneLayout layout;
-    auto* intervals = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto* intervals = mPlot->add<QCPIntervals>(&layout).get();
     mPlot->legend->setVisible(true);
     mPlot->legend->clearItems();
     mPlot->legend->addItem(new QCPPlottableLegendItem(mPlot->legend, intervals));
@@ -1911,7 +1911,7 @@ void TestIntervals::theLegendIconKeepsTheAntialiasingSetting()
     {
         QCustomPlot plot;
         QCPLaneLayout layout;
-        auto* intervals = new QCPIntervals(plot.xAxis, plot.yAxis, &layout);
+        auto* intervals = plot.add<QCPIntervals>(&layout).get();
         intervals->setCategoryColors(QVector<QColor> { fill });
         intervals->setAntialiased(antialiased);
         plot.legend->setVisible(true);

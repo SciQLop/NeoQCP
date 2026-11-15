@@ -417,7 +417,9 @@ void TestBuilder::addEveryPlottable_data()
             columns.lane = {0};
             columns.category = {0};
             columns.ids = {1};
-            auto i = p.add<QCPIntervals>(columns);
+            QCPLaneLayout lanes;
+            lanes.laneIndices({ "A" });
+            auto i = p.add<QCPIntervals>(columns, &lanes);
             return i->rowCount() == 1;
         });
     row("errorbar",
@@ -817,7 +819,7 @@ void TestBuilder::takeDuringTeardown()
 void TestBuilder::addUserBuilt()
 {
     QCustomPlot plot;
-    auto built = std::make_unique<UserGraph>(nullptr, nullptr); // detached: valid, no misuse
+    auto built = std::make_unique<UserGraph>(); // detached: valid, no misuse
     QCOMPARE(gMisuses, 0);
     auto handle = plot.add(std::move(built));
     static_assert(std::is_base_of_v<QCPHandle<UserGraph>, decltype(handle)>);
@@ -832,32 +834,44 @@ void TestBuilder::addUserBuilt()
     QCOMPARE(gMisuses, 0);
 }
 
-void TestBuilder::addRefusesObjectOfAPlot()
+void TestBuilder::aPlotWithoutAnAxisRectRefusesAPlottable()
 {
+    // A plottable is built without a plot, so the one that adopts it is the one it belongs to; a
+    // plot with no axis rect has no system to bind and refuses instead.
     QCustomPlot plot;
-    QCustomPlot other;
-    auto handle = plot.add(std::make_unique<QCPGraph>(other.xAxis, other.yAxis));
-    QVERIFY(!handle);
-    QCOMPARE(gMisuses, 1);
-    QCOMPARE(plot.plottableCount(), 0);
-    QCOMPARE(other.plottableCount(), 0);
-    QVERIFY(!plot.add(std::unique_ptr<QCPGraph>()));
-    QCOMPARE(gMisuses, 2);
+    auto built = std::make_unique<QCPGraph>();
+    QCOMPARE(built->parentPlot(), nullptr);
+    QVERIFY(!built->isRegistered());
 
     plot.plotLayout()->clear();
-    QVERIFY(!plot.add(std::make_unique<QCPGraph>(other.xAxis, other.yAxis)));
-    QCOMPARE(gMisuses, 3); // the object is the cause; the missing axis rect is not reported too
+    QVERIFY(!plot.add(std::move(built)));
+    QCOMPARE(gMisuses, 1);
+    QCOMPARE(plot.plottableCount(), 0);
+
+    QVERIFY(!plot.add(std::unique_ptr<QCPGraph>()));
+    QCOMPARE(gMisuses, 2);
 }
 
-void TestBuilder::axesOfTwoPlotsAreRefused()
+void TestBuilder::aTakenPlottableJoinsTheNextPlot()
 {
     QCustomPlot plot;
     QCustomPlot other;
-    auto built = std::make_unique<QCPGraph>(plot.xAxis, other.yAxis);
-    QCOMPARE(gMisuses, 1);
-    QCOMPARE(plot.plottableCount(), 0);
+    auto built = other.add<QCPGraph>();
+    QCOMPARE(built->parentPlot(), &other);
+
+    auto taken = other.take(built);
+    QVERIFY(taken);
+    QCOMPARE(taken->parentPlot(), nullptr);
+    QVERIFY(!taken->layer()); // left whole, in the state of a plottable built without axes
+    QCOMPARE(gMisuses, 0);
+
+    auto again = plot.add(std::move(taken));
+    QVERIFY(again);
+    QCOMPARE(again->parentPlot(), &plot);
+    QCOMPARE(again->system(), plot.axisRect()->system(plot.xAxis, plot.yAxis));
+    QCOMPARE(plot.plottableCount(), 1);
     QCOMPARE(other.plottableCount(), 0);
-    QVERIFY(!built->layer()); // inert: neither plot draws it
+    QCOMPARE(gMisuses, 0);
     settle(plot);
     settle(other);
 }
@@ -910,7 +924,9 @@ void TestBuilder::addIntervalsWithBadColumnsLeavesThePlotUnchanged()
     qcp::intervals::Columns bad;
     bad.start = {0.0, 1.0};
     bad.stop = {1.0};
-    QVERIFY_EXCEPTION_THROWN(plot.add<QCPIntervals>(bad), std::invalid_argument);
+    QCPLaneLayout lanes;
+    lanes.laneIndices({ "A" });
+    QVERIFY_EXCEPTION_THROWN(plot.add<QCPIntervals>(bad, &lanes), std::invalid_argument);
     QCOMPARE(plot.plottableCount(), 0);
     QCOMPARE(plot.legend->itemCount(), rows);
     QCOMPARE(gMisuses, 0);
@@ -980,7 +996,7 @@ void TestBuilder::addPlottableDuringTeardownIsRefused()
     bool refused = false;
     connect(first.get(), &QObject::destroyed,
             [plot, &refused]
-            { refused = !plot->add(std::make_unique<QCPGraph>(nullptr, nullptr)); });
+            { refused = !plot->add(std::make_unique<QCPGraph>()); });
     delete plot;
     QVERIFY(refused);
     QCOMPARE(gMisuses, 1);

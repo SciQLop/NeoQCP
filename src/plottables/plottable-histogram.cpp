@@ -93,15 +93,12 @@ double largest(const std::vector<std::vector<double>>& heights)
   signals.
 */
 
-QCPHistogram::QCPHistogram(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPPlottable(keyAxis, valueAxis)
-    , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
+QCPHistogram::QCPHistogram() : QCPPlottable(), mPipeline(nullptr, this)
 {
     installTransform();
     connect(&mPipeline, &QCPHistogram1DPipeline::finished, this, &QCPHistogram::onPipelineFinished);
     connect(&mPipeline, &QCPHistogram1DPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
-    followKeyAxis();
 }
 
 // Edges in one scale mean nothing in the other: re-fit them when the key axis toggles.

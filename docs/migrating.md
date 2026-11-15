@@ -374,3 +374,45 @@ warns.
 
 A user item may create and place its positions in its constructor or in a member initialiser, as before;
 `createPosition()` no longer binds them to a plot.
+
+## Plottables are built without axes
+
+A plottable's constructor takes the plottable's own arguments only. It no longer takes the key and
+value axes: the plottable is built detached and `add<T>()` joins it to a system.
+
+| Old | New |
+|---|---|
+| `new QCPGraph(customPlot->xAxis, customPlot->yAxis)` | `customPlot->add<QCPGraph>()` |
+| `new QCPBars(keyAxis, valueAxis)` | `keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis)` |
+| `new QCPIntervals(keyAxis, valueAxis, &lanes)` | `keyAxis->axisRect()->add<QCPIntervals>(keyAxis, valueAxis, &lanes)` |
+| `new QCPPolarGraph(area->angularAxis(), area->radialAxis())` | `area->add<QCPPolarGraph>()` |
+| `new QCPPlottable(customPlot, ...)` subclass | `customPlot->add<MyPlottable>(...)`, plot dropped from the constructor |
+
+`add<T>(args...)` on the plot or on an axis rect of the plot joins the plottable to that rect's first
+bottom and left axes. `add<T>(key, value, args...)` on the same rect binds the pair given, which is how
+a plottable on a second axis pair is added: both axes must belong to that rect. A polar area's
+`add<T>()` binds its angular axis and its first radial axis; a graph on another radial axis is moved
+there with `setSystem()` afterwards.
+
+The pair of the axes a plottable is added with decides whether it is accepted: a system that lacks a
+capability the plottable needs (a rectangle for bars, a straight key for a curve) refuses it, and the
+add returns an empty handle. The plottable is deleted, one misuse is reported, and the plot, its
+layers and its legend are untouched. The same applies to a plot whose axis rect has no bottom or left
+axis, and to a rect add whose bottom or left axis was removed.
+
+Every built-in plottable takes its data in the constructor now, in the ranges its `setData()` takes:
+
+```cpp
+customPlot->add<QCPGraph>(keys, values);
+customPlot->add<QCPFinancial>(keys, open, high, low, close);
+customPlot->add<QCPColorMap>(&mapData, true /* copy */);
+rect->add<QCPIntervals>(columns, &lanes);
+```
+
+A user plottable that inherits from `QCPPlottable1D<D>` takes the key/value constructor with
+`using QCPPlottable1D::QCPPlottable1D;`, next to its own constructors; the data is sorted by key. The
+extra arguments an `add<T>()` used to forward to `setData()` are constructor arguments now: give the
+subclass a constructor that takes them, or call `setData()` on the returned handle.
+
+A plottable that is built and not placed answers its setters, `setData()` and its data accessors, and
+draws nothing; it has no parent plot, so `setSystem()` refuses a system until the plottable is added.

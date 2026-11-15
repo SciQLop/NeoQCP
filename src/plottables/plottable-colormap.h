@@ -126,7 +126,9 @@ public:
     template <typename T>
     using OpsFor = QCPColorMapOps<T>;
 
-    explicit QCPColorMap(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    QCPColorMap();
+    //! The map data, as setData() takes it: \a copy keeps \a data the caller's.
+    explicit QCPColorMap(QCPColorMapData* data, bool copy = false);
     virtual ~QCPColorMap() override;
 
     // getters:

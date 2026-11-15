@@ -39,7 +39,13 @@ public:
     template <typename T>
     using OpsFor = QCPColorMap2Ops<T>;
 
-    explicit QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    QCPColorMap2();
+    //! One point per index of \a x, \a y and \a z, as setData() takes them.
+    template <IndexableNumericRange XC, IndexableNumericRange YC, IndexableNumericRange ZC>
+    QCPColorMap2(XC&& x, YC&& y, ZC&& z) : QCPColorMap2()
+    {
+        setData(std::forward<XC>(x), std::forward<YC>(y), std::forward<ZC>(z));
+    }
 
     // Data source management
     void setDataSource(std::unique_ptr<QCPDataSource2D> source);
@@ -141,7 +147,7 @@ protected:
     void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
     bool canProduceContent() const override;
 
-    void systemDidChange() override { followAxes(); }
+    void systemDidChange() override;
 
 private:
     [[nodiscard]] bool needsAnImageOfTheNewSize() const;
@@ -160,6 +166,8 @@ private:
     void onViewportChanged();
     void followAxes();
     QList<QMetaObject::Connection> mAxisLinks;
+    //! The plot's afterLayout connection, made when the map joins one (once).
+    QMetaObject::Connection mListensToLayout;
     void queueViewportChange();
     bool mViewportChangeQueued = false;
 };

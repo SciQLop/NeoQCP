@@ -109,7 +109,21 @@ public:
     template <typename T>
     using OpsFor = QCPStatisticalBoxOps<T>;
 
-    explicit QCPStatisticalBox(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    QCPStatisticalBox();
+    //! Keys and the five statistics, as setData() takes them: one box per key.
+    template <QCPNumberRange K, QCPNumberRange MN, QCPNumberRange LQ, QCPNumberRange MD,
+              QCPNumberRange UQ, QCPNumberRange MX>
+    QCPStatisticalBox(const K& keys, const MN& minimum, const LQ& lowerQuartile,
+                      const MD& median, const UQ& upperQuartile, const MX& maximum)
+        : QCPStatisticalBox()
+    {
+        setData(QVector<double>(std::ranges::begin(keys), std::ranges::end(keys)),
+                QVector<double>(std::ranges::begin(minimum), std::ranges::end(minimum)),
+                QVector<double>(std::ranges::begin(lowerQuartile), std::ranges::end(lowerQuartile)),
+                QVector<double>(std::ranges::begin(median), std::ranges::end(median)),
+                QVector<double>(std::ranges::begin(upperQuartile), std::ranges::end(upperQuartile)),
+                QVector<double>(std::ranges::begin(maximum), std::ranges::end(maximum)));
+    }
 
     // getters:
     [[nodiscard]] QSharedPointer<QCPStatisticalBoxDataContainer> data() const { return mDataContainer; }

@@ -33,6 +33,9 @@
 #include "plottable-draw-utils.h"
 #include "plottable.h"
 
+#include <algorithm>
+#include <concepts>
+#include <ranges>
 #include <span>
 #include <vector>
 
@@ -62,10 +65,13 @@ class QCPPlottable1D
     // No Q_OBJECT macro due to template class
 
 public:
-    QCPPlottable1D(QCPAxis* keyAxis, QCPAxis* valueAxis,
-                           QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
-    explicit QCPPlottable1D(QCPCoordinateSystem* system,
-                                    QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
+    explicit QCPPlottable1D(QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
+    //! One data point per (key, value) pair, sorted by key: the constructor form of setData(), so
+    //! that add<T>(keys, values) needs no setData() call. A user type inherits it with
+    //! using QCPPlottable1D<D>::QCPPlottable1D;
+    template <QCPNumberRange K, QCPNumberRange V>
+        requires std::constructible_from<DataType, double, double>
+    QCPPlottable1D(const K& keys, const V& values);
     virtual ~QCPPlottable1D() override;
 
     // virtual methods of 1d plottable interface:
@@ -293,22 +299,34 @@ private:
 /* end documentation of inline functions */
 
 /*!
-  Forwards \a keyAxis and \a valueAxis to the \ref QCPPlottable::QCPPlottable
-  "QCPPlottable" constructor and allocates the \a mDataContainer.
+  Forwards \a required to the \ref QCPPlottable::QCPPlottable "QCPPlottable" constructor and
+  allocates the \a mDataContainer.
 */
 template <class DataType, class Base>
-QCPPlottable1D<DataType, Base>::QCPPlottable1D(QCPAxis* keyAxis,
-                                                               QCPAxis* valueAxis,
-                                                               QCP::Capabilities required)
-        : Base(keyAxis, valueAxis, required), mDataContainer(new QCPDataContainer<DataType>)
+QCPPlottable1D<DataType, Base>::QCPPlottable1D(QCP::Capabilities required)
+        : Base(required), mDataContainer(new QCPDataContainer<DataType>)
 {
 }
 
+/*!
+  Fills the data container with one \c DataType per (key, value) pair, sorted by key.
+
+  The two ranges are read in step; the shorter one ends the fill. This is the constructor form of
+  setData(), for the plottables whose data type is made of a key and a value.
+*/
 template <class DataType, class Base>
-QCPPlottable1D<DataType, Base>::QCPPlottable1D(QCPCoordinateSystem* system,
-                                                               QCP::Capabilities required)
-        : Base(system, required), mDataContainer(new QCPDataContainer<DataType>)
+template <QCPNumberRange K, QCPNumberRange V>
+    requires std::constructible_from<DataType, double, double>
+QCPPlottable1D<DataType, Base>::QCPPlottable1D(const K& keys, const V& values)
+        : QCPPlottable1D()
 {
+    QVector<DataType> data;
+    data.reserve(std::min(std::ranges::distance(keys), std::ranges::distance(values)));
+    auto key = std::ranges::begin(keys);
+    auto value = std::ranges::begin(values);
+    for (; key != std::ranges::end(keys) && value != std::ranges::end(values); ++key, ++value)
+        data.append(DataType(double(*key), double(*value)));
+    mDataContainer->set(data, false);
 }
 
 template <class DataType, class Base>

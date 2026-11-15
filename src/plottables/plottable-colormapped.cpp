@@ -3,9 +3,8 @@
 #include <core.h>
 #include <layoutelements/layoutelement-colorscale.h>
 
-QCPColorMapped::QCPColorMapped(QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                               bool transparentNan, QCP::Capabilities required)
-        : QCPPlottable(keyAxis, valueAxis, required)
+QCPColorMapped::QCPColorMapped(bool transparentNan, QCP::Capabilities required)
+        : QCPPlottable(required)
         , mDataScaleType(QCPAxis::stLinear)
         , mGradient(QCPColorGradient::gpCold)
 {

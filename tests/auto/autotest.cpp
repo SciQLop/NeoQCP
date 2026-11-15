@@ -32,6 +32,7 @@
 #include "test-item-recording/test-item-recording.h"
 #include "test-item-system/test-item-system.h"
 #include "test-item-without-plot/test-item-without-plot.h"
+#include "test-plottable-without-axes/test-plottable-without-axes.h"
 #include "test-layer-removal/test-layer-removal.h"
 #include "test-line-extruder/test-line-extruder.h"
 #include "test-linked-axes/test-linked-axes.h"
@@ -200,6 +201,7 @@ int main(int argc, char** argv)
     QCPTEST(TestItemPosition);
     QCPTEST(TestItemSystem);
     QCPTEST(TestItemWithoutPlot);
+QCPTEST(TestPlottableWithoutAxes);
     QCPTEST(TestLayerRemoval);
     QCPTEST(TestHiddenReplot);
     QCPTEST(TestColorByScalar);

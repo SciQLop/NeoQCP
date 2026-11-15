@@ -56,7 +56,7 @@ QCPGraph* threeColumnGraphOn(QCustomPlot& plot)
 QCPIntervals* intervalsOn(QCustomPlot& plot)
 {
     auto* layout = new QCPLaneLayout(&plot);
-    auto* intervals = new QCPIntervals(plot.xAxis, plot.yAxis, layout);
+    auto* intervals = plot.add<QCPIntervals>(layout).get();
     qcp::intervals::Columns columns;
     columns.start = { 10, 60 };
     columns.stop = { 40, 90 };
@@ -73,7 +73,7 @@ QCPIntervals* intervalsOn(QCustomPlot& plot)
 QCPHistogram* settledHistogramOn(QCustomPlot& plot)
 {
     using Source = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
-    auto* histogram = new QCPHistogram(plot.xAxis, plot.yAxis);
+    auto* histogram = plot.add<QCPHistogram>().get();
     histogram->setDataSource(std::make_shared<Source>(
         std::vector<double> { 0, 1, 2 }, std::vector<std::vector<double>> { { 1, 2, 3 } }));
     QTest::qWaitFor([histogram] { return !histogram->busy(); }, 5000);
@@ -91,7 +91,7 @@ QCPWaterfallGraph* settledWaterfallOn(QCustomPlot& plot)
         first[i] = i % 7;
         second[i] = i % 5;
     }
-    auto* waterfall = new QCPWaterfallGraph(plot.xAxis, plot.yAxis);
+    auto* waterfall = plot.add<QCPWaterfallGraph>().get();
     waterfall->setData(keys, std::vector<QVector<double>> { first, second });
     QTest::qWaitFor([waterfall] { return !waterfall->busy(); }, 5000);
     return waterfall;
@@ -99,7 +99,7 @@ QCPWaterfallGraph* settledWaterfallOn(QCustomPlot& plot)
 
 QCPColorMap2* settledColorMap2On(QCustomPlot& plot)
 {
-    auto* map = new QCPColorMap2(plot.xAxis, plot.yAxis);
+    auto* map = plot.add<QCPColorMap2>().get();
     map->setData(std::vector<double> { 0, 1, 2 }, std::vector<double> { 0, 1, 2 },
                  std::vector<double>(9, 1.0));
     QTest::qWaitFor([map] { return !map->busy(); }, 5000);
@@ -136,14 +136,14 @@ std::pair<QObject*, const char*> armedOnTheLegendOfTwo(QCustomPlot& plot)
 
 QCPCurve* curveOn(QCustomPlot& plot)
 {
-    auto* curve = new QCPCurve(plot.xAxis, plot.yAxis);
+    auto* curve = plot.add<QCPCurve>().get();
     curve->setData(QVector<double> { 0, 5, 10 }, QVector<double> { 1, 6, 2 });
     return curve;
 }
 
 QCPBars* barsOn(QCustomPlot& plot)
 {
-    auto* bars = new QCPBars(plot.xAxis, plot.yAxis);
+    auto* bars = plot.add<QCPBars>().get();
     bars->setData(QVector<double> { 1, 5, 9 }, QVector<double> { 3, 6, 2 });
     return bars;
 }
@@ -180,7 +180,10 @@ QCPPolarGraph* polarGraphOnASecondRadialAxis(QCustomPlot& plot)
 {
     QCPPolarArea* area = polarAreaOn(plot);
     QCPPolarAxisRadial* radial = area->addRadialAxis().get();
-    return new QCPPolarGraph(area->angularAxis().get(), radial);
+    auto* graph = area->add<QCPPolarGraph>().get();
+    // add<> binds the area's first radial axis; this graph is about the second one.
+    graph->setSystem(area->system(area->angularAxis(), radial));
+    return graph;
 }
 
 QCPAxisRect* axisRectOn(QCustomPlot& plot)
@@ -640,7 +643,7 @@ const QVector<Fixture>& fixtures()
           [](QCustomPlot& plot) -> QObject*
           {
               QCPPolarArea* area = polarAreaOn(plot);
-              return new QCPPolarGraph(area->angularAxis(), area->radialAxis());
+              return area->add<QCPPolarGraph>().get();
           } },
         { "QCPOverlay", [](QCustomPlot& plot) -> QObject* { return plot.overlay().get(); } },
         { "QCPSelectionRect",
@@ -659,27 +662,27 @@ const QVector<Fixture>& fixtures()
         { "QCPItemText", itemOn<QCPItemText> },
         { "QCPItemTracer", itemOn<QCPItemTracer> },
         { "QCPColorMap",
-          [](QCustomPlot& plot) -> QObject* { return new QCPColorMap(plot.xAxis, plot.yAxis); } },
+          [](QCustomPlot& plot) -> QObject* { return plot.add<QCPColorMap>().get(); } },
         { "QCPErrorBars",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* errors = new QCPErrorBars(plot.xAxis, plot.yAxis);
+              auto* errors = plot.add<QCPErrorBars>().get();
               errors->setDataPlottable(graphOn(plot));
               return errors;
           } },
         { "QCPFinancial",
-          [](QCustomPlot& plot) -> QObject* { return new QCPFinancial(plot.xAxis, plot.yAxis); } },
+          [](QCustomPlot& plot) -> QObject* { return plot.add<QCPFinancial>().get(); } },
         { "QCPStatisticalBox", [](QCustomPlot& plot) -> QObject*
-          { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); } },
+          { return plot.add<QCPStatisticalBox>().get(); } },
         { "QCPColorMap2",
-          [](QCustomPlot& plot) -> QObject* { return new QCPColorMap2(plot.xAxis, plot.yAxis); } },
+          [](QCustomPlot& plot) -> QObject* { return plot.add<QCPColorMap2>().get(); } },
         { "QCPHistogram",
-          [](QCustomPlot& plot) -> QObject* { return new QCPHistogram(plot.xAxis, plot.yAxis); } },
+          [](QCustomPlot& plot) -> QObject* { return plot.add<QCPHistogram>().get(); } },
         { "QCPHistogram2D", [](QCustomPlot& plot) -> QObject*
-          { return new QCPHistogram2D(plot.xAxis, plot.yAxis); } },
+          { return plot.add<QCPHistogram2D>().get(); } },
         { "QCPIntervals", [](QCustomPlot& plot) -> QObject* { return intervalsOn(plot); } },
         { "QCPWaterfallGraph", [](QCustomPlot& plot) -> QObject*
-          { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); } },
+          { return plot.add<QCPWaterfallGraph>().get(); } },
         { "QCPCartesianSystem", [](QCustomPlot& plot) -> QObject*
           { return plot.axisRect()->system(plot.xAxis, plot.yAxis).get(); } },
         { "QCPPolarSystem",
@@ -1323,7 +1326,7 @@ const QVector<Writer>& writers()
         { "QCPColorMap2::setAutoContourLevels",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* map = new QCPColorMap2(plot.xAxis, plot.yAxis);
+              auto* map = plot.add<QCPColorMap2>().get();
               map->setContourLevels({ 1, 2 });
               return map;
           },
@@ -1333,7 +1336,7 @@ const QVector<Writer>& writers()
         { "QCPHistogram2D::setAutoContourLevels",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* histogram = new QCPHistogram2D(plot.xAxis, plot.yAxis);
+              auto* histogram = plot.add<QCPHistogram2D>().get();
               histogram->setContourLevels({ 1, 2 });
               return histogram;
           },
@@ -1523,7 +1526,7 @@ const QVector<Writer>& writers()
         { "QCPErrorBars refusing a data plottable",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* errors = new QCPErrorBars(plot.xAxis, plot.yAxis);
+              auto* errors = plot.add<QCPErrorBars>().get();
               errors->setDataPlottable(graphOn(plot));
               return errors;
           },
@@ -2200,7 +2203,7 @@ const QVector<Deleting>& deletingWriters()
         { "deleting an axis",
           [](QCustomPlot& plot)
           {
-              auto* graph = new QCPGraph(plot.xAxis2, plot.yAxis);
+              auto* graph = plot.xAxis2->axisRect()->add<QCPGraph>(plot.xAxis2, plot.yAxis).get();
               return std::pair<QObject*, const char*>(graph, "system");
           },
           [](QCustomPlot& plot) { delete plot.xAxis2.get(); }, true },

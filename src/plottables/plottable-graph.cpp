@@ -39,28 +39,12 @@ static bool isAboveResampleThreshold(const QCPMultiDataSource& src);
   signals.
 */
 
-QCPGraph::QCPGraph(QCPAxis* keyAxis, QCPAxis* valueAxis, QCP::Capabilities required)
-        : QCPLine(keyAxis, valueAxis, required)
-    , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
+QCPGraph::QCPGraph(QCP::Capabilities required)
+        : QCPLine(required), mPipeline(nullptr, this)
 {
-    // The graph list (2.x's addGraph/graph(i)): a graph its frame refused registered nowhere and
-    // must not leave a dangling entry there either. A graph the base registered (a cross-plot pair
-    // it owns but keeps inert included) is listed.
-    if (mParentPlot && isRegistered())
-        mParentPlot->registerGraph(this);
-
-    // Base constructor auto-adds a QCPPlottableLegendItem (vtable not yet set up
-    // for virtual addToLegend). Replace it with our group legend item. A refused object has no
-    // system and no row to replace. The plain row leaves its cell empty (no re-wrap) and the group
-    // row takes that cell: the legend's shape, and its stretch factors, move once, not three times.
-    if (mSystem && mParentPlot && mParentPlot->autoAddPlottableToLegend() && mParentPlot->legend) {
-        if (const auto plain = mParentPlot->legend->itemWithPlottable(this))
-            mParentPlot->legend->remove(plain.get());
-        addToLegend();
-    }
-
-    followAxes();
-
+    // The graph list, the legend row and the axes are wired when the graph is added: adoption
+    // registers it (registerGraph included), addToLegend() is virtual by then, and
+    // systemDidChange() calls followAxes().
     connect(&mPipeline, &QCPGraphPipeline::finished,
             this, [this](uint64_t gen) { onL1Ready(gen); });
     connect(&mPipeline, &QCPGraphPipeline::busyChanged,

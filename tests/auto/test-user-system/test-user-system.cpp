@@ -166,7 +166,8 @@ TwoRects twoRects(QCustomPlot& plot)
 //! A curve on the rect's axes, moved onto the rect's skew system: the J-3 route a user takes.
 InspectableCurve* curveOn(SkewRect* rect)
 {
-    auto* curve = new InspectableCurve(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
+    auto* curve = rect->axis(QCPAxis::atBottom)->axisRect()->add<InspectableCurve>(
+            rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)).get();
     curve->setSystem(rect->skew());
     curve->setPen(QPen(Qt::black, 3));
     curve->setLineStyle(QCPCurve::lsLine);
@@ -201,8 +202,8 @@ public:
 
 InspectableMultiGraph* multiGraphOn(SkewRect* rect)
 {
-    auto* graph = new InspectableMultiGraph(rect->axis(QCPAxis::atBottom),
-                                            rect->axis(QCPAxis::atLeft));
+    auto* graph = rect->axis(QCPAxis::atBottom)->axisRect()->add<InspectableMultiGraph>(
+            rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)).get();
     graph->setLineStyle(QCPGraph::lsLine);
     graph->setPen(QPen(Qt::black, 3));
     return graph;
@@ -518,8 +519,8 @@ void TestUserSystem::rescaleWalksTheOverriddenPlottables()
     QCPCoordinateSystem* flatSystem = flat->system(flat->key(), flat->value());
     QVERIFY(flatSystem);
 
-    auto* graph = new QCPGraph(cartesian->axis(QCPAxis::atBottom),
-                               cartesian->axis(QCPAxis::atLeft));
+    auto* graph = cartesian->axis(QCPAxis::atBottom)->axisRect()->add<QCPGraph>(
+            cartesian->axis(QCPAxis::atBottom), cartesian->axis(QCPAxis::atLeft)).get();
     graph->setData(QVector<double> { 0.0, 10.0 }, QVector<double> { 0.0, 1.0 });
     graph->setSystem(flatSystem);
     QCOMPARE(graph->system(), flatSystem);
@@ -536,26 +537,25 @@ void TestUserSystem::theCapabilityMasks()
 {
     QCustomPlot plot;
     QCPAxisRect* rect = plainRect(plot);
-    QCPAxis* key = rect->axis(QCPAxis::atBottom);
-    QCPAxis* value = rect->axis(QCPAxis::atLeft);
-    QCPCoordinateSystem* cartesian = rect->system(key, value);
+    QCPCoordinateSystem* cartesian = rect->system(rect->axis(QCPAxis::atBottom),
+                                                 rect->axis(QCPAxis::atLeft));
     QVERIFY(cartesian);
     QVERIFY2(cartesian->capabilities()
                  == (QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale | QCP::capLanes
                      | QCP::capStraightSegments),
              "a cartesian system offers every capability");
 
-    std::unique_ptr<QCPCurve> curve(new QCPCurve(key, value));
-    QVERIFY2(curve->requiredCapabilities() == QCP::capStraightSegments,
+    QCPCurve curve;
+    QVERIFY2(curve.requiredCapabilities() == QCP::capStraightSegments,
              "a curve needs only a straight segment between two data points");
-    std::unique_ptr<QCPBars> bars(new QCPBars(key, value));
-    QVERIFY2(bars->requiredCapabilities() == (QCP::capRectangular | QCP::capStraightKey),
+    QCPBars bars;
+    QVERIFY2(bars.requiredCapabilities() == (QCP::capRectangular | QCP::capStraightKey),
              "bars still need the rectangle and a straight key axis");
-    std::unique_ptr<QCPGraph> multi(new QCPGraph(key, value));
-    QVERIFY2(multi->requiredCapabilities() == QCP::capStraightSegments,
+    QCPGraph multi;
+    QVERIFY2(multi.requiredCapabilities() == QCP::capStraightSegments,
              "the multigraph needs only a straight segment between two data points");
-    std::unique_ptr<QCPWaterfallGraph> waterfall(new QCPWaterfallGraph(key, value));
-    QVERIFY2(waterfall->requiredCapabilities()
+    QCPWaterfallGraph waterfall;
+    QVERIFY2(waterfall.requiredCapabilities()
                  == (QCP::capRectangular | QCP::capStraightKey),
              "the waterfall's pixel offsets still need the rectangle and a straight key axis");
 
@@ -681,11 +681,10 @@ void TestUserSystem::aRefusedPlottableIsOnNoLayer()
     QCustomPlot plot;
     BendRect* rect = bendRect(plot);
 
-    auto* bars = new QCPBars(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
+    auto bars = rect->add<QCPBars>();
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
-    QVERIFY(!bars->system());
-    QVERIFY2(!bars->layer(), "a refused plottable stayed a child of a layer");
-    delete bars;
+    QVERIFY2(!bars, "the rect handed out a plottable its system refused");
+    QCOMPARE(plot.plottableCount(), 0);
     test_misuse::calls.clear();
 }
 
@@ -715,8 +714,8 @@ void TestUserSystem::adoptingBarsOntoASkewDefaultRectIsRefused()
 
     QCustomPlot source;
     QCPAxisRect* sourceRect = plainRect(source);
-    auto* takenBars = new QCPBars(sourceRect->axis(QCPAxis::atBottom),
-                                  sourceRect->axis(QCPAxis::atLeft));
+    auto* takenBars = sourceRect->axis(QCPAxis::atBottom)->axisRect()->add<QCPBars>(
+            sourceRect->axis(QCPAxis::atBottom), sourceRect->axis(QCPAxis::atLeft)).get();
     std::unique_ptr<QCPBars> moved = source.take(QCPHandle<QCPBars>(takenBars));
     QVERIFY(moved);
     test_misuse::calls.clear();
@@ -727,7 +726,7 @@ void TestUserSystem::adoptingBarsOntoASkewDefaultRectIsRefused()
     test_misuse::calls.clear();
 }
 
-void TestUserSystem::aRefusedPlottableThatJoinsLaterIsRegistered()
+void TestUserSystem::aRefusedAddLeavesThePlotUntouched()
 {
     QCustomPlot plot;
     plot.resize(400, 300);
@@ -742,15 +741,23 @@ void TestUserSystem::aRefusedPlottableThatJoinsLaterIsRegistered()
     settle(plot);
     QVERIFY(plot.legend);
 
-    auto* bars = new QCPBars(skew->axis(QCPAxis::atBottom), skew->axis(QCPAxis::atLeft));
+    // A refused add owns nothing: the object is deleted before the caller sees the empty handle,
+    // so nothing of it can be left in a list, a layer or a legend.
+    auto refused = skew->axis(QCPAxis::atBottom)->axisRect()->add<QCPBars>(
+            skew->axis(QCPAxis::atBottom), skew->axis(QCPAxis::atLeft));
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
-    QVERIFY(!bars->system());
+    QVERIFY(!refused);
     QCOMPARE(plot.plottableCount(), 0);
+    QCOMPARE(plot.legend->itemCount(), 0);
+    QVERIFY(plot.findChildren<QCPBars*>().isEmpty());
     test_misuse::calls.clear();
 
+    // The pair that accepts it registers it, legend row and all.
     QCPCoordinateSystem* system = cartesian->system(cartesian->axis(QCPAxis::atBottom),
                                                     cartesian->axis(QCPAxis::atLeft));
-    bars->setSystem(system);
+    auto bars = cartesian->add<QCPBars>(cartesian->axis(QCPAxis::atBottom),
+                                        cartesian->axis(QCPAxis::atLeft));
+    QVERIFY(bars);
     QCOMPARE(bars->system(), system);
     QCOMPARE(plot.plottableCount(), 1);
     QCOMPARE(plot.legend->itemCount(), 1);
@@ -770,15 +777,15 @@ void TestUserSystem::aRefusedIntervalsLeavesNoLayerOrLegendRow()
     BendRect* rect = bendRect(plot);
     auto* layout = new QCPLaneLayout(&plot);
 
-    auto* intervals = new QCPIntervals(rect->axis(QCPAxis::atBottom),
-                                       rect->axis(QCPAxis::atLeft), layout);
+    auto intervals = rect->axis(QCPAxis::atBottom)->axisRect()->add<QCPIntervals>(
+            rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft), layout);
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
-    QVERIFY(!intervals->system());
-    QVERIFY2(!intervals->layer(), "a refused intervals object stayed a child of a layer");
-    QVERIFY2(!intervals->labelLayer(), "a refused intervals object made its label layer");
+    QVERIFY2(!intervals, "the rect handed out an intervals object its system refused");
     QCOMPARE(plot.plottableCount(), 0);
     QCOMPARE(plot.legend ? plot.legend->itemCount() : 0, 0);
-    delete intervals;
+    QVERIFY(plot.findChildren<QCPIntervals*>().isEmpty());
+    // The label layer of a refused object never existed: it is made on arrival, which is refused.
+    QCOMPARE(plot.layer(QStringLiteral("intervals labels")), QCPHandle<QCPLayer> { });
     delete layout;
     test_misuse::calls.clear();
 }
@@ -792,20 +799,20 @@ void TestUserSystem::aCustomSystemDeclaringARectangleStillRefusesBars()
                     ->capabilities()
                     .testFlag(QCP::capRectangular));
 
-        auto* bars = new QCPBars(rect->axis(QCPAxis::atBottom),
-                                 rect->axis(QCPAxis::atLeft));
+        auto bars = rect->axis(QCPAxis::atBottom)->axisRect()->add<QCPBars>(
+                rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
         QCOMPARE(test_misuse::calls.size(), std::size_t(1));
-        QVERIFY2(!bars->system(),
+        QVERIFY2(!bars,
                  "a non-cartesian system that declares a rectangle handed out its plottable");
         QCOMPARE(plot.plottableCount(), 0);
-        delete bars;
         test_misuse::calls.clear();
     }
     {
         QCustomPlot plot;
         TwoRects rects = twoRects(plot);
-        auto* bars = new QCPBars(rects.cartesian->axis(QCPAxis::atBottom),
-                                 rects.cartesian->axis(QCPAxis::atLeft));
+        auto* bars = rects.cartesian->axis(QCPAxis::atBottom)->axisRect()->add<QCPBars>(
+                rects.cartesian->axis(QCPAxis::atBottom),
+                rects.cartesian->axis(QCPAxis::atLeft)).get();
         QCPCoordinateSystem* own = bars->system();
         QVERIFY(own);
         auto* declaring = new RectangleDeclaringSystem(
@@ -825,13 +832,13 @@ void TestUserSystem::barsBuiltOnASkewRectAreRefused()
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
 
-    // A11: the capability is checked where the object is built, not only in setSystem: a bar needs
-    // a rectangle, and a user system does not offer one.
-    auto* bars = new QCPBars(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
+    // A11: the capability is checked at adoption, not only in setSystem: a bar needs a rectangle,
+    // and a user system does not offer one.
+    auto bars = rect->axis(QCPAxis::atBottom)->axisRect()->add<QCPBars>(
+            rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
-    QVERIFY2(!bars->system(), "a bar joined a system that lacks its rectangle");
+    QVERIFY2(!bars, "a bar joined a system that lacks its rectangle");
     QCOMPARE(plot.plottableCount(), 0);
-    delete bars;
     test_misuse::calls.clear();
 }
 
@@ -864,8 +871,8 @@ void TestUserSystem::barsAreRefusedOnASkewRect()
 {
     QCustomPlot plot;
     TwoRects rects = twoRects(plot);
-    auto* bars = new QCPBars(rects.cartesian->axis(QCPAxis::atBottom),
-                             rects.cartesian->axis(QCPAxis::atLeft));
+    auto* bars = rects.cartesian->axis(QCPAxis::atBottom)->axisRect()->add<QCPBars>(
+            rects.cartesian->axis(QCPAxis::atBottom), rects.cartesian->axis(QCPAxis::atLeft)).get();
     QCPCoordinateSystem* own = bars->system();
     QVERIFY(own);
 
@@ -880,12 +887,11 @@ void TestUserSystem::errorBarsOnASkewRectAreRefused()
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
 
-    auto* bars = new QCPErrorBars(rect->axis(QCPAxis::atBottom),
-                                  rect->axis(QCPAxis::atLeft));
+    auto bars = rect->axis(QCPAxis::atBottom)->axisRect()->add<QCPErrorBars>(
+            rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
-    QVERIFY2(!bars->system(), "error bars joined a skew rect");
+    QVERIFY2(!bars, "error bars joined a skew rect");
     QCOMPARE(plot.plottableCount(), 0);
-    delete bars;
     test_misuse::calls.clear();
 }
 
@@ -939,8 +945,8 @@ void TestUserSystem::aCurveHitMapsInOneBatch()
     auto* rect = bareRect<TunedSkewRect<CountingSkewMapping>>(plot);
     auto* system = static_cast<TunedSkewSystem<CountingSkewMapping>*>(
             rect->system(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)).get());
-    auto* curve = new InspectableCurve(rect->axis(QCPAxis::atBottom),
-                                       rect->axis(QCPAxis::atLeft));
+    auto* curve = rect->axis(QCPAxis::atBottom)->axisRect()->add<InspectableCurve>(
+            rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)).get();
     curve->setSystem(system);
     curve->setPen(QPen(Qt::black, 3));
     curve->setData(QVector<double> { 1, 2, 3, 4, 5 },
@@ -1172,8 +1178,8 @@ void TestUserSystem::aFillWithAnUnrepresentableInverseStaysFinite()
     auto* rect = bareRect<TunedSkewRect<NaNSkewMapping>>(plot);
     auto* system = static_cast<TunedSkewSystem<NaNSkewMapping>*>(
             rect->system(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)).get());
-    auto* graph = new InspectableMultiGraph(rect->axis(QCPAxis::atBottom),
-                                       rect->axis(QCPAxis::atLeft));
+    auto* graph = rect->axis(QCPAxis::atBottom)->axisRect()->add<InspectableMultiGraph>(
+            rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)).get();
     graph->setSystem(system);
     graph->setData(QVector<double> { 2, 4 }, QVector<double> { 2, 8 });
     graph->setBrush(QColor(255, 0, 0));
@@ -1260,8 +1266,8 @@ void TestUserSystem::channelFillNeedsOneSystem()
     QCustomPlot plot;
     TwoRects rects = twoRects(plot);
     InspectableMultiGraph* graph = multiGraphOn(rects.skew);
-    auto* cartesian = new QCPGraph(rects.cartesian->axis(QCPAxis::atBottom),
-                                   rects.cartesian->axis(QCPAxis::atLeft));
+    auto* cartesian = rects.cartesian->axis(QCPAxis::atBottom)->axisRect()->add<QCPGraph>(
+            rects.cartesian->axis(QCPAxis::atBottom), rects.cartesian->axis(QCPAxis::atLeft)).get();
 
     // A5: on a user system both ends of a channel must be mapped by the same system, otherwise the
     // polygon would join two different frames.
@@ -1345,8 +1351,8 @@ void TestUserSystem::aCartesianChannelFillPartnerThatLostItsSystemDrawsNoBand()
     plot.xAxis->setRange(0, 10);
     plot.yAxis->setRange(0, 10);
 
-    auto* lower = new QCPGraph(plot.xAxis, plot.yAxis);
-    auto* upper = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* lower = plot.add<QCPGraph>().get();
+    auto* upper = plot.add<QCPGraph>().get();
     lower->setData(QVector<double> { 0, 10 }, QVector<double> { 2, 2 });
     upper->setData(QVector<double> { 0, 10 }, QVector<double> { 8, 8 });
     lower->setBrush(QColor(255, 0, 0));
@@ -1372,8 +1378,8 @@ void TestUserSystem::aCartesianChannelFillAcrossValueAxesStillWorks()
     plot.yAxis->setRange(0, 10);
     right->setRange(0, 10);
 
-    auto* lower = new QCPGraph(plot.xAxis, plot.yAxis);
-    auto* upper = new QCPGraph(plot.xAxis, right);
+    auto* lower = plot.add<QCPGraph>().get();
+    auto* upper = plot.xAxis->axisRect()->add<QCPGraph>(plot.xAxis, right).get();
     lower->setData(QVector<double> { 0, 10 }, QVector<double> { 2, 2 });
     upper->setData(QVector<double> { 0, 10 }, QVector<double> { 8, 8 });
     lower->setBrush(QColor(255, 0, 0));
@@ -1707,8 +1713,8 @@ void TestUserSystem::switchingBetweenCartesianAndSkewReRecords()
 {
     QCustomPlot plot;
     TwoRects rects = twoRects(plot);
-    auto* curve = new InspectableCurve(rects.cartesian->axis(QCPAxis::atBottom),
-                                       rects.cartesian->axis(QCPAxis::atLeft));
+    auto* curve = rects.cartesian->axis(QCPAxis::atBottom)->axisRect()->add<InspectableCurve>(
+            rects.cartesian->axis(QCPAxis::atBottom), rects.cartesian->axis(QCPAxis::atLeft)).get();
     curve->setLineStyle(QCPCurve::lsLine);
     curve->setPen(QPen(Qt::black, 3));
     curve->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
@@ -1834,11 +1840,11 @@ void TestUserSystem::aWaterfallIsRefusedOnASkewRect()
     // A guard (P-3): the offsets are pixel stacking, so a waterfall keeps the rectangle mask.
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
-    auto* waterfall = new QCPWaterfallGraph(rect->axis(QCPAxis::atBottom),
-                                             rect->axis(QCPAxis::atLeft));
-    QCOMPARE(waterfall->requiredCapabilities(),
-             QCP::capRectangular | QCP::capStraightKey);
-    QVERIFY2(!waterfall->system(), "a waterfall joined a skew rect");
+    QCPWaterfallGraph detached;
+    QCOMPARE(detached.requiredCapabilities(), QCP::capRectangular | QCP::capStraightKey);
+    auto waterfall = rect->axis(QCPAxis::atBottom)->axisRect()->add<QCPWaterfallGraph>(
+            rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
+    QVERIFY2(!waterfall, "a waterfall joined a skew rect");
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear();
 }
@@ -1940,8 +1946,8 @@ void TestUserSystem::switchingToASkewRectDropsTheBins()
 {
     QCustomPlot plot;
     TwoRects rects = twoRects(plot);
-    auto* graph = new InspectableMultiGraph(rects.cartesian->axis(QCPAxis::atBottom),
-                                            rects.cartesian->axis(QCPAxis::atLeft));
+    auto* graph = rects.cartesian->axis(QCPAxis::atBottom)->axisRect()->add<InspectableMultiGraph>(
+            rects.cartesian->axis(QCPAxis::atBottom), rects.cartesian->axis(QCPAxis::atLeft)).get();
     const int count = 100000;
     QVector<double> keys(count), values(count);
     for (int i = 0; i < count; ++i)
@@ -2110,8 +2116,8 @@ void TestUserSystem::aFillToAnotherGraphOnASkewRect()
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
     InspectableMultiGraph* owner = multiGraphOn(rect);
-    auto* partner = new QCPGraph(rect->axis(QCPAxis::atBottom),
-                                      rect->axis(QCPAxis::atLeft));
+    auto* partner = rect->axis(QCPAxis::atBottom)->axisRect()->add<QCPGraph>(
+            rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)).get();
     owner->setData(QVector<double> { 2, 4, 6 }, QVector<double> { 2, 6, 3 });
     partner->setData(QVector<double> { 2, 4, 6 }, QVector<double> { 8, 9, 5 });
     owner->setComponentPens({ QPen(Qt::NoPen) });
@@ -2272,8 +2278,8 @@ void TestUserSystem::multiGraphErrorBarCapsPerBarOnANonlinearMapping()
     rect->axis(QCPAxis::atLeft)->setRange(0, 10);
     settle(plot);
 
-    auto* graph = new InspectableMultiGraph(rect->axis(QCPAxis::atBottom),
-                                            rect->axis(QCPAxis::atLeft));
+    auto* graph = rect->axis(QCPAxis::atBottom)->axisRect()->add<InspectableMultiGraph>(
+            rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)).get();
     graph->setData(std::vector<double>{2, 6},
                    std::vector<std::vector<double>>{{1, 9}, {0.8, 8.8}, {1.2, 9.2}});
     QVERIFY(graph->setComponentErrorBars(0, 1, 2, 12.0));
@@ -2392,8 +2398,8 @@ void TestUserSystem::colourScaleFollowsASystemMove()
     scaleA->setDataRange(QCPRange(0, 1));
     scaleB->setDataRange(QCPRange(0, 100));
 
-    auto* graph = new InspectableMultiGraph(rects.cartesian->axis(QCPAxis::atBottom),
-                                            rects.cartesian->axis(QCPAxis::atLeft));
+    auto* graph = rects.cartesian->axis(QCPAxis::atBottom)->axisRect()->add<InspectableMultiGraph>(
+            rects.cartesian->axis(QCPAxis::atBottom), rects.cartesian->axis(QCPAxis::atLeft)).get();
     graph->setData(QVector<double> { 1, 2, 3 },
                    std::vector<QVector<double>> { QVector<double> { 1, 2, 1 } });
     graph->setColorValues(std::vector<double> { 0.0, 0.5, 1.0 });
@@ -2427,8 +2433,8 @@ void TestUserSystem::setColorScaleOnTheBaseIsRefused()
     QCPCoordinateSystem* flatSystem = flat->system(flat->key(), flat->value());
     QVERIFY(flatSystem);
 
-    auto* graph = new InspectableMultiGraph(cartesian->axis(QCPAxis::atBottom),
-                                            cartesian->axis(QCPAxis::atLeft));
+    auto* graph = cartesian->axis(QCPAxis::atBottom)->axisRect()->add<InspectableMultiGraph>(
+            cartesian->axis(QCPAxis::atBottom), cartesian->axis(QCPAxis::atLeft)).get();
     graph->setData(QVector<double> { 2, 5 }, std::vector<QVector<double>> { QVector<double> { 2, 5 } });
     auto* scale = new QCPColorScale(&plot);
     graph->setColorScale(scale);
@@ -2464,8 +2470,8 @@ void TestUserSystem::aMultiGraphColourWithoutAScaleIsRefused()
     QCPCoordinateSystem* flatSystem = flat->system(flat->key(), flat->value());
     QVERIFY(flatSystem);
 
-    auto* graph = new InspectableMultiGraph(cartesian->axis(QCPAxis::atBottom),
-                                            cartesian->axis(QCPAxis::atLeft));
+    auto* graph = cartesian->axis(QCPAxis::atBottom)->axisRect()->add<InspectableMultiGraph>(
+            cartesian->axis(QCPAxis::atBottom), cartesian->axis(QCPAxis::atLeft)).get();
     graph->setData(QVector<double> { 2, 5 }, std::vector<QVector<double>> { QVector<double> { 2, 5 } });
     graph->setSystem(flatSystem);
     QCOMPARE(graph->system(), flatSystem);
@@ -2483,8 +2489,8 @@ void TestUserSystem::aMultiGraphColourWithoutAScaleIsRefused()
     QVERIFY2(graph->hasColorValues(), "an explicit colour scale did not admit the values");
 
     // The join refuses too: colour values, no scale, non-rect area.
-    auto* other = new InspectableMultiGraph(cartesian->axis(QCPAxis::atBottom),
-                                            cartesian->axis(QCPAxis::atLeft));
+    auto* other = cartesian->axis(QCPAxis::atBottom)->axisRect()->add<InspectableMultiGraph>(
+            cartesian->axis(QCPAxis::atBottom), cartesian->axis(QCPAxis::atLeft)).get();
     other->setData(QVector<double> { 2, 5 }, std::vector<QVector<double>> { QVector<double> { 2, 5 } });
     other->setColorValues(std::vector<double> { 0.0, 1.0 });
     QVERIFY2(other->colorScale(), "the cartesian graph did not join its rect's scale");
@@ -2513,7 +2519,8 @@ void TestUserSystem::aMapMovedOffAnAxisRectLeavesItsScale()
     QCPCoordinateSystem* flatSystem = flat->system(flat->key(), flat->value());
     QVERIFY(flatSystem);
 
-    auto* map = new QCPColorMap(cartesian->axis(QCPAxis::atBottom), cartesian->axis(QCPAxis::atLeft));
+    auto* map = cartesian->axis(QCPAxis::atBottom)->axisRect()->add<QCPColorMap>(
+            cartesian->axis(QCPAxis::atBottom), cartesian->axis(QCPAxis::atLeft)).get();
     QCOMPARE(map->colorScale(), cartesian->colorScale().get());
     map->setSystem(flatSystem);
     QCOMPARE(map->system(), flatSystem);
@@ -2528,7 +2535,7 @@ void TestUserSystem::aDecoratedMultiGraphJoinsASkewRect()
     TwoRects rects = twoRects(plot);
     QCPAxis* key = rects.cartesian->axis(QCPAxis::atBottom);
     QCPAxis* value = rects.cartesian->axis(QCPAxis::atLeft);
-    auto* graph = new InspectableMultiGraph(key, value);
+    auto* graph = key->axisRect()->add<InspectableMultiGraph>(key, value).get();
     graph->setData(QVector<double> { 2, 3.5, 5 },
                    std::vector<QVector<double>> { QVector<double> { 2, 4, 3 },
                                                   QVector<double> { 5, 1, 6 },

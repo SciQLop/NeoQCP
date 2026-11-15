@@ -69,7 +69,24 @@ public:
     enum OffsetMode { omUniform, omCustom };
     Q_ENUM(OffsetMode)
 
-    explicit QCPWaterfallGraph(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    explicit QCPWaterfallGraph(QCP::Capabilities required = QCP::capRectangular
+                                                           | QCP::capStraightKey);
+    //! One row per (key, value) pair, sorted by key.
+    template <QCPNumberRange K, QCPNumberRange V>
+    QCPWaterfallGraph(const K& keys, const V& values, bool alreadySorted = false)
+        : QCPWaterfallGraph()
+    {
+        std::vector<double> keyValues(std::ranges::begin(keys), std::ranges::end(keys));
+        std::vector<double> dataValues(std::ranges::begin(values), std::ranges::end(values));
+        setData(keyValues, dataValues, alreadySorted);
+    }
+    //! Value columns of any numeric type: the constructor form of the multi-column setData().
+    template <IndexableNumericRange KC, IndexableNumericRange VC>
+    QCPWaterfallGraph(KC&& keys, std::vector<VC>&& valueColumns, bool alreadySorted = false)
+        : QCPWaterfallGraph()
+    {
+        setData(std::forward<KC>(keys), std::forward<std::vector<VC>>(valueColumns), alreadySorted);
+    }
 
     void setDataSource(std::shared_ptr<QCPMultiDataSource> source) override;
 

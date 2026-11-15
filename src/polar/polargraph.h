@@ -87,10 +87,16 @@ public:
     template <typename T>
     using OpsFor = QCPPolarGraphOps<T>;
 
-    QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* valueAxis,
-                  QCP::Capabilities required = QCP::Capabilities());
-    explicit QCPPolarGraph(QCPCoordinateSystem* system,
-                           QCP::Capabilities required = QCP::Capabilities());
+    explicit QCPPolarGraph(QCP::Capabilities required = QCP::Capabilities());
+    //! Keys (angles) and values, as setData() takes them.
+    template <QCPNumberRange K, QCPNumberRange V>
+    QCPPolarGraph(const K& keys, const V& values, bool alreadySorted = false)
+        : QCPPolarGraph()
+    {
+        setData(QVector<double>(std::ranges::begin(keys), std::ranges::end(keys)),
+                QVector<double>(std::ranges::begin(values), std::ranges::end(values)),
+                alreadySorted);
+    }
 
     // getters:
     bool periodic() const { return mPeriodic; }

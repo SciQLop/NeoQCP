@@ -25,12 +25,12 @@ void TestQCustomPlot::interface_plottables()
   mPlot->yAxis->setRange(mPlot->axisRect()->top(), mPlot->axisRect()->top()+mPlot->axisRect()->height());
   mPlot->yAxis->setRangeReversed(true);
   
-  QCPGraph *g1 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
-  QCPGraph *g2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  QCPGraph *g1 = mPlot->add<QCPGraph>().get();
+  QCPGraph *g2 = mPlot->add<QCPGraph>().get();
   g1->setData(QVector<double>() << 200 << 300, QVector<double>() << 100 << 120);
   g2->setData(QVector<double>() << 200 << 300, QVector<double>() << 106 << 126);
 
-  QCPBars *b1 = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+  QCPBars *b1 = mPlot->add<QCPBars>().get();
   b1->setWidth(50);
   b1->setData(QVector<double>() << 250, QVector<double>() << 150);
 
@@ -256,7 +256,7 @@ void dragFromTo(QCustomPlot* plot, QPoint from, QPoint to)
 //! A flat graph at value 5 over keys [2, 8], axes [0, 10], laid out.
 QCPGraph* flatGraph(QCustomPlot* plot, double value = 5)
 {
-  auto* g = new QCPGraph(plot->xAxis, plot->yAxis);
+  auto* g = plot->add<QCPGraph>().get();
   g->setData(QVector<double>{ 2, 5, 8 }, QVector<double>{ value, value, value });
   return g;
 }

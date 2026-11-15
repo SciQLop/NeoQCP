@@ -28,8 +28,8 @@ public:
     enum LineStyle { lsNone, lsLine, lsStepLeft, lsStepRight, lsStepCenter, lsImpulse };
     Q_ENUM(LineStyle)
 
-    explicit QCPLine(QCPAxis* keyAxis, QCPAxis* valueAxis,
-                             QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale);
+    explicit QCPLine(QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey
+                                                   | QCP::capColourScale);
     // Out of line: QCPGraphComponent is complete only after this class (it holds a LineStyle).
     ~QCPLine() override;
 

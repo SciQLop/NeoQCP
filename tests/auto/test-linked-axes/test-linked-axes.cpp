@@ -198,7 +198,7 @@ void TestLinkedAxes::barsOnADecreasingLink()
     plot.yAxis->setRange(0, 10);
     plot.xAxis2->linkTo(plot.xAxis, reciprocal, reciprocal);
 
-    QCPBars* bars = new QCPBars(plot.xAxis2, plot.yAxis);
+    QCPBars* bars = plot.xAxis2->axisRect()->add<QCPBars>(plot.xAxis2, plot.yAxis).get();
     bars->setPen(Qt::NoPen);
     bars->setBrush(Qt::red);
     bars->setWidth(0.5);

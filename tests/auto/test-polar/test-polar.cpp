@@ -498,10 +498,7 @@ namespace
 class RectangularPolarGraph : public QCPPolarGraph
 {
 public:
-    RectangularPolarGraph(QCPPolarAxisAngular* angular, QCPPolarAxisRadial* radial)
-        : QCPPolarGraph(angular, radial, QCP::capRectangular)
-    {
-    }
+    RectangularPolarGraph() : QCPPolarGraph(QCP::capRectangular) { }
 };
 
 int redInkCount(const QImage& image)
@@ -634,8 +631,7 @@ void TestPolar::areaAddTakesAnyPolarCapablePlottable()
     QCOMPARE(plot.plottableCount(), 1);
 
     // A plottable needing a frame the polar system does not carry is refused, once.
-    auto refused = area->add<RectangularPolarGraph>(QVector<double> { 0, 180 },
-                                                    QVector<double> { 0.5, 0.5 });
+    auto refused = area->add<RectangularPolarGraph>();
     QVERIFY(!refused);
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear();

@@ -114,8 +114,8 @@ int leftEdgeShift(QCustomPlot* plot, const std::function<QImage()>& frame, doubl
 //! Two bars side by side in one group, both with a width in plot coordinates.
 void groupedPair(QCustomPlot* plot, QCPBars*& first, QCPBars*& second)
 {
-    first = new QCPBars(plot->xAxis, plot->yAxis);
-    second = new QCPBars(plot->xAxis, plot->yAxis);
+    first = plot->add<QCPBars>().get();
+    second = plot->add<QCPBars>().get();
     auto* group = new QCPBarsGroup(plot); // default: an absolute spacing in pixels
     group->append(first);
     group->append(second);
@@ -124,15 +124,15 @@ void groupedPair(QCustomPlot* plot, QCPBars*& first, QCPBars*& second)
 //! Two bars on one key range, the second stacked on the first.
 void stackedPair(QCustomPlot* plot, QCPBars*& below, QCPBars*& above)
 {
-    below = new QCPBars(plot->xAxis, plot->yAxis);
-    above = new QCPBars(plot->xAxis, plot->yAxis);
+    below = plot->add<QCPBars>().get();
+    above = plot->add<QCPBars>().get();
     above->moveAbove(below);
 }
 
 //! A bar on \a plot at keys {2, 3}, painted \a colour without an outline.
 QCPBars* colouredBars(QCustomPlot* plot, const QColor& colour, double value = 1.0)
 {
-    auto* bars = new QCPBars(plot->xAxis, plot->yAxis);
+    auto* bars = plot->add<QCPBars>().get();
     bars->setWidth(0.6);
     bars->setPen(Qt::NoPen);
     bars->setBrush(colour);
@@ -168,7 +168,7 @@ int lowestEdgeOf(const QImage& frame, QCustomPlot* plot, double key, const QColo
 void TestQCPBars::init()
 {
   mPlot = new QCustomPlot(0);
-  mBars = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+  mBars = mPlot->add<QCPBars>().get();
 }
 
 void TestQCPBars::cleanup()
@@ -273,7 +273,7 @@ void TestQCPBars::dataManipulation()
 
 void TestQCPBars::dataSharing()
 {
-  QCPBars *bars2 = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+  QCPBars *bars2 = mPlot->add<QCPBars>().get();
   
   QSharedPointer<QCPBarsDataContainer> data = bars2->data();
   mBars->setData(data); // now shares data with bars2
@@ -491,8 +491,8 @@ void TestQCPBars::aBarLeavingItsSystemLeavesItsStackAndGroup()
     mPlot->resize(400, 300);
     auto* rect2 = new QCPAxisRect(mPlot);
     mPlot->plotLayout()->addElement(0, 1, rect2);
-    auto* lower = new QCPBars(mPlot->xAxis, mPlot->yAxis);
-    auto* upper = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+    auto* lower = mPlot->add<QCPBars>().get();
+    auto* upper = mPlot->add<QCPBars>().get();
     lower->setData({ 1, 2, 3 }, { 1, 1, 1 });
     upper->setData({ 1, 2, 3 }, { 1, 1, 1 });
     lower->setBrush(QBrush(Qt::red));
@@ -531,8 +531,8 @@ void TestQCPBars::aBarKeepsItsStackAndGroupWithinItsArea()
     mPlot->resize(400, 300);
     QCPAxis* top = mPlot->axisRect()->addAxis(QCPAxis::atTop);
     QCPAxis* right = mPlot->axisRect()->addAxis(QCPAxis::atRight);
-    auto* lower = new QCPBars(mPlot->xAxis, mPlot->yAxis);
-    auto* upper = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+    auto* lower = mPlot->add<QCPBars>().get();
+    auto* upper = mPlot->add<QCPBars>().get();
     lower->setData({ 1, 2, 3 }, { 1, 1, 1 });
     upper->setData({ 1, 2, 3 }, { 1, 1, 1 });
     upper->moveAbove(lower);
@@ -657,7 +657,7 @@ void TestQCPBars::groupedBarsOnALogAxis()
 void TestQCPBars::plotWidthBarsNeverReRecord()
 {
     // A width in plot coordinates is a data position: a pan and a zoom both reuse the recording.
-    auto* bars = new CountingBars(mPlot->xAxis, mPlot->yAxis);
+    auto* bars = mPlot->add<CountingBars>().get();
     bars->setData(QVector<double> { 1, 2, 3 }, QVector<double> { 1, 2, 3 });
     mPlot->resize(300, 200);
     mPlot->xAxis->setRange(0, 4);
@@ -679,7 +679,7 @@ void TestQCPBars::pixelWidthBarsReRecordOnEveryPan()
 {
     // A width in pixels is baked out of the transform: any new transform remakes the recording,
     // a pan included (the pixels it baked all moved).
-    auto* bars = new CountingBars(mPlot->xAxis, mPlot->yAxis);
+    auto* bars = mPlot->add<CountingBars>().get();
     bars->setData(QVector<double> { 1, 2, 3 }, QVector<double> { 1, 2, 3 });
     bars->setWidth(8);
     bars->setWidthType(QCPBars::wtAbsolute);
@@ -701,7 +701,7 @@ void TestQCPBars::pixelWidthBarsReRecordOnEveryPan()
 
 void TestQCPBars::barsSelectionReRecordsAndUsesTheDecorator()
 {
-    auto* bars = new CountingBars(mPlot->xAxis, mPlot->yAxis);
+    auto* bars = mPlot->add<CountingBars>().get();
     bars->setData(QVector<double> { 1, 2, 3 }, QVector<double> { 2, 2, 2 });
     bars->setWidth(0.6);
     bars->setPen(Qt::NoPen); // fill only, so the pixel read is the brush
@@ -741,7 +741,7 @@ void TestQCPBars::bracketDecorationOverTheBars()
     QCustomPlot* plot = shownPlot(host);
     if (!plot)
         QSKIP("no QRhi on this platform");
-    auto* bars = new QCPBars(plot->xAxis, plot->yAxis);
+    auto* bars = plot->add<QCPBars>().get();
     bars->setData(QVector<double> { 1 }, QVector<double> { 2 });
     bars->setWidth(0.6);
     bars->setPen(Qt::NoPen);
@@ -780,7 +780,7 @@ void TestQCPBars::bracketSubclassKeepsItsDrawBracket()
     QCustomPlot* plot = shownPlot(host);
     if (!plot)
         QSKIP("no QRhi on this platform");
-    auto* bars = new QCPBars(plot->xAxis, plot->yAxis);
+    auto* bars = plot->add<QCPBars>().get();
     bars->setData(QVector<double> { 1 }, QVector<double> { 2 });
     bars->setWidth(0.6);
     bars->setPen(Qt::NoPen);
@@ -818,7 +818,7 @@ void TestQCPBars::barsPanDoesNotReRecord()
     QCustomPlot* plot = shownPlot(host);
     if (!plot)
         QSKIP("no QRhi on this platform");
-    auto* bars = new CountingBars(plot->xAxis, plot->yAxis);
+    auto* bars = plot->add<CountingBars>().get();
     bars->setData(spreadKeys(10000), flatValues(10000));
     plot->xAxis->setRange(0, 10);
     plot->yAxis->setRange(0, 1);
@@ -884,7 +884,7 @@ void TestQCPBars::barsOnTheKeyBoundEdgeAreHit()
     const double onEdge = bound + outward * 0.5;
     const double onePixelOut = onEdge + outward * keysPerPixel;
 
-    auto* bars = new QCPBars(keyAxis, valueAxis);
+    auto* bars = keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis).get();
     bars->setWidth(1.0);
     bars->setData(QVector<double> { 5.0, onEdge, onePixelOut },
                   QVector<double> { 1.0, 1.0, 1.0 });
@@ -940,7 +940,7 @@ void TestQCPBars::aClickSelectsTheBarUnderTheCursor()
             selectEvent(nullptr, false, details, &changed);
         }
     };
-    auto* bars = new ClickableBars(mPlot->xAxis, mPlot->yAxis);
+    auto* bars = mPlot->add<ClickableBars>().get();
     QVector<double> keys;
     QVector<double> values;
     for (int i = 0; i < 8; ++i)

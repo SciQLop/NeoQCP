@@ -111,14 +111,14 @@ Scene errorBarsScene(bool verticalKey, bool logValue, bool selected,
     QCPAxis* value = verticalKey ? plot.xAxis : plot.yAxis;
     key->setRange(0, 6);
     value->setRange(logValue ? 0.5 : -1, logValue ? 10 : 1.5);
-    auto* graph = new QCPGraph(key, value);
+    auto* graph = key->axisRect()->add<QCPGraph>(key, value).get();
     graph->setLineStyle(QCPGraph::lsNone);
     graph->setPen(QPen(Qt::blue, 0));
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
     graph->setData(QVector<double> { 0.5, 1.5, 2.5, 3.5, 4.5, 5.5 },
                    logValue ? QVector<double> { 0.7, 1.2, 2.4, 1.6, 3.4, 5.5 }
                             : QVector<double> { 0.2, -0.4, 0.6, 0.1, -0.3, 0.5 });
-    auto* bars = new RecordingErrorBars(key, value);
+    auto* bars = key->axisRect()->add<RecordingErrorBars>(key, value).get();
     bars->setDataPlottable(graph);
     bars->setErrorType(QCPErrorBars::etValueError);
     bars->setData(QVector<double> { 0.2, 0.4, 0.3, 0.5, 0.2, 0.4 });
@@ -144,10 +144,10 @@ std::unique_ptr<QCustomPlot> makeBarsPlot(RecordingErrorBars** out)
     plot->resize(400, 300);
     plot->xAxis->setRange(0, 6);
     plot->yAxis->setRange(-1, 1.5);
-    auto* graph = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* graph = plot->add<QCPGraph>().get();
     graph->setLineStyle(QCPGraph::lsNone);
     graph->setData(QVector<double> { 0.5, 1.5, 2.5 }, QVector<double> { 0.2, 0.2, 0.2 });
-    auto* bars = new RecordingErrorBars(plot->xAxis, plot->yAxis);
+    auto* bars = plot->add<RecordingErrorBars>().get();
     bars->setDataPlottable(graph);
     bars->setErrorType(QCPErrorBars::etValueError);
     bars->setData(QVector<double> { 0.4, 0.4, 0.4 });
@@ -204,11 +204,11 @@ void TestErrorBarGeometry::barsFollowTheirPlottablesData()
     plot.resize(400, 300);
     plot.xAxis->setRange(0, 6);
     plot.yAxis->setRange(-1, 1.5);
-    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* graph = plot.add<QCPGraph>().get();
     graph->setLineStyle(QCPGraph::lsNone);
     graph->setData(QVector<double> { 0.5, 1.5, 2.5, 3.5, 4.5, 5.5 },
                    QVector<double> { 0.2, 0.2, 0.2, 0.2, 0.2, 0.2 });
-    auto* bars = new RecordingErrorBars(plot.xAxis, plot.yAxis);
+    auto* bars = plot.add<RecordingErrorBars>().get();
     bars->setDataPlottable(graph);
     bars->setErrorType(QCPErrorBars::etValueError);
     bars->setData(QVector<double> { 0.4, 0.4, 0.4, 0.4, 0.4, 0.4 });
@@ -235,7 +235,7 @@ void TestErrorBarGeometry::attachDetachReattach()
 {
     RecordingErrorBars* bars = nullptr;
     auto plot = makeBarsPlot(&bars);
-    auto* other = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* other = plot->add<QCPGraph>().get();
     other->setLineStyle(QCPGraph::lsNone);
     other->setData(QVector<double> { 2.5, 3.5, 4.5 }, QVector<double> { 0.2, 0.2, 0.2 });
     plot->replot();
@@ -392,7 +392,7 @@ void TestErrorBarGeometry::aDecoratorScatterStyleReachesTheSelectedOutliers()
     plot.resize(400, 300);
     plot.xAxis->setRange(0, 6);
     plot.yAxis->setRange(0, 10);
-    auto* box = new QCPStatisticalBox(plot.xAxis, plot.yAxis);
+    auto* box = plot.add<QCPStatisticalBox>().get();
     box->addData(2.0, 1.0, 3.0, 4.0, 6.0, 7.0, QVector<double> { 9.0 });
     box->setOutlierStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 5));
     box->setSelectable(QCP::stDataRange);
@@ -438,14 +438,14 @@ void TestErrorBarGeometry::aCurveRecordsEveryBar()
     plot.resize(400, 300);
     plot.xAxis->setRange(-1, 1);
     plot.yAxis->setRange(-1, 1);
-    auto* curve = new QCPCurve(plot.xAxis, plot.yAxis);
+    auto* curve = plot.add<QCPCurve>().get();
     const int n = 41;
     QVector<QCPCurveData> points;
     for (int i = 0; i < n; ++i)
         points.append(QCPCurveData(i, -1.0 + 2.0 * i / (n - 1), 0.2));
     curve->data()->set(points, true);
     QVERIFY(!curve->sortKeyIsMainKey());
-    auto* bars = new RecordingErrorBars(plot.xAxis, plot.yAxis);
+    auto* bars = plot.add<RecordingErrorBars>().get();
     bars->setDataPlottable(curve);
     bars->setErrorType(QCPErrorBars::etValueError);
     bars->setData(QVector<double>(n, 0.3));
@@ -484,8 +484,8 @@ void TestErrorBarGeometry::aGroupedBarsErrorBarSitsOnItsOwnBar()
     plot.resize(400, 300);
     plot.xAxis->setRange(0, 2);
     plot.yAxis->setRange(0, 1);
-    auto* first = new QCPBars(plot.xAxis, plot.yAxis);
-    auto* second = new QCPBars(plot.xAxis, plot.yAxis);
+    auto* first = plot.add<QCPBars>().get();
+    auto* second = plot.add<QCPBars>().get();
     first->setData(QVector<double> { 1.0 }, QVector<double> { 0.3 });
     second->setData(QVector<double> { 1.0 }, QVector<double> { 0.3 });
     auto* group = new QCPBarsGroup(&plot);
@@ -493,7 +493,7 @@ void TestErrorBarGeometry::aGroupedBarsErrorBarSitsOnItsOwnBar()
     second->setBarsGroup(group);
     for (QCPBars* bar : { first, second })
     {
-        auto* bars = new RecordingErrorBars(plot.xAxis, plot.yAxis);
+        auto* bars = plot.add<RecordingErrorBars>().get();
         bars->setDataPlottable(bar);
         bars->setErrorType(QCPErrorBars::etValueError);
         bars->setData(QVector<double> { 0.1 });
@@ -520,12 +520,12 @@ void TestErrorBarGeometry::aStackedBarsErrorBarSitsOnTheTopOfTheStack()
     plot.resize(400, 300);
     plot.xAxis->setRange(0, 2);
     plot.yAxis->setRange(0, 1);
-    auto* below = new QCPBars(plot.xAxis, plot.yAxis);
+    auto* below = plot.add<QCPBars>().get();
     below->setData(QVector<double> { 1.0 }, QVector<double> { 0.3 });
-    auto* above = new QCPBars(plot.xAxis, plot.yAxis);
+    auto* above = plot.add<QCPBars>().get();
     above->setData(QVector<double> { 1.0 }, QVector<double> { 0.3 });
     above->moveAbove(below);
-    auto* bars = new RecordingErrorBars(plot.xAxis, plot.yAxis);
+    auto* bars = plot.add<RecordingErrorBars>().get();
     bars->setDataPlottable(above);
     bars->setErrorType(QCPErrorBars::etValueError);
     bars->setData(QVector<double> { 0.1 });
@@ -545,7 +545,7 @@ void TestErrorBarGeometry::aStackedBarsErrorBarSitsOnTheTopOfTheStack()
 void TestErrorBarGeometry::theLegendIconIsRecorded()
 {
     QCustomPlot plot;
-    auto* bars = new RecordingErrorBars(plot.xAxis, plot.yAxis);
+    auto* bars = plot.add<RecordingErrorBars>().get();
     plot.legend->setVisible(true);
     [[maybe_unused]] const QPixmap painted = plot.toPixmap(300, 200);
     const QCPDrawList& icon = bars->iconList();

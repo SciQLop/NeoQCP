@@ -418,8 +418,8 @@ public:
 
     // Creates a T the plot owns and returns its fluent handle (qcp::HandleFor<T>). What args mean
     // depends on T's family (qcp::Construct<T>, construct.h):
-    //  - plottable: add<QCPGraph>(keys, values): created on the default axis rect's bottom and left
-    //    axes and the current layer; args go to the handle's setData;
+    //  - plottable: add<QCPGraph>(keys, values): its constructor arguments, joined to the default
+    //    axis rect's system and the current layer (a plottable takes its data in its constructor);
     //  - item: add<QCPItemLine>(args...): its constructor arguments, placed on the default axis rect;
     //  - layout part: add<QCPTextElement>(row, column, text): inserted in the plot layout; the
     //    arguments after the cell go to the constructor after the plot;

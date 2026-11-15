@@ -85,8 +85,8 @@ DOC_SNIPPET(performance_shared_source, 600, 420)
         axis->setLayer("axes");
         axis->grid()->setLayer("grid");
     }
-    auto* detail = new QCPGraph(detailRect->axis(QCPAxis::atBottom),
-                                 detailRect->axis(QCPAxis::atLeft));
+    auto* detail = detailRect->axis(QCPAxis::atBottom)->axisRect()->add<QCPGraph>(
+            detailRect->axis(QCPAxis::atBottom), detailRect->axis(QCPAxis::atLeft)).get();
     detail->setDataSource(source); // the same samples, no second copy
     detail->setPen(QPen(QColor(214, 39, 40)));
 

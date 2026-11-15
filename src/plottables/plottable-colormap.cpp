@@ -783,15 +783,19 @@ QCPRange rangeWithHalfACell(QCPAxis* axis, const QCPRange& range, int size)
   \a keyAxis. This QCustomPlot instance takes ownership of the QCPColorMap, so do not delete it
   manually but use QCustomPlot::removePlottable() instead.
 */
-QCPColorMap::QCPColorMap(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPColorMapped(keyAxis, valueAxis)
+QCPColorMap::QCPColorMap()
+        : QCPColorMapped()
         , mMapData(new QCPColorMapData(10, 10, QCPRange(0, 5), QCPRange(0, 5)))
         , mInterpolate(true)
         , mTightBoundary(false)
         , mMapImageInvalidated(true)
 {
     mMapData->mOwner = this;
-    followKeyAxisRectScale();
+}
+
+QCPColorMap::QCPColorMap(QCPColorMapData* data, bool copy) : QCPColorMap()
+{
+    setData(data, copy);
 }
 
 QCPColorMap::~QCPColorMap()

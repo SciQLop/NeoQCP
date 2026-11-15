@@ -9,7 +9,7 @@
 void TestQCPFinancial::init()
 {
   mPlot = new QCustomPlot(0);
-  mFinancial = new QCPFinancial(mPlot->xAxis, mPlot->yAxis);
+  mFinancial = mPlot->add<QCPFinancial>().get();
 }
 
 void TestQCPFinancial::cleanup()
@@ -134,7 +134,7 @@ void TestQCPFinancial::dataManipulation()
 
 void TestQCPFinancial::dataSharing()
 {
-  QCPFinancial *financial2 = new QCPFinancial(mPlot->xAxis, mPlot->yAxis);
+  QCPFinancial *financial2 = mPlot->add<QCPFinancial>().get();
   
   QSharedPointer<QCPFinancialDataContainer> data = financial2->data();
   mFinancial->setData(data); // now shares data with financial2
@@ -212,7 +212,7 @@ Scene financialScene(bool ohlc, bool verticalKey, bool logValue, bool selected)
   QCPAxis* value = verticalKey ? plot.xAxis : plot.yAxis;
   key->setRange(0, 7);
   value->setRange(logValue ? 1 : 0, 10);
-  auto* financial = new RecordingFinancial(key, value);
+  auto* financial = key->axisRect()->add<RecordingFinancial>(key, value).get();
   const QVector<double> keys { 0.6, 1.4, 2.2, 3.0, 3.8, 4.6, 5.4, 6.2 };
   QVector<double> open, high, low, close;
   for (int i = 0; i < keys.size(); ++i)
@@ -243,7 +243,7 @@ RecordingFinancial* makeFinancialPlot(QCustomPlot& plot)
   plot.resize(400, 300);
   plot.xAxis->setRange(0, 7);
   plot.yAxis->setRange(0, 10);
-  auto* financial = new RecordingFinancial(plot.xAxis, plot.yAxis);
+  auto* financial = plot.add<RecordingFinancial>().get();
   financial->setData(QVector<double> { 0.6, 1.4, 2.2, 3.0, 3.8, 4.6, 5.4, 6.2 },
                      QVector<double> { 3.0, 3.6, 4.2, 4.8, 5.4, 6.0, 6.6, 7.2 },
                      QVector<double> { 4.0, 4.6, 5.2, 5.8, 6.4, 7.0, 7.6, 8.2 },
@@ -338,7 +338,7 @@ void TestQCPFinancial::aLogKeyAxisCentresTheBodyInPixels()
   plot.xAxis->setScaleType(QCPAxis::stLogarithmic);
   plot.xAxis->setRange(1, 100);
   plot.yAxis->setRange(0, 10);
-  auto* chart = new RecordingFinancial(plot.xAxis, plot.yAxis);
+  auto* chart = plot.add<RecordingFinancial>().get();
   chart->setChartStyle(QCPFinancial::csCandlestick);
   chart->setWidthType(QCPFinancial::wtPlotCoords);
   chart->setWidth(10.0);
@@ -373,7 +373,7 @@ void TestQCPFinancial::aLogKeyAxisCentresTheBodyInPixels()
 void TestQCPFinancial::theLegendIconIsRecorded()
 {
   QCustomPlot plot;
-  auto* financial = new RecordingFinancial(plot.xAxis, plot.yAxis);
+  auto* financial = plot.add<RecordingFinancial>().get();
   plot.legend->setVisible(true);
   [[maybe_unused]] const QPixmap painted = plot.toPixmap(300, 200);
   const QCPDrawList& icon = financial->iconList();

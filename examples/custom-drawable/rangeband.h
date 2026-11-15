@@ -18,9 +18,7 @@
 class RangeBand : public QCPPlottable
 {
 public:
-    RangeBand(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPPlottable(keyAxis, valueAxis)
-    { }
+    RangeBand() : QCPPlottable() { }
 
     void setData(const QVector<double>& keys, const QVector<double>& lower,
                  const QVector<double>& upper)

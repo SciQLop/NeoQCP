@@ -501,8 +501,8 @@ void TestHandle::addGraphReturnsTheSameHandleAsAdd()
 void TestHandle::aConstructedGraphIsInTheGraphList()
 {
     QCustomPlot plot;
-    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
-    auto* waterfall = new QCPWaterfallGraph(plot.xAxis, plot.yAxis);
+    auto* graph = plot.add<QCPGraph>().get();
+    auto* waterfall = plot.add<QCPWaterfallGraph>().get();
     QCOMPARE(plot.graphCount(), 2);
     QCOMPARE(plot.graph(0).get(), graph);
     QCOMPARE(plot.graph().get(), static_cast<QCPGraph*>(waterfall));
@@ -843,7 +843,7 @@ void TestHandle::thePlottablesHandOutHandles()
     QCOMPARE(group->members().first().get(), static_cast<QCPPlottable*>(graph));
     QCOMPARE(group->parentPlot().get(), &plot);
 
-    QCPErrorBars* errors = new QCPErrorBars(plot.xAxis, plot.yAxis);
+    QCPErrorBars* errors = plot.add<QCPErrorBars>().get();
     errors->setDataPlottable(graph);
     QCOMPARE(errors->dataPlottable().get(), static_cast<QCPPlottable*>(graph));
 
@@ -857,7 +857,7 @@ void TestHandle::thePlottablesHandOutHandles()
     QCOMPARE(barsGroup->bars(-1).get(), nullptr);
 
     QCPColorScale* scale = new QCPColorScale(&plot);
-    QCPColorMap* map = new QCPColorMap(plot.xAxis, plot.yAxis);
+    QCPColorMap* map = plot.add<QCPColorMap>().get();
     map->setColorScale(scale);
     QCOMPARE(map->colorScale().get(), scale);
 
@@ -943,15 +943,15 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
     QCPItem* item = plot.add<QCPItemLine>().get();
     item->setClipAxisRect(rect);
     QCPColorScale* scale = new QCPColorScale(&plot);
-    QCPColorMap* map = new QCPColorMap(plot.xAxis, plot.yAxis);
+    QCPColorMap* map = plot.add<QCPColorMap>().get();
     map->setColorScale(scale);
-    QCPErrorBars* errors = new QCPErrorBars(plot.xAxis, plot.yAxis);
+    QCPErrorBars* errors = plot.add<QCPErrorBars>().get();
     errors->setDataPlottable(graph);
-    QCPBars* bars = new QCPBars(plot.xAxis, plot.yAxis);
+    QCPBars* bars = plot.add<QCPBars>().get();
     QCPBarsGroup* group = new QCPBarsGroup(&plot);
     bars->setBarsGroup(group);
-    QCPBars* below = new QCPBars(plot.xAxis, plot.yAxis);
-    QCPBars* above = new QCPBars(plot.xAxis, plot.yAxis);
+    QCPBars* below = plot.add<QCPBars>().get();
+    QCPBars* above = plot.add<QCPBars>().get();
     above->moveAbove(below);
     QCPLegendItem* row = legend->item(0).get();
     QVERIFY(row);

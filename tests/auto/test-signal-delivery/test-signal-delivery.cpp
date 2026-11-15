@@ -160,7 +160,7 @@ void TestSignalDelivery::removeLayerWhileIntervalsAddsLayer()
     QCPLaneLayout lanes;
     QVERIFY(plot.addLayer(QStringLiteral("custom")));
     plot.setCurrentLayer(QStringLiteral("custom"));
-    auto* intervals = new QCPIntervals(plot.xAxis, plot.yAxis, &lanes);
+    auto* intervals = plot.add<QCPIntervals>(&lanes).get();
     plot.setCurrentLayer(QStringLiteral("main"));
     const int layerables = layerablesOnLayers(plot).size();
     QVERIFY(plot.removeLayer(plot.layer(QStringLiteral("custom"))));
@@ -746,7 +746,7 @@ void TestSignalDelivery::colorMapGradientSlotDeletingThePlot()
     plot->resize(400, 300);
     plot->xAxis->setRange(0, 10);
     plot->yAxis->setRange(0, 10);
-    auto* map = new QCPColorMap(plot->xAxis, plot->yAxis);
+    auto* map = plot->add<QCPColorMap>().get();
     auto* scale = new QCPColorScale(plot);
     plot->plotLayout()->addElement(0, 1, scale);
 

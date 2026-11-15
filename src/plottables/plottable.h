@@ -132,10 +132,9 @@ public:
     template <typename T>
     using OpsFor = QCPPlottableOps<T>;
 
-    QCPPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis,
-                         QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
-    explicit QCPPlottable(QCPCoordinateSystem* system,
-                                  QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
+    //! Constructs a plottable with no axes and no area: it is placed, and bound to a frame, when it
+    //! is added to a rect (QCPAxisRect::add<T>()) or to a plot (QCustomPlot::add<T>()).
+    explicit QCPPlottable(QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
     virtual ~QCPPlottable() override;
 
     //! Whether \a system can host a plottable that needs \a required; reports the one misuse when it
@@ -348,7 +347,9 @@ protected:
     //! is still honoured.
     [[nodiscard]] virtual QList<QCPLayer*> dependentLayersRaw() const;
 
-    //! Called after setSystem; not called by the constructor.
+    //! Called after setSystem, once the plottable has joined (or left) the plot's lists: the hook
+    //! through which a subclass wires itself to the frame it is drawn in. Not called by the
+    //! constructor, which places the object nowhere.
     virtual void systemDidChange() { }
     //! Called before setSystem adopts \a next: a plottable that ties itself to others (a stack, a
     //! group) unties itself unless \a next keeps it in the same area, while the old system is still

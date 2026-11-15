@@ -99,7 +99,20 @@ public:
     };
     Q_ENUM(ErrorType)
 
-    explicit QCPErrorBars(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    QCPErrorBars();
+    //! The same error on both sides, as setData() takes it.
+    template <QCPNumberRange E>
+    explicit QCPErrorBars(const E& error) : QCPErrorBars()
+    {
+        setData(QVector<double>(std::ranges::begin(error), std::ranges::end(error)));
+    }
+    //! One error per side, as setData() takes them.
+    template <QCPNumberRange EM, QCPNumberRange EP>
+    QCPErrorBars(const EM& errorMinus, const EP& errorPlus) : QCPErrorBars()
+    {
+        setData(QVector<double>(std::ranges::begin(errorMinus), std::ranges::end(errorMinus)),
+                QVector<double>(std::ranges::begin(errorPlus), std::ranges::end(errorPlus)));
+    }
     virtual ~QCPErrorBars() override;
 
     // getters:

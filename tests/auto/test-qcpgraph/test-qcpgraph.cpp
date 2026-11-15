@@ -30,7 +30,7 @@ void TestQCPGraph::specializedGraphInterface()
   QCOMPARE(mPlot->plottableCount(), 2);
   QCOMPARE(mPlot->graphCount(), 2);
   
-  QCPGraph *graph3 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  QCPGraph *graph3 = mPlot->add<QCPGraph>().get();
   QCOMPARE(mPlot->plottableCount(), 3);
   QCOMPARE(mPlot->graphCount(), 3);
   
@@ -60,9 +60,9 @@ void TestQCPGraph::specializedGraphInterface()
 void TestQCPGraph::multiColumnAndWaterfallGraphsAreListed()
 {
   mPlot->clearPlottables();
-  auto *multi = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  auto *multi = mPlot->add<QCPGraph>().get();
   multi->setData(std::vector<double>{0, 1}, std::vector<std::vector<double>>{{0, 1}, {1, 2}});
-  auto *waterfall = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+  auto *waterfall = mPlot->add<QCPWaterfallGraph>().get();
   QCOMPARE(mPlot->graphCount(), 2);
   QCOMPARE(mPlot->graph(0).get(), multi);
   QCOMPARE(mPlot->graph(1).get(), static_cast<QCPGraph*>(waterfall));

@@ -25,7 +25,7 @@ private slots:
     void deletingAnAxisDeletesItsSystems();
     void aPlottableTakesASystem();
     void theAxisPairFollowsEveryFrame();
-    void twoConstructorsShareTheSystem();
+    void twoAddsOnOnePairShareTheSystem();
     void movingBetweenSystemsReRecords();
     void aPlottableOfADeletedSystemIsInert();
     void aDropSystemHookMayDeleteASibling();
@@ -35,7 +35,7 @@ private slots:
     void aRecordingPlottableWithNoNeedsJoinsPolar();
     void relationshipsAcrossAreasAreRefused();
     void dualValueAxesKeepTheirRelationships();
-    void aMisusedPairIsOwnedAndInert();
+    void aMisusedPairIsRefused();
     void aChangedSlotMayDeleteTheAxis();
     void aMovedPlottableFollowsItsNewArea();
     void aTakenPlottableFollowsItsNewPlot();

@@ -284,7 +284,7 @@ void TestPaintBuffer::rhi_reallocatedTextureRequiresUpload()
 
 void TestPaintBuffer::skipRepaint_multiGraphPanOnly()
 {
-    auto* graph2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph2 = mPlot->add<QCPGraph>().get();
     std::vector<double> keys = {1.0, 2.0, 3.0, 4.0, 5.0};
     std::vector<double> vals = {1.0, 4.0, 2.0, 5.0, 3.0};
     graph2->setData(std::move(keys), std::move(vals));
@@ -308,7 +308,7 @@ void TestPaintBuffer::skipRepaint_multiGraphPanOnly()
 
 void TestPaintBuffer::skipRepaint_disabledWithItems()
 {
-    auto* graph2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph2 = mPlot->add<QCPGraph>().get();
     std::vector<double> keys = {1.0, 2.0, 3.0};
     std::vector<double> vals = {1.0, 4.0, 2.0};
     graph2->setData(std::move(keys), std::move(vals));
@@ -331,7 +331,7 @@ void TestPaintBuffer::skipRepaint_disabledWithItems()
 
 void TestPaintBuffer::skipRepaint_disabledOnInvalidation()
 {
-    auto* graph2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph2 = mPlot->add<QCPGraph>().get();
     std::vector<double> keys = {1.0, 2.0, 3.0};
     std::vector<double> vals = {1.0, 4.0, 2.0};
     graph2->setData(std::move(keys), std::move(vals));
@@ -408,7 +408,7 @@ void TestPaintBuffer::setVisible_noOpWhenUnchanged()
 
 void TestPaintBuffer::skipRepaint_bufferNotReuploadedOnPan()
 {
-    auto* graph2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph2 = mPlot->add<QCPGraph>().get();
     std::vector<double> keys = {1.0, 2.0, 3.0, 4.0, 5.0};
     std::vector<double> vals = {1.0, 4.0, 2.0, 5.0, 3.0};
     graph2->setData(std::move(keys), std::move(vals));
@@ -445,7 +445,7 @@ void TestPaintBuffer::colormap2_panDirtiesLayerBuffer()
     // still dirty its layer on every viewport change so the existing image
     // redraws repositioned to the current axes — otherwise the spectrogram
     // freezes in place while the axes scroll until the resample lands.
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 100);
     std::vector<double> x{0, 5, 10}, y{0, 50, 100};
@@ -468,7 +468,7 @@ void TestPaintBuffer::colormap2_panDirtiesLayerBufferLogY()
     // Same, with a logarithmic value axis (energy spectrogram): a pure pan in
     // log space must still dirty the layer (regression for the reported stuck
     // log-Y spectrogram).
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->yAxis->setRange(1, 1000);
@@ -491,7 +491,7 @@ void TestPaintBuffer::colormap2_stallOffsetOnPan()
 {
     // Skip-on-translate: after a pan the colormap reports a pixel offset so the
     // compositor shifts the existing texture instead of repainting+re-uploading.
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 100);
     std::vector<double> x{0, 5, 10}, y{0, 50, 100};
@@ -518,7 +518,7 @@ void TestPaintBuffer::colormap2_stallOffsetOnLogYPan()
 {
     // A pure pan on a log Y axis must still translate (regression for the stuck
     // log-Y energy spectrogram): the zoom check is scale-aware.
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->yAxis->setRange(1, 1000);
@@ -539,7 +539,7 @@ void TestPaintBuffer::colormap2_stallOffsetNullOnZoom()
 {
     // A genuine zoom must NOT translate (texture would be wrongly scaled); fall
     // back to a real repaint.
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 100);
     std::vector<double> x{0, 5, 10}, y{0, 50, 100};
@@ -560,7 +560,7 @@ void TestPaintBuffer::colormap2_drawSkipsNonOverlappingStaleResample()
     // key/value range no longer overlaps the current viewport at all.
     // Drawing that image would misposition it off-screen; the colormap
     // should instead keep showing its last relevant frame.
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 100);
     std::vector<double> x{0, 5, 10}, y{0, 50, 100};
@@ -604,7 +604,7 @@ void TestPaintBuffer::bufferedLayerAddedLate_leavesNoStaleAxisLabels()
     mPlot->layer("spans")->setMode(QCPLayer::lmBuffered);
     mPlot->addLayer("cmap", mPlot->layer("main"), QCustomPlot::limBelow);
     mPlot->layer("cmap")->setMode(QCPLayer::lmBuffered);
-    auto* curve = new QCPCurve(mPlot->xAxis, mPlot->yAxis);
+    auto* curve = mPlot->add<QCPCurve>().get();
     curve->setName("MMS1 GSE");
     curve->setData(QVector<double>{0, 1, 2, 3}, QVector<double>{0, 5, 2, 4});
     mPlot->legend->setVisible(true);

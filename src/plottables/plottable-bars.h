@@ -207,7 +207,15 @@ public:
     };
     Q_ENUM(WidthType)
 
-    explicit QCPBars(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    QCPBars();
+    //! Keys and values, as setData() takes them: one bar per pair.
+    template <QCPNumberRange K, QCPNumberRange V>
+    QCPBars(const K& keys, const V& values, bool alreadySorted = false) : QCPBars()
+    {
+        setData(QVector<double>(std::ranges::begin(keys), std::ranges::end(keys)),
+                QVector<double>(std::ranges::begin(values), std::ranges::end(values)),
+                alreadySorted);
+    }
     virtual ~QCPBars() override;
 
     // getters:

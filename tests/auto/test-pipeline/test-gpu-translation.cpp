@@ -3,7 +3,7 @@
 
 void TestPipeline::multiGraphTranslationResetsOnFreshData()
 {
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     QVector<double> keys(200000), values(200000);
     for (int i = 0; i < 200000; ++i) {
         keys[i] = i;
@@ -29,7 +29,7 @@ void TestPipeline::multiGraphTranslationResetsOnFreshData()
 
 void TestPipeline::multiGraphTranslationOffsetWhenBusy()
 {
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     constexpr int N = 200000;
     QVector<double> keys(N);
     std::vector<QVector<double>> columns(3, QVector<double>(N));
@@ -59,7 +59,7 @@ void TestPipeline::histogram2dTranslationOffsetWhenBusy()
     // Histogram2D uses coordToPixel()-based quad positioning (same as ColorMap2),
     // so it naturally repositions on pan without GPU translation.
     // This test verifies panning during busy pipeline doesn't crash.
-    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    auto* hist = mPlot->add<QCPHistogram2D>().get();
     constexpr int N = 200000;
     std::vector<double> keys(N), values(N);
     for (int i = 0; i < N; ++i) {
@@ -85,7 +85,7 @@ void TestPipeline::colormap2TranslationOffsetWhenBusy()
     // ColorMap2 uses coordToPixel()-based quad positioning, so the image
     // naturally repositions on pan without needing a GPU translation offset.
     // This test verifies that panning during a busy pipeline doesn't crash.
-    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
 
     constexpr int NX = 500, NY = 500;
     std::vector<double> x(NX), y(NY), z(NX * NY);
@@ -108,7 +108,7 @@ void TestPipeline::colormap2TranslationOffsetWhenBusy()
 
 void TestPipeline::translatedGeometryClippedToAxisRect()
 {
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     QVector<double> keys(200000), values(200000);
     for (int i = 0; i < 200000; ++i) {
         keys[i] = i;
@@ -152,12 +152,12 @@ void TestPipeline::translatedGeometryClippedToAxisRect()
 
 void TestPipeline::multipleMultiGraphsIndependentOffsets()
 {
-    auto* small = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* small = mPlot->add<QCPGraph>().get();
     QVector<double> ks(100), vs(100);
     for (int i = 0; i < 100; ++i) { ks[i] = i * 1000; vs[i] = i; }
     small->setData(std::move(ks), std::move(vs));
 
-    auto* large = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* large = mPlot->add<QCPGraph>().get();
     QVector<double> kl(500000), vl(500000);
     for (int i = 0; i < 500000; ++i) { kl[i] = i; vl[i] = i; }
     large->setData(std::move(kl), std::move(vl));

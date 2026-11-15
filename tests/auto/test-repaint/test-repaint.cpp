@@ -82,7 +82,7 @@ protected:
 class PendingStub : public QCPPlottable
 {
 public:
-    PendingStub(QCPAxis* k, QCPAxis* v) : QCPPlottable(k, v) { }
+    PendingStub() : QCPPlottable() { }
 
     int commits = 0;
 
@@ -116,10 +116,7 @@ public:
 class SystemStub : public QCPPlottable
 {
 public:
-    explicit SystemStub(QCPCoordinateSystem* system)
-        : QCPPlottable(system, QCP::Capabilities())
-    {
-    }
+    SystemStub() : QCPPlottable(QCP::Capabilities()) { }
 
     void draw(QCPDrawContext&) const override { } // only its layer is under test: records nothing
     double selectTest(const QPointF&, bool, QVariant* = nullptr) const override { return -1; }
@@ -319,7 +316,7 @@ void TestRepaint::appearanceChangeIsNotHiddenByTranslation()
 {
     QCustomPlot plot;
     plot.resize(400, 300);
-    auto* fill = new FillStub(plot.xAxis, plot.yAxis);
+    auto* fill = plot.add<FillStub>().get();
     fill->setPen(QPen(Qt::red));
     plot.replot();
     fill->stall = QPointF(5, 0); // a pan in progress: the layer would shift its old frame
@@ -418,7 +415,7 @@ void TestRepaint::layerKeptWhileBusyIsNotRequeued()
 {
     QCustomPlot plot;
     plot.resize(400, 300);
-    new NoContentStub(plot.xAxis, plot.yAxis);
+    plot.add<NoContentStub>().get();
     plot.replot();
     for (int i = 0; i < 3; ++i)
     {
@@ -463,7 +460,7 @@ void TestRepaint::exportSettlesFirst()
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
     auto plot = settledPlot();
-    auto* pending = new PendingStub(plot->xAxis, plot->yAxis);
+    auto* pending = plot->add<PendingStub>().get();
     plot->setDataSwapDebounceMs(10000);
     plot->requestDataSwap();
     const QColor newColor(0, 0, 255);
@@ -488,7 +485,7 @@ void TestRepaint::exportShowsReadyStagedData()
 {
     QCustomPlot plot;
     plot.resize(400, 300);
-    auto* mg = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* mg = plot.add<QCPGraph>().get();
     mg->setDeferredDataSwap(true); // the staged export path is opt-in
     mg->setData(std::vector<double> { 0, 10 }, std::vector<std::vector<double>> { { 2, 2 } });
     mg->setComponentPens({ QPen(Qt::red, 4) });
@@ -747,101 +744,101 @@ const QVector<PlottableAppearanceCase>& plottableAppearanceCases()
         { "graph.setName", [](Plot plot) -> QCPPlottable* { return plot.graph(0); },
           [](QCPPlottable* p) { p->setName(QStringLiteral("renamed")); } },
         { "curve.setPen",
-          [](Plot plot) -> QCPPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
+          [](Plot plot) -> QCPPlottable* { return plot.add<QCPCurve>().get(); },
           [](QCPPlottable* p) { p->setPen(QPen(Qt::darkCyan, 3)); } },
         { "curve.setBrush",
-          [](Plot plot) -> QCPPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
+          [](Plot plot) -> QCPPlottable* { return plot.add<QCPCurve>().get(); },
           [](QCPPlottable* p) { p->setBrush(QBrush(Qt::cyan)); } },
         { "curve.setScatterStyle",
-          [](Plot plot) -> QCPPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
+          [](Plot plot) -> QCPPlottable* { return plot.add<QCPCurve>().get(); },
           [](QCPPlottable* p)
           {
               static_cast<QCPCurve*>(p)->setScatterStyle(
                   QCPScatterStyle(QCPScatterStyle::ssCircle, 6));
           } },
         { "bars.setWidth",
-          [](Plot plot) -> QCPPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
+          [](Plot plot) -> QCPPlottable* { return plot.add<QCPBars>().get(); },
           [](QCPPlottable* p) { static_cast<QCPBars*>(p)->setWidth(0.5); } },
         { "bars.setWidthType", [](Plot plot) -> QCPPlottable*
-          { return new QCPBars(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPBars>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPBars*>(p)->setWidthType(QCPBars::wtAbsolute); } },
         { "bars.setBaseValue",
-          [](Plot plot) -> QCPPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
+          [](Plot plot) -> QCPPlottable* { return plot.add<QCPBars>().get(); },
           [](QCPPlottable* p) { static_cast<QCPBars*>(p)->setBaseValue(0.5); } },
         { "bars.setStackingGap",
-          [](Plot plot) -> QCPPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
+          [](Plot plot) -> QCPPlottable* { return plot.add<QCPBars>().get(); },
           [](QCPPlottable* p) { static_cast<QCPBars*>(p)->setStackingGap(2); } },
         { "financial.setWidth", [](Plot plot) -> QCPPlottable*
-          { return new QCPFinancial(plot.xAxis, plot.yAxis); },
+          { return plot.add<QCPFinancial>().get(); },
           [](QCPPlottable* p) { static_cast<QCPFinancial*>(p)->setWidth(0.3); } },
         { "financial.setChartStyle", [](Plot plot) -> QCPPlottable*
-          { return new QCPFinancial(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPFinancial>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPFinancial*>(p)->setChartStyle(QCPFinancial::csOhlc); } },
         { "financial.setPenNegative", [](Plot plot) -> QCPPlottable*
-          { return new QCPFinancial(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPFinancial>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPFinancial*>(p)->setPenNegative(QPen(Qt::magenta, 2)); } },
         { "statisticalbox.setWidth", [](Plot plot) -> QCPPlottable*
-          { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); },
+          { return plot.add<QCPStatisticalBox>().get(); },
           [](QCPPlottable* p) { static_cast<QCPStatisticalBox*>(p)->setWidth(0.6); } },
         { "statisticalbox.setWhiskerPen", [](Plot plot) -> QCPPlottable*
-          { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPStatisticalBox>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPStatisticalBox*>(p)->setWhiskerPen(QPen(Qt::magenta, 2)); } },
         { "statisticalbox.setMedianPen", [](Plot plot) -> QCPPlottable*
-          { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPStatisticalBox>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPStatisticalBox*>(p)->setMedianPen(QPen(Qt::darkGreen, 3)); } },
         { "errorbars.setWhiskerWidth", [](Plot plot) -> QCPPlottable*
-          { return new QCPErrorBars(plot.xAxis, plot.yAxis); },
+          { return plot.add<QCPErrorBars>().get(); },
           [](QCPPlottable* p) { static_cast<QCPErrorBars*>(p)->setWhiskerWidth(10); } },
         { "errorbars.setErrorType", [](Plot plot) -> QCPPlottable*
-          { return new QCPErrorBars(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPErrorBars>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPErrorBars*>(p)->setErrorType(QCPErrorBars::etKeyError); } },
         { "colormap.setDataRange", [](Plot plot) -> QCPPlottable*
-          { return new QCPColorMap(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPColorMap>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPColorMap*>(p)->setDataRange(QCPRange(0, 5)); } },
         { "colormap.setDataScaleType", [](Plot plot) -> QCPPlottable*
-          { return new QCPColorMap(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPColorMap>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPColorMap*>(p)->setDataScaleType(QCPAxis::stLogarithmic); } },
         { "colormap.setGradient", [](Plot plot) -> QCPPlottable*
-          { return new QCPColorMap(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPColorMap>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPColorMap*>(p)->setGradient(QCPColorGradient::gpJet); } },
         { "colormap.setInterpolate", [](Plot plot) -> QCPPlottable*
-          { return new QCPColorMap(plot.xAxis, plot.yAxis); },
+          { return plot.add<QCPColorMap>().get(); },
           [](QCPPlottable* p) { static_cast<QCPColorMap*>(p)->setInterpolate(false); } },
         { "colormap.setTightBoundary", [](Plot plot) -> QCPPlottable*
-          { return new QCPColorMap(plot.xAxis, plot.yAxis); },
+          { return plot.add<QCPColorMap>().get(); },
           [](QCPPlottable* p) { static_cast<QCPColorMap*>(p)->setTightBoundary(true); } },
         { "colormap2.setGapThreshold", [](Plot plot) -> QCPPlottable*
-          { return new QCPColorMap2(plot.xAxis, plot.yAxis); },
+          { return plot.add<QCPColorMap2>().get(); },
           [](QCPPlottable* p) { static_cast<QCPColorMap2*>(p)->setGapThreshold(0.5); } },
         { "colormap2.setContourPen", [](Plot plot) -> QCPPlottable*
-          { return new QCPColorMap2(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPColorMap2>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPColorMap2*>(p)->setContourPen(QPen(Qt::magenta, 2)); } },
         { "colormap2.setAutoContourLevels", [](Plot plot) -> QCPPlottable*
-          { return new QCPColorMap2(plot.xAxis, plot.yAxis); },
+          { return plot.add<QCPColorMap2>().get(); },
           [](QCPPlottable* p) { static_cast<QCPColorMap2*>(p)->setAutoContourLevels(8); } },
         { "histogram.setBins", [](Plot plot) -> QCPPlottable*
-          { return new QCPHistogram(plot.xAxis, plot.yAxis); },
+          { return plot.add<QCPHistogram>().get(); },
           [](QCPPlottable* p) { static_cast<QCPHistogram*>(p)->setBins(12); } },
         { "histogram.setStyle", [](Plot plot) -> QCPPlottable*
-          { return new QCPHistogram(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPHistogram>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPHistogram*>(p)->setStyle(QCPHistogram::sStep); } },
         { "histogram2d.setContourPen", [](Plot plot) -> QCPPlottable*
-          { return new QCPHistogram2D(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPHistogram2D>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPHistogram2D*>(p)->setContourPen(QPen(Qt::magenta, 2)); } },
         { "multigraph.setLineStyle", [](Plot plot) -> QCPPlottable*
-          { return new QCPGraph(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPGraph>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPGraph*>(p)->setLineStyle(QCPGraph::lsNone); } },
         { "multigraph.setAdaptiveSampling", [](Plot plot) -> QCPPlottable*
-          { return new QCPGraph(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPGraph>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPGraph*>(p)->setAdaptiveSampling(false); } },
         { "waterfall.setOffsetMode", [](Plot plot) -> QCPPlottable*
-          { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPWaterfallGraph>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPWaterfallGraph*>(p)->setOffsetMode(QCPWaterfallGraph::omCustom); } },
         { "waterfall.setGain", [](Plot plot) -> QCPPlottable*
-          { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); },
+          { return plot.add<QCPWaterfallGraph>().get(); },
           [](QCPPlottable* p) { static_cast<QCPWaterfallGraph*>(p)->setGain(2.0); } },
         { "waterfall.setNormalize", [](Plot plot) -> QCPPlottable*
-          { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); }, [](QCPPlottable* p)
+          { return plot.add<QCPWaterfallGraph>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPWaterfallGraph*>(p)->setNormalize(false); } },
     };
     return cases;
@@ -923,7 +920,7 @@ void TestRepaint::axisMarginChangeDuringPanRepaints()
     // pan in progress would otherwise translate the old frame and leave the fill at the old edge.
     QCustomPlot plot;
     plot.resize(400, 300);
-    auto* fill = new FillStub(plot.xAxis, plot.yAxis);
+    auto* fill = plot.add<FillStub>().get();
     fill->setPen(QPen(kBlue));
     plot.xAxis->setLabel(QStringLiteral("x"));
     plot.yAxis->setLabel(QStringLiteral("y"));
@@ -978,7 +975,7 @@ void TestRepaint::multiGraphLineStyleResetsComponents()
     // A component may carry its own style; the global setter must still reset it, so comparing the
     // global member alone is not enough to decide "nothing changed".
     QCustomPlot plot;
-    auto* mg = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* mg = plot.add<QCPGraph>().get();
     auto source = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double> { 0.0, 1.0 }, std::vector<std::vector<double>> { { 0.0, 1.0 } });
     mg->setDataSource(source);
@@ -998,8 +995,8 @@ void TestRepaint::barsGroupSpacingRepaints()
     QCustomPlot plot;
     plot.resize(400, 300);
     auto* group = new QCPBarsGroup(&plot);
-    auto* first = new QCPBars(plot.xAxis, plot.yAxis);
-    auto* second = new QCPBars(plot.xAxis, plot.yAxis);
+    auto* first = plot.add<QCPBars>().get();
+    auto* second = plot.add<QCPBars>().get();
     for (auto* bars : { first, second })
     {
         bars->setBarsGroup(group);
@@ -1136,7 +1133,7 @@ const QVector<RemainingCase>& remainingCases()
           {
               auto* legend = new QCPLegend();
               plot.plotLayout()->addElement(1, 0, legend);
-              auto* multi = new QCPGraph(plot.xAxis, plot.yAxis);
+              auto* multi = plot.add<QCPGraph>().get();
               auto* group = new QCPGroupLegendItem(legend, multi);
               legend->addItem(group);
               return group;
@@ -1367,9 +1364,9 @@ void TestRepaint::remainingSettersScheduleRepaint()
 
 void TestRepaint::orphanPlottableKeepsName()
 {
-    // A plottable with null axes is a valid detached object: it has no legend to mark, but its name
-    // is still its own.
-    QCPGraph graph(nullptr, nullptr);
+    // A plottable built without axes is a valid detached object: it has no legend to mark, but its
+    // name is still its own.
+    QCPGraph graph;
     graph.setName(QStringLiteral("orphan"));
     QCOMPARE(graph.name(), QStringLiteral("orphan"));
 }
@@ -1380,7 +1377,7 @@ void TestRepaint::axisRectMarginsMoveTheContent()
     // be redrawn there: a pending pan translation must not keep them at the old pixels.
     QCustomPlot plot;
     plot.resize(400, 300);
-    auto* fill = new FillStub(plot.xAxis, plot.yAxis);
+    auto* fill = plot.add<FillStub>().get();
     fill->setPen(QPen(kBlue));
     plot.replot();
     waitUntilSettled(plot);
@@ -1514,7 +1511,7 @@ void TestRepaint::aPolarAxisChangeDirtiesItsPlottablesLayers()
     area->angularAxis()->setRange(0, 360);
     area->radialAxis()->setRange(0, 1);
     QVERIFY(plot.addLayer(QStringLiteral("arc")));
-    auto* plottable = new SystemStub(area->system(area->angularAxis(), area->radialAxis()));
+    auto* plottable = area->add<SystemStub>().get();
     plottable->setLayer(QStringLiteral("arc"));
     QCPLayer* layer = plot.layer(QStringLiteral("arc"));
     QVERIFY(layer);
@@ -2619,7 +2616,7 @@ void TestRepaint::barsStackWithTextAbove()
     plot->xAxis->setRange(0, 2);
     plot->yAxis->setRange(0, 2);
     const QColor barColor(30, 90, 200);
-    auto* bars = new QCPBars(plot->xAxis, plot->yAxis);
+    auto* bars = plot->add<QCPBars>().get();
     bars->setData(QVector<double> { 1.0 }, QVector<double> { 1.6 });
     bars->setWidth(0.8);
     bars->setPen(Qt::NoPen);
@@ -3552,7 +3549,7 @@ void TestRepaint::reusedRecordingKeepsItsImagesAtTheCap()
     QVector<QCPBars*> bars;
     for (int i = 0; i < 5; ++i)
     {
-        auto* bar = new QCPBars(plot->xAxis, plot->yAxis);
+        auto* bar = plot->add<QCPBars>().get();
         bar->setPen(Qt::NoPen);
         // The first bar starts solid: four images fit, the fifth one comes from its re-record.
         bar->setBrush(i == 0 ? QBrush(solid)
@@ -4167,7 +4164,7 @@ void TestRepaint::busyFadeCoversTheGpuCommandsInAnExport()
     QCustomPlot plot;
     plot.resize(400, 300);
     // Bars record their rects: those are GPU commands, replayed by the export's deferred pass.
-    auto* bars = new QCPBars(plot.xAxis, plot.yAxis);
+    auto* bars = plot.add<QCPBars>().get();
     bars->setData(QVector<double> { 1, 2, 3 }, QVector<double> { 0.5, 0.7, 0.4 });
     bars->setPen(QPen(Qt::black, 2));
     bars->setBrush(QColor(20, 40, 160));

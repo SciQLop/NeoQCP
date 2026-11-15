@@ -74,7 +74,7 @@ static PlotFixture setupPlotWithRhi(TestData& data)
     auto* plot = new QCustomPlot();
     plot->resize(1920, 1080);
 
-    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* mg = plot->add<QCPGraph>().get();
     {
         std::vector<std::vector<double>> cols;
         cols.reserve(static_cast<int>(data.columns.size()));

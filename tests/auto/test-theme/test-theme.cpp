@@ -202,7 +202,7 @@ void TestTheme::applyThemePropagatesColorScaleAxis()
 // applied: both must come out themed.
 void TestTheme::applyThemeReachesTheRectsOwnScale()
 {
-    auto* map = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* map = mPlot->add<QCPColorMap2>().get();
     Q_UNUSED(map);
     auto scale = mPlot->axisRect()->colorScale();
     QVERIFY(scale);
@@ -212,7 +212,7 @@ void TestTheme::applyThemeReachesTheRectsOwnScale()
 
     auto* other = new QCustomPlot;
     other->setTheme(theme);
-    auto* otherMap = new QCPColorMap2(other->xAxis, other->yAxis);
+    auto* otherMap = other->add<QCPColorMap2>().get();
     Q_UNUSED(otherMap);
     auto otherScale = other->axisRect()->colorScale();
     QVERIFY(otherScale);

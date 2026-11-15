@@ -41,7 +41,13 @@ public:
     template <typename T>
     using OpsFor = QCPHistogram2DOps<T>;
 
-    explicit QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    QCPHistogram2D();
+    //! Keys and values, as setData() takes them: one sample per index.
+    template <IndexableNumericRange KC, IndexableNumericRange VC>
+    QCPHistogram2D(KC&& keys, VC&& values) : QCPHistogram2D()
+    {
+        setData(std::forward<KC>(keys), std::forward<VC>(values));
+    }
 
     // Data
     template <IndexableNumericRange KC, IndexableNumericRange VC>

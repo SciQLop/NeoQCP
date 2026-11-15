@@ -161,7 +161,7 @@ void TestPlottableGroup::unwantedLegendStaysOutAfterTheGroup()
 
 void TestPlottableGroup::multiGraphUnwantedLegendStaysOut()
 {
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     QCOMPARE(mPlot->legend->itemCount(), 1);
 
     mg->setWantsLegend(false);
@@ -221,7 +221,7 @@ void TestPlottableGroup::rowRepaintsWhenMembersHide()
     // The row lives on the legend layer, not the members' layers: hiding a member must dirty
     // the legend too, or the row keeps its old (undimmed) look until something else repaints it.
     QCPGraph* graph = mPlot->addGraph();
-    auto* multiGraph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* multiGraph = mPlot->add<QCPGraph>().get();
     multiGraph->setDataSource(
         std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
             std::vector<double> { 1.0, 2.0 }, std::vector<std::vector<double>> { { 1.0, 2.0 } }));
@@ -262,7 +262,7 @@ void TestPlottableGroup::deletingThePlotWithGroupsIsSafe()
     auto* plot = new QCustomPlot(nullptr);
     QCPPlottableGroup* group = plot->addPlottableGroup("g");
     group->addMember(plot->addGraph());
-    group->addMember(new QCPGraph(plot->xAxis, plot->yAxis));
+    group->addMember(plot->add<QCPGraph>().get());
     plot->addPlottableGroup("empty");
     plot->replot(QCustomPlot::rpImmediateRefresh);
     delete plot;
@@ -337,7 +337,7 @@ void TestPlottableGroup::wantedWhileGroupedGetsARowOnLeaving()
 
 void TestPlottableGroup::showingRestoresHiddenComponents()
 {
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     mg->setDataSource(
         std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
             std::vector<double> { 1.0, 2.0 },
@@ -356,7 +356,7 @@ void TestPlottableGroup::showingRestoresHiddenComponents()
 void TestPlottableGroup::intervalsCanBeGrouped()
 {
     auto* layout = new QCPLaneLayout(mPlot);
-    auto* intervals = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, layout);
+    auto* intervals = mPlot->add<QCPIntervals>(layout).get();
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
     QVERIFY(group->addMember(intervals));
     QCOMPARE(mPlot->legend->itemCount(), 1);
@@ -431,13 +431,13 @@ void TestPlottableGroup::financialAndErrorBarIconsShowInTheGroupRow()
 {
     const QList<std::function<QCPPlottable*(QCustomPlot&)>> makers {
         [](QCustomPlot& plot) -> QCPPlottable* {
-            auto* financial = new QCPFinancial(plot.xAxis, plot.yAxis);
+            auto* financial = plot.add<QCPFinancial>().get();
             financial->setChartStyle(QCPFinancial::csOhlc);
             financial->setPen(QPen(Qt::darkGreen, 2));
             return financial;
         },
         [](QCustomPlot& plot) -> QCPPlottable* {
-            auto* bars = new QCPErrorBars(plot.xAxis, plot.yAxis);
+            auto* bars = plot.add<QCPErrorBars>().get();
             bars->setPen(QPen(Qt::darkRed, 2));
             return bars;
         },

@@ -479,14 +479,14 @@ void TestDataSource::soaMismatchedLengthsDegradeToEmpty()
 void TestDataSource::multiGraphCreation()
 {
     mPlot = new QCustomPlot();
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
     QVERIFY(graph->dataSource() == nullptr);
 }
 
 void TestDataSource::multiGraphSetDataOwning()
 {
     mPlot = new QCustomPlot();
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
 
     std::vector<double> keys = {1.0, 2.0, 3.0};
     std::vector<std::vector<float>> values = {{10.0f, 20.0f, 30.0f}};
@@ -502,7 +502,7 @@ void TestDataSource::multiGraphSetDataOwning()
 void TestDataSource::multiGraphViewData()
 {
     mPlot = new QCustomPlot();
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
 
     double keys[] = {1.0, 2.0, 3.0};
     int values[] = {100, 200, 300};
@@ -517,8 +517,8 @@ void TestDataSource::multiGraphViewData()
 void TestDataSource::multiGraphSharedSource()
 {
     mPlot = new QCustomPlot();
-    auto* g1 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
-    auto* g2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* g1 = mPlot->add<QCPGraph>().get();
+    auto* g2 = mPlot->add<QCPGraph>().get();
 
     auto source = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{1.0, 2.0}, oneColumn({10.0, 20.0}));
@@ -532,7 +532,7 @@ void TestDataSource::multiGraphSharedSource()
 void TestDataSource::multiGraphAxisRanges()
 {
     mPlot = new QCustomPlot();
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
 
     graph->setData(std::vector<double> {1.0, 2.0, 3.0, 4.0, 5.0},
                    oneColumn({-1.0, 5.0, 2.0, 8.0, 3.0}));
@@ -553,7 +553,7 @@ void TestDataSource::multiGraphRender()
 {
     mPlot = new QCustomPlot();
     mPlot->resize(400, 300);
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
 
     graph->setData(std::vector<double> {1.0, 2.0, 3.0, 4.0, 5.0},
                    oneColumn({1.0, 4.0, 2.0, 5.0, 3.0}));
@@ -580,7 +580,7 @@ void TestDataSource::multiGraphLineStyles()
 {
     mPlot = new QCustomPlot();
     mPlot->resize(400, 300);
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
 
     graph->setData(std::vector<double> {1.0, 2.0, 3.0, 4.0, 5.0},
                    oneColumn({1.0, 4.0, 2.0, 5.0, 3.0}));
@@ -605,7 +605,7 @@ void TestDataSource::multiGraphScatterStyle()
 {
     mPlot = new QCustomPlot();
     mPlot->resize(400, 300);
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
 
     graph->setData(std::vector<double> {1.0, 2.0, 3.0}, oneColumn({1.0, 2.0, 3.0}));
     graph->rescaleAxes();
@@ -625,7 +625,7 @@ void TestDataSource::multiGraphScatterSkip()
 {
     mPlot = new QCustomPlot();
     mPlot->resize(400, 300);
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
 
     graph->setData(std::vector<double> {1.0, 2.0, 3.0, 4.0, 5.0},
                    oneColumn({1.0, 2.0, 3.0, 4.0, 5.0}));
@@ -645,7 +645,7 @@ void TestDataSource::multiGraphLineStyleNoneWithScatter()
 {
     mPlot = new QCustomPlot();
     mPlot->resize(400, 300);
-    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = mPlot->add<QCPGraph>().get();
 
     graph->setData(std::vector<double> {1.0, 2.0, 3.0}, oneColumn({1.0, 2.0, 3.0}));
     graph->rescaleAxes();

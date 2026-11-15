@@ -21,7 +21,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
     std::vector<std::vector<double>> columns(1);
     columns[0] = std::move(vals);
-    auto* g = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* g = plot->add<QCPGraph>().get();
     g->setData(std::move(keys), std::move(columns));
     g->setPen(QPen(QColor(31, 119, 180), 1));
 

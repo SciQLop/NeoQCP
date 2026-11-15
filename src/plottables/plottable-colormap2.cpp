@@ -38,14 +38,10 @@
   signals.
 */
 
-QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPColorMapped(keyAxis, valueAxis, true)
-    , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
-    , mRenderer(this)
+QCPColorMap2::QCPColorMap2()
+    : QCPColorMapped(true), mPipeline(nullptr, this), mRenderer(this)
 {
     installResampleTransform();
-
-    followAxes();
 
     connect(&mPipeline, &QCPColormapPipeline::finished,
             this, [this](uint64_t) {
@@ -56,16 +52,22 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
     connect(&mPipeline, &QCPColormapPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
 
+}
+
+void QCPColorMap2::systemDidChange()
+{
+    followAxes();
     // A resize changes the axis rect's pixel size with no axis signal: the sharper image would
-    // never be asked for (the recording is reused, so draw() is not called again on its own).
-    if (QCustomPlot* plot = parentPlot())
-        connect(plot, &QCustomPlot::afterLayout, this, [this]
+    // never be asked for (the recording is reused, so draw() is not called again on its own). The
+    // plot is known only once this map has one, and an arriving map may already have listened.
+    if (mParentPlot && !mListensToLayout)
+    {
+        mListensToLayout = connect(mParentPlot, &QCustomPlot::afterLayout, this, [this]
         {
             if (needsAnImageOfTheNewSize())
                 queueViewportChange();
         });
-
-    followKeyAxisRectScale();
+    }
 }
 
 void QCPColorMap2::followAxes()

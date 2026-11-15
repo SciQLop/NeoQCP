@@ -67,7 +67,7 @@ Scene statisticalBoxScene(bool verticalKey, bool selected)
     QCPAxis* value = verticalKey ? plot.xAxis : plot.yAxis;
     key->setRange(0, 4);
     value->setRange(0, 10);
-    auto* box = new RecordingBox(key, value);
+    auto* box = key->axisRect()->add<RecordingBox>(key, value).get();
     box->addData(0.8, 1.0, 2.5, 4.0, 6.0, 8.5);
     box->addData(1.8, 0.5, 3.0, 5.2, 7.0, 9.5);
     box->addData(2.8, 2.0, 3.5, 5.5, 7.5, 9.0);
@@ -88,7 +88,7 @@ RecordingBox* makeBoxPlot(QCustomPlot& plot)
     plot.resize(400, 300);
     plot.xAxis->setRange(0, 4);
     plot.yAxis->setRange(0, 10);
-    auto* box = new RecordingBox(plot.xAxis, plot.yAxis);
+    auto* box = plot.add<RecordingBox>().get();
     box->addData(0.8, 1.0, 2.5, 4.0, 6.0, 8.5);
     box->addData(1.8, 0.5, 3.0, 5.2, 7.0, 9.5);
     box->addData(2.8, 2.0, 3.5, 5.5, 7.5, 9.0);
@@ -174,7 +174,7 @@ void TestStatisticalBox::anUnstyledOutlierMarkerTakesTheBoxPen()
 void TestStatisticalBox::theLegendIconIsRecorded()
 {
     QCustomPlot plot;
-    auto* box = new RecordingBox(plot.xAxis, plot.yAxis);
+    auto* box = plot.add<RecordingBox>().get();
     plot.legend->setVisible(true);
     [[maybe_unused]] const QPixmap painted = plot.toPixmap(300, 200);
     const QCPDrawList& icon = box->iconList();
@@ -218,7 +218,7 @@ void TestStatisticalBox::theLegendIconKeepsTheAntialiasingSetting()
     const auto blended = [&](bool antialiased)
     {
         QCustomPlot plot;
-        auto* box = new QCPStatisticalBox(plot.xAxis, plot.yAxis);
+        auto* box = plot.add<QCPStatisticalBox>().get();
         box->setPen(Qt::NoPen);
         box->setBrush(fill);
         box->setAntialiased(antialiased);

@@ -215,10 +215,9 @@ QCPCurveData::QCPCurveData(double t, double key, double value) : t(t), key(key),
   keyAxis. This QCustomPlot instance takes ownership of the QCPCurve, so do not delete it manually
   but use QCustomPlot::removePlottable() instead.
 */
-QCPCurve::QCPCurve(QCPAxis* keyAxis, QCPAxis* valueAxis)
+QCPCurve::QCPCurve()
         // A curve needs a straight segment and nothing else: no rectangle, no straight key axis.
-        : QCPPlottable1D<QCPCurveData, QCPLine>(keyAxis, valueAxis,
-                                                                QCP::capStraightSegments)
+        : QCPPlottable1D<QCPCurveData, QCPLine>(QCP::capStraightSegments)
 {
     // One component: the whole curve is one line, with one pen and one marker style.
     mComponents.resize(1);

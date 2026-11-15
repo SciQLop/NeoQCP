@@ -253,8 +253,8 @@ QCPFinancialData::QCPFinancialData(double key, double open, double high, double 
   \a keyAxis. This QCustomPlot instance takes ownership of the QCPFinancial, so do not delete it
   manually but use QCustomPlot::removePlottable() instead.
 */
-QCPFinancial::QCPFinancial(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPPlottable1D<QCPFinancialData>(keyAxis, valueAxis)
+QCPFinancial::QCPFinancial()
+        : QCPPlottable1D<QCPFinancialData>()
         , mChartStyle(csCandlestick)
         , mWidth(0.5)
         , mWidthType(wtPlotCoords)

@@ -37,9 +37,11 @@ public:
     template <typename T>
     using OpsFor = QCPIntervalsOps<T>;
 
-    QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* layout,
+    QCPIntervals(QCPLaneLayout* layout = nullptr,
                  QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey
                      | QCP::capLanes);
+    //! The columns, as setData() takes them: one bar per row.
+    QCPIntervals(qcp::intervals::Columns columns, QCPLaneLayout* layout = nullptr);
     ~QCPIntervals() override;
 
     void setData(qcp::intervals::Columns columns);
@@ -182,6 +184,8 @@ protected:
     void draw(QCPDrawContext& context) const override;
     void drawLegendIcon(QCPDrawContext& icon) const override;
     void emitSelectionChanged() override;
+    //! Makes the lane labels' layerable once a plot takes this plottable.
+    void systemDidChange() override;
 
     void regroupIfLanesWereAdded();
     void updateSubRows();

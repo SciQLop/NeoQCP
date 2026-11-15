@@ -22,9 +22,7 @@
   signals.
 */
 
-QCPLine::QCPLine(QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                 QCP::Capabilities required)
-    : QCPColorMapped(keyAxis, valueAxis, false, required)
+QCPLine::QCPLine(QCP::Capabilities required) : QCPColorMapped(false, required)
 {
     // A coloured line on a fresh rect keeps what the mapper had: gpJet over 0..1. Written through
     // the members, not the setters: the subclasses are not constructed yet.

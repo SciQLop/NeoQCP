@@ -21,7 +21,7 @@ void TestQCPLegend::autoAddPlottables()
   mPlot->setAutoAddPlottableToLegend(false);
   mPlot->addGraph();
   QCOMPARE(mPlot->legend->itemCount(), 0);
-  new QCPBars(mPlot->xAxis, mPlot->yAxis);
+  mPlot->add<QCPBars>().get();
   QCOMPARE(mPlot->legend->itemCount(), 0);
   
   // legend items should be added if auto-add is on:
@@ -30,7 +30,7 @@ void TestQCPLegend::autoAddPlottables()
   QCOMPARE(mPlot->legend->itemCount(), 1);
   mPlot->addGraph();
   QCOMPARE(mPlot->legend->itemCount(), 2);
-  new QCPBars(mPlot->xAxis, mPlot->yAxis);
+  mPlot->add<QCPBars>().get();
   QCOMPARE(mPlot->legend->itemCount(), 3);
 }
 
@@ -38,9 +38,9 @@ void TestQCPLegend::addAndRemove()
 {
   mPlot->setAutoAddPlottableToLegend(false);
   
-  QCPGraph *g1 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
-  QCPGraph *g2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
-  QCPBars *b1 = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+  QCPGraph *g1 = mPlot->add<QCPGraph>().get();
+  QCPGraph *g2 = mPlot->add<QCPGraph>().get();
+  QCPBars *b1 = mPlot->add<QCPBars>().get();
   QCOMPARE(mPlot->legend->itemCount(), 0);
   
   g1->addToLegend();
@@ -66,7 +66,7 @@ void TestQCPLegend::itemTextColorRepaintsTheLegend()
   // Dimming an entry (a hidden graph) only changes its text colour. The legend lives on a
   // layer of its own, so the setter must dirty it or the entry keeps its old colour until
   // something else repaints the legend.
-  auto *graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  auto *graph = mPlot->add<QCPGraph>().get();
   graph->setName("dimmed");
   graph->addToLegend();
   mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -88,7 +88,7 @@ void TestQCPLegend::itemTextColorRepaintsTheLegend()
 
 void TestQCPLegend::groupRowFollowsComponentVisibility()
 {
-  auto *mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  auto *mg = mPlot->add<QCPGraph>().get();
   mg->setData(std::vector<double>{1.0, 2.0, 3.0},
               std::vector<std::vector<double>>{{10.0, 20.0, 30.0}, {-1.0, -2.0, -3.0}});
   mg->addToLegend();
@@ -198,7 +198,7 @@ void TestQCPLegend::clickAwayDeletingTheLegendFromAnItemDeselectionIsSafe()
 void TestQCPLegend::aRowAddedAsAnElementBelongsToItsNewLegend()
 {
   mPlot->setAutoAddPlottableToLegend(false);
-  auto *graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  auto *graph = mPlot->add<QCPGraph>().get();
   auto *other = new QCPLegend;
   mPlot->axisRect()->insetLayout()->addElement(other, Qt::AlignTop | Qt::AlignLeft);
   auto *row = new QCPPlottableLegendItem(mPlot->legend, graph);
@@ -215,7 +215,7 @@ void TestQCPLegend::aRowAddedAsAnElementBelongsToItsNewLegend()
 void TestQCPLegend::aRowTakenOutOfItsLegendOutlivesIt()
 {
   mPlot->setAutoAddPlottableToLegend(false);
-  auto *graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  auto *graph = mPlot->add<QCPGraph>().get();
   graph->setName("orphan");
   QPointer<QCPLegend> other = new QCPLegend;
   mPlot->axisRect()->insetLayout()->addElement(other, Qt::AlignTop | Qt::AlignLeft);
@@ -239,7 +239,7 @@ void TestQCPLegend::aRowTakenOutOfItsLegendOutlivesIt()
 void TestQCPLegend::aSlotDeletingTheLegendARowJoinsIsSafe()
 {
   mPlot->setAutoAddPlottableToLegend(false);
-  auto *graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  auto *graph = mPlot->add<QCPGraph>().get();
   QPointer<QCPLegend> other = new QCPLegend;
   mPlot->axisRect()->insetLayout()->addElement(other, Qt::AlignTop | Qt::AlignLeft);
   QPointer<QCPLegendItem> row = new QCPPlottableLegendItem(mPlot->legend, graph);

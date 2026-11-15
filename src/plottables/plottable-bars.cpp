@@ -598,8 +598,8 @@ QCPBarsData::QCPBarsData(double key, double value) : key(key), value(value) { }
   keyAxis. This QCustomPlot instance takes ownership of the QCPBars, so do not delete it manually
   but use QCustomPlot::removePlottable() instead.
 */
-QCPBars::QCPBars(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPPlottable1D<QCPBarsData>(keyAxis, valueAxis)
+QCPBars::QCPBars()
+        : QCPPlottable1D<QCPBarsData>()
         , mWidth(0.75)
         , mWidthType(wtPlotCoords)
         , mBarsGroup(nullptr)

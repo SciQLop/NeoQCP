@@ -76,16 +76,9 @@ private:
 class RecordingPlottable : public QCPPlottable
 {
 public:
-    //! Needs nothing of its system: it records whatever the frame gives it, disc or rectangle.
-    explicit RecordingPlottable(QCPCoordinateSystem* system)
-            : QCPPlottable(system, QCP::Capabilities())
-    {
-    }
-
-    RecordingPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
-            : QCPPlottable(keyAxis, valueAxis, QCP::Capabilities())
-    {
-    }
+    //! Needs nothing of its system: it records whatever the frame gives it, disc or rectangle. It
+    //! is built without axes: the add that places it binds the frame it draws in.
+    RecordingPlottable() : QCPPlottable(QCP::Capabilities()) { }
 
     void draw(QCPDrawContext& context) const override
     {
@@ -179,10 +172,7 @@ QCPCoordinateSystem* polarSystem(QCPPolarArea* area)
 class ArcPlottable : public QCPPlottable1D<QCPGraphData>
 {
 public:
-    explicit ArcPlottable(QCPCoordinateSystem* system)
-            : QCPPlottable1D<QCPGraphData>(system, QCP::Capabilities())
-    {
-    }
+    ArcPlottable() : QCPPlottable1D<QCPGraphData>(QCP::Capabilities()) { }
 
     void setArc(QVector<QCPGraphData> points) { mDataContainer->set(points); }
 
@@ -377,8 +367,7 @@ void TestCoordinateSystem::aDeliberateNullSystemStaysQuiet()
     // Dropping the system on purpose makes the plottable inert: it draws nothing and says nothing.
     QCustomPlot plot;
     QCPAxisRect* rect = cartesianRect(plot);
-    auto* plottable = new RecordingPlottable(
-        rect->system(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)));
+    auto* plottable = rect->add<RecordingPlottable>().get();
     settle(plot);
     const int draws = plottable->draws();
     test_misuse::calls.clear();
@@ -398,7 +387,7 @@ void TestCoordinateSystem::aLostSystemReportsOnce()
     QCPAxisRect* rect = cartesianRect(plot);
     QCPAxis* top = rect->addAxis(QCPAxis::atTop);
     QCPAxis* right = rect->addAxis(QCPAxis::atRight);
-    auto* plottable = new RecordingPlottable(rect->system(top, right));
+    auto* plottable = rect->add<RecordingPlottable>(top, right).get();
     settle(plot);
     test_misuse::calls.clear();
 
@@ -420,7 +409,7 @@ void TestCoordinateSystem::aMixedPositionInAPolarAreaReportsOnce()
     QCustomPlot plot;
     QCPPolarArea* area = polarArea(plot);
     area->setBackground(QBrush(Qt::white));
-    auto* plottable = new RecordingPlottable(area->system(area->angularAxis(), area->radialAxis()));
+    auto* plottable = area->add<RecordingPlottable>().get();
     plottable->mixedRect = true;
     settle(plot);
     QCOMPARE(test_misuse::calls.size(), 1);
@@ -452,7 +441,7 @@ void TestCoordinateSystem::aPolarPlottableIsClippedToItsDisc()
     area->angularAxis()->setTickLabels(false);
     area->radialAxis()->setTicks(false);
     area->radialAxis()->setTickLabels(false);
-    auto* sheet = new RecordingPlottable(area->system(area->angularAxis(), area->radialAxis()));
+    auto* sheet = area->add<RecordingPlottable>().get();
     sheet->coversItsClip = true;
     settle(plot);
 
@@ -475,7 +464,8 @@ void TestCoordinateSystem::theIconAsksTheSystem()
     plot.resize(400, 300);
     QCPAxisRect* rect = plot.axisRect();
     CountingSystem system(rect, rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
-    auto* plottable = new RecordingPlottable(&system);
+    auto* plottable = plot.add<RecordingPlottable>().get();
+    plottable->setSystem(&system);
     QCOMPARE(plottable->system(), &system);
     plot.legend->setVisible(true);
     settle(plot);
@@ -486,7 +476,7 @@ void TestCoordinateSystem::aNonCartesianPlottableRescalesQuietly()
 {
     QCustomPlot plot;
     QCPPolarArea* area = polarArea(plot);
-    auto* plottable = new RecordingPlottable(polarSystem(area));
+    auto* plottable = area->add<RecordingPlottable>().get();
     settle(plot);
     const QCPRange angular = area->angularAxis()->range();
     const QCPRange radial = area->radialAxis()->range();
@@ -525,14 +515,14 @@ void TestCoordinateSystem::aPlottableTakesASystem()
     QCPAxis* y = rect->axis(QCPAxis::atLeft);
     QCPCoordinateSystem* system = rect->system(x, y);
 
-    auto* plottable = new RecordingPlottable(system);
+    auto* plottable = rect->add<RecordingPlottable>(x, y).get();
     QCOMPARE(plottable->system(), system);
     QCOMPARE(plottable->keyAxis(), x);
     QCOMPARE(plottable->valueAxis(), y);
     QCOMPARE(system->plottables().size(), 1);
 
     // The axis pair resolves to the same one, and the projections follow the system.
-    auto* sibling = new RecordingPlottable(x, y);
+    auto* sibling = rect->add<RecordingPlottable>(x, y).get();
     QCOMPARE(sibling->system(), system);
     QCOMPARE(rect->systems().size(), 1);
 }
@@ -550,7 +540,7 @@ void TestCoordinateSystem::theAxisPairFollowsEveryFrame()
         return Pair { p->keyAxis().get(), p->valueAxis().get() };
     };
 
-    auto* plottable = new RecordingPlottable(x, y);
+    auto* plottable = rect->add<RecordingPlottable>(x, y).get();
     QCOMPARE(pairOf(plottable), Pair(x, y));
     QCOMPARE(plottable->rawPair(), Pair(x, y));
 
@@ -588,8 +578,7 @@ void TestCoordinateSystem::theAxisPairFollowsEveryFrame()
     // An axis rect deleted under a plottable takes its system and its pair with it.
     auto* doomed = new QCPAxisRect(&plot);
     plot.plotLayout()->addElement(2, 0, doomed);
-    auto* orphan = new RecordingPlottable(doomed->axis(QCPAxis::atBottom),
-                                          doomed->axis(QCPAxis::atLeft));
+    auto* orphan = doomed->add<RecordingPlottable>().get();
     QVERIFY(orphan->system());
     delete doomed;
     QVERIFY(!orphan->system());
@@ -597,15 +586,15 @@ void TestCoordinateSystem::theAxisPairFollowsEveryFrame()
     QCOMPARE(orphan->rawPair(), Pair(nullptr, nullptr));
 }
 
-void TestCoordinateSystem::twoConstructorsShareTheSystem()
+void TestCoordinateSystem::twoAddsOnOnePairShareTheSystem()
 {
     QCustomPlot plot;
     QCPAxisRect* rect = cartesianRect(plot);
     QCPAxis* x = rect->axis(QCPAxis::atBottom);
     QCPAxis* y = rect->axis(QCPAxis::atLeft);
 
-    std::unique_ptr<QCPGraph> graph(new QCPGraph(x, y));
-    std::unique_ptr<QCPCurve> curve(new QCPCurve(x, y));
+    auto graph = rect->add<QCPGraph>(x, y);
+    auto curve = rect->add<QCPCurve>(x, y);
     QVERIFY(graph->system());
     QCOMPARE(graph->system(), curve->system());
     QCOMPARE(curve->system(), rect->system(x, y));
@@ -619,7 +608,7 @@ void TestCoordinateSystem::movingBetweenSystemsReRecords()
     QCPAxis* x = rect->axis(QCPAxis::atBottom);
     QCPAxis* other = rect->addAxis(QCPAxis::atBottom);
     QCPAxis* y = rect->axis(QCPAxis::atLeft);
-    auto* plottable = new RecordingPlottable(x, y);
+    auto* plottable = rect->add<RecordingPlottable>(x, y).get();
     plottable->readsTransform = true;
     plot.replot();
     const int before = plottable->recordings();
@@ -646,7 +635,7 @@ void TestCoordinateSystem::aPlottableOfADeletedSystemIsInert()
     QCustomPlot plot;
     QCPAxisRect* rect = cartesianRect(plot);
     QCPAxis* x = rect->axis(QCPAxis::atBottom);
-    auto* plottable = new RecordingPlottable(x, rect->axis(QCPAxis::atLeft));
+    auto* plottable = rect->add<RecordingPlottable>(x, rect->axis(QCPAxis::atLeft)).get();
     plottable->readsTransform = true;
     plot.replot();
     const int before = plottable->recordings();
@@ -667,9 +656,10 @@ void TestCoordinateSystem::aDropSystemHookMayDeleteASibling()
 {
     QCustomPlot plot;
     QCPAxisRect* rect = cartesianRect(plot);
-    auto* first
-        = new RecordingPlottable(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
-    auto* sibling = new RecordingPlottable(first->system());
+    auto* first = rect->add<RecordingPlottable>(rect->axis(QCPAxis::atBottom),
+                                                rect->axis(QCPAxis::atLeft))
+                      .get();
+    auto* sibling = rect->add<RecordingPlottable>().get();
     QVERIFY(first->system());
     QCOMPARE(first->system(), sibling->system());
     QCOMPARE(sibling->keyAxis().get(), first->keyAxis().get());
@@ -689,8 +679,9 @@ void TestCoordinateSystem::crossPlotSystemIsRefused()
 {
     QCustomPlot plot;
     QCPAxisRect* rect = cartesianRect(plot);
-    auto* plottable = new RecordingPlottable(rect->axis(QCPAxis::atBottom),
-                                             rect->axis(QCPAxis::atLeft));
+    auto* plottable = rect->add<RecordingPlottable>(rect->axis(QCPAxis::atBottom),
+                                                    rect->axis(QCPAxis::atLeft))
+                          .get();
     QCPCoordinateSystem* own = plottable->system();
     QVERIFY(own);
 
@@ -716,8 +707,10 @@ void TestCoordinateSystem::deletingAnAxisDeletesItsSystems()
     QCOMPARE(rect->systems().size(), 2);
 
     // A plottable of each: the one whose system dies is detached first, then the system goes.
-    auto* stayer = new RecordingPlottable(kept);
-    auto* leaver = new RecordingPlottable(doomed);
+    auto* stayer = plot.add<RecordingPlottable>().get();
+    stayer->setSystem(kept);
+    auto* leaver = plot.add<RecordingPlottable>().get();
+    leaver->setSystem(doomed);
     QCOMPARE(stayer->system(), kept);
     QCOMPARE(leaver->system(), doomed);
 
@@ -752,13 +745,13 @@ void TestCoordinateSystem::barsAreRefusedInAPolarSystem()
     QCPAxis* value = rect->axis(QCPAxis::atLeft);
     QCPPlottable* plottable = nullptr;
     if (kind == QStringLiteral("bars"))
-        plottable = new QCPBars(key, value);
+        plottable = key->axisRect()->add<QCPBars>(key, value).get();
     else if (kind == QStringLiteral("colormap"))
-        plottable = new QCPColorMap(key, value);
+        plottable = key->axisRect()->add<QCPColorMap>(key, value).get();
     else if (kind == QStringLiteral("multigraph"))
-        plottable = new QCPGraph(key, value);
+        plottable = key->axisRect()->add<QCPGraph>(key, value).get();
     else
-        plottable = new QCPIntervals(key, value, new QCPLaneLayout(&plot));
+        plottable = key->axisRect()->add<QCPIntervals>(key, value, new QCPLaneLayout(&plot)).get();
 
     // What each class needs: the cartesian pair, plus the flags its drawing assumes. A
     // multigraph needs the straight segment only (P-3); a polar system offers none of these.
@@ -794,7 +787,7 @@ void TestCoordinateSystem::aRecordingPlottableWithNoNeedsJoinsPolar()
     area->grid()->setVisible(false);
     settle(plot);
 
-    auto* arc = new ArcPlottable(polarSystem(area));
+    auto* arc = area->add<ArcPlottable>().get();
     QVERIFY(arc->system());
     QCOMPARE(arc->requiredCapabilities(), QCP::Capabilities());
     // The angular axis starts at -90 degrees: data coordinates are its own scale, so the arc is
@@ -833,16 +826,16 @@ void TestCoordinateSystem::relationshipsAcrossAreasAreRefused()
     // A channel fill spans one frame: two areas are refused.
     auto [leftKey, leftValue] = pairOf(left);
     auto [rightKey, rightValue] = pairOf(right);
-    auto* here = new QCPGraph(leftKey, leftValue);
-    auto* there = new QCPGraph(rightKey, rightValue);
+    auto* here = leftKey->axisRect()->add<QCPGraph>(leftKey, leftValue).get();
+    auto* there = rightKey->axisRect()->add<QCPGraph>(rightKey, rightValue).get();
     here->setComponentFillToGraph(0, there, 0);
     QVERIFY(!here->componentFill(0));
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear();
 
     // So does a stacking, whether by moveAbove or by a bars group.
-    auto* mine = new QCPBars(leftKey, leftValue);
-    auto* theirs = new QCPBars(rightKey, rightValue);
+    auto* mine = leftKey->axisRect()->add<QCPBars>(leftKey, leftValue).get();
+    auto* theirs = rightKey->axisRect()->add<QCPBars>(rightKey, rightValue).get();
     mine->moveAbove(theirs);
     QVERIFY(!mine->barAbove());
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
@@ -864,14 +857,14 @@ void TestCoordinateSystem::relationshipsAcrossAreasAreRefused()
     test_misuse::calls.clear();
 
     // Whiskers draw their data plottable's points: they must be in its frame.
-    auto* whiskers = new QCPErrorBars(leftKey, leftValue);
+    auto* whiskers = leftKey->axisRect()->add<QCPErrorBars>(leftKey, leftValue).get();
     whiskers->setDataPlottable(there);
     QVERIFY(!whiskers->dataPlottable());
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear(); // the three refusals are the point of this test
 }
 
-void TestCoordinateSystem::aMisusedPairIsOwnedAndInert()
+void TestCoordinateSystem::aMisusedPairIsRefused()
 {
     QCustomPlot plot;
     plot.plotLayout()->clear();
@@ -881,30 +874,25 @@ void TestCoordinateSystem::aMisusedPairIsOwnedAndInert()
     plot.plotLayout()->addElement(0, 1, right);
     settle(plot);
 
-    // Axes of two rects: 2.x drew this clipped to both rects. Now it is no frame, but the plot
-    // still owns it, and the one misuse report is the diagnostic.
-    auto* across = new QCPGraph(left->axis(QCPAxis::atBottom), right->axis(QCPAxis::atLeft));
+    // Axes of two rects name no frame of one area: the add reports once and the object is deleted,
+    // rather than a plottable the plot owns but cannot place.
+    auto across = left->add<QCPGraph>(left->axis(QCPAxis::atBottom), right->axis(QCPAxis::atLeft));
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear();
-    QVERIFY(!across->system());
-    QCOMPARE(plot.graphCount(), 1);
-    QCOMPARE(plot.graph(0), across);
-    QCOMPARE(plot.plottableCount(), 1);
+    QVERIFY(!across);
+    QCOMPARE(plot.graphCount(), 0);
+    QCOMPARE(plot.plottableCount(), 0);
 
-    // Two axes of one orientation: same story, not just a debug line.
-    auto* flat = new QCPGraph(left->axis(QCPAxis::atBottom), left->axis(QCPAxis::atTop));
+    // Two axes of one orientation: same refusal, not just a debug line.
+    auto flat = left->add<QCPGraph>(left->axis(QCPAxis::atBottom), left->axis(QCPAxis::atTop));
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear();
-    QVERIFY(!flat->system());
-    QCOMPARE(plot.graphCount(), 2);
-    QCOMPARE(plot.graph(1), flat);
-    QCOMPARE(plot.plottableCount(), 2);
+    QVERIFY(!flat);
+    QCOMPARE(plot.graphCount(), 0);
+    QCOMPARE(plot.plottableCount(), 0);
 
-    // Inert: no layer put it anywhere to draw, and a replot is quiet.
-    flat->setData({ 0, 1 }, { 0, 1 });
     settle(plot);
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
-    QCOMPARE(plot.graphCount(), 2);
 }
 
 void TestCoordinateSystem::aChangedSlotMayDeleteTheAxis()
@@ -938,9 +926,7 @@ void TestCoordinateSystem::aMovedPlottableFollowsItsNewArea()
     QCPAxisRect* first = plot.axisRect();
     auto* second = new QCPAxisRect(&plot);
     plot.plotLayout()->addElement(0, 1, second);
-    auto* plottable
-        = new RecordingPlottable(first->system(first->axis(QCPAxis::atBottom),
-                                               first->axis(QCPAxis::atLeft)));
+    auto* plottable = first->add<RecordingPlottable>().get();
     settle(plot);
     QVERIFY(plottable->draws() > 0);
 
@@ -963,7 +949,7 @@ void TestCoordinateSystem::aTakenPlottableFollowsItsNewPlot()
     from.resize(400, 300);
     to.resize(400, 300);
 
-    auto handle = from.add(std::unique_ptr<RecordingPlottable>(new RecordingPlottable(nullptr)));
+    auto handle = from.add(std::make_unique<RecordingPlottable>());
     QVERIFY(handle);
     RecordingPlottable* recorded = handle.get();
     const int before = recorded->systemChanges();
@@ -996,8 +982,8 @@ void TestCoordinateSystem::dualValueAxesKeepTheirRelationships()
     right->setRange(0, 1);
 
     // A group lays its members out in key pixels only, so two value axes are fine.
-    auto* low = new QCPBars(plot.xAxis, plot.yAxis);
-    auto* high = new QCPBars(plot.xAxis, right);
+    auto* low = plot.add<QCPBars>().get();
+    auto* high = plot.xAxis->axisRect()->add<QCPBars>(plot.xAxis, right).get();
     low->setData({ 1, 2, 3 }, { 1, 1, 1 });
     high->setData({ 1, 2, 3 }, { 1, 1, 1 });
     low->setPen(Qt::NoPen);
@@ -1013,8 +999,8 @@ void TestCoordinateSystem::dualValueAxesKeepTheirRelationships()
 
     // A fill to another graph works in pixels, between two value axes of one orientation. Its keys
     // stay clear of the bars the colours are read on.
-    auto* here = new QCPGraph(plot.xAxis, plot.yAxis);
-    auto* there = new QCPGraph(plot.xAxis, right);
+    auto* here = plot.add<QCPGraph>().get();
+    auto* there = plot.xAxis->axisRect()->add<QCPGraph>(plot.xAxis, right).get();
     here->setData(QVector<double> { 3.5, 4.5 }, QVector<double> { 0.2, 0.2 });
     there->setData(QVector<double> { 3.5, 4.5 }, QVector<double> { 0.8, 0.8 });
     QVERIFY(here->setComponentFillToGraph(0, there, 0));
@@ -1045,7 +1031,7 @@ void TestCoordinateSystem::rescaleAxesVisitsEveryArea()
     QCustomPlot plot;
     QCPPolarArea* area = polarArea(plot);
     const QCPRange angularBefore = area->angularAxis()->range();
-    auto* plottable = new RecordingPlottable(polarSystem(area));
+    auto* plottable = area->add<RecordingPlottable>().get();
     settle(plot); // the drawn data range comes from the recording
     QVERIFY(plottable->drawnDataRange().has_value());
 
@@ -1077,7 +1063,7 @@ void TestCoordinateSystem::aBracketDecorationNeedsAKeyAxis()
 {
     QCustomPlot plot;
     QCPPolarArea* area = polarArea(plot);
-    auto* arc = new ArcPlottable(polarSystem(area));
+    auto* arc = area->add<ArcPlottable>().get();
     arc->setArc(QVector<QCPGraphData> { { 0, 0.5 }, { 90, 0.5 } });
     auto* bracket = new QCPSelectionDecoratorBracket;
     arc->setSelectionDecorator(bracket);

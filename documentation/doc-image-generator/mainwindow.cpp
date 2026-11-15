@@ -669,7 +669,7 @@ void MainWindow::genQCPCurve()
     x1 << 4*qCos(t);
     y1 << qSin(t*2);
   }
-  QCPCurve *curve = new QCPCurve(customPlot->xAxis, customPlot->yAxis);
+  QCPCurve *curve = customPlot->add<QCPCurve>().get();
   curve->setData(x1, y1);
   
   customPlot->xAxis->setRange(-5, 5);
@@ -699,8 +699,8 @@ void MainWindow::genQCPBars()
   y1 << 0.7 << 0.5 << -0.4 << 0.2 << 0.8 << 1.2 << 1.3;
   y2 << 0.2 << 0.3 << -0.2 << 0.2 << 0.3 << 0.4 << 0.45;
   
-  QCPBars *bars1 = new QCPBars(customPlot->xAxis, customPlot->yAxis);
-  QCPBars *bars2 = new QCPBars(customPlot->xAxis, customPlot->yAxis);
+  QCPBars *bars1 = customPlot->add<QCPBars>().get();
+  QCPBars *bars2 = customPlot->add<QCPBars>().get();
   bars1->setData(x1, y1);
   bars2->setData(x1, y2);
   bars2->moveAbove(bars1);
@@ -731,7 +731,7 @@ void MainWindow::genQCPStatisticalBox()
   customPlot->xAxis->setTickLabels(false);
   customPlot->yAxis->setTickLabels(false);
   
-  QCPStatisticalBox *statistical = new QCPStatisticalBox(customPlot->xAxis, customPlot->yAxis);
+  QCPStatisticalBox *statistical = customPlot->add<QCPStatisticalBox>().get();
   statistical->addData(-1, -1.2, -0.35, 0.1, 0.4, 1.1);
   statistical->addData(0, -1.4, -0.7, -0.1, 0.34, 0.9);
   statistical->addData(1, -0.6, -0.2, 0.15, 0.6, 1.2);
@@ -763,7 +763,7 @@ void MainWindow::genQCPColorMap()
   customPlot->xAxis->ticker()->setTickCount(6);
   customPlot->yAxis->ticker()->setTickCount(6);
   
-  QCPColorMap *colorMap = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
+  QCPColorMap *colorMap = customPlot->add<QCPColorMap>().get();
   colorMap->setColorScale(nullptr); // the class picture shows the map alone, as in 2.x
   int nx = 200;
   int ny = 100;
@@ -823,7 +823,7 @@ void MainWindow::genQCPFinancial()
   }
   
   // create candlestick chart:
-  QCPFinancial *candlesticks = new QCPFinancial(customPlot->xAxis, customPlot->yAxis);
+  QCPFinancial *candlesticks = customPlot->add<QCPFinancial>().get();
   candlesticks->setChartStyle(QCPFinancial::csCandlestick);
   candlesticks->data()->set(QCPFinancial::timeSeriesToOhlc(time, value1, binSize, startTime));
   candlesticks->setWidth(binSize*0.9);
@@ -834,7 +834,7 @@ void MainWindow::genQCPFinancial()
   candlesticks->setPenNegative(QPen(QColor(0, 0, 0)));
 
   // create ohlc chart:
-  QCPFinancial *ohlc = new QCPFinancial(customPlot->xAxis, customPlot->yAxis);
+  QCPFinancial *ohlc = customPlot->add<QCPFinancial>().get();
   ohlc->setChartStyle(QCPFinancial::csOhlc);
   ohlc->data()->set(QCPFinancial::timeSeriesToOhlc(time, value2, binSize, startTime));
   ohlc->setWidth(binSize*0.75);
@@ -884,26 +884,26 @@ void MainWindow::genQCPErrorBars()
     errY2[i] = 0.02+std::rand()/(double)RAND_MAX*0.2;
   }
   
-  QCPGraph *graph = new QCPGraph(customPlot->xAxis, customPlot->yAxis);
+  QCPGraph *graph = customPlot->add<QCPGraph>().get();
   graph->setLineStyle(QCPGraph::lsLine);
   graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, QColor(200, 200, 200), 6));
   graph->setPen(QPen(QColor(200, 200, 200)));
   graph->setData(x, y);
-  QCPBars *bars = new QCPBars(customPlot->xAxis, customPlot->yAxis);
+  QCPBars *bars = customPlot->add<QCPBars>().get();
   bars->setData(x2, y2);
   bars->setWidth(0.3);
   bars->setPen(QPen(QColor(200, 200, 200)));
   bars->setBrush(QBrush(QColor(230, 230, 230)));
 
-  QCPErrorBars *xErrors = new QCPErrorBars(customPlot->xAxis, customPlot->yAxis);
+  QCPErrorBars *xErrors = customPlot->add<QCPErrorBars>().get();
   xErrors->setErrorType(QCPErrorBars::etKeyError);
   xErrors->setDataPlottable(graph);
   xErrors->setData(errX);
-  QCPErrorBars *yErrors = new QCPErrorBars(customPlot->xAxis, customPlot->yAxis);
+  QCPErrorBars *yErrors = customPlot->add<QCPErrorBars>().get();
   yErrors->setErrorType(QCPErrorBars::etValueError);
   yErrors->setDataPlottable(graph);
   yErrors->setData(errY);
-  QCPErrorBars *yErrorsBars = new QCPErrorBars(customPlot->xAxis, customPlot->yAxis);
+  QCPErrorBars *yErrorsBars = customPlot->add<QCPErrorBars>().get();
   yErrorsBars->setErrorType(QCPErrorBars::etValueError);
   yErrorsBars->setDataPlottable(bars);
   yErrorsBars->setData(errY2);
@@ -967,7 +967,7 @@ void MainWindow::genQCPColorGradient()
     customPlot->axisRect()->setMinimumMargins(m); // make some space for label
     QString gradientName(presetEnum.key(i));
     
-    QCPColorMap *colorMap = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
+    QCPColorMap *colorMap = customPlot->add<QCPColorMap>().get();
     int nx = 400;
     int ny = 400;
     colorMap->data()->setSize(nx, ny);
@@ -1014,19 +1014,19 @@ void MainWindow::genQCPBarsGroup()
   QVector<double> datay3 = QVector<double>() << 0.33 << 0.31 << 0.27 << 0.13;
   
   QCPBarsGroup *group1 = new QCPBarsGroup(customPlot);
-  QCPBars *bars = new QCPBars(customPlot->xAxis, customPlot->yAxis);
+  QCPBars *bars = customPlot->add<QCPBars>().get();
   bars->setData(datax, datay1);
   bars->setBrush(QColor(0, 0, 255, 50));
   bars->setPen(QColor(0, 0, 255));
   bars->setWidth(0.15);
   bars->setBarsGroup(group1);
-  bars = new QCPBars(customPlot->xAxis, customPlot->yAxis);
+  bars = customPlot->add<QCPBars>().get();
   bars->setData(datax, datay2);
   bars->setBrush(QColor(180, 00, 120, 50));
   bars->setPen(QColor(180, 00, 120));
   bars->setWidth(0.15);
   bars->setBarsGroup(group1);
-  bars = new QCPBars(customPlot->xAxis, customPlot->yAxis);
+  bars = customPlot->add<QCPBars>().get();
   bars->setData(datax, datay3);
   bars->setBrush(QColor(255, 154, 0, 50));
   bars->setPen(QColor(255, 154, 0));
@@ -1115,8 +1115,10 @@ void MainWindow::genQCPColorMap_Interpolate()
   ar2->axis(QCPAxis::atLeft)->setLayer("axes");
   ar2->axis(QCPAxis::atBottom)->setLayer("axes");
   customPlot->plotLayout()->addElement(0, 1, ar2);
-  QCPColorMap *cm1 = new QCPColorMap(ar1->axis(QCPAxis::atBottom), ar1->axis(QCPAxis::atLeft));
-  QCPColorMap *cm2 = new QCPColorMap(ar2->axis(QCPAxis::atBottom), ar2->axis(QCPAxis::atLeft));
+  QCPColorMap *cm1 = ar1->axis(QCPAxis::atBottom)->axisRect()->add<QCPColorMap>(
+          ar1->axis(QCPAxis::atBottom), ar1->axis(QCPAxis::atLeft)).get();
+  QCPColorMap *cm2 = ar2->axis(QCPAxis::atBottom)->axisRect()->add<QCPColorMap>(
+          ar2->axis(QCPAxis::atBottom), ar2->axis(QCPAxis::atLeft)).get();
   cm1->setColorScale(nullptr); // this picture is about interpolation, not the colour bar
   cm2->setColorScale(nullptr);
   cm1->data()->setSize(10, 10);
@@ -1167,8 +1169,10 @@ void MainWindow::genQCPColorMap_TightBoundary()
   }
   customPlot->plotLayout()->setMargins(QMargins(0, 5, 0, 0));
   customPlot->plotLayout()->addElement(0, 1, ar2);
-  QCPColorMap *cm1 = new QCPColorMap(ar1->axis(QCPAxis::atBottom), ar1->axis(QCPAxis::atLeft));
-  QCPColorMap *cm2 = new QCPColorMap(ar2->axis(QCPAxis::atBottom), ar2->axis(QCPAxis::atLeft));
+  QCPColorMap *cm1 = ar1->axis(QCPAxis::atBottom)->axisRect()->add<QCPColorMap>(
+          ar1->axis(QCPAxis::atBottom), ar1->axis(QCPAxis::atLeft)).get();
+  QCPColorMap *cm2 = ar2->axis(QCPAxis::atBottom)->axisRect()->add<QCPColorMap>(
+          ar2->axis(QCPAxis::atBottom), ar2->axis(QCPAxis::atLeft)).get();
   cm1->setColorScale(nullptr); // this picture is about the cell edges, not the colour bar
   cm2->setColorScale(nullptr);
   cm1->data()->setSize(7, 7);
@@ -1236,8 +1240,10 @@ void MainWindow::genQCPColorGradient_LevelCount()
   r1->setMinimumMargins(m);
   r2->setMinimumMargins(m);
 
-  QCPColorMap *map1 = new QCPColorMap(r1->axis(QCPAxis::atBottom), r1->axis(QCPAxis::atLeft));
-  QCPColorMap *map2 = new QCPColorMap(r2->axis(QCPAxis::atBottom), r2->axis(QCPAxis::atLeft));
+  QCPColorMap *map1 = r1->axis(QCPAxis::atBottom)->axisRect()->add<QCPColorMap>(
+          r1->axis(QCPAxis::atBottom), r1->axis(QCPAxis::atLeft)).get();
+  QCPColorMap *map2 = r2->axis(QCPAxis::atBottom)->axisRect()->add<QCPColorMap>(
+          r2->axis(QCPAxis::atBottom), r2->axis(QCPAxis::atLeft)).get();
   int nx = 400;
   int ny = 400;
   map1->data()->setSize(nx, ny);
@@ -1311,8 +1317,10 @@ void MainWindow::genQCPColorGradient_Periodic()
   r1->setMinimumMargins(m);
   r2->setMinimumMargins(m);
 
-  QCPColorMap *map1 = new QCPColorMap(r1->axis(QCPAxis::atBottom), r1->axis(QCPAxis::atLeft));
-  QCPColorMap *map2 = new QCPColorMap(r2->axis(QCPAxis::atBottom), r2->axis(QCPAxis::atLeft));
+  QCPColorMap *map1 = r1->axis(QCPAxis::atBottom)->axisRect()->add<QCPColorMap>(
+          r1->axis(QCPAxis::atBottom), r1->axis(QCPAxis::atLeft)).get();
+  QCPColorMap *map2 = r2->axis(QCPAxis::atBottom)->axisRect()->add<QCPColorMap>(
+          r2->axis(QCPAxis::atBottom), r2->axis(QCPAxis::atLeft)).get();
   int nx = 400;
   int ny = 400;
   map1->data()->setSize(nx, ny);

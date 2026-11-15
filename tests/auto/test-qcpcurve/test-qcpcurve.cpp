@@ -128,7 +128,7 @@ void TestQCPCurve::init()
 {
   mPlot = new QCustomPlot(0);
   mPlot->resize(400, 300);
-  mCurve = new InspectableCurve(mPlot->xAxis, mPlot->yAxis);
+  mCurve = mPlot->add<InspectableCurve>().get();
 }
 
 void TestQCPCurve::cleanup()
@@ -235,7 +235,7 @@ void TestQCPCurve::dataManipulation()
 
 void TestQCPCurve::dataSharing()
 {
-  QCPCurve *curve2 = new QCPCurve(mPlot->xAxis, mPlot->yAxis);
+  QCPCurve *curve2 = mPlot->add<QCPCurve>().get();
   
   QSharedPointer<QCPCurveDataContainer> data = curve2->data();
   mCurve->setData(data); // now shares data with curve2
@@ -467,7 +467,7 @@ void TestQCPCurve::nanSplitsTheCurveFill()
        { std::pair { QVector<double> { 1, 3, 2 }, QVector<double> { 1, 1, 4 } },
          std::pair { QVector<double> { 6, 8, 7 }, QVector<double> { 1, 1, 4 } } })
   {
-      auto* half = new QCPCurve(split.xAxis, split.yAxis);
+      auto* half = split.add<QCPCurve>().get();
       half->setPen(QPen(Qt::NoPen));
       half->setBrush(brush);
       half->setData(keys, values);
@@ -508,7 +508,7 @@ void TestQCPCurve::noSetterIsIgnored()
 
   DirtyAwarePlot plot;
   plot.resize(400, 300);
-  auto* curve = new QCPCurve(plot.xAxis, plot.yAxis);
+  auto* curve = plot.add<QCPCurve>().get();
   setFivePoints(curve);
   plot.xAxis->setRange(0, 4);
   plot.yAxis->setRange(0, 3);

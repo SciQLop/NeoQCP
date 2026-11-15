@@ -103,32 +103,36 @@ QCPLayer* layerAbove(QCustomPlot* plot, QCPLayer* base)
   signals.
 */
 
-QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* layout,
-                           QCP::Capabilities required)
-        : QCPPlottable(keyAxis, valueAxis, required), mLayout(layout)
+QCPIntervals::QCPIntervals(QCPLaneLayout* layout, QCP::Capabilities required)
+        : QCPPlottable(required), mLayout(layout)
 {
     setSelectable(QCP::stMultipleDataRanges);
-    // The base constructor auto-added a plain legend item (our addToLegend override was not
-    // in place yet): swap in the category list. A refused object has no system and no row to swap.
-    if (mSystem && mParentPlot && mParentPlot->autoAddPlottableToLegend() && mParentPlot->legend)
-    {
-        QCPPlottable::removeFromLegend(mParentPlot->legend);
-        addToLegend(mParentPlot->legend);
-    }
     if (hasLaneLayout())
         connect(layout, &QCPLaneLayout::changed, this, [this] {
             regroupIfLanesWereAdded();
             update();
         });
     connect(this, &QCPPlottable::selectionChanged, this, &QCPIntervals::markLayersDirty);
-    if (!mParentPlot || !mSystem)
-        return; // inert (null axis or a refused system): no plot-side label layer
-    mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
     // Keep the label layerable one layer above wherever this plottable itself moves to.
     connect(this, &QCPLayerable::layerChanged, this, [this](QCPLayer* newLayer) {
-        if (newLayer)
+        if (newLayer && mLabelLayer)
             mLabelLayer->setLayer(layerAbove(mParentPlot, newLayer));
     });
+}
+
+QCPIntervals::QCPIntervals(qcp::intervals::Columns columns, QCPLaneLayout* layout)
+        : QCPIntervals(layout)
+{
+    setData(std::move(columns));
+}
+
+void QCPIntervals::systemDidChange()
+{
+    // The lane labels are layerables of the plot: an intervals plottable built without axes has
+    // none to draw them in until a frame takes it.
+    if (!mSystem || !mParentPlot || mLabelLayer)
+        return;
+    mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
 }
 
 void QCPIntervals::setData(qcp::intervals::Columns columns)

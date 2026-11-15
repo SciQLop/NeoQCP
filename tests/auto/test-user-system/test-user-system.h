@@ -21,7 +21,7 @@ private slots:
     void aRefusedPlottableIsOnNoLayer();
     void plotAddOfRefusedBarsReturnsNoHandle();
     void adoptingBarsOntoASkewDefaultRectIsRefused();
-    void aRefusedPlottableThatJoinsLaterIsRegistered();
+    void aRefusedAddLeavesThePlotUntouched();
     void aRefusedIntervalsLeavesNoLayerOrLegendRow();
     void aCustomSystemDeclaringARectangleStillRefusesBars();
     void barsBuiltOnASkewRectAreRefused();

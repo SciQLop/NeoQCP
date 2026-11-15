@@ -52,8 +52,22 @@ public:
     template <typename T>
     using OpsFor = QCPGraphOps<T>;
 
-    explicit QCPGraph(QCPAxis* keyAxis, QCPAxis* valueAxis,
-                           QCP::Capabilities required = QCP::capStraightSegments);
+    explicit QCPGraph(QCP::Capabilities required = QCP::capStraightSegments);
+    //! One data point per (key, value) pair, sorted by key: add<QCPGraph>(keys, values) needs no
+    //! setData() call.
+    template <QCPNumberRange K, QCPNumberRange V>
+    QCPGraph(const K& keys, const V& values, bool alreadySorted = false) : QCPGraph()
+    {
+        std::vector<double> keyValues(std::ranges::begin(keys), std::ranges::end(keys));
+        std::vector<double> dataValues(std::ranges::begin(values), std::ranges::end(values));
+        setData(keyValues, dataValues, alreadySorted);
+    }
+    //! Value columns of any numeric type: the constructor form of the multi-column setData().
+    template <IndexableNumericRange KC, IndexableNumericRange VC>
+    QCPGraph(KC&& keys, std::vector<VC>&& valueColumns, bool alreadySorted = false) : QCPGraph()
+    {
+        setData(std::forward<KC>(keys), std::forward<std::vector<VC>>(valueColumns), alreadySorted);
+    }
     ~QCPGraph() override;
 
     // Data source

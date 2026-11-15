@@ -462,13 +462,12 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPPlottable* plottable)
 /* end of documentation of signals */
 
 /*!
-  Constructs an abstract plottable which uses \a keyAxis as its key axis ("x") and \a valueAxis as
-  its value axis ("y"). \a keyAxis and \a valueAxis must reside in the same QCustomPlot instance
-  and have perpendicular orientations. If either of these restrictions is violated, a corresponding
-  message is printed to the debug output (qDebug), the construction is not aborted, though.
+  Constructs an abstract plottable with no axes and no area: a plottable is built from its own
+  arguments, and placed - bound to an axis rect's coordinate system - when it is added (see
+  QCPAxisRect::add<T>() and QCustomPlot::add<T>()).
 
-  A null \a keyAxis or \a valueAxis is a misuse (see \ref qcp::setMisuseHandler): the plottable is
-  then built but inert, in no plot and never drawn, and deleting it is up to the caller.
+  \a required is what a frame must offer to draw this plottable; it is fixed at construction, and a
+  frame that lacks one of these capabilities refuses the plottable at placement (see systemAdmits).
 
   Since QCPPlottable is an abstract class that defines the basic interface to plottables,
   it can't be directly instantiated.
@@ -484,14 +483,6 @@ bool projectsOntoAxes(const QCPCoordinateSystem* system)
     return !system || system->kind() == QCPTransform::Kind::Cartesian;
 }
 
-//! \a system when it offers \a required, else null after a misuse report: the object it belongs
-//! to stays inert, exactly like one told to join a frame it cannot draw in.
-QCPCoordinateSystem* admits(QCPCoordinateSystem* system, QCP::Capabilities required)
-{
-    if (!system)
-        return nullptr;
-    return QCPPlottable::systemAdmits(system, required) ? system : nullptr;
-}
 } // namespace
 
 bool QCPPlottable::systemAdmits(const QCPCoordinateSystem* system,
@@ -528,89 +519,26 @@ bool QCPPlottable::systemAdmits(const QCPCoordinateSystem* system,
   signals.
 */
 
-QCPPlottable::QCPPlottable(QCPCoordinateSystem* system, QCP::Capabilities required)
-        : QCPLayerable(system && system->area() ? system->area()->parentPlot() : nullptr, QString(),
-                       system ? static_cast<QCPLayerable*>(system->area()) : nullptr)
+QCPPlottable::QCPPlottable(QCP::Capabilities required)
+        : QCPLayerable(nullptr, QString(), nullptr)
         , mName()
         , mAntialiasedFill(true)
         , mAntialiasedScatters(true)
         , mPen(Qt::black)
         , mBrush(Qt::NoBrush)
-        , mSystem(admits(system, required))
+        , mSystem(nullptr)
         , mRequiredCapabilities(required)
         , mSelectable(QCP::stWhole)
         , mSelectionDecorator(nullptr)
-        , mKeyAxis(mSystem && projectsOntoAxes(mSystem) ? qobject_cast<QCPAxis*>(mSystem->keyAxis())
-                                                        : nullptr)
-        , mValueAxis(mSystem && projectsOntoAxes(mSystem)
-                         ? qobject_cast<QCPAxis*>(mSystem->valueAxis())
-                         : nullptr)
+        , mKeyAxis(nullptr)
+        , mValueAxis(nullptr)
 {
     setSelectionDecorator(new QCPSelectionDecorator);
     mBusyDebounceTimer.setSingleShot(true);
     connect(&mBusyDebounceTimer, &QTimer::timeout, this, &QCPPlottable::onDebounceTimeout);
-
-    if (!mSystem)
-    {
-        // Without a system there is no plot to join, and a frame that refused the mask said so:
-        // the plottable stays inert, on no layer, registers nowhere, and owes no second report on
-        // its first draw. The plot it was built on stays its QObject parent, so nothing leaks.
-        setParentLayerable(nullptr);
-        moveToLayer(nullptr, false);
-        mReportedLostAxis = true;
-        return;
-    }
-    mReportedLostAxis = false;
-    if (!mParentPlot)
-        return;
-    if (mParentPlot->registerPlottable(this))
-        mRegisteredPlot = mParentPlot;
-}
-
-QCPPlottable::QCPPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                           QCP::Capabilities required)
-        : QCPPlottable(qcpSystemOfAxes(keyAxis, valueAxis), required)
-{
-    // A frame that refused the pair has already said so and left this object inert: the 2.x axes
-    // are not a second chance to join it.
-    if (qcpSystemOfAxes(keyAxis, valueAxis) && !mSystem)
-        return;
-    // The 2.x pair is the cartesian projection of the system it resolves to: a system of the user's
-    // own draws through its transform, and hands 2.x pixel code no axis at all.
-    if (projectsOntoAxes(mSystem))
-    {
-        mKeyAxis = keyAxis;
-        mValueAxis = valueAxis;
-    }
-    if (!keyAxis && !valueAxis)
-        return;
-    QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "a plottable needs a key axis and a value axis");
-    if (keyAxis->parentPlot() != valueAxis->parentPlot())
-    {
-        // Neither plot may end up drawing it: report once and leave the object inert, like the
-        // both-null case.
-        QCP_CHECK(false, "a plottable needs both axes on the same plot");
-        moveToLayer(nullptr, false);
-        return;
-    }
-    if (!system())
-    {
-        // 2.x drew a cross-rect pair (clipped to both rects) and registered a same-orientation one:
-        // neither is one frame now. The plottable stays owned by the plot and inert, and this
-        // report is the one diagnostic - never an orphan nobody deletes, never a silent no-show.
-        qcp::reportMisuse(Q_FUNC_INFO,
-                          "the key and value axes are not two axes of one axis rect: the "
-                          "plottable is inert");
-        QCustomPlot* plot = keyAxis->parentPlot();
-        if (plot)
-        {
-            setParent(plot);
-            initializeParentPlot(plot);
-            setParentLayerable(keyAxis->axisRect());
-            if (plot->registerPlottable(this))
-                mRegisteredPlot = plot;
-        }
-    }
+    // Detached: no plot, no layer. A frame this one cannot be drawn in reports the refusal once at
+    // placement (see systemAdmits), so the first draw owes no second report.
+    mReportedLostAxis = true;
 }
 
 /*! \internal

@@ -323,10 +323,7 @@ public:
 class TestLine : public QCPPlottable
 {
 public:
-    TestLine(QCPAxis* keyAxis, QCPAxis* valueAxis)
-            : QCPPlottable(keyAxis, valueAxis)
-    {
-    }
+    TestLine() : QCPPlottable() { }
 
     using QCPPlottable::drawLegendIcon; // the painter overload stays reachable
 
@@ -382,10 +379,7 @@ public:
 class TestIconSetter : public QCPPlottable
 {
 public:
-    TestIconSetter(QCPAxis* keyAxis, QCPAxis* valueAxis)
-            : QCPPlottable(keyAxis, valueAxis)
-    {
-    }
+    TestIconSetter() : QCPPlottable() { }
 
     using QCPPlottable::drawLegendIcon; // the painter overload stays reachable
 
@@ -416,10 +410,7 @@ public:
 class BareLine : public QCPPlottable1D<QCPGraphData>
 {
 public:
-    BareLine(QCPAxis* keyAxis, QCPAxis* valueAxis)
-            : QCPPlottable1D<QCPGraphData>(keyAxis, valueAxis)
-    {
-    }
+    BareLine() : QCPPlottable1D<QCPGraphData>() { }
 
     void draw(QCPDrawContext& context) const override
     {
@@ -763,7 +754,7 @@ void TestDrawable::contentChangedInsideDrawIsAMisuse()
 void TestDrawable::contentChangedInsideLegendIconIsAMisuse()
 {
     Fixture f;
-    auto* line = new TestIconSetter(f.plot->xAxis, f.plot->yAxis);
+    auto* line = f.plot->add<TestIconSetter>().get();
     QImage image(100, 50, QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::white);
     QCPPainter painter(&image);
@@ -894,7 +885,7 @@ void TestDrawable::dataOnlyDrawingLetsItsLayerTranslate()
     if (!f.hasRhi())
         QSKIP("No QRhi available - the translate path is a GPU one");
     hideAxes(f.plot.get());
-    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    auto* line = f.plot->add<TestLine>().get();
     line->mLine = std::make_shared<const std::vector<QPointF>>(
         std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
     f.plot->replot();
@@ -933,7 +924,7 @@ void TestDrawable::translatedLayerRevealsAnEnteringLabel()
     if (!f.hasRhi())
         QSKIP("No QRhi available - the translate path is a GPU one");
     hideAxes(f.plot.get());
-    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    auto* line = f.plot->add<TestLine>().get();
     line->mLine = std::make_shared<const std::vector<QPointF>>(
         std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
     line->labelAt = QPointF(12.0, 5.0); // just right of the visible key range
@@ -959,7 +950,7 @@ void TestDrawable::translatedLayerRevealsAClippedRaster()
     if (!f.hasRhi())
         QSKIP("No QRhi available - the raster fallback is a GPU path");
     hideAxes(f.plot.get());
-    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    auto* line = f.plot->add<TestLine>().get();
     line->rasterRect = true; // a gradient from (2,2) to (14,6): half of it is outside the view
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
 
@@ -981,7 +972,7 @@ void TestDrawable::translatedBarsRevealTheNextBar()
     if (!f.hasRhi())
         QSKIP("No QRhi available - the translate path is a GPU one");
     hideAxes(f.plot.get());
-    auto* bars = new QCPBars(f.plot->xAxis, f.plot->yAxis);
+    auto* bars = f.plot->add<QCPBars>().get();
     QVector<double> keys(10000), values(10000);
     for (int i = 0; i < 10000; ++i)
     {
@@ -1094,7 +1085,7 @@ void TestDrawable::brokenDashedPipelineKeepsTheOutline()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the dashed pipeline is a GPU path");
-    auto* bars = new QCPBars(f.plot->xAxis, f.plot->yAxis);
+    auto* bars = f.plot->add<QCPBars>().get();
     bars->setPen(QPen(Qt::black, 2, Qt::DashLine));
     bars->setBrush(Qt::NoBrush);
     bars->setWidth(1.0);
@@ -1126,7 +1117,7 @@ void TestDrawable::rasterisedDashesStopTheLayerFromTranslating()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the dashed pipeline is a GPU path");
-    auto* bars = new QCPBars(f.plot->xAxis, f.plot->yAxis);
+    auto* bars = f.plot->add<QCPBars>().get();
     bars->setPen(QPen(Qt::black, 2));
     bars->setBrush(QColor(200, 60, 60));
     bars->setWidth(1.0);
@@ -1233,9 +1224,9 @@ void TestDrawable::fadeSplitsTheRun()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the merged entries are a GPU path only");
-    auto* first = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    auto* first = f.plot->add<TestLine>().get();
     first->setPen(QPen(Qt::black, 2));
-    auto* second = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    auto* second = f.plot->add<TestLine>().get();
     second->mLine = std::make_shared<const std::vector<QPointF>>(
         std::initializer_list<QPointF> { { 1, 8 }, { 9, 8 } });
     second->setPen(QPen(Qt::black, 2));
@@ -1579,7 +1570,7 @@ void TestDrawable::defaultDataRangeFollowsTheExtentRules()
 void TestDrawable::defaultLegendIconIsTheRecordingFitted()
 {
     Fixture f;
-    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    auto* line = f.plot->add<TestLine>().get();
     const QRectF icon(0, 0, 100, 50);
     QImage image(100, 50, QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::white);
@@ -1597,7 +1588,7 @@ void TestDrawable::defaultLegendIconIsTheRecordingFitted()
 void TestDrawable::legendIconFollowsTheTheme()
 {
     Fixture f;
-    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    auto* line = f.plot->add<TestLine>().get();
     line->readsTheme = true;
     const QRectF icon(0, 0, 100, 50);
     const auto ink = [&]
@@ -1625,7 +1616,7 @@ void TestDrawable::flatLineHasALegendIcon()
     // A horizontal line has no value extent: fitting it to the icon rect must widen that side, not
     // reject the box and leave the icon blank.
     Fixture f;
-    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    auto* line = f.plot->add<TestLine>().get();
     line->mLine = std::make_shared<const std::vector<QPointF>>(
         std::initializer_list<QPointF> { { 1, 3 }, { 9, 3 } });
     const QRectF icon(0, 0, 100, 50);
@@ -1644,7 +1635,7 @@ void TestDrawable::logAxisRescaleKeepsThePositivePart()
     // The recording reaches zero, so the item index drops the value side on a log axis; a
     // plottable's range is data, and rescaleAxes must still fit the positive part.
     Fixture f;
-    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    auto* line = f.plot->add<TestLine>().get();
     line->mLine = std::make_shared<const std::vector<QPointF>>(
         std::initializer_list<QPointF> { { 1, 0 }, { 2, 5 }, { 3, 10 } });
     f.plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
@@ -1659,7 +1650,7 @@ void TestDrawable::logAxisRescaleKeepsThePositivePart()
 void TestDrawable::setPenReRecordsOnce()
 {
     Fixture f;
-    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    auto* line = f.plot->add<TestLine>().get();
     f.plot->replot();
     QCOMPARE(line->drawCalls, 1);
 
@@ -1704,7 +1695,7 @@ void TestDrawable::selectionChangeReRecords()
 void TestDrawable::clickSelectsADrawnPlottable()
 {
     Fixture f;
-    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    auto* line = f.plot->add<TestLine>().get();
     line->setSelectable(QCP::stWhole);
     f.plot->replot();
     QVERIFY(!line->selected());
@@ -1719,7 +1710,7 @@ void TestDrawable::clickSelectsADrawnPlottable()
 void TestDrawable::clickOutsideTheAxisRectMisses()
 {
     Fixture f;
-    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    auto* line = f.plot->add<TestLine>().get();
     line->setSelectable(QCP::stWhole);
     // Data (1, 1), one end of the recorded line, now maps outside the axis rect.
     f.plot->xAxis->setRange(5, 10);
@@ -1893,7 +1884,7 @@ void TestDrawable::pannedTimeAxisKeepsTheShapeOnAxis()
     const double start = 1.7e9;
     const double span = 99.9;
     f.plot->xAxis->setRange(start, start + span);
-    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    auto* line = f.plot->add<TestLine>().get();
     line->mLine = std::make_shared<const std::vector<QPointF>>(
         std::initializer_list<QPointF> { { start + 10.0, 2.0 }, { start + 90.0, 8.0 } });
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
@@ -1939,7 +1930,7 @@ void TestDrawable::rangeBandExampleDraws()
     // its fill is where it says, and its label is inked.
     Fixture f;
     const QColor fill(120, 180, 240);
-    auto* band = new RangeBand(f.plot->xAxis, f.plot->yAxis);
+    auto* band = f.plot->add<RangeBand>().get();
     band->setBrush(fill);
     band->setLabel(QStringLiteral("band"));
     band->setData(QVector<double> { 1, 2, 3, 4, 5, 6, 7, 8, 9 }, QVector<double>(9, 3.0),
@@ -1971,9 +1962,9 @@ void TestDrawable::adapterExposesThePublicSelectAndRanges()
     // adapter's overrides may not narrow that: a user's `bars->selectTest(...)` and
     // `band->getKeyRange(...)` must keep compiling.
     Fixture f;
-    auto* bars = new QCPBars(f.plot->xAxis, f.plot->yAxis);
+    auto* bars = f.plot->add<QCPBars>().get();
     bars->setData(QVector<double> { 5 }, QVector<double> { 4 });
-    auto* band = new RangeBand(f.plot->xAxis, f.plot->yAxis);
+    auto* band = f.plot->add<RangeBand>().get();
     band->setData(QVector<double> { 1, 9 }, QVector<double> { 3, 3 }, QVector<double> { 5, 5 });
     f.plot->replot();
 
@@ -1998,7 +1989,7 @@ void TestDrawable::rangeBandRescalesToItsData()
     // I5: the label's anchor is a data position, so it must not unbound the recording. While it
     // did, getKeyRange/getValueRange reported nothing and rescaleAxes() left the band alone.
     Fixture f;
-    auto* band = new RangeBand(f.plot->xAxis, f.plot->yAxis);
+    auto* band = f.plot->add<RangeBand>().get();
     QVector<double> keys, lower(9, 3.0), upper(9, 5.0);
     for (int i = 1; i <= 9; ++i)
         keys << double(i);
@@ -2026,7 +2017,7 @@ void TestDrawable::rangeBandLegendIconIsInked()
     // visible range, so the only pixels of the fill in the image are the icon's.
     Fixture f;
     const QColor fill(120, 180, 240);
-    auto* band = new RangeBand(f.plot->xAxis, f.plot->yAxis);
+    auto* band = f.plot->add<RangeBand>().get();
     QVector<double> keys, lower(5, 3.0), upper(5, 5.0);
     for (int i = 0; i < 5; ++i)
         keys << 100.0 + i;
@@ -2057,7 +2048,7 @@ void TestDrawable::exportStacksLikeTheScreen()
     if (!f.hasRhi())
         QSKIP("No QRhi available - this compares the screen with the export paths");
 
-    auto* bars = new QCPBars(f.plot->xAxis, f.plot->yAxis);
+    auto* bars = f.plot->add<QCPBars>().get();
     bars->setWidthType(QCPBars::wtPlotCoords);
     bars->setWidth(6);
     bars->setData(QVector<double> { 5 }, QVector<double> { 8 }); // 0..8, so it covers the text
@@ -2314,7 +2305,7 @@ void TestDrawable::aPlottableRecordsWithoutTheAdapter()
     // The base owns the recording: a plottable that overrides only draw(QCPDrawContext&) records,
     // hit-tests and draws its legend icon without any adapter in between.
     Fixture f;
-    auto* line = new BareLine(f.plot->xAxis, f.plot->yAxis);
+    auto* line = f.plot->add<BareLine>().get();
     QCOMPARE(line->recordings(), 0); // nothing recorded before the first frame
     f.plot->replot();
     QCOMPARE(line->recordings(), 1);
@@ -2351,7 +2342,7 @@ void TestDrawable::aStyleSetterReRecords()
 {
     // setPen is a content change: the recording is remade, not replayed in the old colour.
     Fixture f;
-    auto* bars = new CountingBars(f.plot->xAxis, f.plot->yAxis);
+    auto* bars = f.plot->add<CountingBars>().get();
     bars->setData(QVector<double> { 5 }, QVector<double> { 4 });
     f.plot->replot();
     const int before = bars->recordings();

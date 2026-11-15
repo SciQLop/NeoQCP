@@ -27,7 +27,7 @@ std::vector<std::vector<double>> sines(int n, int cols)
 class PendingStub : public QCPPlottable
 {
 public:
-    PendingStub(QCPAxis* k, QCPAxis* v) : QCPPlottable(k, v) {}
+    PendingStub() : QCPPlottable() {}
     int commits = 0;
     const QElapsedTimer* clock = nullptr;
     qint64 committedAt = -1; // clock time of the first commit, if a clock is set
@@ -70,7 +70,7 @@ void TestDataSwap::cleanup()
 
 void TestDataSwap::pendingCountsAsBusy()
 {
-    auto* p = new PendingStub(mPlot->xAxis, mPlot->yAxis);
+    auto* p = mPlot->add<PendingStub>().get();
     p->notifyBusy();
     QVERIFY(p->busy());
     p->pending = false;
@@ -80,8 +80,8 @@ void TestDataSwap::pendingCountsAsBusy()
 
 void TestDataSwap::requestsWithinWindowCommitOnce()
 {
-    auto* a = new PendingStub(mPlot->xAxis, mPlot->yAxis);
-    auto* b = new PendingStub(mPlot->xAxis, mPlot->yAxis);
+    auto* a = mPlot->add<PendingStub>().get();
+    auto* b = mPlot->add<PendingStub>().get();
     mPlot->setDataSwapDebounceMs(400);
     QSignalSpy replots(mPlot, &QCustomPlot::afterReplot);
 
@@ -109,7 +109,7 @@ void TestDataSwap::requestsWithinWindowCommitOnce()
 
 void TestDataSwap::requestAfterWindowCommitsAgain()
 {
-    auto* a = new PendingStub(mPlot->xAxis, mPlot->yAxis);
+    auto* a = mPlot->add<PendingStub>().get();
     mPlot->setDataSwapDebounceMs(20);
     mPlot->requestDataSwap();
     QTRY_COMPARE_WITH_TIMEOUT(a->commits, 1, 2000);
@@ -119,7 +119,7 @@ void TestDataSwap::requestAfterWindowCommitsAgain()
 
 void TestDataSwap::swapWaitsForPanToSettle()
 {
-    auto* a = new PendingStub(mPlot->xAxis, mPlot->yAxis);
+    auto* a = mPlot->add<PendingStub>().get();
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     a->stall = QPointF(3, 0);              // from now on replots translate
     mPlot->setDataSwapDebounceMs(100);
@@ -143,7 +143,7 @@ void TestDataSwap::swapWaitsForPanToSettle()
 
 void TestDataSwap::swapCapForcesCommitWhilePanning()
 {
-    auto* a = new PendingStub(mPlot->xAxis, mPlot->yAxis);
+    auto* a = mPlot->add<PendingStub>().get();
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     a->stall = QPointF(3, 0);
     mPlot->setDataSwapDebounceMs(100);
@@ -165,7 +165,7 @@ void TestDataSwap::newDataIsSeenAtOnceByDefault()
 {
     // A rendered graph takes the new data at once: the getters answer for it before any
     // event-loop turn, so nothing that runs right after setData() sees the old data.
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     mg->setData(ramp(200), sines(200, 1));
     mPlot->xAxis->setRange(0, 200);
     mPlot->yAxis->setRange(-1.5, 1.5);
@@ -186,7 +186,7 @@ void TestDataSwap::newDataIsSeenAtOnceByDefault()
 
 void TestDataSwap::rescaleAxesSeesNewDataAtOnce()
 {
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     mg->setData(ramp(10), std::vector<std::vector<double>>{{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}});
     mPlot->replot();
     QVERIFY(mg->hasRenderedRange());
@@ -202,7 +202,7 @@ void TestDataSwap::rescaleAxesSeesNewDataAtOnce()
 
 void TestDataSwap::deferredSwapKeepsTheOldDataUntilCommit()
 {
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     mg->setDeferredDataSwap(true);
     QVERIFY(mg->deferredDataSwap());
     mg->setData(ramp(200), sines(200, 1));
@@ -229,7 +229,7 @@ void TestDataSwap::deferredSwapKeepsTheOldDataUntilCommit()
 
 void TestDataSwap::turningTheDeferredSwapOffAppliesThePendingData()
 {
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     mg->setDeferredDataSwap(true);
     mg->setData(ramp(200), sines(200, 1));
     mPlot->xAxis->setRange(0, 200);
@@ -252,7 +252,7 @@ void TestDataSwap::multiGraphKeepsTranslationWhileDataPending()
 {
     // Large data so the L1 cache is built asynchronously.
     constexpr int n = 120'000;
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     mg->setDeferredDataSwap(true);
     mg->setData(ramp(n), sines(n, 2));
     mPlot->xAxis->setRange(0, n);
@@ -280,7 +280,7 @@ void TestDataSwap::multiGraphKeepsTranslationWhileDataPending()
 void TestDataSwap::multiGraphCommitsAfterWindow()
 {
     constexpr int n = 120'000;
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     mg->setDeferredDataSwap(true);
     mg->setData(ramp(n), sines(n, 2));
     mPlot->xAxis->setRange(0, n);
@@ -307,7 +307,7 @@ void TestDataSwap::multiGraphCommitsAfterWindow()
 
 void TestDataSwap::multiGraphFirstDataCommitsImmediately()
 {
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     mg->setData(ramp(10), sines(10, 1));
     QVERIFY(!mg->hasPendingData());
     QVERIFY(mg->dataSource());
@@ -317,7 +317,7 @@ void TestDataSwap::multiGraphFirstDataCommitsImmediately()
 void TestDataSwap::multiGraphLatestPendingWins()
 {
     constexpr int n = 120'000;
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     mg->setDeferredDataSwap(true);
     mg->setData(ramp(n), sines(n, 2));
     mPlot->xAxis->setRange(0, n);
@@ -343,7 +343,7 @@ void TestDataSwap::multiGraphDataChangedWhilePendingKeepsDisplayedGeometry()
     // stale pending one), not touch the displayed caches directly — the
     // on-screen geometry (and GPU translation) must stay put throughout.
     constexpr int n = 120'000;
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     mg->setDeferredDataSwap(true);
     mg->setData(ramp(n), sines(n, 2));
     mPlot->xAxis->setRange(0, n);
@@ -381,7 +381,7 @@ void TestDataSwap::multiGraphPendingWiderSourceDrawsSafely()
     // clamping of its own — draw()/getValueRange()/selectTest() must clamp
     // to its columnCount() themselves once mComponents was resized for a
     // wider pending source, or this reads past the row-major buffer.
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     mg->setDeferredDataSwap(true);
     mg->setAdaptiveSampling(false); // every row drawn, no envelope
 
@@ -435,7 +435,7 @@ void TestDataSwap::multiGraphSmallPendingIgnoresLateLargeJob()
     // result for the large source would pass onL1Ready's staleness check
     // and land in mPendingL1 for the small (already-committed) source.
     constexpr int n = 120'000;
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     mg->setDeferredDataSwap(true);
     mg->setData(ramp(n), sines(n, 2));
     mPlot->xAxis->setRange(0, n);
@@ -471,7 +471,7 @@ void TestDataSwap::multiGraphLateLargeJobDoesNotContaminateCommittedSmallSource(
     // small (non-resampled) B source's L1/L2 cache — otherwise the graph
     // would render A's stale data even though dataSource() correctly reports B.
     constexpr int n = 120'000;
-    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = mPlot->add<QCPGraph>().get();
     mg->setDeferredDataSwap(true);
     mg->setData(ramp(n), sines(n, 2));
     mPlot->xAxis->setRange(0, n);
@@ -503,7 +503,7 @@ void TestDataSwap::multiGraphLateLargeJobDoesNotContaminateCommittedSmallSource(
 
 void TestDataSwap::noCommitNoReplot()
 {
-    auto* p = new PendingStub(mPlot->xAxis, mPlot->yAxis);
+    auto* p = mPlot->add<PendingStub>().get();
     p->committer = false; // commitPendingData() returns false: nothing was committed
     mPlot->setDataSwapDebounceMs(20);
     mPlot->replot(); // the first draw a new plot queues
@@ -529,10 +529,10 @@ void TestDataSwap::commitRemovingAPlottableStillCommitsTheOthers()
         }
     };
     // Not first: Qt erases the front of a list by moving its start, which hides the bug.
-    auto* b = new PendingStub(mPlot->xAxis, mPlot->yAxis);
-    new SelfRemoving(mPlot->xAxis, mPlot->yAxis);
-    auto* c = new PendingStub(mPlot->xAxis, mPlot->yAxis);
-    auto* d = new PendingStub(mPlot->xAxis, mPlot->yAxis);
+    auto* b = mPlot->add<PendingStub>().get();
+    mPlot->add<SelfRemoving>();
+    auto* c = mPlot->add<PendingStub>().get();
+    auto* d = mPlot->add<PendingStub>().get();
     mPlot->setDataSwapDebounceMs(0);
     mPlot->requestDataSwap();
     QTRY_COMPARE_WITH_TIMEOUT(b->commits, 1, 2000);

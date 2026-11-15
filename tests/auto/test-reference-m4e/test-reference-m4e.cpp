@@ -58,14 +58,14 @@ QImage errorBarsScene(bool verticalKey, bool logValue, bool selected, bool legen
             QCPAxis* value = verticalKey ? plot.xAxis : plot.yAxis;
             key->setRange(0, 6);
             value->setRange(logValue ? 0.5 : -1, logValue ? 10 : 1.5);
-            auto* graph = new QCPGraph(key, value);
+            auto* graph = key->axisRect()->add<QCPGraph>(key, value).get();
             graph->setLineStyle(QCPGraph::lsNone);
             graph->setPen(QPen(Qt::blue, 0));
             graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
             graph->setData(sampleKeys(),
                            logValue ? QVector<double> { 0.7, 1.2, 2.4, 1.6, 3.4, 5.5 }
                                     : QVector<double> { 0.2, -0.4, 0.6, 0.1, -0.3, 0.5 });
-            auto* bars = new QCPErrorBars(key, value);
+            auto* bars = key->axisRect()->add<QCPErrorBars>(key, value).get();
             bars->setDataPlottable(graph);
             bars->setErrorType(type);
             bars->setData(QVector<double> { 0.2, 0.4, 0.3, 0.5, 0.2, 0.4 });
@@ -96,7 +96,7 @@ QImage financialScene(bool ohlc, bool verticalKey, bool logValue, bool selected,
             QCPAxis* value = verticalKey ? plot.xAxis : plot.yAxis;
             key->setRange(0, 7);
             value->setRange(logValue ? 1 : 0, 10);
-            auto* financial = new QCPFinancial(key, value);
+            auto* financial = key->axisRect()->add<QCPFinancial>(key, value).get();
             const QVector<double> keys { 0.6, 1.4, 2.2, 3.0, 3.8, 4.6, 5.4, 6.2 };
             QVector<double> open, high, low, close;
             for (int i = 0; i < keys.size(); ++i)
@@ -140,7 +140,7 @@ QImage statisticalBoxScene(bool verticalKey, bool selected, bool legend, bool lo
             QCPAxis* value = verticalKey ? plot.xAxis : plot.yAxis;
             key->setRange(0, 4);
             value->setRange(logValue ? 0.1 : 0, 10);
-            auto* box = new QCPStatisticalBox(key, value);
+            auto* box = key->axisRect()->add<QCPStatisticalBox>(key, value).get();
             box->addData(0.8, 1.0, 2.5, 4.0, 6.0, 8.5);
             box->addData(1.8, 0.5, 3.0, 5.2, 7.0, 9.5);
             box->addData(2.8, 2.0, 3.5, 5.5, 7.5, 9.0);
@@ -185,7 +185,7 @@ QImage intervalsScene(bool lanes, bool selected, bool legend)
         {
             plot.xAxis->setRange(0, 6);
             plot.yAxis->setRange(-0.5, 2.5);
-            auto* intervals = new QCPIntervals(plot.xAxis, plot.yAxis, &layout);
+            auto* intervals = plot.add<QCPIntervals>(&layout).get();
             intervals->setData(intervalColumns(layout));
             intervals->setCategoryNames(QStringList { QStringLiteral("A") });
             intervals->setCategoryColors(QVector<QColor> { QColor(70, 130, 200) });
@@ -208,7 +208,7 @@ QImage intervalsIconScene()
         {
             plot.xAxis->setRange(0, 6);
             plot.yAxis->setRange(-0.5, 2.5);
-            auto* intervals = new QCPIntervals(plot.xAxis, plot.yAxis, &layout);
+            auto* intervals = plot.add<QCPIntervals>(&layout).get();
             intervals->setData(intervalColumns(layout));
             intervals->setCategoryColors(QVector<QColor> { QColor(70, 130, 200) });
             intervals->setName(QStringLiteral("intervals"));
@@ -297,7 +297,7 @@ QImage itemScene(const char* kind)
             }
             else if (name == QLatin1String("tracer"))
             {
-                auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+                auto* graph = plot.add<QCPGraph>().get();
                 QVector<double> keys, values;
                 for (int i = 0; i <= 60; ++i)
                 {
@@ -393,7 +393,7 @@ QImage polarScene(const char* kind)
                         angle[i] = i;
                         gain[i] = std::abs(a + (1 - a) * std::cos(i * std::numbers::pi / 180));
                     }
-                    auto* graph = new QCPPolarGraph(angular, radial);
+                    auto* graph = area->add<QCPPolarGraph>().get();
                     graph->setData(angle, gain);
                     graph->setPen(QPen(color, 2));
                 }
@@ -417,7 +417,7 @@ QImage polarScene(const char* kind)
                     theta[i] = i * std::numbers::pi / 360;
                     r[i] = std::abs(std::cos(3 * theta[i]));
                 }
-                auto* rose = new QCPPolarGraph(angular, radial);
+                auto* rose = area->add<QCPPolarGraph>().get();
                 rose->setData(theta, r);
                 rose->setPen(QPen(QColor(148, 103, 189), 2));
                 rose->setBrush(QColor(148, 103, 189, 60));
@@ -456,10 +456,10 @@ QImage polarScene(const char* kind)
                 const auto [_, hann] = pattern(
                     [&](int n)
                     { return std::pow(std::sin(std::numbers::pi * (n + 0.5) / elements), 2); });
-                auto* plain = new QCPPolarGraph(angular, radial);
+                auto* plain = area->add<QCPPolarGraph>().get();
                 plain->setData(angle, uniform);
                 plain->setPen(QPen(QColor(31, 119, 180), 1.5));
-                auto* tapered = new QCPPolarGraph(angular, radial);
+                auto* tapered = area->add<QCPPolarGraph>().get();
                 tapered->setData(angle, hann);
                 tapered->setPen(QPen(QColor(214, 39, 40), 2));
                 plot.plotLayout()->insertRow(0);
@@ -486,7 +486,7 @@ QImage polarScene(const char* kind)
                     angle[i] = i;
                     r[i] = std::pow(10.0, 1.5 + 1.4 * std::sin(i * std::numbers::pi / 90));
                 }
-                auto* graph = new QCPPolarGraph(angular, radial);
+                auto* graph = area->add<QCPPolarGraph>().get();
                 graph->setData(angle, r);
                 graph->setPen(QPen(QColor(20, 120, 140), 2));
             }
@@ -505,7 +505,7 @@ QImage polarScene(const char* kind)
                     angle[i] = i;
                     r[i] = 1 + 0.8 * std::cos(2 * i * std::numbers::pi / 180);
                 }
-                auto* graph = new QCPPolarGraph(angular, radial);
+                auto* graph = area->add<QCPPolarGraph>().get();
                 graph->setData(angle, r);
                 graph->setPen(QPen(QColor(230, 140, 20), 2));
             }
@@ -522,7 +522,7 @@ QImage polarScene(const char* kind)
                     angle[i] = i;
                     r[i] = 0.5 + 0.4 * std::sin(3 * i * std::numbers::pi / 180);
                 }
-                auto* graph = new QCPPolarGraph(angular, radial);
+                auto* graph = area->add<QCPPolarGraph>().get();
                 graph->setData(angle, r);
                 graph->setPen(QPen(QColor(90, 90, 90), 2));
                 angular->setSelectableParts(QCPPolarAxisAngular::spAxis
@@ -543,7 +543,7 @@ QImage polarScene(const char* kind)
                                               190, 210, 240, 270, 300, 330, 360 };
                 const QVector<double> r { 0.2, 1.6, 0.9, 1.8, 1.3, 0.5, 1.1,
                                           0.7, 1.9, 1.2, 0.3, 1.5, 0.8, 0.4 };
-                auto* graph = new QCPPolarGraph(angular, radial);
+                auto* graph = area->add<QCPPolarGraph>().get();
                 graph->setData(angle, r);
                 graph->setPen(QPen(QColor(31, 119, 180), 2));
             }
@@ -556,7 +556,7 @@ QImage polarScene(const char* kind)
                 radial->setRange(0, 1);
                 const QVector<double> angle { 0, 60, 120, 180, 240, 300 };
                 const QVector<double> r { 0.9, 0.35, 0.8, 0.45, 0.95, 0.5 };
-                auto* graph = new QCPPolarGraph(angular, radial);
+                auto* graph = area->add<QCPPolarGraph>().get();
                 graph->setData(angle, r);
                 graph->setPen(QPen(QColor(214, 39, 40), 2));
             }
@@ -584,7 +584,7 @@ QImage userSystemMultiGraphScene()
             }
 
             const QVector<double> keys { 0.5, 2, 3.5, 5, 6.5, 8 };
-            auto* graph = new QCPGraph(key, value);
+            auto* graph = key->axisRect()->add<QCPGraph>(key, value).get();
             graph->setData(
                 keys, std::vector<QVector<double>> {
                           QVector<double> { 7, 6, 8, 7, 9, 8.5 },     // the step column
@@ -628,37 +628,37 @@ QImage userSystemSkewScene()
             }
 
             const QVector<double> keys { 0.5, 2, 3.5, 5, 6.5, 8 };
-            auto* filled = new QCPGraph(key, value);
+            auto* filled = key->axisRect()->add<QCPGraph>(key, value).get();
             filled->setData(keys, QVector<double> { 2, 4, 3, 5, 3.5, 6 });
             filled->setBrush(QColor(40, 110, 200, 70));
             filled->setPen(QPen(QColor(40, 110, 200), 2));
             filled->setName(QStringLiteral("filled"));
 
-            auto* step = new QCPGraph(key, value);
+            auto* step = key->axisRect()->add<QCPGraph>(key, value).get();
             step->setLineStyle(QCPGraph::lsStepLeft);
             step->setData(QVector<double> { 1, 3, 5, 7, 9 },
                           QVector<double> { 7, 6, 8, 7, 9 });
             step->setPen(QPen(QColor(200, 60, 40), 2));
             step->setName(QStringLiteral("step"));
 
-            auto* impulse = new QCPGraph(key, value);
+            auto* impulse = key->axisRect()->add<QCPGraph>(key, value).get();
             impulse->setLineStyle(QCPGraph::lsImpulse);
             impulse->setData(QVector<double> { 0.5, 1.5, 2.5, 3.5 },
                              QVector<double> { 1, 3, 2, 4 });
             impulse->setPen(QPen(QColor(60, 150, 70), 2));
             impulse->setName(QStringLiteral("impulse"));
 
-            auto* dots = new QCPGraph(key, value);
+            auto* dots = key->axisRect()->add<QCPGraph>(key, value).get();
             dots->setLineStyle(QCPGraph::lsNone);
             dots->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
             dots->setData(QVector<double> { 2, 4, 6, 8 }, QVector<double> { 8, 9, 6, 8 });
             dots->setPen(QPen(QColor(120, 60, 160), 2));
             dots->setName(QStringLiteral("dots"));
 
-            auto* lower = new QCPGraph(key, value);
+            auto* lower = key->axisRect()->add<QCPGraph>(key, value).get();
             lower->setData(keys, QVector<double> { 1, 1.5, 1, 2, 1.5, 2.5 });
             lower->setPen(QPen(QColor(180, 120, 40), 2));
-            auto* upper = new QCPGraph(key, value);
+            auto* upper = key->axisRect()->add<QCPGraph>(key, value).get();
             upper->setData(keys, QVector<double> { 3, 3.5, 3, 4, 3.5, 4.5 });
             upper->setPen(QPen(QColor(180, 120, 40), 2));
             upper->setBrush(QColor(220, 160, 60, 70));
@@ -671,7 +671,7 @@ QImage userSystemSkewScene()
                 curveKeys.push_back(6.0 + 2.0 * std::cos(angle));
                 curveValues.push_back(3.0 + 1.5 * std::sin(angle));
             }
-            auto* curve = new QCPCurve(key, value);
+            auto* curve = key->axisRect()->add<QCPCurve>(key, value).get();
             curve->setData(QVector<double>(curveKeys.begin(), curveKeys.end()),
                            QVector<double>(curveValues.begin(), curveValues.end()));
             curve->setPen(QPen(QColor(30, 30, 30), 2));

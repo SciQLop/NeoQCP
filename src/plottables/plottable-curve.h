@@ -104,7 +104,23 @@ public:
     //! \ref lsLine or \ref lsNone; a step or an impulse style is refused through the misuse tier.
     using LineStyle = QCPLine::LineStyle;
 
-    explicit QCPCurve(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    QCPCurve();
+    //! T, keys and values, as setData() takes them.
+    template <QCPNumberRange T, QCPNumberRange K, QCPNumberRange V>
+    QCPCurve(const T& t, const K& keys, const V& values, bool alreadySorted = false) : QCPCurve()
+    {
+        setData(QVector<double>(std::ranges::begin(t), std::ranges::end(t)),
+                QVector<double>(std::ranges::begin(keys), std::ranges::end(keys)),
+                QVector<double>(std::ranges::begin(values), std::ranges::end(values)),
+                alreadySorted);
+    }
+    //! Keys and values, as setData() takes them: a curve whose points follow the keys.
+    template <QCPNumberRange K, QCPNumberRange V>
+    QCPCurve(const K& keys, const V& values) : QCPCurve()
+    {
+        setData(QVector<double>(std::ranges::begin(keys), std::ranges::end(keys)),
+                QVector<double>(std::ranges::begin(values), std::ranges::end(values)));
+    }
     ~QCPCurve() override;
 
     // getters:

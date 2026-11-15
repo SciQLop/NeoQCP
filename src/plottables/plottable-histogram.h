@@ -37,7 +37,7 @@ public:
     enum Style { sBars, sStep };
     Q_ENUM(Style)
 
-    explicit QCPHistogram(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    QCPHistogram();
     ~QCPHistogram() override;
 
     void setDataSource(std::shared_ptr<QCPMultiDataSource> source);

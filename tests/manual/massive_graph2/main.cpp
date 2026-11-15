@@ -36,7 +36,7 @@ int main(int argc, char* argv[])
         QMetaObject::invokeMethod(plot, [plot, keys = std::move(keys), vals = std::move(vals)]() mutable {
             std::vector<std::vector<double>> columns(1);
             columns[0] = std::move(vals);
-            auto* g = new QCPGraph(plot->xAxis, plot->yAxis);
+            auto* g = plot->add<QCPGraph>().get();
             g->setData(std::move(keys), std::move(columns));
             g->setPen(QPen(QColor(31, 119, 180), 1));
             g->setName("500M points");

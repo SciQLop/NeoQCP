@@ -17,7 +17,7 @@ void TestWaterfall::cleanup()
 
 void TestWaterfall::uniformOffset()
 {
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omUniform);
     wf->setUniformSpacing(10.0);
 
@@ -34,7 +34,7 @@ void TestWaterfall::uniformOffset()
 
 void TestWaterfall::customOffset()
 {
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omCustom);
     wf->setOffsets({50.0, 100.0, 150.0});
 
@@ -51,7 +51,7 @@ void TestWaterfall::customOffset()
 
 void TestWaterfall::customOffsetFallback()
 {
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omCustom);
     wf->setOffsets({50.0});
     wf->setUniformSpacing(10.0);
@@ -69,7 +69,7 @@ void TestWaterfall::customOffsetFallback()
 
 void TestWaterfall::normalizationFactors()
 {
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omUniform);
     wf->setUniformSpacing(100.0);
     wf->setNormalize(true);
@@ -90,7 +90,7 @@ void TestWaterfall::normalizationFactors()
 
 void TestWaterfall::normalizationDisabled()
 {
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omUniform);
     wf->setUniformSpacing(100.0);
     wf->setNormalize(false);
@@ -109,7 +109,7 @@ void TestWaterfall::normalizationDisabled()
 
 void TestWaterfall::invalidateNormalization()
 {
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omCustom);
     wf->setOffsets({0.0});
     wf->setNormalize(true);
@@ -154,7 +154,7 @@ void TestWaterfall::dataChangedWhileRenderedKeepsRebuiltAdapter()
     // OLD displayed adapter over it (its "a mutation superseded the pending
     // replacement" branch), so the eventual commit showed the stale
     // normalization factor instead of the one just rebuilt.
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omCustom);
     wf->setOffsets({0.0});
     wf->setNormalize(true);
@@ -186,7 +186,7 @@ void TestWaterfall::dataChangedWhileRenderedKeepsRebuiltAdapter()
 
 void TestWaterfall::adapterValueAt()
 {
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omCustom);
     wf->setOffsets({50.0, 100.0});
     wf->setNormalize(false);
@@ -204,7 +204,7 @@ void TestWaterfall::adapterValueAt()
 
 void TestWaterfall::singleComponentValueRange()
 {
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omCustom);
     wf->setOffsets({0.0});
     wf->setNormalize(false);
@@ -225,7 +225,7 @@ void TestWaterfall::singleComponentValueRange()
 
 void TestWaterfall::getValueRangeNormalized()
 {
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omCustom);
     wf->setOffsets({10.0, 20.0});
     wf->setNormalize(true);
@@ -244,7 +244,7 @@ void TestWaterfall::getValueRangeNormalized()
 
 void TestWaterfall::getValueRangeUnnormalized()
 {
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omCustom);
     wf->setOffsets({10.0, 20.0});
     wf->setNormalize(false);
@@ -263,7 +263,7 @@ void TestWaterfall::getValueRangeUnnormalized()
 
 void TestWaterfall::getValueRangeSignDomain()
 {
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omCustom);
     wf->setOffsets({10.0, 20.0});
     wf->setNormalize(true);
@@ -286,7 +286,7 @@ void TestWaterfall::getValueRangeSignDomain()
 
 void TestWaterfall::drawDoesNotCrash()
 {
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omCustom);
     wf->setOffsets({50.0, 100.0, 150.0});
     wf->setNormalize(true);
@@ -302,7 +302,7 @@ void TestWaterfall::drawDoesNotCrash()
 
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    mPlot->add<QCPWaterfallGraph>().get();
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 }
 
@@ -312,7 +312,7 @@ void TestWaterfall::parameterChangesApplyWithoutDraw()
     // immediately — not only after the next draw() happened to refresh the
     // shared adapter (stale-draw bug: the line cache redrew old amplitudes
     // while autoscale already used the new ones).
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setOffsetMode(QCPWaterfallGraph::omUniform);
     wf->setUniformSpacing(0.0);
     wf->setNormalize(false);
@@ -338,7 +338,7 @@ void TestWaterfall::concurrentParameterAndDataChangesAreSafe()
     // never mutate state those jobs read (shared adapter members, inner
     // source swap) — pre-fix this is a data race / UAF caught by ASan.
     constexpr int n = 80'000; // x2 columns > kResampleThreshold
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     wf->setNormalize(true);
 
     for (int iter = 0; iter < 10; ++iter)
@@ -366,7 +366,7 @@ void TestWaterfall::clearingSourceEmptiesTheGraph()
     // rebuildAdapter() used to early-return on a null source, leaving the
     // previous adapter installed in QCPGraph: the graph kept rendering
     // the old data while getKeyRange() already reported "no data".
-    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* wf = mPlot->add<QCPWaterfallGraph>().get();
     std::vector<double> keys = {0.0, 1.0};
     std::vector<std::vector<double>> vals = {{1.0, 2.0}};
     wf->setData(std::move(keys), std::move(vals));

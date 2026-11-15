@@ -156,8 +156,8 @@ QCPErrorBarsData::QCPErrorBarsData(double errorMinus, double errorPlus)
   from \a keyAxis. This QCustomPlot instance takes ownership of the \ref QCPErrorBars, so do not
   delete it manually but use \ref QCustomPlot::removePlottable() instead.
 */
-QCPErrorBars::QCPErrorBars(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPPlottable(keyAxis, valueAxis)
+QCPErrorBars::QCPErrorBars()
+        : QCPPlottable()
         , mDataContainer(new QVector<QCPErrorBarsData>)
         , mErrorType(etValueError)
         , mWhiskerWidth(9)
