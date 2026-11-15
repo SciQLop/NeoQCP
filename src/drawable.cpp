@@ -221,14 +221,15 @@ double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
                 const QPointF centre = qcpResolvePosition(frame, cmd.centre);
                 const QRectF box(centre.x() - cmd.radius, centre.y() - cmd.radius,
                                  2.0 * cmd.radius, 2.0 * cmd.radius);
-                if (visibleBrush(cmd.brush) && box.contains(at)
-                    && QLineF(centre, at).length() <= cmd.radius)
+                if (visibleBrush(cmd.brush) && QLineF(centre, at).length() <= cmd.radius)
                     return 0.0;
                 return distanceTo(qcpRingOf(qcpEllipseRing(box)), at, true) - halfPen(cmd.pen);
             }
             else if constexpr (std::is_same_v<Command, qcp::RoundedRectCmd>)
             {
-                // Rounded corners are inside the box's stroke, so the rect's own distance answers.
+                // Deliberate approximation: a rounded rect answers as its square corners do, so a
+                // click beside a rounded corner of an unfilled one is a hit it does not draw. The
+                // radius is a few pixels; the box is what the user aims at.
                 const QRectF box
                     = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
                           .normalized();
@@ -906,8 +907,9 @@ double QCPDrawnCore::pixelPad() const
                                    return cmd.radius + halfPen(cmd.pen);
                                else if constexpr (std::is_same_v<Command, qcp::RoundedRectCmd>)
                                    return halfPen(cmd.shape->pen);
+                               else if constexpr (std::is_same_v<Command, qcp::BoxedTextCmd>)
+                                   return halfPen(cmd.box->style.pen);
                                else if constexpr (std::is_same_v<Command, qcp::TextCmd>
-                                                  || std::is_same_v<Command, qcp::BoxedTextCmd>
                                                   || std::is_same_v<Command, qcp::ImageCmd>
                                                   || std::is_same_v<Command, qcp::FillBetweenCmd>
                                                   || std::is_same_v<Command, qcp::PainterCmd>)

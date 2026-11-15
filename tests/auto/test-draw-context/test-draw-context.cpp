@@ -169,6 +169,10 @@ static_assert(sizeof(qcp::TextCmd) <= 96);
 static_assert(sizeof(qcp::PathCmd) <= 96);
 static_assert(sizeof(qcp::ImageCmd) <= 96);
 static_assert(sizeof(qcp::PainterCmd) <= 96);
+static_assert(sizeof(qcp::LineCmd) <= 96);
+static_assert(sizeof(qcp::CircleCmd) <= 96);
+static_assert(sizeof(qcp::RoundedRectCmd) <= 96);
+static_assert(sizeof(qcp::BoxedTextCmd) <= 96);
 static_assert(sizeof(qcp::QCPDrawCommand) <= 104);
 // A batch is a header: its arrays live behind one pointer, so a recording that holds no batch pays
 // nothing for the ones that exist, and a batch costs a command slot like any other.
@@ -640,6 +644,13 @@ void TestDrawContext::boxedTextWrapsInsideItsBox()
     }
     QVERIFY2(bands >= 2, "the text did not wrap");
 
+    // The wrap and the drawing agree on one metric: every line fits the box's inner width as the
+    // painter measures text, not as a font the widget happened to hand over.
+    const int innerWidth = qRound(box.width());
+    for (const QString& line : boxed->box->wrapped.split(QLatin1Char('\n')))
+        QVERIFY2(QCP::paintedMetrics(style.font).horizontalAdvance(line) <= innerWidth + 1,
+                 qPrintable(line));
+
     // The box bounds the text: nothing lands beside it.
     int outside = 0;
     for (int y = 0; y < kHeight; ++y)
@@ -723,6 +734,54 @@ void TestDrawContext::circleOfAPixelLengthPicksThePixelCircle()
     QVERIFY(std::holds_alternative<qcp::EllipseCmd>(commands[1]));
 }
 
+void TestDrawContext::dataOffsetCentreCircleKeepsItsOffset()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    const QCP::DataOffset centre = QCP::Data { 50, 75 } + QCP::PixelOffset { 7, -9 };
+    context.circle(centre, 10.0, kPen, kBrush);
+
+    QCOMPARE(int(context.drawList().commands.size()), 1);
+    const auto* ellipse = std::get_if<qcp::EllipseCmd>(&context.drawList().commands.front());
+    QVERIFY(ellipse);
+    const auto* first = std::get_if<QCP::DataOffset>(&ellipse->a);
+    const auto* second = std::get_if<QCP::DataOffset>(&ellipse->b);
+    QVERIFY(first);
+    QVERIFY(second);
+    // A data radius is a data ellipse: the radius is measured in data units on each axis, and the
+    // centre's own offset rides on both corners so the shape moves with the data and keeps the
+    // nudge.
+    QCOMPARE(first->at.x, 40.0);
+    QCOMPARE(first->at.y, 65.0);
+    QCOMPARE(second->at.x, 60.0);
+    QCOMPARE(second->at.y, 85.0);
+    QCOMPARE(first->offset.dx, 7.0);
+    QCOMPARE(first->offset.dy, -9.0);
+    QCOMPARE(second->offset.dx, 7.0);
+    QCOMPARE(second->offset.dy, -9.0);
+    QCOMPARE(qcpResolvePosition(context.frame(), ellipse->a),
+             pixelOf(context.transform(), 40, 65) + QPointF(7, -9));
+    QCOMPARE(qcpResolvePosition(context.frame(), ellipse->b),
+             pixelOf(context.transform(), 60, 85) + QPointF(7, -9));
+}
+
+void TestDrawContext::circleOnAPixelCentreIsRefused()
+{
+    // A radius in data units around a pixel centre has no meaning: the shape would grow with the
+    // zoom on one axis and not the other. The call is refused once and records nothing.
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    test_misuse::calls.clear();
+    qcp::setMisuseHandler(test_misuse::record);
+    context.circle(QCP::Pixels { 40, 60 }, 5.0, kPen);
+    qcp::setMisuseHandler(nullptr);
+    QCOMPARE(int(context.drawList().commands.size()), 0);
+    QCOMPARE(test_misuse::calls.size(), size_t(1));
+}
+
+
 void TestDrawContext::helperCommandsJoinTheKindTable()
 {
     Fixture fixture;
@@ -753,6 +812,10 @@ void TestDrawContext::helperCommandsJoinTheKindTable()
     // skipped.
     for (const qcp::QCPDrawCommand& command : commands)
         QVERIFY(qcp::qcpCullsByExtent(command));
+    // A line and a disc are geometry the GPU strokes and fills; a rounded rect and a boxed text
+    // are the painter's. None of them needs a raster image, so none takes a raster slot.
+    for (const qcp::QCPDrawCommand& command : commands)
+        QVERIFY2(!qcp::needsRaster(command), "a helper needs no raster image of its own");
 }
 
 void TestDrawContext::boxedTextIsMeasuredOncePerBox()
@@ -1915,7 +1978,7 @@ protected:
     void draw(QCPDrawContext& context) const override
     {
         const QPen outline(QColor(60, 60, 60), 1.2);
-        const QBrush paper(QColor(255, 250, 225));
+        const QBrush paper(QColor(255, 160, 0));
         context.line(QCP::Data { 0.5, 0.9 }, QCP::Data { 2.2, 0.7 }, outline);
         context.rect(QRectF(2.6, 0.7, 1.6, 0.22), outline, paper);
         context.polygon(QPolygonF { QPointF(5.0, 0.7), QPointF(6.5, 0.7), QPointF(5.7, 0.92) },
@@ -1940,6 +2003,28 @@ protected:
         context.text(QCP::Data { 7.0, 0.28 }, QCP::Data { 8.5, 0.05 }, QString(), boxed);
     }
 };
+
+QRect helperArea(const QCustomPlot& plot, QCP::Data a, QCP::Data b)
+{
+    const QPointF first(plot.xAxis->coordToPixel(a.x), plot.yAxis->coordToPixel(a.y));
+    const QPointF second(plot.xAxis->coordToPixel(b.x), plot.yAxis->coordToPixel(b.y));
+    return QRectF(first, second).normalized().toRect().adjusted(-4, -4, 4, 4);
+}
+
+int inkPixels(const QImage& image, const QRect& area)
+{
+    int ink = 0;
+    for (int y = area.top(); y <= area.bottom(); ++y)
+        for (int x = area.left(); x <= area.right(); ++x)
+        {
+            if (!image.rect().contains(x, y))
+                continue;
+            const QColor colour = image.pixelColor(x, y);
+            if (colour.red() < 200 || colour.green() < 200 || colour.blue() < 200)
+                ++ink;
+        }
+    return ink;
+}
 
 void prepareReferencePlot(QCustomPlot& plot)
 {
@@ -2005,6 +2090,37 @@ void TestDrawContext::everyHelperDrawsTheSamePicture()
     const QImage gpu = shown->grabFramebuffer().convertToFormat(QImage::Format_ARGB32);
     QVERIFY2(qcp::test::matchesReference(gpu, dir, name, &why, qcp::test::Tolerance { 1500, 64 }),
              qPrintable(why));
+
+    // Every geometry helper must ink its own patch of the picture. The picture-wide tolerance
+    // above absorbs the text and the antialiasing, and a helper that stopped drawing - or drew
+    // twice - stays under it; a region check cannot miss one. The exported picture is the
+    // yardstick, since it already matches the reference.
+    struct Footprint
+    {
+        const char* name;
+        QCP::Data a;
+        QCP::Data b;
+    };
+    const Footprint footprints[] {
+        { "line", { 0.5, 0.9 }, { 2.2, 0.7 } },
+        { "rect", { 2.6, 0.7 }, { 4.2, 0.92 } },
+        { "polygon", { 5.0, 0.7 }, { 6.5, 0.92 } },
+        { "offset polygon", { 7.0, 0.7 }, { 9.0, 0.92 } },
+        { "data circle", { 1.08, 0.36 }, { 1.32, 0.6 } },
+        { "pixel circle", { 2.9, 0.44 }, { 3.5, 0.52 } },
+    };
+    for (const Footprint& footprint : footprints)
+    {
+        const QRect area = helperArea(plot, footprint.a, footprint.b);
+        const int expected = inkPixels(exported, area);
+        QVERIFY2(expected > 20, footprint.name);
+        const int drawn = inkPixels(gpu, area);
+        QVERIFY2(std::abs(drawn - expected) <= expected / 4 + 20,
+                 qPrintable(QStringLiteral("%1: %2 ink pixels on the GPU, %3 exported")
+                                .arg(QLatin1String(footprint.name))
+                                .arg(drawn)
+                                .arg(expected)));
+    }
 }
 
 void TestDrawContext::dataOffsetRectKeepsItsOffsetOnAPan()

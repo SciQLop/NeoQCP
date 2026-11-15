@@ -87,32 +87,41 @@ qcp::QCPTextLayout qcpTextLayout(const QCPTextStyle& style, const QString& text)
 
 QString qcpWrappedText(const QCPTextStyle& style, const QString& text, int width)
 {
-    // One measurement per box size, not per word: the words are advanced against the same metrics.
+    // One measurement per box width, not per word: the words are advanced against the same metrics.
     gTextMeasures.fetch_add(1, std::memory_order_relaxed);
     if (style.mathText || width <= 0)
         return text;
-    const QFontMetrics metrics(style.font);
+    // The painter's metrics, not the font's: a font taken from a widget carries that screen's dpi,
+    // and the plot paints at Qt's own.
+    const QFontMetricsF metrics = QCP::paintedMetricsF(style.font);
+    const double spaceWidth = metrics.horizontalAdvance(QLatin1Char(' '));
     QString wrapped;
     wrapped.reserve(text.size() + text.size() / 8);
     for (const QString& paragraph : text.split(QLatin1Char('\n')))
     {
-        int lineStart = 0;
-        int lastBreak = -1;
-        for (int i = 0; i < paragraph.size(); ++i)
+        // A word wider than the box never breaks: it is drawn clipped at the box's edge.
+        double lineWidth = 0.0;
+        bool lineEmpty = true;
+        for (const QString& word : paragraph.split(QLatin1Char(' ')))
         {
-            const QChar character = paragraph.at(i);
-            if (character.isSpace())
-                lastBreak = i;
-            if (metrics.horizontalAdvance(paragraph.mid(lineStart, i - lineStart + 1)) > width
-                && lastBreak > lineStart)
+            const double wordWidth = metrics.horizontalAdvance(word);
+            if (!lineEmpty && lineWidth + spaceWidth + wordWidth > width)
             {
-                wrapped += paragraph.mid(lineStart, lastBreak - lineStart);
                 wrapped += QLatin1Char('\n');
-                lineStart = lastBreak + 1;
-                lastBreak = -1;
+                lineWidth = wordWidth;
             }
+            else
+            {
+                if (!lineEmpty)
+                {
+                    wrapped += QLatin1Char(' ');
+                    lineWidth += spaceWidth;
+                }
+                lineWidth += wordWidth;
+            }
+            wrapped += word;
+            lineEmpty = false;
         }
-        wrapped += paragraph.mid(lineStart);
         wrapped += QLatin1Char('\n');
     }
     if (!wrapped.isEmpty())
@@ -167,11 +176,14 @@ void replayBoxedText(const qcp::BoxedTextCmd& cmd, QCPPainter& painter, const QC
                        qMax(0.0, box.height() - style.padding.top() - style.padding.bottom()));
     if (inner.isEmpty() || payload.text.isEmpty())
         return;
-    const QSize innerSize = inner.size().toSize();
-    if (payload.laidOutFor != innerSize)
+    // simplify: the wrap is cached in the recording and written by every replay, with no lock. Every
+    // replay runs on the GUI thread (a screen repaint, a raster fallback, an export), so one writer
+    // at a time; a second thread replaying would need its own copy.
+    const int innerWidth = inner.size().toSize().width();
+    if (payload.laidOutWidth != innerWidth)
     {
-        payload.wrapped = qcpWrappedText(style, payload.text, innerSize.width());
-        payload.laidOutFor = innerSize;
+        payload.wrapped = qcpWrappedText(style, payload.text, innerWidth);
+        payload.laidOutWidth = innerWidth;
     }
     QCPLabelRenderer::drawWith(textRenderer(style), &painter, inner.toRect(), style.font, color,
                                payload.wrapped, style.textFlags);
@@ -398,9 +410,11 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
             }
             else if constexpr (std::is_same_v<Command, LineCmd>)
             {
-                painter.setPen(cmd.pen);
-                painter.drawLine(qcpResolvePosition(frame, cmd.a),
-                                 qcpResolvePosition(frame, cmd.b));
+                // QCPPainter rounds a line to whole pixels without antialiasing; QPainter does not,
+                // and neither does the GPU stroke, so the two replays agree on the same pixels.
+                painter.setPen(mode.withStroke ? cmd.pen : QPen(Qt::NoPen));
+                painter.QPainter::drawLine(QLineF(qcpResolvePosition(frame, cmd.a),
+                                                 qcpResolvePosition(frame, cmd.b)));
             }
             else if constexpr (std::is_same_v<Command, CircleCmd>)
             {

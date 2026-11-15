@@ -283,8 +283,9 @@ struct BoxedText
 {
     QString text;
     QCPTextStyle style;
-    //! The inner box the wrap was made for; a replay that finds another size wraps again.
-    mutable QSize laidOutFor;
+    //! The width the wrap was made for: the height does not change where a word breaks, so a replay
+    //! that finds another width wraps again and another height does not.
+    mutable int laidOutWidth = -1;
     //! The text with a newline where a word did not fit, so drawing it wraps nothing.
     mutable QString wrapped;
 };
@@ -952,7 +953,12 @@ inline CommandExtent commandExtent(const QCPDrawCommand& command, const QCPDrawF
                     extent.pad = qcpStrokePad(cmd.shape->pen);
                 }
                 else
-                    extent.pad = 0.0; // a box is its corners; the glyphs stay inside them
+                {
+                    // The glyphs stay inside the corners; a border sits on the edge, so half of
+                    // it lies outside.
+                    extent.pen = cmd.box->style.pen;
+                    extent.pad = qcpStrokePad(cmd.box->style.pen);
+                }
                 extent.cullable = true;
             }
             else if constexpr (std::is_same_v<T, PolygonCmd>

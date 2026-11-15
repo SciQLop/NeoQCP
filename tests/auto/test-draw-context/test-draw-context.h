@@ -26,6 +26,8 @@ private slots:
     void boxedTextSmallerThanItsPaddingHasNoNegativeBox();
     void emptyBoxedTextDrawsOnlyTheBox();
     void circleOfAPixelLengthPicksThePixelCircle();
+    void dataOffsetCentreCircleKeepsItsOffset();
+    void circleOnAPixelCentreIsRefused();
     void helperCommandsJoinTheKindTable();
     void boxedTextIsMeasuredOncePerBox();
     void markersMatchesHandPainting();
