@@ -197,8 +197,13 @@ bool holdsAnchor(const qcp::QCPDrawCommand& command)
                 return anyAnchor(value.points);
             else if constexpr (std::is_same_v<Command, qcp::RectCmd>
                                || std::is_same_v<Command, qcp::EllipseCmd>
-                               || std::is_same_v<Command, qcp::ImageCmd>)
+                               || std::is_same_v<Command, qcp::ImageCmd>
+                               || std::is_same_v<Command, qcp::LineCmd>
+                               || std::is_same_v<Command, qcp::RoundedRectCmd>
+                               || std::is_same_v<Command, qcp::BoxedTextCmd>)
                 return holdsAnchor(value.a) || holdsAnchor(value.b);
+            else if constexpr (std::is_same_v<Command, qcp::CircleCmd>)
+                return holdsAnchor(value.centre);
             else if constexpr (std::is_same_v<Command, qcp::TextCmd>)
                 return holdsAnchor(value.at);
             else if constexpr (std::is_same_v<Command, qcp::PathCmd>)
@@ -230,8 +235,13 @@ bool holdsDataOffset(const qcp::QCPDrawCommand& command)
                 return anyOffset(value.points);
             else if constexpr (std::is_same_v<Command, qcp::RectCmd>
                                || std::is_same_v<Command, qcp::EllipseCmd>
-                               || std::is_same_v<Command, qcp::ImageCmd>)
+                               || std::is_same_v<Command, qcp::ImageCmd>
+                               || std::is_same_v<Command, qcp::LineCmd>
+                               || std::is_same_v<Command, qcp::RoundedRectCmd>
+                               || std::is_same_v<Command, qcp::BoxedTextCmd>)
                 return offset(value.a) || offset(value.b);
+            else if constexpr (std::is_same_v<Command, qcp::CircleCmd>)
+                return offset(value.centre);
             else if constexpr (std::is_same_v<Command, qcp::TextCmd>)
                 return offset(value.at);
             else if constexpr (std::is_same_v<Command, qcp::PathCmd>)
@@ -600,6 +610,14 @@ void QCPDrawContext::polyline(std::span<const QCP::Position> points, const QPen&
         extent);
 }
 
+void QCPDrawContext::line(QCP::Position a, QCP::Position b, const QPen& pen)
+{
+    // Two ends in a fixed command: a lollipop records ten thousand of these a frame, and a vector
+    // per call would allocate ten thousand times.
+    const QCP::Position ends[] = { a, b };
+    record(*mList, qcp::LineCmd { a, b, pen }, extentOf(ends));
+}
+
 void QCPDrawContext::polygon(std::span<const QCP::Position> points, const QPen& pen,
                              const QBrush& brush)
 {
@@ -607,6 +625,23 @@ void QCPDrawContext::polygon(std::span<const QCP::Position> points, const QPen& 
     record(*mList,
            qcp::PolygonCmd { std::vector<QCP::Position>(points.begin(), points.end()), pen, brush },
            extent);
+}
+
+void QCPDrawContext::polygon(const QPolygonF& dataPoints, const QPen& pen, const QBrush& brush)
+{
+    // The shape is in data units: a QTransform moves and rotates it before the call, so the replay
+    // only ever sees the vertices the caller meant.
+    std::vector<QCP::Position> positions;
+    positions.reserve(std::size_t(dataPoints.size()));
+    for (const QPointF& point : dataPoints)
+        positions.push_back(QCP::Data { point.x(), point.y() });
+    polygon(std::span<const QCP::Position>(positions), pen, brush);
+}
+
+void QCPDrawContext::polygon(std::initializer_list<QCP::Position> points, const QPen& pen,
+                             const QBrush& brush)
+{
+    polygon(std::span<const QCP::Position>(points.begin(), points.size()), pen, brush);
 }
 
 void QCPDrawContext::fillBetween(std::shared_ptr<const std::vector<QPointF>> upper,
@@ -634,6 +669,13 @@ void QCPDrawContext::rect(QCP::Position a, QCP::Position b, const QPen& pen, con
     record(*mList, qcp::RectCmd { a, b, pen, brush }, extent);
 }
 
+void QCPDrawContext::rect(const QRectF& dataRect, const QPen& pen, const QBrush& brush)
+{
+    // x is the key and y the value: a bar is a rectangle in data space.
+    rect(QCP::Data { dataRect.left(), dataRect.top() },
+         QCP::Data { dataRect.right(), dataRect.bottom() }, pen, brush);
+}
+
 void QCPDrawContext::ellipse(QCP::Position a, QCP::Position b, const QPen& pen, const QBrush& brush)
 {
     const QCP::Position corners[] = { a, b };
@@ -645,6 +687,40 @@ void QCPDrawContext::ellipse(QCP::Position a, QCP::Position b, const QPen& pen, 
             *mList, QPointF(first->x, first->y), QPointF(second->x, second->y), pen, brush, extent))
         return;
     record(*mList, qcp::EllipseCmd { a, b, pen, brush }, extent);
+}
+
+void QCPDrawContext::circle(QCP::Position centre, double radius, const QPen& pen,
+                            const QBrush& brush)
+{
+    // A data radius is one radius per axis, so the disc is an ellipse in pixels. The corners carry
+    // the centre's pixel offset, so the shape still follows the data on a pan.
+    if (const auto* data = std::get_if<QCP::Data>(&centre))
+        return ellipse(QCP::Data { data->x - radius, data->y - radius },
+                       QCP::Data { data->x + radius, data->y + radius }, pen, brush);
+    if (const auto* offset = std::get_if<QCP::DataOffset>(&centre))
+        return ellipse(QCP::DataOffset { QCP::Data { offset->at.x - radius, offset->at.y - radius },
+                                         offset->offset },
+                       QCP::DataOffset { QCP::Data { offset->at.x + radius, offset->at.y + radius },
+                                         offset->offset },
+                       pen, brush);
+    QCP_CHECK_OR_RETURN(false, "a data-radius circle needs a data centre");
+}
+
+void QCPDrawContext::circle(QCP::Position centre, QCP::PixelLength radius, const QPen& pen,
+                            const QBrush& brush)
+{
+    record(*mList, qcp::CircleCmd { centre, radius.px, pen, brush }, extentOfPosition(centre));
+}
+
+void QCPDrawContext::roundedRect(QCP::Position a, QCP::Position b, QCP::PixelLength radius,
+                                 const QPen& pen, const QBrush& brush)
+{
+    const QCP::Position corners[] = { a, b };
+    record(*mList,
+           qcp::RoundedRectCmd { a, b,
+                                 std::make_shared<const qcp::RoundedRectShape>(
+                                     qcp::RoundedRectShape { pen, brush, radius }) },
+           extentOf(corners));
 }
 
 void QCPDrawContext::markers(std::shared_ptr<const std::vector<QPointF>> data,
@@ -730,6 +806,19 @@ void QCPDrawContext::text(QCP::Position at, const QString& text, const QCPTextSt
     record(*mList,
            qcp::TextCmd { at, text, std::make_shared<const QCPTextStyle>(style), glyphSize },
            extentOfPosition(at), unboundedExtent());
+}
+
+void QCPDrawContext::text(QCP::Position a, QCP::Position b, const QString& text,
+                          const QCPTextStyle& style)
+{
+    // The box is the two corners, so a pan moves it with the data; the wrapping waits for the
+    // replay, which is the only place that knows how wide the box is in pixels.
+    const QCP::Position corners[] = { a, b };
+    record(*mList,
+           qcp::BoxedTextCmd { a, b,
+                               std::make_shared<const qcp::BoxedText>(
+                                   qcp::BoxedText { text, style, {}, {} }) },
+           extentOf(corners));
 }
 
 void QCPDrawContext::recordEveryFrame()

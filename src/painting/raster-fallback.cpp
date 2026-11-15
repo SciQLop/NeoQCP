@@ -53,7 +53,8 @@ RasterNeeds rasterNeedsOf(const QCPDrawCommand& command)
             else if constexpr (std::is_same_v<T, FillBetweenCmd>)
                 needs.fill = !brushPaintsNothing(cmd.brush)
                     && (!gpuCanFill(cmd.brush) || cmd.upper->size() != cmd.lower->size());
-            else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>)
+            else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>
+                               || std::is_same_v<T, CircleCmd>)
                 needs.fill = fillNeedsRaster(cmd.brush);
             else if constexpr (std::is_same_v<T, RectsCmd> || std::is_same_v<T, EllipsesCmd>)
                 // The recorder keeps a fill the GPU cannot take out of a batch (see joinsBatch), so

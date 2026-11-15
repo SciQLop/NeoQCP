@@ -429,6 +429,27 @@ Two more units came with it. `QCP::PixelLength` and the literal `8_px` (`QCP::Li
 `Qt::Literals`) make a distance a type of its own, and `QCP::Pixels - QCP::Pixels` gives the
 `QCP::PixelOffset` between two pixels.
 
+## The drawing context draws shapes in one call
+
+An item's `draw()` records into a `QCPDrawContext`, and the context now has the shape calls an
+annotation needs, so a custom item is a `draw()` of a few lines instead of a command per corner:
+
+| Before | Now |
+|---|---|
+| `polyline({ a, b }, pen)` over a two-element array | `line(a, b, pen)` |
+| `ellipse(Data { x - r, y - r }, Data { x + r, y + r }, pen)` for a round shape | `circle({ x, y }, r, pen)` |
+| a scatter style on the scatter layer for a fixed-size dot | `circle(centre, 5_px, pen, brush)` |
+| a `QPolygonF` of data points mapped by hand | `polygon(points, pen, brush)` |
+| `rect(Data { ... }, Data { ... }, pen, brush)` | `rect(QRectF { x, y, w, h }, pen, brush)` |
+| two corners plus a corner radius in pixels | `roundedRect(a, b, 6_px, pen, brush)` |
+| a text item that clips, or one that overflows its box | `text(a, b, "t", style)` |
+
+A circle of a data radius is an ellipse in pixels, so it becomes a wide ellipse on axes that scale
+differently; a circle of a pixel radius (`5_px`) keeps its size on every zoom and is a command of
+its own, not a marker, so it draws in call order with the other shapes. A boxed text wraps its words
+inside the box minus `style.padding`, and a box smaller than its padding leaves no text area rather
+than a negative one. `polygon(span)` and `rect(Position, Position)` take an empty brush by default.
+
 ## Plottables are built without axes
 
 A plottable's constructor takes the plottable's own arguments only. It no longer takes the key and

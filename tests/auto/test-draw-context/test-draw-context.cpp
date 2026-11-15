@@ -11,13 +11,20 @@
 #include <painting/scatter-rhi-layer.h>
 #include <qcustomplot.h>
 
+#include "reference-image.h"
+
 #include <QElapsedTimer>
 #include <QFontMetrics>
 #include <QPainterPath>
+#include <QTransform>
+#include <QWidget>
 #include <cmath>
 #include <functional>
 #include <memory>
+#include <type_traits>
 #include <vector>
+
+using namespace QCP::Literals;
 
 namespace
 {
@@ -121,6 +128,20 @@ QImage replayOf(QCPDrawContext& context)
                    context.transform());
 }
 
+//! The frame \a plot's axes and rect make now: a recording replayed at the
+//! current view.
+QCPDrawFrame frameOf(const QCustomPlot& plot)
+{
+    return QCPDrawFrame { QCPTransform(plot.xAxis, plot.yAxis), QCPRatioTransform(plot.axisRect()),
+                          QRectF(plot.axisRect()->rect()) };
+}
+
+//! \a context's recording replayed at \a frame: what a zoom or a pan draws.
+QImage replayAt(QCPDrawContext& context, const QCPDrawFrame& frame)
+{
+    return painted([&context, &frame](QCPPainter& painter, const QCPTransform&)
+                   { qcpReplayWithPainter(context.drawList(), painter, frame); }, frame.transform);
+}
 std::shared_ptr<const std::vector<QPointF>> sharedPoints(std::vector<QPointF> points)
 {
     return std::make_shared<const std::vector<QPointF>>(std::move(points));
@@ -346,6 +367,413 @@ void TestDrawContext::ellipseMatchesHandPainting()
     QCOMPARE(replay, hand);
 }
 
+void TestDrawContext::lineMatchesHandPainting()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    context.line(QCP::Data { 10, 20 }, QCP::Pixels { 150, 110 }, kPen);
+
+    // A line is its own command: the lollipop records ten thousand of them, and a
+    // vector of two positions each would be ten thousand allocations a frame.
+    QCOMPARE(int(context.drawList().commands.size()), 1);
+    const auto* line = std::get_if<qcp::LineCmd>(&context.drawList().commands.front());
+    QVERIFY(line);
+    QCOMPARE(std::get<QCP::Data>(line->a).x, 10.0);
+    QVERIFY(std::holds_alternative<QCP::Pixels>(line->b));
+
+    const QImage replay = replayOf(context);
+    const QImage hand = painted(
+        [](QCPPainter& painter, const QCPTransform& transform)
+        {
+            painter.setPen(kPen);
+            painter.drawLine(pixelOf(transform, 10, 20), QPointF(150, 110));
+        },
+        context.transform());
+    QCOMPARE(replay, hand);
+}
+
+void TestDrawContext::rectOfADataRectMatchesTwoCorners()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    // x is the key and y the value, so the rect is the data rect, corners in
+    // either order.
+    context.rect(QRectF(20, 30, 60, 40), kPen, kBrush);
+
+    QCOMPARE(int(context.drawList().commands.size()), 1);
+    const auto* rect = std::get_if<qcp::RectCmd>(&context.drawList().commands.front());
+    QVERIFY(rect);
+    QCOMPARE(std::get<QCP::Data>(rect->a).x, 20.0);
+    QCOMPARE(std::get<QCP::Data>(rect->a).y, 30.0);
+    QCOMPARE(std::get<QCP::Data>(rect->b).x, 80.0);
+    QCOMPARE(std::get<QCP::Data>(rect->b).y, 70.0);
+
+    const QImage replay = replayOf(context);
+    const QImage hand = painted(
+        [](QCPPainter& painter, const QCPTransform& transform)
+        {
+            painter.setPen(kPen);
+            painter.setBrush(kBrush);
+            painter.drawRect(
+                QRectF(pixelOf(transform, 20, 30), pixelOf(transform, 80, 70)).normalized());
+        },
+        context.transform());
+    QCOMPARE(replay, hand);
+}
+
+void TestDrawContext::dataRadiusCircleIsAnEllipseInPixels()
+{
+    Fixture fixture;
+    // Two pixels per key unit, one per value unit: a data radius is a different
+    // pixel radius on each axis.
+    fixture.plot->xAxis->setRange(0, 100);
+    fixture.plot->replot();
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    context.circle(QCP::Data { 50, 75 }, 10.0, kPen, kBrush);
+
+    QCOMPARE(int(context.drawList().commands.size()), 1);
+    const auto* ellipse = std::get_if<qcp::EllipseCmd>(&context.drawList().commands.front());
+    QVERIFY2(ellipse, "a data radius records the ellipse it is");
+    QCOMPARE(std::get<QCP::Data>(ellipse->a).x, 40.0);
+    QCOMPARE(std::get<QCP::Data>(ellipse->a).y, 65.0);
+    QCOMPARE(std::get<QCP::Data>(ellipse->b).x, 60.0);
+    QCOMPARE(std::get<QCP::Data>(ellipse->b).y, 85.0);
+
+    const QImage replay = replayOf(context);
+    const QPointF centre = pixelOf(context.transform(), 50, 75);
+    // Forty pixels wide, twenty tall, filled: the axes' scales decide the shape.
+    QVERIFY2(replay.pixelColor((centre + QPointF(18, 0)).toPoint()) != QColor(Qt::white),
+             "the circle is not 40 pixels wide");
+    QVERIFY2(replay.pixelColor((centre + QPointF(22, 0)).toPoint()) == QColor(Qt::white),
+             "the circle is wider than 40 pixels");
+    QVERIFY2(replay.pixelColor((centre + QPointF(0, 8)).toPoint()) != QColor(Qt::white),
+             "the circle is not 20 pixels tall");
+    QVERIFY2(replay.pixelColor((centre + QPointF(0, 12)).toPoint()) == QColor(Qt::white),
+             "the circle is taller than 20 pixels");
+}
+
+void TestDrawContext::pixelRadiusCircleStaysAPixelRadius()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    context.circle(QCP::Data { 50, 75 }, 5_px, kPen, kBrush);
+
+    QCOMPARE(int(context.drawList().commands.size()), 1);
+    const auto* circle = std::get_if<qcp::CircleCmd>(&context.drawList().commands.front());
+    QVERIFY2(circle, "a pixel radius is the disc only a replay can size");
+    QCOMPARE(circle->radius, 5.0);
+    // Not a marker: markers draw on the scatter layer, after every plottable, so
+    // a legend icon recorded between two shapes would still come out on top.
+    QVERIFY(!std::holds_alternative<qcp::MarkersCmd>(context.drawList().commands.front()));
+
+    const auto discIsFivePixels = [](const QImage& image, const QPointF& centre)
+    {
+        return image.pixelColor((centre + QPointF(0, 4)).toPoint()) != QColor(Qt::white)
+            && image.pixelColor((centre + QPointF(0, 7)).toPoint()) == QColor(Qt::white);
+    };
+    QVERIFY2(discIsFivePixels(replayOf(context), pixelOf(context.transform(), 50, 75)),
+             "the disc is not five pixels in radius");
+
+    // A zoom moves the data point; the radius is pixels, so the disc stays five
+    // pixels.
+    fixture.plot->xAxis->setRange(0, 100);
+    fixture.plot->replot();
+    const QCPDrawFrame zoomed = frameOf(*fixture.plot);
+    QVERIFY2(discIsFivePixels(replayAt(context, zoomed), pixelOf(zoomed.transform, 50, 75)),
+             "the zoom scaled the disc");
+}
+
+void TestDrawContext::pixelCircleOnARatioIsNotAMarker()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    context.circle(QCP::AxisRatio { 0.5, 0.5 }, 3_px, kPen, kBrush);
+
+    const auto* circle = std::get_if<qcp::CircleCmd>(&context.drawList().commands.front());
+    QVERIFY(circle);
+    QVERIFY(std::holds_alternative<QCP::AxisRatio>(circle->centre));
+
+    // A legend icon centres on the axis rect, which is a ratio: no axes are
+    // needed to replay it, and it is not static, because a ratio follows the
+    // rect's size.
+    const qcp::QCPDrawCommand command = *circle;
+    const qcp::CommandKind kind = qcp::commandKind(command);
+    QVERIFY(kind.gpu);
+    QVERIFY(!kind.painterOnly);
+    QVERIFY(!kind.dataOnly);
+    QVERIFY(!kind.staticOnly);
+    QVERIFY(!qcp::qcpCommandNeedsAxes(command));
+
+    const QRect rect = fixture.plot->axisRect()->rect();
+    const QPointF centre(rect.center());
+    const QImage replay = replayOf(context);
+    QVERIFY(replay.pixelColor((centre + QPointF(0, 2)).toPoint()) != QColor(Qt::white));
+    // Outside the stroke too: 3 px plus half a 3 px pen, and the antialiasing that follows it.
+    QVERIFY(replay.pixelColor((centre + QPointF(0, 8)).toPoint()) == QColor(Qt::white));
+}
+
+void TestDrawContext::rotatedPolygonMatchesHandPainting()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    // A QTransform turns and moves the shape before the call, in data units: the
+    // asteroids' rock.
+    QPolygonF shape;
+    shape << QPointF(-20, -10) << QPointF(20, -10) << QPointF(0, 20);
+    QTransform placement;
+    placement.translate(100, 75);
+    placement.rotate(30);
+    const QPolygonF vertices = placement.map(shape);
+    context.polygon(vertices, kPen, kBrush);
+
+    QCOMPARE(int(context.drawList().commands.size()), 1);
+    const auto* polygon = std::get_if<qcp::PolygonCmd>(&context.drawList().commands.front());
+    QVERIFY(polygon);
+    QCOMPARE(int(polygon->points.size()), 3);
+    QVERIFY(std::holds_alternative<QCP::Data>(polygon->points.front()));
+
+    const QImage replay = replayOf(context);
+    const QImage hand = painted(
+        [&vertices](QCPPainter& painter, const QCPTransform& transform)
+        {
+            QVector<QPointF> pixels;
+            for (const QPointF& vertex : vertices)
+                pixels.append(pixelOf(transform, vertex.x(), vertex.y()));
+            painter.setPen(kPen);
+            painter.setBrush(kBrush);
+            painter.drawPolygon(pixels);
+        },
+        context.transform());
+    QCOMPARE(replay, hand);
+}
+
+void TestDrawContext::initializerListPolygonKeepsItsPositions()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    // A callout's tail: a data point, one nudged by pixels, and one pinned to the
+    // rect.
+    context.polygon({ QCP::Data { 20, 20 }, QCP::Data { 120, 30 } + QCP::PixelOffset { 4, -4 },
+                      QCP::AxisRatio { 0.5, 0.5 } },
+                    kPen, kBrush);
+
+    const auto* polygon = std::get_if<qcp::PolygonCmd>(&context.drawList().commands.front());
+    QVERIFY(polygon);
+    QCOMPARE(int(polygon->points.size()), 3);
+    QVERIFY(std::holds_alternative<QCP::Data>(polygon->points[0]));
+    QVERIFY(std::holds_alternative<QCP::DataOffset>(polygon->points[1]));
+    QVERIFY(std::holds_alternative<QCP::AxisRatio>(polygon->points[2]));
+
+    // The nudge is a pixel offset, resolved as the data point's pixel plus the
+    // offset.
+    const QPointF nudged = pixelOf(context.transform(), 120, 30) + QPointF(4, -4);
+    QCOMPARE(qcpResolvePosition(context.frame(), polygon->points[1]), nudged);
+    QVERIFY(replayOf(context).pixelColor(nudged.toPoint()) != QColor(Qt::white));
+}
+
+void TestDrawContext::roundedRectMatchesHandPainting()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    context.roundedRect(QCP::Data { 20, 30 }, QCP::Data { 120, 110 }, 6_px, kPen, kBrush);
+
+    QCOMPARE(int(context.drawList().commands.size()), 1);
+    const auto* rounded = std::get_if<qcp::RoundedRectCmd>(&context.drawList().commands.front());
+    QVERIFY(rounded);
+    QCOMPARE(std::get<QCP::Data>(rounded->a).x, 20.0);
+    QCOMPARE(std::get<QCP::Data>(rounded->b).y, 110.0);
+    QCOMPARE(rounded->shape->radius.px, 6.0);
+    QCOMPARE(rounded->shape->pen, kPen);
+
+    const QImage replay = replayOf(context);
+    const QImage hand = painted(
+        [](QCPPainter& painter, const QCPTransform& transform)
+        {
+            const QRectF rect
+                = QRectF(pixelOf(transform, 20, 30), pixelOf(transform, 120, 110)).normalized();
+            painter.setPen(kPen);
+            painter.setBrush(kBrush);
+            painter.drawRoundedRect(rect, 6.0, 6.0);
+        },
+        context.transform());
+    QCOMPARE(replay, hand);
+}
+
+void TestDrawContext::boxedTextWrapsInsideItsBox()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    QCPTextStyle style;
+    style.font = QFont(QStringLiteral("Sans"), 9);
+    style.color = QColor(10, 60, 90);
+    const QString text = QStringLiteral("the quick brown fox jumps over the lazy dog");
+    context.text(QCP::Data { 20, 120 }, QCP::Data { 140, 60 }, text, style);
+
+    const auto* boxed = std::get_if<qcp::BoxedTextCmd>(&context.drawList().commands.front());
+    QVERIFY(boxed);
+    QCOMPARE(boxed->box->text, text);
+
+    const QImage replay = replayOf(context);
+    const QRectF box
+        = QRectF(pixelOf(context.transform(), 20, 120), pixelOf(context.transform(), 140, 60))
+              .normalized();
+    // The words wrap: the ink inside the box makes more than one band of rows.
+    int bands = 0;
+    bool inBand = false;
+    for (int y = int(box.top()) + 2; y < int(box.bottom()) - 1; ++y)
+    {
+        bool inked = false;
+        for (int x = int(box.left()) + 2; x < int(box.right()) - 1; ++x)
+            inked = inked || replay.pixelColor(x, y) != QColor(Qt::white);
+        if (inked && !inBand)
+            ++bands;
+        inBand = inked;
+    }
+    QVERIFY2(bands >= 2, "the text did not wrap");
+
+    // The box bounds the text: nothing lands beside it.
+    int outside = 0;
+    for (int y = 0; y < kHeight; ++y)
+        for (int x = 0; x < kWidth; ++x)
+            if (!box.contains(x, y) && replay.pixelColor(x, y) != QColor(Qt::white))
+                ++outside;
+    QCOMPARE(outside, 0);
+}
+
+void TestDrawContext::boxedTextSmallerThanItsPaddingHasNoNegativeBox()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    QCPTextStyle style;
+    style.font = QFont(QStringLiteral("Sans"), 9);
+    style.color = QColor(10, 60, 90);
+    style.pen = kPen;
+    style.brush = kBrush;
+    style.padding = QMarginsF(10, 10, 10, 10);
+    // Ten pixels of box and ten of padding on each side: the inner rect is empty,
+    // never negative.
+    context.text(QCP::Data { 60, 90 }, QCP::Data { 70, 80 }, QStringLiteral("wrapped"), style);
+
+    const QImage replay = replayOf(context);
+    const QRectF box
+        = QRectF(pixelOf(context.transform(), 60, 90), pixelOf(context.transform(), 70, 80))
+              .normalized();
+    QCOMPARE(box.size(), QSizeF(10, 10));
+    // The box is painted, and the text is not: it has no room, so it draws
+    // nothing at all.
+    QCOMPARE(replay.pixelColor(box.center().toPoint()), kBrush.color());
+
+    int outside = 0;
+    for (int y = 0; y < kHeight; ++y)
+        for (int x = 0; x < kWidth; ++x)
+            if (!box.adjusted(-2, -2, 2, 2).contains(x, y)
+                && replay.pixelColor(x, y) != QColor(Qt::white))
+                ++outside;
+    QCOMPARE(outside, 0);
+}
+
+void TestDrawContext::emptyBoxedTextDrawsOnlyTheBox()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    QCPTextStyle style;
+    style.font = QFont(QStringLiteral("Sans"), 9);
+    style.color = QColor(10, 60, 90);
+    style.pen = kPen;
+    style.brush = kBrush;
+    style.padding = QMarginsF(3, 3, 3, 3);
+    context.text(QCP::Data { 40, 100 }, QCP::Data { 120, 60 }, QString(), style);
+
+    const QImage replay = replayOf(context);
+    const QRectF box
+        = QRectF(pixelOf(context.transform(), 40, 100), pixelOf(context.transform(), 120, 60))
+              .normalized();
+    // An empty string leaves the box: its fill everywhere inside, its border on
+    // the edge.
+    QCOMPARE(replay.pixelColor(box.center().toPoint()), kBrush.color());
+    QVERIFY(replay.pixelColor((box.topLeft() + QPointF(0, 1)).toPoint()) != QColor(Qt::white));
+}
+
+void TestDrawContext::circleOfAPixelLengthPicksThePixelCircle()
+{
+    // A PixelLength converts to nothing, so 5_px can only pick the pixel
+    // overload; a plain double stays the data radius. (5_px.px is a double, but
+    // PixelLength itself is not one.)
+    static_assert(!std::is_convertible_v<QCP::PixelLength, double>);
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    context.circle(QCP::Data { 50, 75 }, 5_px, kPen);
+    context.circle(QCP::Data { 50, 75 }, 5.0, kPen);
+
+    const auto& commands = context.drawList().commands;
+    QCOMPARE(int(commands.size()), 2);
+    QVERIFY(std::holds_alternative<qcp::CircleCmd>(commands[0]));
+    QVERIFY(std::holds_alternative<qcp::EllipseCmd>(commands[1]));
+}
+
+void TestDrawContext::helperCommandsJoinTheKindTable()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    context.line(QCP::Data { 10, 20 }, QCP::Pixels { 150, 110 }, kPen);
+    context.circle(QCP::AxisRatio { 0.5, 0.5 }, 5_px, kPen);
+    context.roundedRect(QCP::Data { 20, 30 }, QCP::Data { 120, 110 }, 6_px, kPen);
+    context.text(QCP::Data { 20, 120 }, QCP::Data { 140, 60 }, QStringLiteral("boxed"),
+                 QCPTextStyle());
+
+    const auto& commands = context.drawList().commands;
+    QCOMPARE(int(commands.size()), 4);
+    // A line and a disc are geometry; a rounded rect and a boxed text are the
+    // painter's, measured in pixels, until call order gives them their place.
+    const qcp::CommandKind line = qcp::commandKind(commands[0]);
+    QVERIFY(line.gpu && !line.painterOnly && !line.dataOnly && !line.staticOnly);
+    const qcp::CommandKind circle = qcp::commandKind(commands[1]);
+    QVERIFY(circle.gpu && !circle.painterOnly && !circle.dataOnly && !circle.staticOnly);
+    QVERIFY(!qcp::qcpCommandNeedsAxes(commands[1]));
+    for (int index : { 2, 3 })
+    {
+        const qcp::CommandKind kind = qcp::commandKind(commands[size_t(index)]);
+        QVERIFY2(kind.painterOnly && !kind.gpu, "a boxed shape is the painter's");
+        QVERIFY(qcp::qcpCommandNeedsAxes(commands[size_t(index)]));
+    }
+    // Every one of them boxes its geometry, so a shape outside the clip is
+    // skipped.
+    for (const qcp::QCPDrawCommand& command : commands)
+        QVERIFY(qcp::qcpCullsByExtent(command));
+}
+
+void TestDrawContext::boxedTextIsMeasuredOncePerBox()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    QCPTextStyle style;
+    style.font = QFont(QStringLiteral("Sans"), 9);
+    context.text(QCP::Data { 20, 120 }, QCP::Data { 140, 60 },
+                 QStringLiteral("the quick brown fox jumps over the lazy dog"), style);
+
+    const quint64 recorded = qcpTextMeasureCount();
+    replayOf(context);
+    const quint64 once = qcpTextMeasureCount();
+    QVERIFY2(once > recorded, "the first replay lays the text out");
+    replayOf(context);
+    // The box did not change: the payload keeps the layout, so no frame measures
+    // the text again.
+    QCOMPARE(qcpTextMeasureCount(), once);
+}
 void TestDrawContext::markersMatchesHandPainting()
 {
     Fixture fixture;
@@ -1473,4 +1901,108 @@ void TestDrawContext::theKeyWindowComesFromTheSystem()
     QVERIFY(fromAxes.keys.upper > fixture.plot->xAxis->range().upper);
     QVERIFY(fromAxes.pixelsPerKey > 0.0);
     QVERIFY(cartesian.drawList().keyWindow.has_value());
+}
+
+// The reference scene: one item that records every helper once, so a single
+// picture shows what the helpers draw. It holds no position of its own: the
+// shapes carry theirs.
+class EveryHelperItem : public QCPItemRect
+{
+public:
+    using QCPItemRect::QCPItemRect;
+
+protected:
+    void draw(QCPDrawContext& context) const override
+    {
+        const QPen outline(QColor(60, 60, 60), 1.2);
+        const QBrush paper(QColor(255, 250, 225));
+        context.line(QCP::Data { 0.5, 0.9 }, QCP::Data { 2.2, 0.7 }, outline);
+        context.rect(QRectF(2.6, 0.7, 1.6, 0.22), outline, paper);
+        context.polygon(QPolygonF { QPointF(5.0, 0.7), QPointF(6.5, 0.7), QPointF(5.7, 0.92) },
+                        outline, paper);
+        context.polygon({ QCP::Data { 7.0, 0.7 },
+                          QCP::Data { 9.0, 0.7 } + QCP::PixelOffset { 0, -8 },
+                          QCP::Data { 8.0, 0.92 } },
+                        outline, paper);
+        context.circle(QCP::Data { 1.2, 0.48 }, 0.12, outline, paper);
+        context.circle(QCP::Data { 3.2, 0.48 }, 12_px, outline, paper);
+        QCPTextStyle boxed;
+        boxed.font = qcp::test::referenceFont(9);
+        boxed.color = QColor(10, 60, 90);
+        boxed.pen = outline;
+        boxed.brush = paper;
+        boxed.padding = QMarginsF(4, 3, 4, 3);
+        context.text(QCP::Data { 5.0, 0.6 }, QCP::Data { 8.0, 0.35 },
+                     QStringLiteral("a boxed text wraps its words inside the box"), boxed);
+        context.roundedRect(QCP::Data { 0.5, 0.05 }, QCP::Data { 3.0, 0.28 }, 6_px, outline, paper);
+        context.text(QCP::Data { 3.5, 0.28 }, QCP::Data { 6.5, 0.05 }, QStringLiteral("one line"),
+                     boxed);
+        context.text(QCP::Data { 7.0, 0.28 }, QCP::Data { 8.5, 0.05 }, QString(), boxed);
+    }
+};
+
+void prepareReferencePlot(QCustomPlot& plot)
+{
+    plot.resize(400, 300);
+    QFont font = qcp::test::referenceFont();
+    font.setPixelSize(10);
+    plot.setFont(font);
+    for (QCPAxis* axis : plot.axisRect()->axes())
+    {
+        axis->setTickLabelFont(font);
+        axis->setLabelFont(font);
+    }
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 1);
+    plot.add<EveryHelperItem>();
+}
+
+//! A shown plot that owns a QRhi, or nullptr offscreen: the GPU case skips
+//! there.
+QCustomPlot* shownPlot(QWidget& host)
+{
+    host.resize(400, 300);
+    auto* plot = new QCustomPlot(&host);
+    plot->setGeometry(0, 0, 400, 300);
+    prepareReferencePlot(*plot);
+    host.show();
+    if (!QTest::qWaitForWindowExposed(&host))
+        return nullptr;
+    QElapsedTimer waited;
+    waited.start();
+    while (!plot->rhi() && waited.elapsed() < 5000)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        QTest::qWait(10);
+    }
+    return plot->rhi() ? plot : nullptr;
+}
+
+void TestDrawContext::everyHelperDrawsTheSamePicture()
+{
+    const QString dir = QStringLiteral("test-draw-context");
+    const QString name = QStringLiteral("helpers.png");
+    QCustomPlot plot;
+    prepareReferencePlot(plot);
+    plot.replot();
+    const QImage exported
+        = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QString why;
+    QVERIFY2(qcp::test::matchesReference(exported, dir, name, &why), qPrintable(why));
+    // The export writes the picture: the GPU replay is compared to it on the next
+    // run, so writing it here too would compare a picture with itself.
+    if (qEnvironmentVariableIsSet("QCP_WRITE_REFERENCE"))
+        return;
+
+    // The same recording through the other replay: a frame read back from the GPU
+    // draws the same scene, so a helper that only the painter knows would show
+    // here.
+    QWidget host;
+    QCustomPlot* shown = shownPlot(host);
+    if (!shown)
+        QSKIP("no QRhi offscreen: the GPU replay of the helpers is checked on Xvfb");
+    shown->replot();
+    const QImage gpu = shown->grabFramebuffer().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(qcp::test::matchesReference(gpu, dir, name, &why, qcp::test::Tolerance { 1500, 64 }),
+             qPrintable(why));
 }

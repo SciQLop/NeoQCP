@@ -14,6 +14,20 @@ private slots:
     void fillBetweenMatchesHandPainting();
     void rectMatchesHandPainting();
     void ellipseMatchesHandPainting();
+    void lineMatchesHandPainting();
+    void rectOfADataRectMatchesTwoCorners();
+    void dataRadiusCircleIsAnEllipseInPixels();
+    void pixelRadiusCircleStaysAPixelRadius();
+    void pixelCircleOnARatioIsNotAMarker();
+    void rotatedPolygonMatchesHandPainting();
+    void initializerListPolygonKeepsItsPositions();
+    void roundedRectMatchesHandPainting();
+    void boxedTextWrapsInsideItsBox();
+    void boxedTextSmallerThanItsPaddingHasNoNegativeBox();
+    void emptyBoxedTextDrawsOnlyTheBox();
+    void circleOfAPixelLengthPicksThePixelCircle();
+    void helperCommandsJoinTheKindTable();
+    void boxedTextIsMeasuredOncePerBox();
     void markersMatchesHandPainting();
     void errorBarsMatchesHandPainting();
     void textMatchesHandPainting();
@@ -54,4 +68,5 @@ private slots:
     void mismatchedColourCountIsRefused();
     void colouredPolylinePanReusesTheKeptGeometry();
     void theKeyWindowComesFromTheSystem();
+    void everyHelperDrawsTheSamePicture();
 };

@@ -38,6 +38,8 @@ bool usesTheView(const QCPDrawList& list)
     {
         if (std::holds_alternative<qcp::TextCmd>(command)
             || std::holds_alternative<qcp::PathCmd>(command)
+            || std::holds_alternative<qcp::RoundedRectCmd>(command)
+            || std::holds_alternative<qcp::BoxedTextCmd>(command)
             || std::holds_alternative<qcp::PainterCmd>(command))
             return true;
         // An image with two data corners is a textured quad, which a pan moves; any other corner
@@ -207,6 +209,41 @@ double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
                         return 0.0;
                 }
                 return distanceTo(qcpRingOf(qcpEllipseRing(box)), at, true) - halfPen(cmd.pen);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::LineCmd>)
+            {
+                const std::array<QPointF, 2> ends { qcpResolvePosition(frame, cmd.a),
+                                                    qcpResolvePosition(frame, cmd.b) };
+                return distanceTo(ends, at, false) - halfPen(cmd.pen);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::CircleCmd>)
+            {
+                const QPointF centre = qcpResolvePosition(frame, cmd.centre);
+                const QRectF box(centre.x() - cmd.radius, centre.y() - cmd.radius,
+                                 2.0 * cmd.radius, 2.0 * cmd.radius);
+                if (visibleBrush(cmd.brush) && box.contains(at)
+                    && QLineF(centre, at).length() <= cmd.radius)
+                    return 0.0;
+                return distanceTo(qcpRingOf(qcpEllipseRing(box)), at, true) - halfPen(cmd.pen);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::RoundedRectCmd>)
+            {
+                // Rounded corners are inside the box's stroke, so the rect's own distance answers.
+                const QRectF box
+                    = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                          .normalized();
+                if (visibleBrush(cmd.shape->brush) && box.contains(at))
+                    return 0.0;
+                const std::array<QPointF, 4> corners { box.topLeft(), box.topRight(),
+                                                       box.bottomRight(), box.bottomLeft() };
+                return distanceTo(corners, at, true) - halfPen(cmd.shape->pen);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::BoxedTextCmd>)
+            {
+                const QRectF box
+                    = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                          .normalized();
+                return distanceTo(box, at);
             }
             else if constexpr (std::is_same_v<Command, qcp::RectsCmd>)
             {
@@ -865,7 +902,12 @@ double QCPDrawnCore::pixelPad() const
                                    return cmd.style->size() / 2.0;
                                else if constexpr (std::is_same_v<Command, qcp::ErrorBarsCmd>)
                                    return cmd.whiskerWidth / 2.0 + halfPen(cmd.pen);
+                               else if constexpr (std::is_same_v<Command, qcp::CircleCmd>)
+                                   return cmd.radius + halfPen(cmd.pen);
+                               else if constexpr (std::is_same_v<Command, qcp::RoundedRectCmd>)
+                                   return halfPen(cmd.shape->pen);
                                else if constexpr (std::is_same_v<Command, qcp::TextCmd>
+                                                  || std::is_same_v<Command, qcp::BoxedTextCmd>
                                                   || std::is_same_v<Command, qcp::ImageCmd>
                                                   || std::is_same_v<Command, qcp::FillBetweenCmd>
                                                   || std::is_same_v<Command, qcp::PainterCmd>)

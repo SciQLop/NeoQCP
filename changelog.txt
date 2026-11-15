@@ -597,6 +597,17 @@ Milestone 6c (the drawing context): units and positions. Additive, except where 
         one resolves as its data point plus the offset, contributes its data point to the data
         extent and leaves the item index unbounded, as a text at a data position does.
 
+  - The drawing context's helpers, one call each: line(a, b, pen), circle(centre, radius) with the
+        radius in data units, circle(centre, 5_px) with a fixed pixel radius, polygon(QPolygonF) and
+        polygon({Data{...}, Data{...} + PixelOffset{...}, ...}), rect(QRectF) in data coordinates,
+        roundedRect(a, b, 6_px, pen, brush), and text(a, b, "t", style) laid out inside the box from
+        a to b, word-wrapped, with style.padding inside the box.
+  - A circle of a pixel radius is a command of its own, not a markers command: markers live on the
+        scatter layer, drawn after every plottable, so the disc would leave the call order. A circle
+        of a data radius is an ellipse command: it joins a rect batch and moves with the data.
+  - Additive: polygon(span) and rect(Position, Position) take an empty brush by default now, so a
+        plain outline needs no second argument.
+
 Milestone 6b (plot-free construction). Breaking, in the 3.0 preview line.
   - The three annotations an axis rect can make in one call: ax->line(keys, values, options), with
         QCPLineOptions{pen, name, scatterStyle} feeding setPen/setName/setScatterStyle (the data goes

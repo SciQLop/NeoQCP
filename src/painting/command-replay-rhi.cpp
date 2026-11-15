@@ -742,6 +742,27 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     raster();
                     stroke(qcpRingOf(ring), cmd.pen, true);
                 }
+                else if constexpr (std::is_same_v<T, qcp::LineCmd>)
+                {
+                    // Two ends on the stack: a lollipop records ten thousand lines a frame and must
+                    // not allocate one vector each.
+                    const std::array<QPointF, 2> ends { qcpResolvePosition(frame, cmd.a),
+                                                        qcpResolvePosition(frame, cmd.b) };
+                    raster();
+                    stroke(ends, cmd.pen);
+                }
+                else if constexpr (std::is_same_v<T, qcp::CircleCmd>)
+                {
+                    const QPointF centre = qcpResolvePosition(frame, cmd.centre);
+                    const QRectF box(centre.x() - cmd.radius, centre.y() - cmd.radius,
+                                     2.0 * cmd.radius, 2.0 * cmd.radius);
+                    const std::vector<QPointF> ring = qcpEllipseRing(box);
+                    if (qcp::gpuCanFill(cmd.brush) && !needs.fill && !strokeRaster)
+                        fanFill(plottables, centre, ring, cmd.brush.color(), clip, dpr, outputHeight,
+                                alpha, dataOnly, keep);
+                    raster();
+                    stroke(qcpRingOf(ring), cmd.pen, true);
+                }
                 else if constexpr (std::is_same_v<T, qcp::RectsCmd>)
                 {
                     // One command, many rects: the fan and the closed stroke RectCmd builds, in the

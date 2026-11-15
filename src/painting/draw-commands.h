@@ -238,11 +238,71 @@ struct PainterCmd
     std::shared_ptr<const std::function<void(QCPPainter&, const QCPTransform&)>> callback;
 };
 
+//! A line between two positions, held inline: the lollipop records ten thousand of them, and a
+//! vector of two positions each would be ten thousand allocations a frame.
+struct LineCmd
+{
+    QCP::Position a;
+    QCP::Position b;
+    QPen pen;
+};
+
+//! A disc of a fixed pixel radius around any position. Not a marker: markers draw on the scatter
+//! layer, after every plottable, so a legend icon's dot would come out on top of what follows it.
+struct CircleCmd
+{
+    QCP::Position centre;
+    double radius = 0.0; //!< in pixels
+    QPen pen;
+    QBrush brush;
+};
+
+//! What a rounded rect draws. Painter-only, so the pen and the brush ride behind the command's
+//! pointer: in the command itself they would push it past the budget.
+struct RoundedRectShape
+{
+    QPen pen;
+    QBrush brush;
+    QCP::PixelLength radius;
+};
+
+//! A rectangle with rounded corners between two positions, the corners rounded by a pixel radius.
+struct RoundedRectCmd
+{
+    QCP::Position a;
+    QCP::Position b;
+    std::shared_ptr<const RoundedRectShape> shape;
+};
+
+/*!
+  What a boxed text says and how: the text, its style, and the lines it wrapped into inside a box of
+  \a laidOutFor pixels. The replay wraps once per inner size and keeps it: a frame at the same size
+  measures nothing.
+*/
+struct BoxedText
+{
+    QString text;
+    QCPTextStyle style;
+    //! The inner box the wrap was made for; a replay that finds another size wraps again.
+    mutable QSize laidOutFor;
+    //! The text with a newline where a word did not fit, so drawing it wraps nothing.
+    mutable QString wrapped;
+};
+
+//! Text laid out inside the box between two positions, its words wrapped at the box's width.
+//! Painter-only: it is measured in pixels, so the painter draws it every frame.
+struct BoxedTextCmd
+{
+    QCP::Position a;
+    QCP::Position b;
+    std::shared_ptr<const BoxedText> box;
+};
+
 //! One draw command. Ordered by the alternatives below, so a replay is a single visit.
 using QCPDrawCommand
     = std::variant<PolylineDataCmd, PolylinePositionsCmd, PolygonCmd, FillBetweenCmd, RectCmd,
                    EllipseCmd, RectsCmd, EllipsesCmd, MarkersCmd, ErrorBarsCmd, TextCmd, PathCmd,
-                   ImageCmd, PainterCmd>;
+                   ImageCmd, LineCmd, CircleCmd, RoundedRectCmd, BoxedTextCmd, PainterCmd>;
 
 //! What a replay asks of a command: one visit answers every question about its kind.
 //!
@@ -302,11 +362,17 @@ inline CommandKind commandKind(const QCPDrawCommand& command)
                 return qcpMovesWithData(cmd.a) && qcpMovesWithData(cmd.b)
                     ? CommandKind { true, false, true, false }
                     : CommandKind { false, true, false, false };
-            else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>)
+            else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>
+                               || std::is_same_v<T, LineCmd>)
                 return CommandKind { true, false,
                                      qcpMovesWithData(cmd.a) && qcpMovesWithData(cmd.b),
                                      std::holds_alternative<QCP::Pixels>(cmd.a)
                                          && std::holds_alternative<QCP::Pixels>(cmd.b) };
+            else if constexpr (std::is_same_v<T, CircleCmd>)
+                return CommandKind { true, false, qcpMovesWithData(cmd.centre),
+                                     std::holds_alternative<QCP::Pixels>(cmd.centre) };
+            else if constexpr (std::is_same_v<T, RoundedRectCmd> || std::is_same_v<T, BoxedTextCmd>)
+                return CommandKind { false, true, false, false }; // the painter draws them
             else
                 return CommandKind { true, false, allPositionsMoveWithData(cmd.points),
                                      allPositionsIn<QCP::Pixels>(cmd.points) };
@@ -327,7 +393,8 @@ inline bool isGpuCommand(const QCPDrawCommand& command)
                 return qcpMovesWithData(cmd.a) && qcpMovesWithData(cmd.b);
             else
                 return !(std::is_same_v<T, TextCmd> || std::is_same_v<T, PathCmd>
-                         || std::is_same_v<T, PainterCmd>);
+                         || std::is_same_v<T, PainterCmd>
+                         || std::is_same_v<T, RoundedRectCmd> || std::is_same_v<T, BoxedTextCmd>);
         },
         command);
 }
@@ -356,8 +423,12 @@ inline bool qcpCommandNeedsAxes(const QCPDrawCommand& command)
             else if constexpr (std::is_same_v<T, ErrorBarsCmd>)
                 return !cmd.inPixels; // a grouped or stacked bar records where it sits, in pixels
             else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>
-                               || std::is_same_v<T, ImageCmd>)
+                               || std::is_same_v<T, ImageCmd> || std::is_same_v<T, LineCmd>
+                               || std::is_same_v<T, RoundedRectCmd>
+                               || std::is_same_v<T, BoxedTextCmd>)
                 return needsAxes(cmd.a) || needsAxes(cmd.b);
+            else if constexpr (std::is_same_v<T, CircleCmd>)
+                return needsAxes(cmd.centre);
             else if constexpr (std::is_same_v<T, TextCmd>)
                 return needsAxes(cmd.at);
             else if constexpr (std::is_same_v<T, PathCmd>)
@@ -372,6 +443,13 @@ inline bool qcpCommandNeedsAxes(const QCPDrawCommand& command)
 
 //! The size \a text needs in \a style: the measurement a text command keeps.
 [[nodiscard]] QCP_LIB_DECL QSize qcpMeasureText(const QCPTextStyle& style, const QString& text);
+
+/*!
+  \a text with a newline wherever a word did not fit in \a width pixels: the wrap a boxed text keeps,
+  measured once per box size. A math text is left alone: its typesetter wraps nothing.
+*/
+[[nodiscard]] QCP_LIB_DECL QString qcpWrappedText(const QCPTextStyle& style, const QString& text,
+                                                  int width);
 
 /*!
   The layout of glyphs of \a glyphSize in \a style, as QCPItemText has always drawn it: one place
@@ -781,7 +859,9 @@ inline bool qcpCullsByExtent(const QCPDrawCommand& command)
                 || std::is_same_v<T, ImageCmd> || std::is_same_v<T, RectsCmd>
                 || std::is_same_v<T, EllipsesCmd> || std::is_same_v<T, PolygonCmd>
                 || std::is_same_v<T, PolylinePositionsCmd> || std::is_same_v<T, MarkersCmd>
-                || std::is_same_v<T, TextCmd>;
+                || std::is_same_v<T, TextCmd> || std::is_same_v<T, LineCmd>
+                || std::is_same_v<T, CircleCmd> || std::is_same_v<T, RoundedRectCmd>
+                || std::is_same_v<T, BoxedTextCmd>;
         },
         command);
 }
@@ -846,6 +926,33 @@ inline CommandExtent commandExtent(const QCPDrawCommand& command, const QCPDrawF
                 }
                 if (count > 0)
                     extent.box = QRectF(QPointF(left, top), QPointF(right, bottom));
+                extent.cullable = true;
+            }
+            else if constexpr (std::is_same_v<T, LineCmd>)
+            {
+                const QCP::Position ends[] = { cmd.a, cmd.b };
+                extent.box = qcpPositionBox(ends, frame);
+                extent.cullable = true;
+            }
+            else if constexpr (std::is_same_v<T, CircleCmd>)
+            {
+                const QPointF centre = qcpResolvePosition(frame, cmd.centre);
+                extent.box = QRectF(centre.x() - cmd.radius, centre.y() - cmd.radius,
+                                    2.0 * cmd.radius, 2.0 * cmd.radius);
+                extent.cullable = true;
+            }
+            else if constexpr (std::is_same_v<T, RoundedRectCmd> || std::is_same_v<T, BoxedTextCmd>)
+            {
+                extent.box
+                    = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                          .normalized();
+                if constexpr (std::is_same_v<T, RoundedRectCmd>)
+                {
+                    extent.pen = cmd.shape->pen;
+                    extent.pad = qcpStrokePad(cmd.shape->pen);
+                }
+                else
+                    extent.pad = 0.0; // a box is its corners; the glyphs stay inside them
                 extent.cullable = true;
             }
             else if constexpr (std::is_same_v<T, PolygonCmd>

@@ -85,6 +85,41 @@ qcp::QCPTextLayout qcpTextLayout(const QCPTextStyle& style, const QString& text)
     return qcpTextLayout(style, qcpMeasureText(style, text));
 }
 
+QString qcpWrappedText(const QCPTextStyle& style, const QString& text, int width)
+{
+    // One measurement per box size, not per word: the words are advanced against the same metrics.
+    gTextMeasures.fetch_add(1, std::memory_order_relaxed);
+    if (style.mathText || width <= 0)
+        return text;
+    const QFontMetrics metrics(style.font);
+    QString wrapped;
+    wrapped.reserve(text.size() + text.size() / 8);
+    for (const QString& paragraph : text.split(QLatin1Char('\n')))
+    {
+        int lineStart = 0;
+        int lastBreak = -1;
+        for (int i = 0; i < paragraph.size(); ++i)
+        {
+            const QChar character = paragraph.at(i);
+            if (character.isSpace())
+                lastBreak = i;
+            if (metrics.horizontalAdvance(paragraph.mid(lineStart, i - lineStart + 1)) > width
+                && lastBreak > lineStart)
+            {
+                wrapped += paragraph.mid(lineStart, lastBreak - lineStart);
+                wrapped += QLatin1Char('\n');
+                lineStart = lastBreak + 1;
+                lastBreak = -1;
+            }
+        }
+        wrapped += paragraph.mid(lineStart);
+        wrapped += QLatin1Char('\n');
+    }
+    if (!wrapped.isEmpty())
+        wrapped.chop(1);
+    return wrapped;
+}
+
 namespace
 {
 //! The box and glyphs, exactly as QCPItemText lays them out relative to the anchor.
@@ -108,6 +143,38 @@ void replayText(const qcp::TextCmd& cmd, QCPPainter& painter, const QCPDrawFrame
     QCPLabelRenderer::drawWith(textRenderer(style), &painter, layout.glyphs, style.font, color,
                                cmd.text, style.textFlags);
     painter.restore();
+}
+
+//! \a box's text laid out inside its inner rect: the box itself, then the wrapped words in it.
+void replayBoxedText(const qcp::BoxedTextCmd& cmd, QCPPainter& painter, const QCPDrawFrame& frame)
+{
+    const QRectF box
+        = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b)).normalized();
+    const qcp::BoxedText& payload = *cmd.box;
+    const QCPTextStyle& style = payload.style;
+    const QColor color = style.color.isValid() ? style.color : painter.pen().color();
+    if (style.brush.style() != Qt::NoBrush || style.pen.style() != Qt::NoPen)
+    {
+        painter.setPen(style.pen);
+        painter.setBrush(style.brush);
+        painter.drawRect(box);
+        painter.setBrush(Qt::NoBrush);
+    }
+    // The padding eats into the box; a box smaller than its padding has no room left, never a
+    // negative one.
+    const QRectF inner(box.left() + style.padding.left(), box.top() + style.padding.top(),
+                       qMax(0.0, box.width() - style.padding.left() - style.padding.right()),
+                       qMax(0.0, box.height() - style.padding.top() - style.padding.bottom()));
+    if (inner.isEmpty() || payload.text.isEmpty())
+        return;
+    const QSize innerSize = inner.size().toSize();
+    if (payload.laidOutFor != innerSize)
+    {
+        payload.wrapped = qcpWrappedText(style, payload.text, innerSize.width());
+        payload.laidOutFor = innerSize;
+    }
+    QCPLabelRenderer::drawWith(textRenderer(style), &painter, inner.toRect(), style.font, color,
+                               payload.wrapped, style.textFlags);
 }
 } // namespace
 
@@ -328,6 +395,32 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
                 painter.scale((b.x() - a.x()) / source.width(), (b.y() - a.y()) / source.height());
                 painter.drawImage(QPointF(0, 0), image, source);
                 painter.restore();
+            }
+            else if constexpr (std::is_same_v<Command, LineCmd>)
+            {
+                painter.setPen(cmd.pen);
+                painter.drawLine(qcpResolvePosition(frame, cmd.a),
+                                 qcpResolvePosition(frame, cmd.b));
+            }
+            else if constexpr (std::is_same_v<Command, CircleCmd>)
+            {
+                const QPointF centre = qcpResolvePosition(frame, cmd.centre);
+                painter.setPen(mode.withStroke ? cmd.pen : QPen(Qt::NoPen));
+                painter.setBrush(cmd.brush);
+                painter.drawEllipse(centre, cmd.radius, cmd.radius);
+            }
+            else if constexpr (std::is_same_v<Command, RoundedRectCmd>)
+            {
+                const QRectF rect
+                    = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                          .normalized();
+                painter.setPen(mode.withStroke ? cmd.shape->pen : QPen(Qt::NoPen));
+                painter.setBrush(cmd.shape->brush);
+                painter.drawRoundedRect(rect, cmd.shape->radius.px, cmd.shape->radius.px);
+            }
+            else if constexpr (std::is_same_v<Command, BoxedTextCmd>)
+            {
+                replayBoxedText(cmd, painter, frame);
             }
             else if constexpr (std::is_same_v<Command, PainterCmd>)
             {

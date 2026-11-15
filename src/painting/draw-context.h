@@ -11,10 +11,12 @@
 #include <QMargins>
 #include <QPainterPath>
 #include <QPen>
+#include <QPolygonF>
 #include <QRectF>
 #include <QString>
 
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <span>
 #include <vector>
@@ -193,12 +195,33 @@ public:
     //! A polyline whose vertices each carry their own space.
     void polyline(std::span<const QCP::Position> points, const QPen& pen);
     //! A filled and stroked polygon; its vertices each carry their own space.
-    void polygon(std::span<const QCP::Position> points, const QPen& pen, const QBrush& brush);
+    void polygon(std::span<const QCP::Position> points, const QPen& pen, const QBrush& brush = { });
+    //! The same polygon, its vertices given in data coordinates: what a QTransform turns and moves.
+    void polygon(const QPolygonF& dataPoints, const QPen& pen, const QBrush& brush = { });
+    //! The same polygon, its vertices listed: a callout's tail is three positions, not a vector.
+    void polygon(std::initializer_list<QCP::Position> points, const QPen& pen,
+                 const QBrush& brush = { });
+    //! A line between two positions, each in its own space. Holds both inline: no allocation.
+    void line(QCP::Position a, QCP::Position b, const QPen& pen);
+    /*!
+      A disc of \a radius data units around \a centre, so it is an ellipse in pixels whenever the
+      axes scale differently. The centre is a data point, with or without a pixel offset riding on
+      it; any other space has no data radius and is refused through the misuse tier.
+    */
+    void circle(QCP::Position centre, double radius, const QPen& pen, const QBrush& brush = { });
+    //! A disc of a fixed pixel radius around any position: a legend icon's dot, a marker's head.
+    void circle(QCP::Position centre, QCP::PixelLength radius, const QPen& pen,
+                const QBrush& brush = { });
     //! The area between two data-space series: \a upper forward, \a lower backward.
     void fillBetween(std::shared_ptr<const std::vector<QPointF>> upper,
                      std::shared_ptr<const std::vector<QPointF>> lower, const QBrush& brush);
     //! An axis-aligned rectangle between two corners, each in its own space.
-    void rect(QCP::Position a, QCP::Position b, const QPen& pen, const QBrush& brush);
+    void rect(QCP::Position a, QCP::Position b, const QPen& pen, const QBrush& brush = { });
+    //! A rectangle given in data coordinates: x is the key, y the value, as QRectF reads them.
+    void rect(const QRectF& dataRect, const QPen& pen, const QBrush& brush = { });
+    //! A rectangle whose corners are rounded by \a radius pixels, between two positions.
+    void roundedRect(QCP::Position a, QCP::Position b, QCP::PixelLength radius, const QPen& pen,
+                     const QBrush& brush = { });
     //! An axis-aligned ellipse inside the rectangle between two corners.
     void ellipse(QCP::Position a, QCP::Position b, const QPen& pen, const QBrush& brush);
     //! One scatter symbol per data-space point.
@@ -221,6 +244,12 @@ public:
     //! The same, for a recorder that already measured \a glyphSize and will ask for it again.
     void text(QCP::Position at, const QString& text, const QCPTextStyle& style,
               const QSize& glyphSize);
+    /*!
+      \a text laid out inside the box between \a a and \a b, its words wrapped at the box's width and
+      \c style.padding inside the box. An empty string draws the box alone; a box smaller than the
+      padding keeps no room for the text, never a negative one.
+    */
+    void text(QCP::Position a, QCP::Position b, const QString& text, const QCPTextStyle& style);
     /*!
       Marks the recording as holding a position only available in pixels: the recorder fell back on
       the position's current pixel (see \ref QCPItemPosition::asPosition), so that command is a
