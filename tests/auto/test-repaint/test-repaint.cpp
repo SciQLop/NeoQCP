@@ -4206,8 +4206,59 @@ enum class CallOrderParts
     TextThenRect,
     Rect,
     Text,
-    LineThenPainter
+    LineThenPainter,
+    NineAlternations
 };
+
+void recordCallOrderRect(QCPDrawContext& context)
+{
+    context.rect(QCP::Data { 2.0, 0.15 }, QCP::Data { 8.0, 0.85 }, QPen(Qt::NoPen),
+                 QBrush(QColor(220, 30, 30)));
+}
+
+void recordCallOrderText(QCPDrawContext& context)
+{
+    QCPTextStyle style;
+    style.font = qcp::test::referenceFont(20);
+    style.color = QColor(20, 20, 20);
+    context.text(QCP::Data { 3.0, 0.72 }, QStringLiteral("MMMM"), style);
+}
+
+//! Records what \a parts names: the rect and the text in one or the other order, alone, or pairs
+//! of them enough to pass the slice cap.
+void recordCallOrder(QCPDrawContext& context, CallOrderParts parts)
+{
+    switch (parts)
+    {
+        case CallOrderParts::RectThenText:
+            recordCallOrderRect(context);
+            recordCallOrderText(context);
+            break;
+        case CallOrderParts::TextThenRect:
+            recordCallOrderText(context);
+            recordCallOrderRect(context);
+            break;
+        case CallOrderParts::Rect:
+            recordCallOrderRect(context);
+            break;
+        case CallOrderParts::Text:
+            recordCallOrderText(context);
+            break;
+        case CallOrderParts::LineThenPainter:
+            context.line(QCP::Data { 2.0, 0.5 }, QCP::Data { 8.0, 0.5 },
+                         QPen(QColor(20, 40, 160), 6.0));
+            context.painter([](QCPPainter& painter, const QCPTransform&)
+                            { painter.fillRect(QRectF(150, 100, 80, 80), QColor(20, 160, 40)); });
+            break;
+        case CallOrderParts::NineAlternations:
+            for (int pair = 0; pair < 9; ++pair)
+            {
+                recordCallOrderRect(context);
+                recordCallOrderText(context);
+            }
+            break;
+    }
+}
 
 //! One recording whose call order decides what a replay paints last: a filled rect, a text over it,
 //! or a line a painter callback covers.
@@ -4219,48 +4270,32 @@ public:
     CallOrderParts parts = CallOrderParts::RectThenText;
 
 protected:
-    void draw(QCPDrawContext& context) const override
-    {
-        switch (parts)
-        {
-            case CallOrderParts::RectThenText:
-                recordRect(context);
-                recordText(context);
-                break;
-            case CallOrderParts::TextThenRect:
-                recordText(context);
-                recordRect(context);
-                break;
-            case CallOrderParts::Rect:
-                recordRect(context);
-                break;
-            case CallOrderParts::Text:
-                recordText(context);
-                break;
-            case CallOrderParts::LineThenPainter:
-                context.line(QCP::Data { 2.0, 0.5 }, QCP::Data { 8.0, 0.5 },
-                             QPen(QColor(20, 40, 160), 6.0));
-                context.painter([](QCPPainter& painter, const QCPTransform&)
-                                { painter.fillRect(QRectF(150, 100, 80, 80), QColor(20, 160, 40)); });
-                break;
-        }
-    }
-
-private:
-    static void recordRect(QCPDrawContext& context)
-    {
-        context.rect(QCP::Data { 2.0, 0.15 }, QCP::Data { 8.0, 0.85 }, QPen(Qt::NoPen),
-                     QBrush(QColor(220, 30, 30)));
-    }
-
-    static void recordText(QCPDrawContext& context)
-    {
-        QCPTextStyle style;
-        style.font = qcp::test::referenceFont(20);
-        style.color = QColor(20, 20, 20);
-        context.text(QCP::Data { 3.0, 0.72 }, QStringLiteral("MMMM"), style);
-    }
+    void draw(QCPDrawContext& context) const override { recordCallOrder(context, parts); }
 };
+
+//! The same recording on a plottable, which a layer may translate instead of repainting.
+class CallOrderPlottable : public PendingStub
+{
+public:
+    using PendingStub::PendingStub;
+
+    CallOrderParts parts = CallOrderParts::RectThenText;
+
+    bool hasPendingData() const override { return false; }
+
+    void draw(QCPDrawContext& context) const override { recordCallOrder(context, parts); }
+};
+
+//! The pixels darker than any red on the whole frame: one count per copy of the text, wherever it is.
+int darkPixels(const QImage& image)
+{
+    int ink = 0;
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x)
+            if (image.pixelColor(x, y).lightness() < 120)
+                ++ink;
+    return ink;
+}
 
 void prepareCallOrderPlot(QCustomPlot& plot)
 {
@@ -4445,4 +4480,85 @@ void TestRepaint::aRecordingWithoutPainterCommandsTakesNoImageSlot()
     plot->replot();
     QVERIFY2(layer->imageDrawEntries().size() > plain,
              "the text after the rect must go to a slice of its own");
+}
+
+// C-5: a plain layerable paints in its layer's call order too. Added after a GPU rect, it covers it.
+void TestRepaint::aScreenDrawsAPlainLayerableOverGpuContent()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto rect = plot->add<CallOrderItem>();
+    rect->parts = CallOrderParts::Rect;
+    const QPointF centre(plot->xAxis->coordToPixel(5.0), plot->yAxis->coordToPixel(0.5));
+    const QColor green(20, 160, 40);
+    auto* hook = new DrawHook(plot, rect->layer()->name());
+    hook->onPaint = [centre, green](QCPPainter* painter)
+    { painter->fillRect(QRectF(centre - QPointF(20, 20), QSizeF(40, 40)), green); };
+    plot->replot();
+    const QColor drawn = screenOf(plot).pixelColor(centre.toPoint());
+    QVERIFY2(drawn.green() > 120 && drawn.red() < 100,
+             qPrintable(QStringLiteral("the plain layerable is not over the GPU rect: %1,%2,%3")
+                            .arg(drawn.red())
+                            .arg(drawn.green())
+                            .arg(drawn.blue())));
+}
+
+// Review Focus 1: a pan of a recording that holds a slice keeps the text over the rect, and leaves
+// no copy of the previous frame behind.
+void TestRepaint::aPanKeepsTheSliceOverItsContent()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto item = plot->add<CallOrderPlottable>();
+    item->parts = CallOrderParts::RectThenText;
+    plot->replot();
+    waitUntilSettled(*plot);
+    const QImage before = screenOf(plot);
+    QVERIFY2(textInkInsideTheRect(*plot, before) > 20,
+             "the text recorded after the rect is not drawn over it before the pan");
+    const int inkBefore = darkPixels(before);
+    // One unit of pan: the frame moves a tenth of the axis rect, which a layer may express by
+    // translating its buffer. The slice holds viewport pixels, so it has to be painted again.
+    plot->xAxis->setRange(1.0, 11.0);
+    plot->replot();
+    waitUntilSettled(*plot);
+    const QImage after = screenOf(plot);
+    QVERIFY2(textInkInsideTheRect(*plot, after) > 20,
+             "the text is no longer over the rect after the pan");
+    QVERIFY2(darkPixels(after) <= inkBefore * 3 / 2,
+             "the pan left a copy of the previous frame behind");
+}
+
+// Past the slice cap the painter-only content falls back into the buffer, with one warning: what is
+// past the cap is not lost, it goes under the GPU content like everything before C-4 did.
+void TestRepaint::aPainterSliceCapWarnsOnce()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto item = plot->add<CallOrderItem>();
+    item->parts = CallOrderParts::NineAlternations;
+    static int warnings = 0;
+    warnings = 0;
+    const QtMessageHandler previous = qInstallMessageHandler(
+        +[](QtMsgType type, const QMessageLogContext&, const QString& message)
+        {
+            if (type == QtDebugMsg && message.contains(QStringLiteral("painter slices in one layer")))
+                ++warnings;
+        });
+    plot->replot();
+    plot->replot();
+    qInstallMessageHandler(previous);
+    QCOMPARE(warnings, 1);
+    const QPointF centre(plot->xAxis->coordToPixel(5.0), plot->yAxis->coordToPixel(0.5));
+    const QColor drawn = screenOf(plot).pixelColor(centre.toPoint());
+    QVERIFY2(drawn.red() > 120, "the rects are lost past the slice cap");
 }

@@ -30,6 +30,7 @@
 
 #include "core.h"
 #include "coordinate-system.h"
+#include "drawable.h"
 #include "layout.h"
 #include "layoutelements/area.h"
 #include "layoutelements/layoutelement-axisrect.h"
@@ -248,22 +249,31 @@ void QCPLayer::draw(QCPPainter* painter)
             auto* plottable = qobject_cast<QCPPlottable*>(child);
             if (plottable && !plottable->drawableAxes())
                 continue;
-            painter->save();
-            painter->setClipRect(child->clipRect().translated(0, -1));
+            // A drawable replays its own recording in call order, and opens a slice when its
+            // painter-only content lands over GPU content. Every other layerable paints straight
+            // into the buffer, under that content: once GPU content is on the layer, it gets the
+            // slice instead, so its pixels stack where the call that drew it puts them.
+            QCPPainter* target = painter;
+            if (!dynamic_cast<QCPDrawable*>(child)
+                && (hasOpenPainterSlice() || mParentPlot->gpuContentBefore(this)))
+                if (QCPPainter* slice = painterSlice(*painter, child->clipRect().translated(0, -1)))
+                    target = slice;
+            target->save();
+            target->setClipRect(child->clipRect().translated(0, -1));
             // Apply busy fade for plottables (suppress during vector export)
             if (plottable && plottable->visuallyBusy()
-                && !painter->modes().testFlag(QCPPainter::pmVectorized))
-                painter->setOpacity(plottable->effectiveBusyFadeAlpha());
-            child->applyDefaultAntialiasingHint(painter);
+                && !target->modes().testFlag(QCPPainter::pmVectorized))
+                target->setOpacity(plottable->effectiveBusyFadeAlpha());
+            child->applyDefaultAntialiasingHint(target);
             // A cosmetic pen is one device pixel: half a logical one on a 2x screen, where the GPU
             // layers and the exports draw it one logical pixel wide. Plottables and grids are the
             // GPU's on screen; painted (the fallback) they keep the cosmetic pen, which a dense
             // polyline needs: stroked one logical pixel wide it was five times slower.
             if (mHiDpiScreenPass)
-                painter->setMode(QCPPainter::pmNonCosmetic,
-                                 !plottable && !qobject_cast<QCPGrid*>(child));
-            child->draw(painter);
-            painter->restore();
+                target->setMode(QCPPainter::pmNonCosmetic,
+                                !plottable && !qobject_cast<QCPGrid*>(child));
+            child->draw(target);
+            target->restore();
         }
     }
     // Consecutive painter-only layerables shared the slice that is open; the next GPU content, or
@@ -576,6 +586,11 @@ void QCPLayer::invalidatePaintBuffer()
 bool QCPLayer::canTranslateInsteadOfRepaint() const
 {
     if (pixelOffset().isNull())
+        return false;
+
+    // A slice is a picture of the viewport, submitted over this layer's GPU content: shifting the
+    // buffer and the quads would leave it where the frame it was painted in put it.
+    if (mSliceCount > 0 || hasOpenPainterSlice())
         return false;
 
     for (auto* child : mChildren)

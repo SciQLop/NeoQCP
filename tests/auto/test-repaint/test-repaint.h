@@ -27,6 +27,9 @@ private slots:
     void aScreenStacksTwoItemsInAddOrder();
     void aScreenDrawsAPainterCallbackOverAPolyline();
     void aRecordingWithoutPainterCommandsTakesNoImageSlot();
+    void aScreenDrawsAPlainLayerableOverGpuContent();
+    void aPanKeepsTheSliceOverItsContent();
+    void aPainterSliceCapWarnsOnce();
     void exportShowsReadyStagedData();
     void legendShowsAddedGraphAndItsName();
     void setLayerRepaintsTheLayerLeft();
