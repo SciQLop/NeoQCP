@@ -18,6 +18,8 @@ See {doc}`graphs`.
 - **A column named "Component 0" by hand counts as unnamed.**
   A one-column graph's legend row then shows the graph's name instead.
   Workaround: pick any other name.
+- **Markers draw over everything else on their layer**, including a text or a painter callback recorded after them.
+  They are one pass above the layer's other content, the buffer and the painter slices alike.
 
 ## Other plottables
 
@@ -117,6 +119,9 @@ See {doc}`performance`.
   Every point is mapped on every repaint, and every click scans every recorded shape.
 - **A big graph shows blank edges during a pan**, until the redraw 150 ms after the pan stops.
 - **Zooming a million-point graph costs about 0.7 ms**, a little over the target.
+- **A layer takes at most 8 painter slices per frame.**
+  A slice is opened where painter-only content follows GPU content, and each one is an image of the output.
+  Past the cap, that content goes under the GPU content again, and one warning per layer says so.
 - **A pan on a log key axis records the graph again on every frame.**
   On a linear axis a pan only moves the picture.
 - **A scatter-only graph of millions of points has no point cap.**

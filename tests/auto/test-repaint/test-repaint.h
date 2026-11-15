@@ -30,6 +30,7 @@ private slots:
     void aScreenDrawsAPlainLayerableOverGpuContent();
     void aPanKeepsTheSliceOverItsContent();
     void aPainterSliceCapWarnsOnce();
+    void aMarkerStaysOverTheSliceOfItsLayer();
     void exportShowsReadyStagedData();
     void legendShowsAddedGraphAndItsName();
     void setLayerRepaintsTheLayerLeft();

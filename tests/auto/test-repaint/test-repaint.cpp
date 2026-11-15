@@ -4562,3 +4562,29 @@ void TestRepaint::aPainterSliceCapWarnsOnce()
     const QColor drawn = screenOf(plot).pixelColor(centre.toPoint());
     QVERIFY2(drawn.red() > 120, "the rects are lost past the slice cap");
 }
+
+// P-5: markers live on the scatter layer, one pass above their plottable's layer, so they stay over
+// its buffer, its GPU quads and its painter slices alike.
+void TestRepaint::aMarkerStaysOverTheSliceOfItsLayer()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    QCPGraph* graph = plot->addGraph();
+    graph->setLineStyle(QCPGraph::lsNone);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(20, 40, 160), 20));
+    graph->setData(QVector<double> { 5.0 }, QVector<double> { 0.5 });
+    auto rect = plot->add<CallOrderItem>();
+    rect->parts = CallOrderParts::Rect;
+    rect->setLayer(graph->layer()); // the rect is recorded after the marker, on the same layer
+    plot->replot();
+    const QPointF centre(plot->xAxis->coordToPixel(5.0), plot->yAxis->coordToPixel(0.5));
+    const QColor drawn = screenOf(plot).pixelColor(centre.toPoint());
+    QVERIFY2(drawn.blue() > 120 && drawn.red() < 100,
+             qPrintable(QStringLiteral("the marker is under the rect recorded after it: %1,%2,%3")
+                            .arg(drawn.red())
+                            .arg(drawn.green())
+                            .arg(drawn.blue())));
+}

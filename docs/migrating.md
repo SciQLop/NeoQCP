@@ -89,6 +89,7 @@ Most changes are confined to the new classes. A few touch existing code.
   - A signal argument that points to an object arrives as `nullptr` when that object was deleted before the signal was delivered.
 - **Span dragging.** Dragging a `QCPItemSpan` or `QCPItemRSpan` moves its edges by the mouse movement in pixels, whatever the type of their positions. An edge placed in pixels used to move by the wrong amount. If the axis moves during the drag, the edge now stays under the pointer.
 - **Native pinch.** A macOS pinch that the plot does not zoom on is left to the parent widget. It used to be swallowed.
+- **Call order is screen order.** Painter-only content recorded after GPU content, a text or a painter callback in a recording, or a plain layerable added after a plottable, paints into a painter slice of its layer: a picture of the output submitted over that GPU content. A text recorded after a rect covers it on the screen as it already did in an export. A layer that holds a slice is not translated on a pan.
 - **New axes are followed.** `QCPGraph`, `QCPColorMap2`, `QCPHistogram2D` and `QCPHistogram` follow the scale and range of an axis given later with `setKeyAxis()` or `setValueAxis()`, not only the axes they were built with.
 
 The classic plottables (`QCPCurve`, `QCPBars`, `QCPColorMap`, ...) keep their data model and behaviour. Their solid lines are drawn by the GPU now; dashed lines and scatters still use `QPainter`. `QCPGraph` is not classic any more: see "One graph" below.

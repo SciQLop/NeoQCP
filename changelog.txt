@@ -607,6 +607,11 @@ Milestone 6c (the drawing context): units and positions. Additive, except where 
         of a data radius is an ellipse command: it joins a rect batch and moves with the data.
   - Additive: polygon(span) and rect(Position, Position) take an empty brush by default now, so a
         plain outline needs no second argument.
+  - Call order is screen order: painter-only content recorded after GPU content (a text, a painter
+        callback, or a plain layerable added after a plottable) paints into a painter slice, an image
+        of the output submitted over that GPU content, so the screen stacks as an export does. A
+        layer takes at most 8 slices a frame; past that, the content goes under the GPU content with
+        one warning. A layer holding a slice is never translated on a pan: it is painted again.
 
 Milestone 6b (plot-free construction). Breaking, in the 3.0 preview line.
   - The three annotations an axis rect can make in one call: ax->line(keys, values, options), with
