@@ -12,19 +12,19 @@ int main(int argc, char* argv[])
     plot.setInteractions(QCP::iSelectItems | QCP::iRangeDrag | QCP::iRangeZoom);
 
     // vertical span
-    auto* vspan = new QCPItemSpan(&plot, Qt::Vertical);
+    auto vspan = plot.add<QCPItemSpan>(Qt::Vertical);
     vspan->setRange(QCPRange(20, 40));
     vspan->setBrush(QBrush(QColor(0, 100, 255, 60)));
     vspan->setBorderPen(QPen(Qt::blue, 2));
 
     // horizontal span
-    auto* hspan = new QCPItemSpan(&plot, Qt::Horizontal);
+    auto hspan = plot.add<QCPItemSpan>(Qt::Horizontal);
     hspan->setRange(QCPRange(30, 60));
     hspan->setBrush(QBrush(QColor(255, 100, 0, 60)));
     hspan->setBorderPen(QPen(Qt::red, 2));
 
     // rectangle span
-    auto* rspan = new QCPItemRSpan(&plot);
+    auto rspan = plot.add<QCPItemRSpan>();
     rspan->setKeyRange(QCPRange(60, 80));
     rspan->setValueRange(QCPRange(20, 80));
     rspan->setBrush(QBrush(QColor(0, 200, 0, 60)));

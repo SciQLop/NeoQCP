@@ -986,18 +986,26 @@ void TestBuilder::addPlottableDuringTeardownIsRefused()
     QCOMPARE(gMisuses, 1);
 }
 
-void TestBuilder::itemsWithoutAxisRectAreRefusedLikePlottables()
+void TestBuilder::anItemWithoutAxisRectJoinsUnbound()
 {
+    // A plottable needs a system, and so refuses without an axis rect; an item does not (a
+    // polar-only scene places the positions itself), so it joins the plot with no area.
     QCustomPlot plot;
     QCustomPlot source;
     auto taken = source.take(source.add<QCPItemLine>());
     plot.plotLayout()->clear();
-    QVERIFY(!plot.add<QCPItemLine>());
-    QCOMPARE(gMisuses, 1);
-    QCOMPARE(plot.itemCount(), 0);
-    QVERIFY(!plot.add(std::move(taken)));
-    QCOMPARE(gMisuses, 2);
-    QCOMPARE(plot.itemCount(), 0);
+    auto line = plot.add<QCPItemLine>();
+    QVERIFY(line);
+    QVERIFY(!line->positions().first()->system());
+    QVERIFY(!line->clipArea());
+    QCOMPARE(gMisuses, 0);
+    QCOMPARE(plot.itemCount(), 1);
+
+    auto readded = plot.add(std::move(taken));
+    QVERIFY(readded);
+    QVERIFY(!readded->positions().first()->system());
+    QCOMPARE(gMisuses, 0);
+    QCOMPARE(plot.itemCount(), 2);
 }
 
 void TestBuilder::layoutCellsFarBeyondTheGridAreRefused()

@@ -131,11 +131,11 @@
 /*!
   Creates a tracer item and sets default values.
 
-  The created item is automatically registered with \a parentPlot. This QCustomPlot instance takes
-  ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
+  The item is built without a plot: its positions and anchors have no area until it is placed with
+  QCustomPlot::add<T>() or QCPAxisRect::add<T>().
 */
-QCPItemTracer::QCPItemTracer(QCustomPlot* parentPlot)
-        : QCPItem(parentPlot)
+QCPItemTracer::QCPItemTracer()
+        : QCPItem()
         , position(createPosition(QLatin1String("position")))
         , mSize(6)
         , mStyle(tsCrosshair)
@@ -479,7 +479,7 @@ quint64 QCPItemTracer::dependencyRevision() const
 */
 void QCPItemTracer::updatePosition()
 {
-    if (mGraph)
+    if (mGraph && mParentPlot)
     {
         if (!mParentPlot->hasPlottable(mGraph))
         {

@@ -337,3 +337,36 @@ A layout element override that keeps the old `update(UpdatePhase)` name no longe
 `QCPLayout::updateLayout()` (the protected hook that positions the children) is `layoutChildren()`, so that the two
 `updateLayout` names do not hide each other in a subclass.
 `QCPDrawnCore::contentChanged()` (the generation bump behind `update()`) is `newGeneration()`.
+
+## Items are built without a plot
+
+An item's constructor takes the item's own arguments only. It no longer takes the plot: the item is
+built detached, with its positions and anchors, and `add<T>()` places it.
+
+| Old | New |
+|---|---|
+| `new QCPItemText(customPlot)` | `customPlot->add<QCPItemText>()` |
+| `new QCPItemSpan(customPlot, Qt::Vertical)` | `customPlot->add<QCPItemSpan>(Qt::Vertical)` |
+| `new MyItem(customPlot, ...)` | `customPlot->add<MyItem>(...)`, with the plot dropped from `MyItem`'s constructor |
+
+The arguments of `add<T>()` are constructor arguments, and they are forwarded: a braced initialiser
+needs a type where a direct `new` accepted `{ }`, as in `add<MyItem>(QRectF(), true)`.
+
+Where the item lands decides what it is bound to:
+
+- `axisRect->add<T>(...)` clips the item to that rect, puts it on the `annotations` layer, and binds its
+  positions that name no system to `axisRect->xAxis()` and `axisRect->yAxis()`, the rect's first bottom
+  and left axes. A rect that lost one of them refuses the item: the call returns an empty handle,
+  reports once, and owns nothing.
+- `customPlot->add<T>(...)` does the same in the plot's axis rect. A plot with no axis rect still takes
+  an item, for a polar-only scene or an annotation placed in pixels: it joins unbound and unclipped, and
+  the caller binds the positions to a system.
+- A position that names a system, or already has an area, before the add keeps it. Only the positions
+  that name none take the target's pair.
+
+An item outside a plot — built and not placed yet, or taken with `QCustomPlot::take()` — answers
+`(0, 0)` from its positions' `pixelPosition()`, and its hit test uses no selection tolerance. Nothing
+warns.
+
+A user item may create and place its positions in its constructor or in a member initialiser, as before;
+`createPosition()` no longer binds them to a plot.

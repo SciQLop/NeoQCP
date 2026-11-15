@@ -2005,7 +2005,7 @@ const QVector<Deleting>& deletingWriters()
           [](QCustomPlot& plot)
           {
               plot.setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*)
-                                  { return new QCPItemSpan(p, Qt::Vertical); });
+                                  { return p->add<QCPItemSpan>(Qt::Vertical); });
               plot.setCreationModeEnabled(true);
               plot.replot();
               const QPoint center = plot.axisRect()->rect().center();

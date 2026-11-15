@@ -75,7 +75,7 @@ Target targetFor(QCustomPlot* plot, const QString& name)
                  [graph](QCP::SelectionType type) { graph->setSelectable(type); } };
     }
     if (name == QLatin1String("item"))
-        return wholeObjectTarget(new QCPItemLine(plot));
+        return wholeObjectTarget(plot->add<QCPItemLine>().get());
     if (name == QLatin1String("axis"))
         return partsTarget(plot->xAxis.get(), QCPAxis::spAxis);
     if (name == QLatin1String("legend"))
@@ -194,7 +194,7 @@ void TestSelectionModel::selectableChangeIsOneSignal()
 
 void TestSelectionModel::itemRefusesAPartialSelectionType()
 {
-    auto* item = new QCPItemLine(mPlot);
+    auto item = mPlot->add<QCPItemLine>();
     QCOMPARE(item->selectable(), QCP::stWhole);
     QSignalSpy spy(item, SIGNAL(selectableChanged()));
 

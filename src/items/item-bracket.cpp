@@ -80,11 +80,11 @@
 /*!
   Creates a bracket item and sets default values.
 
-  The created item is automatically registered with \a parentPlot. This QCustomPlot instance takes
-  ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
+  The item is built without a plot: its positions and anchors have no area until it is placed with
+  QCustomPlot::add<T>() or QCPAxisRect::add<T>().
 */
-QCPItemBracket::QCPItemBracket(QCustomPlot* parentPlot)
-        : QCPItem(parentPlot)
+QCPItemBracket::QCPItemBracket()
+        : QCPItem()
         , left(createPosition(QLatin1String("left")))
         , right(createPosition(QLatin1String("right")))
         , center(createAnchor(QLatin1String("center"), aiCenter))

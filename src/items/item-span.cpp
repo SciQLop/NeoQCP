@@ -39,8 +39,8 @@ bool pinnedToTheRatio(const QCP::Position& at)
 
 } // namespace
 
-QCPItemSpan::QCPItemSpan(QCustomPlot* parentPlot, Qt::Orientation orientation)
-        : QCPSpanItem(parentPlot)
+QCPItemSpan::QCPItemSpan(Qt::Orientation orientation)
+        : QCPSpanItem()
         , mOrientation(orientation)
         , lowerEdge(createPosition(QLatin1String("lowerEdge")))
         , upperEdge(createPosition(QLatin1String("upperEdge")))
@@ -138,7 +138,7 @@ std::optional<double> QCPItemSpan::hitTest(QCP::Pixels at, QVariant* details) co
 
     const double lowerPx = rangePixel(lowerEdge);
     const double upperPx = rangePixel(upperEdge);
-    const double tolerance = mParentPlot->selectionTolerance();
+    const double tolerance = mParentPlot ? mParentPlot->selectionTolerance() : 0.0;
 
     const double distLower = qAbs(along - lowerPx);
     if (distLower <= tolerance && insideTheBand)

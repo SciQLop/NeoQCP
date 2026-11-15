@@ -1893,15 +1893,20 @@ bool QCustomPlot::detach(QCPItem* item)
 
 /*! \internal
 
-  QCustomPlot::add(std::unique_ptr) for an item: positions get the plot's default axes and axis rect
-  as in the item constructor.
+  QCustomPlot::add(std::unique_ptr) for an item: the item joins this plot, clipped to \a rect, on
+  the annotations layer (see registerItem). A position that names no system is bound to \a rect's
+  first bottom and left axes; a position that names one keeps it, and a position that already has an
+  area keeps it too.
 */
-bool QCustomPlot::adopt(QCPItem* item)
+bool QCustomPlot::adopt(QCPItem* item, QCPAxisRect* rect)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     QCP_CHECK_OR_RETURN(!item->parentPlot(), "the object already belongs to a plot: take it first",
                         false);
-    QCP_CHECK_OR_RETURN(axisRect(), "the plot has no axis rect", false);
+    // A plot with no axis rect still holds items (a polar-only scene, or pixel-positioned ones):
+    // they join with no area, and the positions that name no system stay unbound.
+    QCPAxis* keyAxis = rect ? rect->xAxis() : nullptr;
+    QCPAxis* valueAxis = rect ? rect->yAxis() : nullptr;
     // registerItem's layer and colours signal: they wait until the item is in, as a slot may
     // delete it or the plot.
     const QCPEmissionScope scope(this);
@@ -1911,14 +1916,23 @@ bool QCustomPlot::adopt(QCPItem* item)
         anchor->mParentPlot = this;
     for (QCPItemPosition* position : item->mPositions)
     {
-        position->setAxes(xAxis, yAxis);
-        position->setAxisRect(axisRect());
+        if (!position->system() && !position->keyAxis() && !position->valueAxis() && rect)
+        {
+            QCP_CHECK_OR_RETURN(keyAxis && valueAxis,
+                                "the area the item is placed in has no bottom and left axis", false);
+            position->setAxes(keyAxis, valueAxis);
+        }
+        if (!position->area() && rect)
+            position->setAxisRect(rect);
     }
     if (!registerItem(item))
         return false;
     item->mRegisteredPlot = this;
-    if (QCPAxisRect* rect = axisRect())
+    if (rect)
+    {
         item->setClipAxisRect(rect);
+        item->setClipToAxisRect(true);
+    }
     return true;
 }
 

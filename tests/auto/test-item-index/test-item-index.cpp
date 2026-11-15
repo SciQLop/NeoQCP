@@ -20,15 +20,15 @@ QCPItem* makeItem(QCustomPlot* plot, int kind)
     switch (kind % 5)
     {
         case 0:
-            return new QCPItemLine(plot);
+            return plot->add<QCPItemLine>();
         case 1:
-            return new QCPItemRect(plot);
+            return plot->add<QCPItemRect>();
         case 2:
-            return new QCPItemEllipse(plot);
+            return plot->add<QCPItemEllipse>();
         case 3:
-            return new QCPItemCurve(plot);
+            return plot->add<QCPItemCurve>();
         default:
-            return new QCPItemBracket(plot);
+            return plot->add<QCPItemBracket>();
     }
 }
 
@@ -82,7 +82,7 @@ void placeRandomly(QCPItem* item, std::mt19937& rng, QCPAxis* keyAxis, QCPAxis* 
 class CountingLine : public QCPItemLine
 {
 public:
-    explicit CountingLine(QCustomPlot* plot) : QCPItemLine(plot) {}
+    using QCPItemLine::QCPItemLine;
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr)
         const override
     {
@@ -95,7 +95,7 @@ public:
 class DeselectCountingLine : public QCPItemLine
 {
 public:
-    explicit DeselectCountingLine(QCustomPlot* plot) : QCPItemLine(plot) {}
+    using QCPItemLine::QCPItemLine;
     int mDeselectCalls = 0;
 
 protected:
@@ -267,7 +267,7 @@ void TestItemIndex::dragOneItemKeepsTheTree()
     plot.yAxis->setRange(0, 100);
     for (int i = 0; i < 1000; ++i)
     {
-        auto* line = new QCPItemLine(&plot);
+        auto line = plot.add<QCPItemLine>();
         const double x = 0.1 * i;
         line->start->setCoords(x, x);
         line->end->setCoords(x + 0.5, x + 0.5);
@@ -300,11 +300,11 @@ void TestItemIndex::clickTestsOnlyItemsNearTheClick()
     plot.resize(400, 300);
     plot.xAxis->setRange(0, 10);
     plot.yAxis->setRange(0, 10);
-    auto* nearItem = new CountingLine(&plot);
+    auto nearItem = plot.add<CountingLine>();
     nearItem->setPen(QPen(Qt::black, 4));
     nearItem->start->setCoords(2.0, 5.0);
     nearItem->end->setCoords(2.4, 5.0);
-    auto* farItem = new CountingLine(&plot);
+    auto farItem = plot.add<CountingLine>();
     farItem->setPen(QPen(Qt::black, 4));
     farItem->start->setCoords(8.0, 5.0);
     farItem->end->setCoords(8.4, 5.0);
@@ -329,12 +329,12 @@ void TestItemIndex::scaleTypeChangeRebuildsTheIndex()
     // A bracket left of a linear view whose 300 px arms reach into it. On a log axis the same
     // coordinate is drawn 200 px left of the axis rect, so its extent changes meaning: a tree
     // built for the linear axis must not answer after the switch.
-    auto* bracket = new QCPItemBracket(&plot);
+    auto bracket = plot.add<QCPItemBracket>();
     bracket->setPen(QPen(Qt::darkGreen, 3));
     bracket->setLength(300);
     bracket->left->setCoords(-1, 20);
     bracket->right->setCoords(-1, 80);
-    auto* inside = new QCPItemLine(&plot);
+    auto inside = plot.add<QCPItemLine>();
     inside->setPen(QPen(Qt::black, 3));
     inside->start->setCoords(10, 10);
     inside->end->setCoords(90, 90);
@@ -362,12 +362,12 @@ void TestItemIndex::scaleTypeChangeRebuildsTheIndex()
     fresh.xAxis->setScaleType(QCPAxis::stLogarithmic);
     fresh.xAxis->setRange(1, 100);
     fresh.yAxis->setRange(0, 100);
-    auto* freshBracket = new QCPItemBracket(&fresh);
+    auto freshBracket = fresh.add<QCPItemBracket>();
     freshBracket->setPen(QPen(Qt::darkGreen, 3));
     freshBracket->setLength(300);
     freshBracket->left->setCoords(-1, 20);
     freshBracket->right->setCoords(-1, 80);
-    auto* freshInside = new QCPItemLine(&fresh);
+    auto freshInside = fresh.add<QCPItemLine>();
     freshInside->setPen(QPen(Qt::black, 3));
     freshInside->start->setCoords(10, 10);
     freshInside->end->setCoords(90, 90);
@@ -389,7 +389,7 @@ void TestItemIndex::emptyClickVisitsOnlySelectedItems()
     std::vector<DeselectCountingLine*> lines;
     for (int i = 0; i < 50; ++i)
     {
-        auto* line = new DeselectCountingLine(&plot);
+        auto line = plot.add<DeselectCountingLine>();
         line->start->setCoords(i, 10);
         line->end->setCoords(i + 0.5, 20);
         line->setSelected(i % 10 == 0);
@@ -432,12 +432,12 @@ void TestItemIndex::itemsOfTwoSystemsOfOneRectAreIndexedApart()
     QCPCoordinateSystem* second = rect->system(plot.xAxis, plot.yAxis2);
     QVERIFY(first && second && first != second);
 
-    auto* onFirst = new CountingLine(&plot);
+    auto onFirst = plot.add<CountingLine>();
     onFirst->setPen(QPen(Qt::black, 4));
     onFirst->start->setCoords(2.0, 5.0);
     onFirst->end->setCoords(2.4, 5.0);
 
-    auto* onSecond = new CountingLine(&plot);
+    auto onSecond = plot.add<CountingLine>();
     onSecond->setPen(QPen(Qt::black, 4));
     onSecond->start->setSystem(second);
     onSecond->end->setSystem(second);
@@ -495,7 +495,7 @@ void TestItemIndex::anItemOnAPolarSystemIsAlwaysACandidate()
 
     QCPCoordinateSystem* system = area->system(area->angularAxis(), area->radialAxis());
     QVERIFY(system);
-    auto* line = new CountingLine(&plot);
+    auto line = plot.add<CountingLine>();
     line->setPen(QPen(Qt::black, 4));
     line->start->setSystem(system);
     line->end->setSystem(system);
@@ -528,7 +528,7 @@ void TestItemIndex::aDeletedAxisDropsItsGroup()
     QCPAxisRect* rect = plot.axisRect();
     QCPCoordinateSystem* system = rect->system(plot.xAxis, plot.yAxis2);
     QVERIFY(system);
-    auto* line = new CountingLine(&plot);
+    auto line = plot.add<CountingLine>();
     line->setPen(QPen(Qt::black, 4));
     line->start->setSystem(system);
     line->end->setSystem(system);
@@ -587,7 +587,7 @@ void TestItemIndex::aRetargetedItemFollowsItsNewArea()
     plot.resize(400, 300);
     plot.xAxis->setRange(0, 100);
     plot.yAxis->setRange(0, 100);
-    auto* line = new CountingLine(&plot);
+    auto line = plot.add<CountingLine>();
     line->start->setCoords(10, 10);
     line->end->setCoords(20, 20);
     plot.replot(); // the layer learns the cartesian frames
@@ -611,7 +611,7 @@ void TestItemIndex::aDataExtentDoesNotBuildATransform()
     plot.resize(400, 300);
     plot.xAxis->setRange(0, 10);
     plot.yAxis->setRange(0, 10);
-    auto* item = new CountingLine(&plot);
+    auto item = plot.add<CountingLine>();
     CountingSystem system(plot.axisRect(), plot.xAxis, plot.yAxis);
     item->start->setSystem(&system);
     item->end->setSystem(&system);

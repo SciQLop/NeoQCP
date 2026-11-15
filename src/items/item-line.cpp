@@ -89,11 +89,11 @@ QPointF pixelOf(const QCPDrawContext& context, const QCP::Position& at, QCPItemP
 /*!
   Creates a line item and sets default values.
 
-  The created item is automatically registered with \a parentPlot. This QCustomPlot instance takes
-  ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
+  The item is built without a plot: its positions and anchors have no area until it is placed with
+  QCustomPlot::add<T>() or QCPAxisRect::add<T>().
 */
-QCPItemLine::QCPItemLine(QCustomPlot* parentPlot)
-        : QCPItem(parentPlot)
+QCPItemLine::QCPItemLine()
+        : QCPItem()
         , start(createPosition(QLatin1String("start")))
         , end(createPosition(QLatin1String("end")))
 {

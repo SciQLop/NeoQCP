@@ -128,11 +128,11 @@
 /*!
   Creates a text item and sets default values.
 
-  The created item is automatically registered with \a parentPlot. This QCustomPlot instance takes
-  ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
+  The item is built without a plot: its positions and anchors have no area until it is placed with
+  QCustomPlot::add<T>() or QCPAxisRect::add<T>().
 */
-QCPItemText::QCPItemText(QCustomPlot* parentPlot)
-        : QCPItem(parentPlot)
+QCPItemText::QCPItemText()
+        : QCPItem()
         , position(createPosition(QLatin1String("position")))
         , topLeft(createAnchor(QLatin1String("topLeft"), aiTopLeft))
         , top(createAnchor(QLatin1String("top"), aiTop))

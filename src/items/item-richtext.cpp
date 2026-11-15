@@ -9,8 +9,8 @@
   signals.
 */
 
-QCPItemRichText::QCPItemRichText(QCustomPlot* parentPlot)
-        : QCPItemText(parentPlot)
+QCPItemRichText::QCPItemRichText()
+        : QCPItemText()
 {
     mDoc.setDocumentMargin(0);
     mDoc.setUseDesignMetrics(true);

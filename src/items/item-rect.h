@@ -51,7 +51,7 @@ public:
     template <typename T>
     using OpsFor = QCPItemRectOps<T>;
 
-    explicit QCPItemRect(QCustomPlot* parentPlot);
+    QCPItemRect();
     virtual ~QCPItemRect() override;
 
     // getters:

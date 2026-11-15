@@ -1079,7 +1079,7 @@ const QVector<RemainingCase>& remainingCases()
         { "text.setColor",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* item = new QCPItemText(&plot);
+              auto item = plot.add<QCPItemText>();
               item->position->setCoords(1, 1);
               return item;
           },
@@ -1087,7 +1087,7 @@ const QVector<RemainingCase>& remainingCases()
         { "text.setRotation",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* item = new QCPItemText(&plot);
+              auto item = plot.add<QCPItemText>();
               item->position->setCoords(1, 1);
               return item;
           },
@@ -1095,7 +1095,7 @@ const QVector<RemainingCase>& remainingCases()
         { "line.setPen",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* item = new QCPItemLine(&plot);
+              auto item = plot.add<QCPItemLine>();
               item->start->setCoords(0, 0);
               item->end->setCoords(1, 1);
               return item;
@@ -1104,7 +1104,7 @@ const QVector<RemainingCase>& remainingCases()
         { "ellipse.setBrush",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* item = new QCPItemEllipse(&plot);
+              auto item = plot.add<QCPItemEllipse>();
               item->topLeft->setCoords(1, 1);
               item->bottomRight->setCoords(3, 3);
               return item;
@@ -1113,7 +1113,7 @@ const QVector<RemainingCase>& remainingCases()
         { "rect.setPen",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* item = new QCPItemRect(&plot);
+              auto item = plot.add<QCPItemRect>();
               item->topLeft->setCoords(1, 1);
               item->bottomRight->setCoords(3, 3);
               return item;
@@ -1122,7 +1122,7 @@ const QVector<RemainingCase>& remainingCases()
         { "span.setRange",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* span = new QCPItemSpan(&plot, Qt::Horizontal);
+              auto span = plot.add<QCPItemSpan>(Qt::Horizontal);
               return span;
           },
           [](QObject* o) { static_cast<QCPItemSpan*>(o)->setRange(QCPRange(2.5, 7.5)); } },
@@ -1177,7 +1177,7 @@ const QVector<RemainingCase>& remainingCases()
         { "line.setHead",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* item = new QCPItemLine(&plot);
+              auto item = plot.add<QCPItemLine>();
               item->start->setCoords(0, 0);
               item->end->setCoords(1, 1);
               return item;
@@ -1189,7 +1189,7 @@ const QVector<RemainingCase>& remainingCases()
         { "richText.setHtml",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* item = new QCPItemRichText(&plot);
+              auto item = plot.add<QCPItemRichText>();
               item->position->setCoords(1, 1);
               return item;
           },
@@ -1227,7 +1227,7 @@ const QVector<RemainingCase>& remainingCases()
         { "pixmap.setScaled",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* item = new QCPItemPixmap(&plot);
+              auto item = plot.add<QCPItemPixmap>();
               item->setPixmap(QPixmap(4, 4));
               item->topLeft->setCoords(1, 1);
               item->bottomRight->setCoords(3, 3);
@@ -1237,7 +1237,7 @@ const QVector<RemainingCase>& remainingCases()
         { "tracer.setSize",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* item = new QCPItemTracer(&plot);
+              auto item = plot.add<QCPItemTracer>();
               item->setGraph(plot.graph(0));
               item->setGraphKey(5);
               return item;
@@ -1246,7 +1246,7 @@ const QVector<RemainingCase>& remainingCases()
         { "tracer.setStyle",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* item = new QCPItemTracer(&plot);
+              auto item = plot.add<QCPItemTracer>();
               item->setGraph(plot.graph(0));
               item->setGraphKey(5);
               return item;
@@ -1462,7 +1462,7 @@ void TestRepaint::rangeChangeRepaintsItsLayers()
     if (kind == QLatin1String("cartesian"))
     {
         plot.addLayer(QStringLiteral("items"));
-        auto* line = new QCPItemLine(&plot);
+        auto line = plot.add<QCPItemLine>();
         line->setLayer(QStringLiteral("items"));
         line->setPen(QPen(kBlue, 3));
         line->start->setCoords(5, 0);
@@ -1634,7 +1634,7 @@ void TestRepaint::graphTracerSettles()
     // The tracer recomputes its position inside draw(); that must not dirty the layer again, or
     // every replot schedules the next one forever.
     auto plot = settledPlot();
-    auto* tracer = new QCPItemTracer(plot.get());
+    auto tracer = plot->add<QCPItemTracer>();
     tracer->setGraph(plot->graph(0));
     tracer->setGraphKey(5);
     waitUntilSettled(*plot);
@@ -1672,11 +1672,11 @@ void TestRepaint::layerReplotStartsAFrameForEveryFrameRecordings()
     // own replot must start a frame like QCustomPlot::replot() does, or the label keeps the pixels
     // of the ranges it recorded.
     auto plot = settledPlot();
-    auto* tracer = new QCPItemTracer(plot.get());
+    auto tracer = plot->add<QCPItemTracer>();
     tracer->setGraph(plot->graph(0));
     tracer->setInterpolating(true); // the marker follows a key between the graph's two samples
     tracer->setGraphKey(5.0);
-    auto* label = new CountingText(plot.get());
+    auto label = plot->add<CountingText>();
     label->setText(QStringLiteral("W"));
     label->setColor(Qt::blue);
     QFont font = label->font();
@@ -1867,7 +1867,7 @@ void TestRepaint::itemOnOwnLayerFollowsRangeChange()
     QCustomPlot plot;
     plot.resize(400, 300);
     plot.addLayer("items");
-    auto* line = new QCPItemLine(&plot);
+    auto line = plot.add<QCPItemLine>();
     line->setLayer("items");
     line->setPen(QPen(kBlue, 3));
     line->start->setCoords(5, 0);
@@ -1904,12 +1904,12 @@ void TestRepaint::anchoredChildOnOtherLayerFollowsRange()
     plot.yAxis->setRange(0, 10);
     plot.xAxis2->setRange(100, 200);
     plot.yAxis2->setRange(0, 10);
-    auto* parent = new QCPItemLine(&plot);
+    auto parent = plot.add<QCPItemLine>();
     parent->start->setAxes(plot.xAxis2, plot.yAxis2);
     parent->end->setAxes(plot.xAxis2, plot.yAxis2);
     parent->start->setCoords(120, 2);
     parent->end->setCoords(120, 8);
-    auto* child = new QCPItemText(&plot);
+    auto child = plot.add<QCPItemText>();
     QVERIFY(child->setLayer(QStringLiteral("labels")));
     child->position->setParentAnchor(parent->end);
     child->setText(QStringLiteral("follower"));
@@ -1944,10 +1944,10 @@ AnchoredPair makeAnchoredPair(QCustomPlot& plot)
     plot.yAxis->setRange(0, 10);
     plot.xAxis2->setRange(100, 200);
     plot.yAxis2->setRange(0, 10);
-    auto* parent = new QCPItemLine(&plot);
+    auto parent = plot.add<QCPItemLine>();
     parent->start->setCoords(2, 2);
     parent->end->setCoords(2, 8);
-    auto* child = new QCPItemText(&plot);
+    auto child = plot.add<QCPItemText>();
     child->setLayer(QStringLiteral("labels"));
     child->position->setParentAnchor(parent->end);
     child->setText(QStringLiteral("follower"));
@@ -1998,11 +1998,11 @@ void TestRepaint::rangeChangeMarksOnlyLayersUsingTheAxis()
     plot.addLayer(QStringLiteral("b"));
     for (QCPAxis* axis : { plot.xAxis, plot.yAxis, plot.xAxis2, plot.yAxis2 })
         axis->setRange(0, 10);
-    auto* onFirst = new QCPItemLine(&plot);
+    auto onFirst = plot.add<QCPItemLine>();
     QVERIFY(onFirst->setLayer(QStringLiteral("a")));
     onFirst->start->setCoords(1, 1);
     onFirst->end->setCoords(2, 2);
-    auto* onSecond = new QCPItemLine(&plot);
+    auto onSecond = plot.add<QCPItemLine>();
     QVERIFY(onSecond->setLayer(QStringLiteral("b")));
     onSecond->start->setAxes(plot.xAxis2, plot.yAxis2);
     onSecond->end->setAxes(plot.xAxis2, plot.yAxis2);
@@ -2028,7 +2028,7 @@ void TestRepaint::setAxesMovesTheLayerToTheNewAxis()
     plot.addLayer(QStringLiteral("b"));
     for (QCPAxis* axis : { plot.xAxis, plot.yAxis, plot.xAxis2, plot.yAxis2 })
         axis->setRange(0, 10);
-    auto* line = new QCPItemLine(&plot);
+    auto line = plot.add<QCPItemLine>();
     QVERIFY(line->setLayer(QStringLiteral("b")));
     line->start->setCoords(1, 1);
     line->end->setCoords(2, 2);
@@ -2055,7 +2055,7 @@ void TestRepaint::itemTakenAndAddedKeepsAxes()
     plot.addLayer(QStringLiteral("b"));
     for (QCPAxis* axis : { plot.xAxis, plot.yAxis, plot.xAxis2, plot.yAxis2 })
         axis->setRange(0, 10);
-    auto* line = new QCPItemLine(&plot);
+    auto line = plot.add<QCPItemLine>();
     line->start->setAxes(plot.xAxis2, plot.yAxis2);
     line->end->setAxes(plot.xAxis2, plot.yAxis2);
     line->start->setCoords(1, 1);
@@ -2092,7 +2092,7 @@ namespace
 class CountingLine : public QCPItemLine
 {
 public:
-    explicit CountingLine(QCustomPlot* plot) : QCPItemLine(plot) { }
+    using QCPItemLine::QCPItemLine;
 
     double selectTest(const QPointF& pos, bool onlySelectable,
                       QVariant* details = nullptr) const override
@@ -2108,7 +2108,7 @@ public:
 class PlainItem : public QCPItem
 {
 public:
-    explicit PlainItem(QCustomPlot* plot) : QCPItem(plot)
+    PlainItem() : QCPItem()
     {
         // A recording needs the axes: they come from a position, even one this item never reads.
         mAnchor = createPosition(QStringLiteral("anchor"));
@@ -2301,10 +2301,10 @@ void TestRepaint::itemScrolledIntoViewIsDrawn()
 void TestRepaint::culledItemIsNotHitTested()
 {
     auto plot = settledPlot();
-    auto* near = new CountingLine(plot.get());
+    auto near = plot->add<CountingLine>();
     near->start->setCoords(4, 4);
     near->end->setCoords(6, 6);
-    auto* far = new CountingLine(plot.get());
+    auto far = plot->add<CountingLine>();
     far->start->setCoords(1000, 4);
     far->end->setCoords(1000, 6);
     waitUntilSettled(*plot);
@@ -2349,7 +2349,7 @@ void TestRepaint::takenItemUsesNoBoundsOfItsOldPlot()
 void TestRepaint::staleBoundsFallBack()
 {
     auto plot = settledPlot();
-    auto* far = new CountingLine(plot.get());
+    auto far = plot->add<CountingLine>();
     far->start->setCoords(1000, 4);
     far->end->setCoords(1000, 6);
     waitUntilSettled(*plot); // its cached bounds now say "far outside"
@@ -2362,7 +2362,7 @@ void TestRepaint::staleBoundsFallBack()
 
     // Same through a range change: the item enters the view without a replot.
     auto plot2 = settledPlot();
-    auto* line = new CountingLine(plot2.get());
+    auto line = plot2->add<CountingLine>();
     line->start->setCoords(100, 4);
     line->end->setCoords(100, 6);
     waitUntilSettled(*plot2);
@@ -2399,7 +2399,7 @@ void TestRepaint::exportUsesTheIndex()
 void TestRepaint::positionFollowingItsOwnItemDoesNotRecurse()
 {
     auto plot = settledPlot();
-    auto* line = new QCPItemLine(plot.get());
+    auto line = plot->add<QCPItemLine>();
     line->start->setCoords(1, 2);
     line->end->setCoords(3, 4);
     // A position may follow another position of its own item: the marking walk has to terminate.
@@ -2413,8 +2413,8 @@ void TestRepaint::positionFollowingItsOwnItemDoesNotRecurse()
 void TestRepaint::crossItemAnchorCycleIsRefused()
 {
     auto plot = settledPlot();
-    auto* first = new QCPItemRect(plot.get());
-    auto* second = new QCPItemRect(plot.get());
+    auto first = plot->add<QCPItemRect>();
+    auto second = plot->add<QCPItemRect>();
     first->topLeft->setCoords(1, 2);
     first->bottomRight->setCoords(3, 4);
     second->topLeft->setCoords(5, 6);
@@ -2433,7 +2433,7 @@ void TestRepaint::crossItemAnchorCycleIsRefused()
 void TestRepaint::userItemWithoutBoundsIsNeverCulled()
 {
     auto plot = settledPlot();
-    auto* plain = new PlainItem(plot.get());
+    auto plain = plot->add<PlainItem>();
     plain->mCentre = QPointF(plot->xAxis->coordToPixel(4), plot->yAxis->coordToPixel(4));
     waitUntilSettled(*plot);
     QVERIFY2(plain->mDrawCalls > 0, "the item was never drawn");
@@ -2449,8 +2449,8 @@ void TestRepaint::crossAxisAnchorCycleIsRefused()
     // a's x follows b, and b's y would follow a.
     QCustomPlot plot;
     plot.resize(400, 300);
-    auto* a = new QCPItemLine(&plot);
-    auto* b = new QCPItemLine(&plot);
+    auto a = plot.add<QCPItemLine>();
+    auto b = plot.add<QCPItemLine>();
     QVERIFY(a->start->setParentAnchorX(b->start));
     const bool accepted = b->start->setParentAnchorY(a->start);
     if (accepted)
@@ -2489,9 +2489,9 @@ void TestRepaint::itemsDefaultToAnnotations()
     // Items are annotations: they belong above the data whatever the current layer is, so a label
     // is not hidden by a GPU line drawn after it.
     QCustomPlot plot;
-    auto* text = new QCPItemText(&plot);
-    auto* line = new QCPItemLine(&plot);
-    auto* span = new QCPItemSpan(&plot, Qt::Vertical);
+    auto text = plot.add<QCPItemText>();
+    auto line = plot.add<QCPItemLine>();
+    auto span = plot.add<QCPItemSpan>(Qt::Vertical);
 
     QCPLayer* annotations = plot.layer(QStringLiteral("annotations"));
     QVERIFY(annotations);
@@ -2505,21 +2505,21 @@ void TestRepaint::itemsDefaultToAnnotations()
     QVERIFY(plot.setCurrentLayer(QStringLiteral("grid")));
     QCPGraph* graph = plot.addGraph();
     QCOMPARE(graph->layer(), plot.layer(QStringLiteral("grid")));
-    auto* other = new QCPItemText(&plot);
+    auto other = plot.add<QCPItemText>();
     QCOMPARE(other->layer(), annotations);
 }
 
 void TestRepaint::setLayerStillWins()
 {
     QCustomPlot plot;
-    auto* item = new QCPItemLine(&plot);
+    auto item = plot.add<QCPItemLine>();
     QVERIFY(item->setLayer(QStringLiteral("main")));
     QCOMPARE(item->layer(), plot.layer(QStringLiteral("main")));
 
     // Without the layer, an item falls back to the current layer like any other layerable.
     QVERIFY(plot.setCurrentLayer(QStringLiteral("legend")));
     QVERIFY(plot.removeLayer(plot.layer(QStringLiteral("annotations"))));
-    auto* fallback = new QCPItemLine(&plot);
+    auto fallback = plot.add<QCPItemLine>();
     QCOMPARE(fallback->layer(), plot.currentLayer());
 }
 
@@ -3240,9 +3240,8 @@ namespace
 class OverlappingBars : public QCPItem
 {
 public:
-    explicit OverlappingBars(QCustomPlot* plot) : QCPItem(plot)
+    OverlappingBars() : QCPItem()
     {
-        setClipAxisRect(plot->axisRect());
         // An item with no position reports no extent, and the index then never asks it to draw.
         createPosition(QStringLiteral("anchor"))->setCoords(45, 100);
     }
@@ -3274,7 +3273,7 @@ void TestRepaint::overlappingMergedBarsKeepPaintersOrder()
     const QColor firstFill(210, 40, 40);
     const QColor secondFill(40, 170, 70);
     const QColor outline(20, 20, 20);
-    auto* bars = new OverlappingBars(plot); // widget x 45..195, 145..295, 245..395
+    auto bars = plot->add<OverlappingBars>(); // widget x 45..195, 145..295, 245..395
     plot->replot();
     waitUntilSettled(*plot);
 
@@ -3873,16 +3872,15 @@ bool pureBlue(const QColor& colour)
 class ImageItem : public QCPItem
 {
 public:
-    ImageItem(QCustomPlot* plot, const QCP::Position& a, const QCP::Position& b,
-              const QImage& image, const QRectF& source = { }, bool smooth = false)
-            : QCPItem(plot)
+    ImageItem(const QCP::Position& a, const QCP::Position& b, const QImage& image,
+              const QRectF& source = { }, bool smooth = false)
+            : QCPItem()
             , m_a(a)
             , m_b(b)
             , m_image(image)
             , m_source(source)
             , m_smooth(smooth)
     {
-        setClipAxisRect(plot->axisRect());
         // An item with no position reports no extent, and the index then never asks it to draw.
         createPosition(QStringLiteral("anchor"))->setCoords(45, 100);
     }
@@ -3949,8 +3947,7 @@ void TestRepaint::aPannedImageIsNotUploadedAgain()
     if (!plot)
         QSKIP("no QRhi on this platform");
     usePixelRanges(plot);
-    auto* item
-        = new ImageItem(plot, QCP::Data { 100, 100 }, QCP::Data { 300, 200 }, redBlueImage());
+    auto item = plot->add<ImageItem>(QCP::Data { 100, 100 }, QCP::Data { 300, 200 }, redBlueImage());
     plot->replot();
     waitUntilSettled(*plot);
     auto* layer = plot->plottableRhiLayer(item->layer());
@@ -3987,7 +3984,7 @@ void TestRepaint::imageFollowsReversedAxes()
     plot->xAxis->setRangeReversed(true);
     plot->replot();
     waitUntilSettled(*plot);
-    new ImageItem(plot, QCP::Data { 100, 100 }, QCP::Data { 400, 200 }, redBlueImage());
+    plot->add<ImageItem>(QCP::Data { 100, 100 }, QCP::Data { 400, 200 }, redBlueImage());
     plot->replot();
     waitUntilSettled(*plot);
 
@@ -4014,8 +4011,7 @@ void TestRepaint::sourceRectCropsTheImage()
     stripes.setPixelColor(1, 0, QColor(40, 180, 60)); // green
     stripes.setPixelColor(2, 0, QColor(40, 60, 220)); // blue
     stripes.setPixelColor(3, 0, QColor(20, 20, 20)); // black
-    new ImageItem(plot, QCP::Data { 100, 100 }, QCP::Data { 300, 200 }, stripes,
-                  QRectF(1, 0, 2, 1));
+    plot->add<ImageItem>(QCP::Data { 100, 100 }, QCP::Data { 300, 200 }, stripes, QRectF(1, 0, 2, 1));
     plot->replot();
     waitUntilSettled(*plot);
 
@@ -4035,8 +4031,9 @@ void TestRepaint::smoothImageIsInterpolated()
     if (!plot)
         QSKIP("no QRhi on this platform");
     usePixelRanges(plot);
-    new ImageItem(plot, QCP::Data { 100, 200 }, QCP::Data { 300, 250 }, redBlueImage(), { }, true);
-    new ImageItem(plot, QCP::Data { 100, 100 }, QCP::Data { 300, 150 }, redBlueImage());
+    plot->add<ImageItem>(QCP::Data { 100, 200 }, QCP::Data { 300, 250 }, redBlueImage(), QRectF(),
+                         true);
+    plot->add<ImageItem>(QCP::Data { 100, 100 }, QCP::Data { 300, 150 }, redBlueImage());
     plot->replot();
     waitUntilSettled(*plot);
 
@@ -4118,7 +4115,7 @@ void TestRepaint::vectorExportKeepsSharpCells()
     if (!plot)
         QSKIP("no QRhi on this platform");
     usePixelRanges(plot);
-    new ImageItem(plot, QCP::Data { 100, 100 }, QCP::Data { 300, 200 }, redBlueImage());
+    plot->add<ImageItem>(QCP::Data { 100, 100 }, QCP::Data { 300, 200 }, redBlueImage());
     plot->replot();
     waitUntilSettled(*plot);
 

@@ -66,7 +66,7 @@ public:
     template <typename T>
     using OpsFor = QCPItemTextOps<T>;
 
-    explicit QCPItemText(QCustomPlot* parentPlot);
+    QCPItemText();
     virtual ~QCPItemText() override;
 
     // getters:

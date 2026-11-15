@@ -528,7 +528,7 @@ void addLineItems(QCustomPlot* plot, int count, double xMax)
 {
     for (int i = 0; i < count; ++i)
     {
-        auto* item = new QCPItemLine(plot);
+        auto item = plot->add<QCPItemLine>();
         const double x = xMax * i / count;
         item->start->setCoords(x, 0);
         item->end->setCoords(x + 0.01, 1);
@@ -2079,7 +2079,7 @@ void Benchmark::QCPGpu_Text1k()
         QSKIP("no QRhi on this platform (qoffscreen)");
     for (int i = 0; i < 1000; ++i)
     {
-        auto* text = new QCPItemText(plot);
+        auto text = plot->add<QCPItemText>();
         text->setText(QString::number(i));
         text->position->setCoords(100.0 * i / 1000, 0.5);
     }
@@ -2112,7 +2112,7 @@ void Benchmark::QCPGpu_MixedLayer()
             values[j] = 0.9 * qSin(6 * M_PI * keys[j] + i * 0.1);
         }
         graph->setData(keys, values);
-        auto* text = new QCPItemText(plot);
+        auto text = plot->add<QCPItemText>();
         text->setText(QStringLiteral("g%1").arg(i));
         text->position->setCoords(0.01 * i, 0.9);
     }
@@ -2354,7 +2354,7 @@ void Benchmark::QCPItemText_Zoom1k()
 {
     for (int i = 0; i < 1000; ++i)
     {
-        auto* text = new QCPItemText(mPlot);
+        auto text = mPlot->add<QCPItemText>();
         text->setText(QString::number(i));
         text->position->setCoords(100.0 * i / 1000, 0.5);
     }
@@ -2488,11 +2488,10 @@ namespace
 class BenchDrawnBar : public QCPItem
 {
 public:
-    BenchDrawnBar(QCustomPlot* plot, double key, double width) : QCPItem(plot)
+    BenchDrawnBar(double key, double width) : QCPItem()
     {
         mAnchor = createPosition(QStringLiteral("anchor")); // the axes the replay maps through
         mAnchor->setCoords(key, 0);
-        setClipAxisRect(plot->axisRect());
         mA = QCP::Data { key, 0.0 };
         mB = QCP::Data { key + width, 1.0 };
     }
@@ -2512,18 +2511,17 @@ public:
 void addDrawnBars(QCustomPlot* plot, int count, double xMax)
 {
     for (int i = 0; i < count; ++i)
-        new BenchDrawnBar(plot, xMax * i / count, 0.01);
+        plot->add<BenchDrawnBar>(xMax * i / count, 0.01);
 }
 
 //! The same bars, but all of them recorded by ONE object: one recording, \a count commands.
 class BenchDrawnBarSet : public QCPItem
 {
 public:
-    BenchDrawnBarSet(QCustomPlot* plot, int count, double xMax) : QCPItem(plot)
+    BenchDrawnBarSet(int count, double xMax) : QCPItem()
     {
         auto* anchor = createPosition(QStringLiteral("anchor"));
         anchor->setCoords(xMax / 2, 0);
-        setClipAxisRect(plot->axisRect());
         mBars.reserve(std::size_t(count));
         for (int i = 0; i < count; ++i)
         {
@@ -2585,7 +2583,7 @@ void Benchmark::QCPDrawn_Pan10kOneRecording()
     QCustomPlot* plot = nullptr;
     if (!makeGpuPlot(host, plot))
         QSKIP("no QRhi on this platform (qoffscreen)");
-    new BenchDrawnBarSet(plot, 10000, 100); // one object: the extrusion cache has 10 000 keys
+    plot->add<BenchDrawnBarSet>(10000, 100); // one object: the extrusion cache has 10 000 keys
     plot->xAxis->setRange(50, 51);
     plot->yAxis->setRange(0, 1);
     settleGpuPlot(plot);
@@ -2792,49 +2790,49 @@ void Benchmark::QCPItems_MixedKinds_Pan1k()
     {
         const double x = 50.0 + i * 0.009;
         const double y = 0.5 + 0.3 * qSin(i * 0.2);
-        auto* line = new QCPItemLine(mPlot);
+        auto line = mPlot->add<QCPItemLine>();
         line->start->setCoords(x, y - 0.05);
         line->end->setCoords(x + 0.006, y + 0.05);
-        auto* straight = new QCPItemStraightLine(mPlot);
+        auto straight = mPlot->add<QCPItemStraightLine>();
         straight->point1->setCoords(x, y - 0.04);
         straight->point2->setCoords(x + 0.006, y + 0.04);
-        auto* curve = new QCPItemCurve(mPlot);
+        auto curve = mPlot->add<QCPItemCurve>();
         curve->start->setCoords(x, y - 0.04);
         curve->startDir->setCoords(x + 0.002, y - 0.01);
         curve->endDir->setCoords(x + 0.004, y + 0.01);
         curve->end->setCoords(x + 0.006, y + 0.04);
-        auto* bracket = new QCPItemBracket(mPlot);
+        auto bracket = mPlot->add<QCPItemBracket>();
         bracket->left->setCoords(x, y);
         bracket->right->setCoords(x + 0.006, y);
         bracket->setLength(6);
-        auto* rect = new QCPItemRect(mPlot);
+        auto rect = mPlot->add<QCPItemRect>();
         rect->topLeft->setCoords(x, y + 0.02);
         rect->bottomRight->setCoords(x + 0.006, y - 0.02);
-        auto* ellipse = new QCPItemEllipse(mPlot);
+        auto ellipse = mPlot->add<QCPItemEllipse>();
         ellipse->topLeft->setCoords(x, y + 0.02);
         ellipse->bottomRight->setCoords(x + 0.006, y - 0.02);
-        auto* image = new QCPItemPixmap(mPlot);
+        auto image = mPlot->add<QCPItemPixmap>();
         image->topLeft->setCoords(x, y + 0.02);
         image->bottomRight->setCoords(x + 0.006, y - 0.02);
         image->setPixmap(pixmap);
-        auto* tracer = new QCPItemTracer(mPlot);
+        auto tracer = mPlot->add<QCPItemTracer>();
         tracer->setGraph(graph);
         tracer->setGraphKey(x);
         tracer->setStyle(QCPItemTracer::tsCircle);
-        auto* rspan = new QCPItemRSpan(mPlot);
+        auto rspan = mPlot->add<QCPItemRSpan>();
         rspan->leftEdge->setCoords(x, y);
         rspan->rightEdge->setCoords(x + 0.004, y);
         rspan->topEdge->setCoords(x, y + 0.03);
         rspan->bottomEdge->setCoords(x, y - 0.03);
         if (i % 2 == 0)
         {
-            auto* hspan = new QCPItemSpan(mPlot, Qt::Horizontal);
+            auto hspan = mPlot->add<QCPItemSpan>(Qt::Horizontal);
             hspan->lowerEdge->setCoords(x, y - 0.02);
             hspan->upperEdge->setCoords(x, y + 0.02);
         }
         else
         {
-            auto* vspan = new QCPItemSpan(mPlot, Qt::Vertical);
+            auto vspan = mPlot->add<QCPItemSpan>(Qt::Vertical);
             vspan->lowerEdge->setCoords(x, y);
             vspan->upperEdge->setCoords(x + 0.004, y);
         }
@@ -2866,7 +2864,7 @@ void Benchmark::QCPItems_Tracers_Pan1k()
     graph->setData(keys, values);
     for (int i = 0; i < 1000; ++i)
     {
-        auto* tracer = new QCPItemTracer(mPlot);
+        auto tracer = mPlot->add<QCPItemTracer>();
         tracer->setGraph(graph);
         tracer->setGraphKey(50.0 + 0.9 * i / 1000.0);
         tracer->setStyle(QCPItemTracer::tsCircle);
@@ -2893,13 +2891,13 @@ void Benchmark::QCPSpans_Pan100()
         const double y = 0.5 + 0.3 * qSin(i * 0.2);
         if (i % 2 == 0)
         {
-            auto* hspan = new QCPItemSpan(mPlot, Qt::Horizontal);
+            auto hspan = mPlot->add<QCPItemSpan>(Qt::Horizontal);
             hspan->lowerEdge->setCoords(x, y - 0.05);
             hspan->upperEdge->setCoords(x, y + 0.05);
         }
         else
         {
-            auto* vspan = new QCPItemSpan(mPlot, Qt::Vertical);
+            auto vspan = mPlot->add<QCPItemSpan>(Qt::Vertical);
             vspan->lowerEdge->setCoords(x, y);
             vspan->upperEdge->setCoords(x + 0.005, y);
         }

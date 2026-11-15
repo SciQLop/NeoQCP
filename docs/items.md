@@ -5,7 +5,9 @@ They are not data, so they never appear in the legend and `rescaleAxes()` ignore
 This page shows each item type, how to position items and tie them together, and the NeoQCP additions: spans, the message overlay, and interactive item creation.
 
 Every item derives from <a href="api/classQCPItem.html">QCPItem</a>.
-Create it with `new` and the plot pointer. The plot owns it.
+Create it with `customPlot->add<QCPItemText>()`, or on an axis rect with
+`axisRect->add<QCPItemText>()`: the arguments are the item's own, the call places it, clips it to that
+area and binds its positions to the area's first bottom and left axes. The plot owns it.
 Remove it with `customPlot->removeItem(item)`, or all of them with `clearItems()`.
 
 ## Text and arrows

@@ -23,7 +23,7 @@ public:
     template <typename T>
     using OpsFor = QCPItemRichTextOps<T>;
 
-    explicit QCPItemRichText(QCustomPlot* parentPlot);
+    QCPItemRichText();
     virtual ~QCPItemRichText() override;
 
     QString html() const { return mHtml; }

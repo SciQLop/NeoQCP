@@ -116,12 +116,12 @@ void TestSpan::cleanup()
 
 void TestSpan::createAndRange()
 {
-    auto* vertical = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto vertical = mPlot->add<QCPItemSpan>(Qt::Vertical);
     vertical->setRange(QCPRange(2, 5));
     QCOMPARE(vertical->range().lower, 2.0);
     QCOMPARE(vertical->range().upper, 5.0);
 
-    auto* horizontal = new QCPItemSpan(mPlot, Qt::Horizontal);
+    auto horizontal = mPlot->add<QCPItemSpan>(Qt::Horizontal);
     horizontal->setRange(QCPRange(6, 9));
     QCOMPARE(horizontal->range().lower, 6.0);
     QCOMPARE(horizontal->range().upper, 9.0);
@@ -129,15 +129,15 @@ void TestSpan::createAndRange()
 
 void TestSpan::orientationIsKept()
 {
-    auto* vertical = new QCPItemSpan(mPlot, Qt::Vertical);
-    auto* horizontal = new QCPItemSpan(mPlot, Qt::Horizontal);
+    auto vertical = mPlot->add<QCPItemSpan>(Qt::Vertical);
+    auto horizontal = mPlot->add<QCPItemSpan>(Qt::Horizontal);
     QCOMPARE(vertical->orientation(), Qt::Vertical);
     QCOMPARE(horizontal->orientation(), Qt::Horizontal);
 }
 
 void TestSpan::setRange()
 {
-    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);
 
     QSignalSpy spy(span, &QCPItemSpan::rangeChanged);
     span->setRange(QCPRange(3, 7));
@@ -150,7 +150,7 @@ void TestSpan::setRange()
 
 void TestSpan::invertedRange()
 {
-    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);
     span->setRange(QCPRange(8, 2));
     // setRange normalizes: lower <= upper
     QCOMPARE(span->range().lower, 2.0);
@@ -168,7 +168,7 @@ void TestSpan::selectTestEdges_data()
 void TestSpan::selectTestEdges()
 {
     QFETCH(bool, vertical);
-    auto* span = new QCPItemSpan(mPlot, orientationOf(vertical));
+    auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));
     span->setRange(QCPRange(2, 8));
     mPlot->replot();
 
@@ -188,7 +188,7 @@ void TestSpan::selectTestFill_data()
 void TestSpan::selectTestFill()
 {
     QFETCH(bool, vertical);
-    auto* span = new QCPItemSpan(mPlot, orientationOf(vertical));
+    auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));
     span->setRange(QCPRange(2, 8));
     mPlot->replot();
 
@@ -208,7 +208,7 @@ void TestSpan::selectTestMiss_data()
 void TestSpan::selectTestMiss()
 {
     QFETCH(bool, vertical);
-    auto* span = new QCPItemSpan(mPlot, orientationOf(vertical));
+    auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));
     span->setRange(QCPRange(2, 4));
     mPlot->replot();
 
@@ -220,7 +220,7 @@ void TestSpan::selectTestMiss()
 
 void TestSpan::movableFlag()
 {
-    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);
     QVERIFY(span->movable());
     span->setMovable(false);
     QVERIFY(!span->movable());
@@ -228,7 +228,7 @@ void TestSpan::movableFlag()
 
 void TestSpan::drawDoesNotCrash()
 {
-    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);
     span->setRange(QCPRange(1, 9));
     mPlot->replot();
     QVERIFY(true);
@@ -245,7 +245,7 @@ void TestSpan::drawOnLogAxis()
     QCPAxis* axis = rangeAxis(mPlot, vertical);
     axis->setScaleType(QCPAxis::stLogarithmic);
     axis->setRange(1, 1000);
-    auto* span = new QCPItemSpan(mPlot, orientationOf(vertical));
+    auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));
     span->setRange(QCPRange(10, 100));
     mPlot->replot();
     QVERIFY(true);
@@ -259,7 +259,7 @@ void TestSpan::exportFallbackRendersSpan_data()
 void TestSpan::exportFallbackRendersSpan()
 {
     QFETCH(bool, vertical);
-    auto* span = new QCPItemSpan(mPlot, orientationOf(vertical));
+    auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));
     span->setRange(QCPRange(3, 7));
     span->setBrush(QBrush(QColor(255, 0, 0, 128)));
     span->setBorderPen(Qt::NoPen);
@@ -277,7 +277,7 @@ void TestSpan::exportFallbackRendersSpan()
 
 void TestSpan::dirtyTrackingReplots()
 {
-    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);
     span->setRange(QCPRange(2, 8));
     mPlot->replot();
 
@@ -300,11 +300,11 @@ void TestSpan::multiAxisRectSpans()
     auto* ar2 = new QCPAxisRect(mPlot);
     mPlot->plotLayout()->addElement(0, 1, ar2);
 
-    auto* span1 = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto span1 = mPlot->add<QCPItemSpan>(Qt::Vertical);
     span1->setRange(QCPRange(2, 8));
     span1->setBrush(QBrush(QColor(255, 0, 0, 80)));
 
-    auto* span2 = new QCPItemSpan(mPlot, Qt::Horizontal);
+    auto span2 = mPlot->add<QCPItemSpan>(Qt::Horizontal);
     span2->lowerEdge->setAxes(ar2->axis(QCPAxis::atBottom), ar2->axis(QCPAxis::atLeft));
     span2->upperEdge->setAxes(ar2->axis(QCPAxis::atBottom), ar2->axis(QCPAxis::atLeft));
     span2->setRange(QCPRange(3, 7));
@@ -326,7 +326,7 @@ void TestSpan::edgesHonourTheirPositionType()
     // rather than the coords being force-fed to QCPAxis::coordToPixel().
     QFETCH(bool, vertical);
     mPlot->replot();
-    auto* span = new QCPItemSpan(mPlot, orientationOf(vertical));
+    auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));
     if (vertical)
     {
         span->lowerEdge->setTypeX(QCPItemPosition::ptAxisRectAbsolute);
@@ -355,7 +355,7 @@ void TestSpan::edgesHonourTheirPositionType()
 // A slot deleting the span from its own signal: the span must not touch itself afterwards.
 void TestSpan::setRangeSlotDeletingTheSpanIsSafe()
 {
-    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);
     removeOnRangeChange(mPlot, span);
     span->setRange(QCPRange(3, 7));
     QCOMPARE(mPlot->itemCount(), 0);
@@ -363,7 +363,7 @@ void TestSpan::setRangeSlotDeletingTheSpanIsSafe()
 
 void TestSpan::dragSlotDeletingTheSpanIsSafe()
 {
-    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);
     span->setRange(QCPRange(3, 7));
     mPlot->replot();
     removeOnRangeChange(mPlot, span);
@@ -386,7 +386,7 @@ void TestSpan::pixelModeDragMovesByPixels()
     QFETCH(bool, vertical);
     rangeAxis(mPlot, vertical)->setRange(0, 1000);
     mPlot->replot();
-    auto* span = new QCPItemSpan(mPlot, orientationOf(vertical));
+    auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));
     if (vertical)
     {
         span->lowerEdge->setTypeX(QCPItemPosition::ptAxisRectAbsolute);
@@ -418,7 +418,7 @@ void TestSpan::dataDragMovesByMouseDelta_data()
 void TestSpan::dataDragMovesByMouseDelta()
 {
     QFETCH(bool, vertical);
-    auto* span = new QCPItemSpan(mPlot, orientationOf(vertical));
+    auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));
     span->setRange(QCPRange(3, 7));
     mPlot->replot();
     const auto* axis = rangeAxis(mPlot, vertical);
@@ -447,7 +447,7 @@ void TestSpan::logAxisDragFollowsTheMouseInPixels()
     axis->setScaleType(QCPAxis::stLogarithmic);
     axis->setRange(1, 1000);
     mPlot->replot();
-    auto* span = new QCPItemSpan(mPlot, orientationOf(vertical));
+    auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));
     span->setRange(QCPRange(10, 100));
     mPlot->replot();
     const double lower = axis->pixelToCoord(axis->coordToPixel(10) + 40);
@@ -470,7 +470,7 @@ void TestSpan::mixedEdgesEachMoveInTheirOwnUnit_data()
 void TestSpan::mixedEdgesEachMoveInTheirOwnUnit()
 {
     QFETCH(bool, vertical);
-    auto* span = new QCPItemSpan(mPlot, orientationOf(vertical));
+    auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));
     if (vertical)
     {
         span->lowerEdge->setTypeX(QCPItemPosition::ptAxisRectAbsolute);
@@ -510,7 +510,7 @@ void TestSpan::dragMovesAnEdge_data()
 void TestSpan::dragMovesAnEdge()
 {
     QFETCH(bool, vertical);
-    auto* span = new QCPItemSpan(mPlot, orientationOf(vertical));
+    auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));
     span->setRange(QCPRange(3, 7));
     mPlot->replot();
     const auto* axis = rangeAxis(mPlot, vertical);
@@ -527,7 +527,7 @@ void TestSpan::dragMovesAnEdge()
 
 void TestSpan::aSpanIsRecorded()
 {
-    auto* span = new CountingSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<CountingSpan>(Qt::Vertical);
     span->setRange(QCPRange(2, 8));
     QCOMPARE(span->recordedCommands(), 0);
     mPlot->replot();
@@ -544,7 +544,7 @@ void TestSpan::spanFollowsADataPanAndKeepsItsRatioSide_data()
 void TestSpan::spanFollowsADataPanAndKeepsItsRatioSide()
 {
     QFETCH(bool, vertical);
-    auto* span = new CountingSpan(mPlot, orientationOf(vertical));
+    auto span = mPlot->add<CountingSpan>(orientationOf(vertical));
     span->setRange(QCPRange(4, 6));
     mPlot->replot();
     QCOMPARE(span->recordings(), 1);
@@ -584,7 +584,7 @@ void TestSpan::bothOrientationsMatchTheirReferences()
         {
             plot.xAxis->setRange(0, 6);
             plot.yAxis->setRange(0, 1);
-            auto* span = new QCPItemSpan(&plot, Qt::Horizontal);
+            auto span = plot.add<QCPItemSpan>(Qt::Horizontal);
             span->setRange(QCPRange(0.3, 0.6));
             span->setBrush(QBrush(QColor(40, 90, 200, 50)));
             span->setBorderPen(QPen(QColor(40, 90, 200), 2));
@@ -596,7 +596,7 @@ void TestSpan::bothOrientationsMatchTheirReferences()
         {
             plot.xAxis->setRange(0, 6);
             plot.yAxis->setRange(0, 1);
-            auto* span = new QCPItemSpan(&plot, Qt::Vertical);
+            auto span = plot.add<QCPItemSpan>(Qt::Vertical);
             span->setRange(QCPRange(2.0, 4.0));
             span->setBrush(QBrush(QColor(200, 60, 40, 50)));
             span->setBorderPen(QPen(QColor(200, 60, 40), 2));
@@ -608,7 +608,7 @@ void TestSpan::bothOrientationsMatchTheirReferences()
         {
             plot.xAxis->setRange(0, 6);
             plot.yAxis->setRange(0, 1);
-            auto* span = new QCPItemSpan(&plot, Qt::Vertical);
+            auto span = plot.add<QCPItemSpan>(Qt::Vertical);
             span->setRange(QCPRange(1.5, 3.5));
             span->setBrush(QBrush(QColor(200, 60, 40, 50)));
             span->setBorderPen(QPen(QColor(200, 60, 40), 2));
@@ -621,7 +621,7 @@ void TestSpan::bothOrientationsMatchTheirReferences()
         {
             plot.xAxis->setRange(0, 6);
             plot.yAxis->setRange(0, 1);
-            auto* span = new QCPItemRSpan(&plot);
+            auto span = plot.add<QCPItemRSpan>();
             span->leftEdge->setCoords(1.5, 0);
             span->rightEdge->setCoords(4.5, 1);
             span->topEdge->setCoords(0, 0.8);

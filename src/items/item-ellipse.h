@@ -51,7 +51,7 @@ public:
     template <typename T>
     using OpsFor = QCPItemEllipseOps<T>;
 
-    explicit QCPItemEllipse(QCustomPlot* parentPlot);
+    QCPItemEllipse();
     virtual ~QCPItemEllipse() override;
 
     // getters:

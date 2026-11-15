@@ -72,14 +72,14 @@ void TestQCustomPlot::interface_items()
   mPlot->yAxis->setRange(mPlot->axisRect()->top(), mPlot->axisRect()->top()+mPlot->axisRect()->height());
   mPlot->yAxis->setRangeReversed(true);
   
-  QCPItemLine *l1 = new QCPItemLine(mPlot);
+  QCPItemLine *l1 = mPlot->add<QCPItemLine>();
   l1->start->setCoords(200, 100);
   l1->end->setCoords(300, 120);
-  QCPItemLine *l2 = new QCPItemLine(mPlot);
+  QCPItemLine *l2 = mPlot->add<QCPItemLine>();
   l2->start->setCoords(200, 106);
   l2->end->setCoords(300, 126);
 
-  QCPItemTracer *t1 = new QCPItemTracer(mPlot);
+  QCPItemTracer *t1 = mPlot->add<QCPItemTracer>();
   t1->position->setCoords(250, 110);
   t1->setStyle(QCPItemTracer::tsPlus);
   t1->setSize(10);
@@ -328,7 +328,7 @@ void TestQCustomPlot::rectDeselectSlotDeletingACandidateIsSafe()
 void TestQCustomPlot::clickSlotDeletingTheItemIsSafe()
 {
   layOut(mPlot, QCP::iSelectItems);
-  auto* line = new QCPItemLine(mPlot);
+  auto line = mPlot->add<QCPItemLine>();
   line->start->setCoords(2, 5);
   line->end->setCoords(8, 5);
   connect(line, &QCPItem::selectionChanged, mPlot,
@@ -342,7 +342,7 @@ void TestQCustomPlot::deleteKeySlotDeletingEveryItemIsSafe()
   layOut(mPlot, QCP::iSelectItems);
   for (int i = 0; i < 3; ++i)
   {
-    auto* line = new QCPItemLine(mPlot);
+    auto line = mPlot->add<QCPItemLine>();
     line->setSelected(true);
     connect(line, &QCPItem::deleteRequested, mPlot, [this] { mPlot->clearItems(); });
   }

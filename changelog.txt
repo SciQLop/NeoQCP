@@ -576,6 +576,24 @@ Behaviour changes for 2.1 polar users:
   - Clicking inside a polar graph's fill selects it, as for cartesian graphs.
   - setSystem() with a non-polar system is refused as misuse.
 
+Milestone 6b (plot-free construction). Breaking, in the 3.0 preview line.
+  - Items are built without a plot: a constructor takes the item's own arguments only, creates its
+        positions and anchors, and the item joins a plot when it is placed. QCPAxisRect::add<T>(args...)
+        and QCustomPlot::add<T>(args...) build T(args...), adopt it, clip it to the area and bind the
+        positions that name no system to that area's first bottom and left axes (new
+        QCPAxisRect::xAxis()/yAxis(), the rect's first bottom and left axis).
+  - new QCPItemText(plot) is plot.add<QCPItemText>(); new QCPItemSpan(plot, Qt::Vertical) is
+        plot.add<QCPItemSpan>(Qt::Vertical). A user item takes its own arguments, and a member
+        initialiser may create and place a position with no plot in sight.
+  - A position that already names a system keeps it when the item is added elsewhere, and one that
+        already has an area keeps that too. An item added to a rect whose bottom or left axis is gone is
+        refused: empty handle, one report, no object.
+  - A plot with no axis rect still takes items (a polar-only scene, or pixel-positioned annotations):
+        they join unbound and unclipped.
+  - QCPNumberRange (a std::ranges input range of numbers) names the number ranges the data forms take.
+  - Fix: an item outside a plot (built but not placed, or taken) has no viewport to clip to; its hit test
+        no longer reads one, and spans and text use no selection tolerance there.
+
 Milestone 6a (names). Breaking, in the 3.0 preview line.
   - The base classes drop "Abstract": QCPAbstractPlottable is QCPPlottable, QCPAbstractPlottable1D is
         QCPPlottable1D, QCPAbstractItem is QCPItem, QCPAbstractLegendItem is QCPLegendItem, QCPAbstractLine is

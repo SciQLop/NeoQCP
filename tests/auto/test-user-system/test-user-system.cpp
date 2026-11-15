@@ -607,7 +607,7 @@ void TestUserSystem::aDefaultItemOnASkewRectHasNoProjection()
     QCOMPARE(plot.yAxis, rect->axis(QCPAxis::atLeft));
 
     // No setSystem: the item takes the plot's default axes, which are the skew rect's.
-    auto* text = new QCPItemText(&plot);
+    auto text = plot.add<QCPItemText>();
     text->position->setType(QCPItemPosition::ptPlotCoords);
     text->position->setCoords(5, 5);
     text->setClipArea(rect);
@@ -620,7 +620,7 @@ void TestUserSystem::aDefaultItemOnASkewRectHasNoProjection()
     QVERIFY2(near(text->position->pixelPosition(), mapped),
              "the default item position is not on the skew mapping");
 
-    auto* line = new QCPItemLine(&plot);
+    auto line = plot.add<QCPItemLine>();
     line->start->setParentAnchor(text->position);
     line->end->setType(QCPItemPosition::ptPlotCoords);
     line->end->setCoords(7, 2);
@@ -636,7 +636,7 @@ void TestUserSystem::interactiveCreationOnASkewRectLandsOnTheMapping()
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
     plot.setItemCreator(
-            [](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemLine(p); });
+            [](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemLine>(); });
     plot.setCreationModeEnabled(true);
 
     const QPointF click = pixelOf(system->pixelOf(5, 5));
@@ -841,7 +841,7 @@ void TestUserSystem::anItemPositionOnASkewSystemHasNoProjection()
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
 
-    auto* item = new QCPItemText(&plot);
+    auto item = plot.add<QCPItemText>();
     item->position->setSystem(system);
     item->position->setType(QCPItemPosition::ptPlotCoords);
     item->position->setCoords(5, 5);
@@ -977,7 +977,7 @@ void TestUserSystem::aShearChangeRepaints()
     InspectableCurve* curve = curveOn(rect);
     curve->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
 
-    auto* item = new QCPItemLine(&plot);
+    auto item = plot.add<QCPItemLine>();
     for (QCPItemPosition* position : item->positions())
     {
         position->setSystem(system);
@@ -1041,7 +1041,7 @@ void TestUserSystem::anAxisListsASkewItem()
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
 
-    auto* item = new QCPItemLine(&plot);
+    auto item = plot.add<QCPItemLine>();
     for (QCPItemPosition* position : item->positions())
     {
         position->setSystem(system);
@@ -1471,14 +1471,14 @@ void TestUserSystem::itemsFollowTheSkewMapping()
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
 
-    auto* text = new QCPItemText(&plot);
+    auto text = plot.add<QCPItemText>();
     text->position->setSystem(system);
     text->position->setType(QCPItemPosition::ptPlotCoords);
     text->position->setCoords(2, 2);
     text->setClipToAxisRect(true);
     text->setClipArea(rect);
 
-    auto* line = new QCPItemLine(&plot);
+    auto line = plot.add<QCPItemLine>();
     for (QCPItemPosition* position : { line->start, line->end })
     {
         position->setSystem(system);
@@ -1489,7 +1489,7 @@ void TestUserSystem::itemsFollowTheSkewMapping()
     line->setClipToAxisRect(true);
     line->setClipArea(rect);
 
-    auto* ratio = new QCPItemText(&plot);
+    auto ratio = plot.add<QCPItemText>();
     ratio->position->setType(QCPItemPosition::ptAxisRectRatio);
     ratio->position->setAxisRect(rect);
     ratio->position->setCoords(0.25, 0.75);
@@ -1523,7 +1523,7 @@ void TestUserSystem::theTracerFollowsASkewGraph()
     InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 2, 4, 6 }, QVector<double> { 2, 6, 4 });
 
-    auto* tracer = new QCPItemTracer(&plot);
+    auto tracer = plot.add<QCPItemTracer>();
     tracer->setGraph(graph);
     tracer->setGraphKey(4);
     tracer->setClipToAxisRect(true);
@@ -1548,7 +1548,7 @@ void TestUserSystem::theTracerFollowsAMultiGraphOnASkewRect()
     graph->setData(QVector<double> { 2, 4, 6 },
                    std::vector<QVector<double>> { QVector<double> { 1, 1, 1 },
                                                   QVector<double> { 2, 6, 4 } });
-    auto* tracer = new QCPItemTracer(&plot);
+    auto tracer = plot.add<QCPItemTracer>();
     tracer->setGraph(graph, 1);
     tracer->setGraphKey(4);
     tracer->setClipToAxisRect(true);
@@ -1572,12 +1572,12 @@ void TestUserSystem::anAnchoredPositionOnASkewSystemResolvesThroughTheFrame()
         SkewRect* rect = skewRect(plot);
         SkewSystem* system = rect->skew();
 
-        auto* anchor = new QCPItemText(&plot);
+        auto anchor = plot.add<QCPItemText>();
         anchor->position->setSystem(system);
         anchor->position->setType(QCPItemPosition::ptPlotCoords);
         anchor->position->setCoords(2, 2);
 
-        auto* anchored = new QCPItemText(&plot);
+        auto anchored = plot.add<QCPItemText>();
         anchored->position->setSystem(system);
         QVERIFY(test_misuse::calls.empty());
         anchored->position->setParentAnchor(anchor->position);
@@ -1611,7 +1611,7 @@ void TestUserSystem::takeAndAdoptAGraphAndAnItemOnASkewRect()
     InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 1, 9 }, QVector<double> { 1, 9 });
     QCOMPARE(graph->system(), rect->skew());
-    auto* line = new QCPItemLine(&from);
+    auto line = from.add<QCPItemLine>();
     line->start->setSystem(rect->skew());
     line->end->setSystem(rect->skew());
     line->start->setType(QCPItemPosition::ptPlotCoords);
@@ -1653,7 +1653,7 @@ void TestUserSystem::anAxisDeletedMidDragLeavesThemInert()
     graph->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
     InspectableCurve* curve = curveOn(rect);
     curve->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
-    auto* text = new QCPItemText(&plot);
+    auto text = plot.add<QCPItemText>();
     text->position->setSystem(system);
     text->position->setType(QCPItemPosition::ptPlotCoords);
     text->position->setCoords(5, 5);
@@ -1684,7 +1684,7 @@ void TestUserSystem::deletingTheSkewRectLeavesThemInert()
     graph->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
     InspectableCurve* curve = curveOn(rect);
     curve->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
-    auto* text = new QCPItemText(&plot);
+    auto text = plot.add<QCPItemText>();
     text->position->setSystem(rect->skew());
     text->position->setType(QCPItemPosition::ptPlotCoords);
     text->position->setCoords(5, 5);
@@ -1757,10 +1757,10 @@ void TestUserSystem::aSkewItemIsAlwaysAnIndexCandidate()
     // user system is always handed to the hit test - correct, and linear in the items.
     QCustomPlot plot;
     TwoRects rects = twoRects(plot);
-    auto* skewItem = new QCPItemLine(&plot);
+    auto skewItem = plot.add<QCPItemLine>();
     skewItem->start->setSystem(rects.skew->skew());
     skewItem->end->setSystem(rects.skew->skew());
-    auto* cartesianItem = new QCPItemLine(&plot);
+    auto cartesianItem = plot.add<QCPItemLine>();
     cartesianItem->start->setSystem(rects.cartesian->system(rects.cartesian->axis(QCPAxis::atBottom),
                                                             rects.cartesian->axis(QCPAxis::atLeft)));
     cartesianItem->end->setSystem(cartesianItem->start->system());

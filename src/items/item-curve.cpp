@@ -80,11 +80,11 @@
 /*!
   Creates a curve item and sets default values.
 
-  The created item is automatically registered with \a parentPlot. This QCustomPlot instance takes
-  ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
+  The item is built without a plot: its positions and anchors have no area until it is placed with
+  QCustomPlot::add<T>() or QCPAxisRect::add<T>().
 */
-QCPItemCurve::QCPItemCurve(QCustomPlot* parentPlot)
-        : QCPItem(parentPlot)
+QCPItemCurve::QCPItemCurve()
+        : QCPItem()
         , start(createPosition(QLatin1String("start")))
         , startDir(createPosition(QLatin1String("startDir")))
         , endDir(createPosition(QLatin1String("endDir")))

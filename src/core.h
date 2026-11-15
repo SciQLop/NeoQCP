@@ -588,7 +588,10 @@ private:
     void forgetSystemOf(QCPPlottable* plottable);
     bool detach(QCPItem* item);
     bool adopt(QCPPlottable* plottable);
-    bool adopt(QCPItem* item);
+    // Both the plot's add<T> and QCPAxisRect::add<T> go through here: \a rect is the area the item
+    // lands in (null when the plot has none), and its first bottom and left axes are the pair bound
+    // to positions that name none.
+    bool adopt(QCPItem* item, QCPAxisRect* rect);
     // The part of adopt() after the default axes are known: a plottable joins this plot in the given
     // system, owned by the given area. What an area uses to readd an object of its own kind.
     bool adoptPlottable(QCPPlottable* plottable, QCPCoordinateSystem* system, QCPArea* area);
@@ -993,7 +996,15 @@ qcp::HandleFor<T> QCustomPlot::add(std::unique_ptr<T> object)
     // Joining signals (its layer, the legend's rows): they wait until the object is dirtied, as a
     // slot may delete it or the plot.
     const QCPEmissionScope scope(this);
-    if (!adopt(object.get()))
+    // An item lands in the plot's axis rect; a plottable resolves its system in its own adopt().
+    const bool joined = [&]
+    {
+        if constexpr (std::derived_from<T, QCPItem>)
+            return adopt(object.get(), axisRect());
+        else
+            return adopt(object.get());
+    }();
+    if (!joined)
         return Handle{};
     Handle handle = qcp::makeHandle<Handle>(object.release());
     handle.get()->update();

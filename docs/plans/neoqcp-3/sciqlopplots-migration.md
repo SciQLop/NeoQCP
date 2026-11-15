@@ -13,7 +13,7 @@ line numbers will drift).
 
 | Change (milestone) | Use instead | Where in SciQLopPlots |
 |---|---|---|
-| `QCPItemHSpan` / `QCPItemVSpan` deleted (4e) | `QCPItemSpan(plot, Qt::Horizontal / Qt::Vertical)`; same `range()`, `setRange()`, `lowerEdge`, `upperEdge`, `rangeChanged` | `src/SciQLopMultiPlotPanel.cpp` ~823-908 (preview spans, `qobject_cast<QCPItemVSpan*>`), `include/SciQLopPlots/MultiPlots/SciQLopMultiPlotPanel.hpp` ~45, 70, `src/SpanTargets.cpp` ~52-54 (`SpanItem<QCPItemVSpan>`, `SpanItem<QCPItemHSpan>`): 16 references in all |
+| `QCPItemHSpan` / `QCPItemVSpan` deleted (4e) | `plot.add<QCPItemSpan>(Qt::Horizontal / Qt::Vertical)`; same `range()`, `setRange()`, `lowerEdge`, `upperEdge`, `rangeChanged` | `src/SciQLopMultiPlotPanel.cpp` ~823-908 (preview spans, `qobject_cast<QCPItemVSpan*>`), `include/SciQLopPlots/MultiPlots/SciQLopMultiPlotPanel.hpp` ~45, 70, `src/SpanTargets.cpp` ~52-54 (`SpanItem<QCPItemVSpan>`, `SpanItem<QCPItemHSpan>`): 16 references in all |
 | Line colour API renamed (4c): `setColorGradient`, `setColorRange`, `setColorScaleType` | `setGradient`, `setDataRange`, `setDataScaleType` | `src/SciQLopLineGraph.cpp` ~229-237 |
 | `QCPHistogram2D::Normalization` (`nNone`, `nColumn`) removed (4c) | `setColumnNormalized(bool)` / `columnNormalized()` | `src/SciQLopHistogram2D.cpp` ~229-238 |
 | `QCPHistogram::edgesChanged()` removed (4c) | `histogramReady()` | `src/SciQLopHistogram.cpp` ~124 |
@@ -21,6 +21,7 @@ line numbers will drift).
 | Selection signals lost their arguments (4a) | connect to `selectionChanged()` and read `selected()` / `selection()` | any connection to a NeoQCP `selectionChanged(bool)` or `selectionChanged(const QCPDataSelection&)`; SciQLopPlots' own `SciQLopPlotPanelInterface::selectionChanged(bool)` is its own signal, check what feeds it |
 | `rangeChanged` has one signature `(newRange, oldRange)` (4a) | connect to that one | any single-argument connection |
 | `QCPAbstractItem::draw(QCPPainter*)` is final (4e) | override `draw(QCPDrawContext&)` | none found today; check every `SciQLopPlotItem<...>` subclass again |
+| Item constructors lost the plot argument (6b) | `plot.add<QCPItemText>()`, `plot.add<QCPItemSpan>(Qt::Vertical)`; a user item's constructor takes its own arguments, `createPosition()` binds nothing | every `new QCPItem*` (`src/SciQLopCrosshair.cpp` ~94-124, `src/SciQLopNDProjectionPlot.cpp` ~477, `SpanTargets.cpp`), and every `SciQLopPlotItem<...>` subclass that forwards the plot |
 
 ## Known behaviour changes to check
 

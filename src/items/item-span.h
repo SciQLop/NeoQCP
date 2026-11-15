@@ -29,7 +29,7 @@ public:
     template <typename T>
     using OpsFor = QCPItemSpanOps<T>;
 
-    QCPItemSpan(QCustomPlot* parentPlot, Qt::Orientation orientation);
+    QCPItemSpan(Qt::Orientation orientation);
 
     Qt::Orientation orientation() const { return mOrientation; }
 

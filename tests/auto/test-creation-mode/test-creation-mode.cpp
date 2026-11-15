@@ -74,7 +74,7 @@ void TestCreationMode::noCreatorSetClickDoesNothing()
 
 void TestCreationMode::vspanCreationClickMoveClick()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
     mPlot->setItemPositioner(vspanPositioner);
     mPlot->setCreationModeEnabled(true);
 
@@ -100,7 +100,7 @@ void TestCreationMode::vspanCreationClickMoveClick()
 
 void TestCreationMode::hspanCreationClickMoveClick()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Horizontal); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Horizontal); });
     mPlot->setItemPositioner(hspanPositioner);
     mPlot->setCreationModeEnabled(true);
 
@@ -123,7 +123,7 @@ void TestCreationMode::hspanCreationClickMoveClick()
 
 void TestCreationMode::rspanCreationClickMoveClick()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemRSpan(p); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemRSpan>(); });
     mPlot->setItemPositioner(rspanPositioner);
     mPlot->setCreationModeEnabled(true);
 
@@ -146,7 +146,7 @@ void TestCreationMode::rspanCreationClickMoveClick()
 
 void TestCreationMode::cancelWithEscape()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
     mPlot->setCreationModeEnabled(true);
 
     QSignalSpy canceled(mPlot, &QCustomPlot::itemCanceled);
@@ -162,7 +162,7 @@ void TestCreationMode::cancelWithEscape()
 
 void TestCreationMode::cancelWithRightClick()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
     mPlot->setCreationModeEnabled(true);
 
     QSignalSpy canceled(mPlot, &QCustomPlot::itemCanceled);
@@ -178,7 +178,7 @@ void TestCreationMode::cancelWithRightClick()
 
 void TestCreationMode::cancelCleansUpItem()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
     mPlot->setCreationModeEnabled(true);
 
     QSignalSpy canceled(mPlot, &QCustomPlot::itemCanceled);
@@ -194,7 +194,7 @@ void TestCreationMode::cancelCleansUpItem()
 
 void TestCreationMode::modifierTriggerCreatesItem()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
     QVERIFY(!mPlot->creationModeEnabled());
 
     QSignalSpy created(mPlot, &QCustomPlot::itemCreated);
@@ -211,7 +211,7 @@ void TestCreationMode::modifierTriggerCreatesItem()
 
 void TestCreationMode::modifierNotHeldDoesNothing()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
     QVERIFY(!mPlot->creationModeEnabled());
 
     QPoint center = mPlot->axisRect()->rect().center();
@@ -221,7 +221,7 @@ void TestCreationMode::modifierNotHeldDoesNothing()
 
 void TestCreationMode::batchModeStaysActiveAfterCommit()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
     mPlot->setCreationModeEnabled(true);
 
     QSignalSpy created(mPlot, &QCustomPlot::itemCreated);
@@ -244,7 +244,7 @@ void TestCreationMode::batchModeStaysActiveAfterCommit()
 
 void TestCreationMode::creationTakesPriorityOverSelectionRect()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
     mPlot->setSelectionRectMode(QCP::srmZoom);
     mPlot->setCreationModeEnabled(true);
 
@@ -262,7 +262,7 @@ void TestCreationMode::creationTakesPriorityOverSelectionRect()
 
 void TestCreationMode::fallbackTwoPositionItem()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemLine(p); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemLine>(); });
     // No positioner — uses default 2-position fallback
     mPlot->setCreationModeEnabled(true);
 
@@ -283,7 +283,7 @@ void TestCreationMode::fallbackTwoPositionItem()
 
 void TestCreationMode::cursorChangesInCreationMode()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
 
     mPlot->setCreationModeEnabled(true);
     QCOMPARE(mPlot->cursor().shape(), Qt::CrossCursor);
@@ -302,7 +302,7 @@ void TestCreationMode::cursorChangesInCreationMode()
 
 void TestCreationMode::clickOutsideAxisRectDoesNothing()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
     mPlot->setCreationModeEnabled(true);
 
     sendMouseClick(mPlot, Qt::LeftButton, Qt::NoModifier, QPoint(2, 2));
@@ -321,7 +321,7 @@ void TestCreationMode::creatorReturnsNullDoesNotCrash()
 
 void TestCreationMode::disableCreationModeDuringDrawingCancels()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
     mPlot->setCreationModeEnabled(true);
 
     QSignalSpy canceled(mPlot, &QCustomPlot::itemCanceled);
@@ -337,13 +337,13 @@ void TestCreationMode::disableCreationModeDuringDrawingCancels()
 
 void TestCreationMode::batchModeIgnoresExistingItems()
 {
-    auto* existing = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto existing = mPlot->add<QCPItemSpan>(Qt::Vertical);
     existing->setRange(QCPRange(4, 6));
     existing->setSelectable(QCP::stWhole);
     mPlot->replot();
     QCOMPARE(mPlot->itemCount(), 1);
 
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
     mPlot->setCreationModeEnabled(true);
 
     QSignalSpy created(mPlot, &QCustomPlot::itemCreated);
@@ -370,7 +370,7 @@ void TestCreationMode::multiAxisRectCreation()
     mPlot->replot();
 
     mPlot->setItemCreator([](QCustomPlot* p, QCPAxis* keyAxis, QCPAxis*) {
-        auto* span = new QCPItemSpan(p, Qt::Vertical);
+        auto span = p->add<QCPItemSpan>(Qt::Vertical);
         span->setClipAxisRect(keyAxis->axisRect());
         span->setClipToAxisRect(true);
         return span;
@@ -400,7 +400,7 @@ void TestCreationMode::itemCreatedInASecondAxisRectIsClippedToIt()
     mPlot->plotLayout()->addElement(1, 0, second);
     second->axis(QCPAxis::atBottom)->setRange(0, 10);
     mPlot->replot();
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
     mPlot->setItemPositioner(vspanPositioner);
     mPlot->setCreationModeEnabled(true);
 
@@ -416,7 +416,7 @@ void TestCreationMode::itemCreatedInASecondAxisRectIsClippedToIt()
 
 void TestCreationMode::itemDeletedByAPressSlotIsNotAnnounced()
 {
-    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemSpan(p, Qt::Vertical); });
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return p->add<QCPItemSpan>(Qt::Vertical); });
     mPlot->setItemPositioner(vspanPositioner);
     mPlot->setCreationModeEnabled(true);
     int presses = 0;

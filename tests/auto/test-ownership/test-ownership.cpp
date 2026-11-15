@@ -316,8 +316,8 @@ void TestOwnership::plottableDeathLeavesSecondLegend()
 
 void TestOwnership::deleteItemLeavesList()
 {
-    auto* line = new QCPItemLine(mPlot);
-    new QCPItemText(mPlot);
+    auto line = mPlot->add<QCPItemLine>();
+    mPlot->add<QCPItemText>();
     QCOMPARE(mPlot->itemCount(), 2);
 
     delete line;
@@ -329,8 +329,8 @@ void TestOwnership::deleteItemLeavesList()
 
 void TestOwnership::deleteLaterItem()
 {
-    auto* line = new QCPItemLine(mPlot);
-    new QCPItemText(mPlot);
+    auto line = mPlot->add<QCPItemLine>();
+    mPlot->add<QCPItemText>();
 
     line->deleteLater();
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
@@ -341,8 +341,8 @@ void TestOwnership::deleteLaterItem()
 
 void TestOwnership::removeItemFromDestroyedSlot()
 {
-    auto* line = new QCPItemLine(mPlot);
-    new QCPItemText(mPlot);
+    auto line = mPlot->add<QCPItemLine>();
+    mPlot->add<QCPItemText>();
     connect(line, &QObject::destroyed, mPlot, [this] { mPlot->clearItems(); });
 
     QVERIFY(mPlot->removeItem(line));
@@ -353,9 +353,9 @@ void TestOwnership::removeItemFromDestroyedSlot()
 
 void TestOwnership::clearItemsWhileASlotDeletesAnother()
 {
-    auto* second = new QCPItemLine(mPlot);
-    QPointer<QCPItemLine> first = new QCPItemLine(mPlot);
-    new QCPItemText(mPlot); // cleared last: its slot deletes an item of the snapshot
+    auto second = mPlot->add<QCPItemLine>();
+    QPointer<QCPItemLine> first = mPlot->add<QCPItemLine>().get();
+    mPlot->add<QCPItemText>(); // cleared last: its slot deletes an item of the snapshot
     // clearItems deletes oldest first, so `first` may already be gone by the time this runs: the
     // guarantee is that neither the slot nor the clear crashes, not that a sibling outlives it.
     connect(mPlot->item(), &QObject::destroyed, mPlot, [first] { delete first.data(); });
@@ -372,10 +372,10 @@ void TestOwnership::clearItemsKeepsOtherLayersOrder()
     auto graph = mPlot->add<QCPGraph>();
     QVERIFY(mPlot->addLayer(QStringLiteral("upper")));
     QCPLayer* upper = mPlot->layer(QStringLiteral("upper"));
-    auto* a = new QCPItemLine(mPlot);
-    auto* b = new QCPItemLine(mPlot);
-    auto* c = new QCPItemLine(mPlot);
-    auto* d = new QCPItemLine(mPlot);
+    auto a = mPlot->add<QCPItemLine>();
+    auto b = mPlot->add<QCPItemLine>();
+    auto c = mPlot->add<QCPItemLine>();
+    auto d = mPlot->add<QCPItemLine>();
     c->setLayer(upper);
     d->setLayer(upper);
     Q_UNUSED(a);
@@ -398,10 +398,10 @@ void TestOwnership::clearItemsKeepsOtherLayersOrder()
 
 void TestOwnership::clearItemsSlotDeletesAnother()
 {
-    auto* victim = new QCPItemLine(mPlot);
+    auto victim = mPlot->add<QCPItemLine>();
     QVERIFY(mPlot->addLayer(QStringLiteral("upper")));
     QCPLayer* upper = mPlot->layer(QStringLiteral("upper"));
-    auto* other = new QCPItemLine(mPlot);
+    auto other = mPlot->add<QCPItemLine>();
     other->setLayer(upper);
     connect(victim, &QObject::destroyed, mPlot, [other] { delete other; });
 
@@ -414,9 +414,9 @@ void TestOwnership::clearItemsSlotDeletesAnother()
 
 void TestOwnership::itemOrderAfterRemove()
 {
-    auto* a = new QCPItemLine(mPlot);
-    auto* b = new QCPItemLine(mPlot);
-    auto* c = new QCPItemLine(mPlot);
+    auto a = mPlot->add<QCPItemLine>();
+    auto b = mPlot->add<QCPItemLine>();
+    auto c = mPlot->add<QCPItemLine>();
     QCOMPARE(mPlot->item(0), a);
     QCOMPARE(mPlot->item(1), b);
     QCOMPARE(mPlot->item(2), c);
@@ -454,9 +454,9 @@ void TestOwnership::layerOrderAfterMoves()
 
 void TestOwnership::deleteParentAnchorItem()
 {
-    auto* tracer = new QCPItemTracer(mPlot);
+    auto tracer = mPlot->add<QCPItemTracer>();
     tracer->position->setCoords(1, 2);
-    auto* text = new QCPItemText(mPlot);
+    auto text = mPlot->add<QCPItemText>();
     text->position->setParentAnchor(tracer->position);
     text->position->setCoords(10, 20); // pixels away from the tracer
     mPlot->replot();
@@ -498,7 +498,7 @@ void TestOwnership::plottablesOfAnotherRectAfterAxisRemoval()
     mPlot->plotLayout()->addElement(1, 0, second);
     auto* graph = new QCPGraph(second->axis(QCPAxis::atBottom), second->axis(QCPAxis::atLeft));
     graph->setData(QVector<double> { 1, 9 }, QVector<double> { 5, 5 });
-    auto* line = new QCPItemLine(mPlot);
+    auto line = mPlot->add<QCPItemLine>();
     line->start->setAxes(second->axis(QCPAxis::atBottom), second->axis(QCPAxis::atLeft));
     mPlot->replot();
 
@@ -679,7 +679,7 @@ void TestOwnership::deleteTracedGraph()
 {
     auto* graph = addRedGraph();
     graph->setPen(QPen(Qt::blue, 2));
-    auto* tracer = new QCPItemTracer(mPlot);
+    auto tracer = mPlot->add<QCPItemTracer>();
     tracer->setStyle(QCPItemTracer::tsCircle);
     tracer->setPen(QPen(Qt::red, 6));
     tracer->setSize(20);
@@ -1001,7 +1001,7 @@ void TestOwnership::destroyedSlotConstructsDuringTeardown()
     QCPGraph* graph = plot->addGraph();
     connect(graph, &QObject::destroyed, [plot] {
         new QCPCurve(plot->xAxis, plot->yAxis);
-        new QCPItemText(plot);
+        plot->add<QCPItemText>();
     });
 
     delete plot;
@@ -1018,7 +1018,7 @@ void TestOwnership::destroyedSlotDeletesSiblingDuringTeardown()
     QCPGraph* second = plot->addGraph();
     group->addMember(first);
     group->addMember(second);
-    QPointer<QCPItem> item = new QCPItemText(plot);
+    QPointer<QCPItem> item = plot->add<QCPItemText>().get();
     QCPGraph* last = plot->addGraph();
     connect(last, &QObject::destroyed, [first] { delete first.data(); });
     connect(second, &QObject::destroyed, [item] { delete item.data(); });
@@ -1037,7 +1037,7 @@ void TestOwnership::childrenDeletedWhilePlotWhole()
     const QRect before = rectBefore->rect();
     QVERIFY(before.isValid());
     QCPGraph* graph = plot->addGraph();
-    auto* item = new QCPItemText(plot);
+    auto item = plot->add<QCPItemText>();
     QRect seenByGraph, seenByItem;
     QCPAxisRect* rectSeenByGraph = nullptr;
     QCPAxisRect* rectSeenByItem = nullptr;
@@ -1064,7 +1064,7 @@ void TestOwnership::mutatorsRefuseDuringTeardown()
     auto* plot = new QCustomPlot;
     QPointer<QCPGraph> sibling = plot->addGraph().get();
     QPointer<QCPPlottableGroup> group(plot->addPlottableGroup("g"));
-    QPointer<QCPItem> item = new QCPItemText(plot);
+    QPointer<QCPItem> item = plot->add<QCPItemText>().get();
     QVERIFY(plot->addLayer("extra"));
     QCPGraph* watched = plot->addGraph();
     const int plottables = plot->plottableCount();
@@ -1141,7 +1141,7 @@ void TestOwnership::shownPlotTeardownFreesGpuResources()
     showAndExpose();
     if (!mPlot->rhi())
         QSKIP("no QRhi on this platform");
-    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);
     span->setRange(QCPRange(2, 4));
     mPlot->xAxis->grid()->setVisible(true);
     mPlot->replot();

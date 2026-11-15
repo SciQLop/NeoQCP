@@ -66,7 +66,7 @@ QImage renderItem(int* commands, const std::function<void(QCustomPlot&, Item*)>&
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* item = new Item(&plot);
+    auto item = plot.add<Item>();
     setup(plot, item);
     plot.replot();
     *commands = item->recordedCommands();
@@ -209,7 +209,7 @@ void TestItemRecording::aPannedPlainLineIsNotReRecorded()
     // A line without endings is data on both sides: a pan moves it, it does not remake it.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* line = new RecordingItem<QCPItemLine>(&plot);
+    auto line = plot.add<RecordingItem<QCPItemLine>>();
     line->start->setCoords(1, 0.2);
     line->end->setCoords(4, 0.8);
     plot.replot();
@@ -227,7 +227,7 @@ void TestItemRecording::aPannedArrowIsRightAfterThePan()
     // end's new pixel and points the new way.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* line = new RecordingItem<QCPItemLine>(&plot);
+    auto line = plot.add<RecordingItem<QCPItemLine>>();
     line->start->setCoords(1, 0.2);
     line->end->setCoords(4, 0.8);
     line->setHead(QCPLineEnding::esFlatArrow);
@@ -254,14 +254,14 @@ void TestItemRecording::anAnchoredArrowFollowsThePan()
     preparePlot(plot);
     auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.2, 0.3, 0.4, 0.5 });
-    auto* tracer = new QCPItemTracer(&plot);
+    auto tracer = plot.add<QCPItemTracer>();
     tracer->setGraph(graph);
     tracer->setGraphKey(3.0);
     tracer->setStyle(QCPItemTracer::tsNone);
-    auto* text = new QCPItemText(&plot);
+    auto text = plot.add<QCPItemText>();
     text->setText(QStringLiteral("label"));
     text->position->setCoords(1.0, 0.6);
-    auto* line = new RecordingItem<QCPItemLine>(&plot);
+    auto line = plot.add<RecordingItem<QCPItemLine>>();
     line->start->setParentAnchor(text->bottom);
     line->end->setParentAnchor(tracer->position);
     line->setHead(QCPLineEnding(QCPLineEnding::esDisc, 14));
@@ -292,7 +292,7 @@ void TestItemRecording::aRatioArrowFollowsTheAxisRect()
     // too. A longer tick label grows the left margin without changing the axis ranges.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* line = new RecordingItem<QCPItemLine>(&plot);
+    auto line = plot.add<RecordingItem<QCPItemLine>>();
     line->start->setType(QCPItemPosition::ptAxisRectRatio);
     line->end->setType(QCPItemPosition::ptAxisRectRatio);
     line->start->setCoords(0.1, 0.85);
@@ -332,12 +332,12 @@ void TestItemRecording::aFollowerFollowsItsAnchorItem()
     preparePlot(plot);
     auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.2, 0.2, 0.2, 0.2 });
-    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    auto tracer = plot.add<RecordingItem<QCPItemTracer>>();
     tracer->setGraph(graph);
     tracer->setGraphKey(2.0);
     tracer->setStyle(QCPItemTracer::tsNone);
     tracer->setLayer(plot.layer(QStringLiteral("main")));
-    auto* curve = new RecordingItem<QCPItemCurve>(&plot);
+    auto curve = plot.add<RecordingItem<QCPItemCurve>>();
     curve->start->setCoords(1.0, 0.9);
     curve->startDir->setCoords(2.0, 0.9);
     curve->endDir->setCoords(2.0, 0.1);
@@ -368,7 +368,7 @@ void TestItemRecording::aTracerOnAnotherLayerFollowsItsGraph()
     const QVector<double> high { 0.8, 0.8, 0.8, 0.8 };
     graph->setData(keys, low);
     graph->setPen(QPen(Qt::black, 1));
-    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    auto tracer = plot.add<RecordingItem<QCPItemTracer>>();
     tracer->setGraph(graph);
     tracer->setGraphKey(3.0);
     tracer->setStyle(QCPItemTracer::tsCircle);
@@ -437,21 +437,21 @@ void TestItemRecording::aPixelOnlyItemDrawsWithoutAxes()
     // A recording whose every position is axis free must go through, even without a transform.
     QCustomPlot plot;
     plot.resize(400, 300);
-    plot.plotLayout()->clear();
-    auto* rect = new RecordingItem<QCPItemRect>(&plot);
+    auto rect = plot.add<RecordingItem<QCPItemRect>>();
     rect->topLeft->setType(QCPItemPosition::ptAbsolute);
     rect->topLeft->setCoords(40, 40);
     rect->bottomRight->setType(QCPItemPosition::ptAbsolute);
     rect->bottomRight->setCoords(140, 120);
     rect->setPen(QPen(QColor(200, 0, 0), 2));
     rect->setBrush(QBrush(Qt::NoBrush));
-    auto* pixmap = new RecordingItem<QCPItemPixmap>(&plot);
+    auto pixmap = plot.add<RecordingItem<QCPItemPixmap>>();
     pixmap->setPixmap(testPixmap());
     pixmap->setScaled(true);
     pixmap->topLeft->setType(QCPItemPosition::ptViewportRatio);
     pixmap->topLeft->setCoords(0.5, 0.5);
     pixmap->bottomRight->setType(QCPItemPosition::ptViewportRatio);
     pixmap->bottomRight->setCoords(0.9, 0.9);
+    plot.plotLayout()->clear(); // the plot loses its axes after the items were placed on it
     plot.replot();
     QVERIFY2(rect->recordings() > 0, "the pixel rectangle has no recording without axes");
     QVERIFY2(pixmap->recordings() > 0, "the viewport ratio pixmap has no recording without axes");
@@ -469,8 +469,8 @@ void TestItemRecording::aDataItemWithoutAxesDrawsNothing()
     // no NaN box ever reaches the replay.
     QCustomPlot plot;
     plot.resize(400, 300);
-    plot.plotLayout()->clear();
-    auto* rect = new RecordingItem<QCPItemRect>(&plot);
+    auto rect = plot.add<RecordingItem<QCPItemRect>>();
+    plot.plotLayout()->clear(); // the plot loses its axes after the items were placed on it
     rect->topLeft->setType(QCPItemPosition::ptPlotCoords);
     rect->topLeft->setCoords(1, 1);
     rect->bottomRight->setType(QCPItemPosition::ptPlotCoords);
@@ -494,7 +494,7 @@ void TestItemRecording::aHugeDataEllipseExports()
         plot.resize(400, 300);
         plot.xAxis->setRange(0, 1);
         plot.yAxis->setRange(0, 1);
-        auto* ellipse = new QCPItemEllipse(&plot);
+        auto ellipse = plot.add<QCPItemEllipse>();
         ellipse->topLeft->setCoords(0, 0);
         ellipse->bottomRight->setCoords(extent, extent);
         ellipse->setPen(QPen(Qt::darkBlue, 2));
@@ -517,7 +517,7 @@ void TestItemRecording::everyStyleSetterReRecords()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* line = new RecordingItem<QCPItemLine>(&plot);
+    auto line = plot.add<RecordingItem<QCPItemLine>>();
     line->start->setCoords(1, 0.2);
     line->end->setCoords(4, 0.8);
     plot.replot();
@@ -609,7 +609,7 @@ void TestItemRecording::aRatioPixmapFollowsTheAxisRect()
     // rect they were taken in: a layout change that moves the rect must remake the recording.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* pixmap = new RecordingItem<QCPItemPixmap>(&plot);
+    auto pixmap = plot.add<RecordingItem<QCPItemPixmap>>();
     pixmap->setPixmap(testPixmap());
     pixmap->setScaled(true);
     pixmap->topLeft->setType(QCPItemPosition::ptAxisRectRatio);
@@ -645,7 +645,7 @@ void TestItemRecording::aStaticPixmapIsConvertedOnce()
     // hook counts them, because Qt shares the raster data and the recorded image cannot show it.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* pixmap = new RecordingItem<QCPItemPixmap>(&plot);
+    auto pixmap = plot.add<RecordingItem<QCPItemPixmap>>();
     pixmap->setPixmap(testPixmap());
     pixmap->setScaled(true);
     pixmap->topLeft->setType(QCPItemPosition::ptAxisRectRatio);
@@ -709,7 +709,7 @@ void TestItemRecording::aTracerFollowsItsGraph()
     preparePlot(plot);
     auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.2, 0.2, 0.2, 0.2 });
-    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    auto tracer = plot.add<RecordingItem<QCPItemTracer>>();
     tracer->setGraph(graph);
     tracer->setGraphKey(3.0);
     tracer->setStyle(QCPItemTracer::tsCircle);
@@ -737,7 +737,7 @@ void TestItemRecording::aPannedTracerIsNotReRecorded()
     preparePlot(plot);
     auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4, 5 }, QVector<double> { 0.2, 0.3, 0.4, 0.5, 0.6 });
-    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    auto tracer = plot.add<RecordingItem<QCPItemTracer>>();
     tracer->setGraph(graph);
     tracer->setGraphKey(3.0);
     tracer->setStyle(QCPItemTracer::tsCircle);
@@ -757,7 +757,7 @@ void TestItemRecording::aTracerFollowsSetGraphKey()
     preparePlot(plot);
     auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4, 5 }, QVector<double> { 0.2, 0.3, 0.4, 0.5, 0.6 });
-    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    auto tracer = plot.add<RecordingItem<QCPItemTracer>>();
     tracer->setGraph(graph);
     tracer->setGraphKey(2.0);
     tracer->setStyle(QCPItemTracer::tsCircle);
@@ -786,7 +786,7 @@ void TestItemRecording::aTracerFollowsInterpolation()
     preparePlot(plot);
     auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 5 }, QVector<double> { 0.2, 0.6 });
-    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    auto tracer = plot.add<RecordingItem<QCPItemTracer>>();
     tracer->setGraph(graph);
     tracer->setGraphKey(2.0);
     tracer->setStyle(QCPItemTracer::tsCircle);
@@ -818,7 +818,7 @@ void TestItemRecording::theTracerFollowsAMultiGraphComponent()
                    std::vector<std::vector<double>>{{0.1, 0.1, 0.1, 0.1},
                                                     {0.2, 0.3, 0.4, 0.5},
                                                     {0.8, 0.8, 0.8, 0.8}});
-    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    auto tracer = plot.add<RecordingItem<QCPItemTracer>>();
     tracer->setGraph(graph, 1);
     QCOMPARE(tracer->component(), 1);
     tracer->setGraphKey(2.5);
@@ -851,7 +851,7 @@ void TestItemRecording::theTracerOutsideTheDataClampsAs2xDid()
     auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(std::vector<double>{1, 2, 3, 4},
                    std::vector<std::vector<double>>{{0.2, 0.3, 0.4, 0.5}});
-    auto* tracer = new QCPItemTracer(&plot);
+    auto tracer = plot.add<QCPItemTracer>();
     tracer->setGraph(graph);
     tracer->setInterpolating(true);
 
@@ -871,7 +871,7 @@ void TestItemRecording::theTracerOnAGapIsInert()
     graph->setData(std::vector<double>{1, 2, 3, 4},
                    std::vector<std::vector<double>>{{0.2, std::numeric_limits<double>::quiet_NaN(),
                                                     0.4, 0.5}});
-    auto* tracer = new QCPItemTracer(&plot);
+    auto tracer = plot.add<QCPItemTracer>();
     tracer->setGraph(graph);
     tracer->setInterpolating(true);
     tracer->setGraphKey(2.0);
@@ -894,7 +894,7 @@ void TestItemRecording::aTracerWhoseComponentDisappearsIsInert()
     auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(std::vector<double>{1, 2, 3},
                    std::vector<std::vector<double>>{{0.2, 0.3, 0.4}, {0.6, 0.7, 0.8}});
-    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    auto tracer = plot.add<RecordingItem<QCPItemTracer>>();
     tracer->setGraph(graph, 1);
     tracer->setStyle(QCPItemTracer::tsCircle);
     tracer->setSize(9);
@@ -916,7 +916,7 @@ void TestItemRecording::setComponentWithoutATargetDoesNothing()
     // M3: without a graph there is no component to follow; the setter is a documented no-op.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* tracer = new QCPItemTracer(&plot);
+    auto tracer = plot.add<QCPItemTracer>();
     const auto previous = qcp::setMisuseHandler(test_misuse::record);
     test_misuse::calls.clear();
     tracer->setComponent(5);
@@ -931,7 +931,7 @@ void TestItemRecording::deletingTheTracedMultiGraphLeavesTheTracerInert()
     preparePlot(plot);
     auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(std::vector<double>{1, 2, 3}, std::vector<std::vector<double>>{{0.2, 0.3, 0.4}});
-    auto* tracer = new QCPItemTracer(&plot);
+    auto tracer = plot.add<QCPItemTracer>();
     tracer->setGraph(graph);
     tracer->setStyle(QCPItemTracer::tsCircle);
     tracer->setSize(9);
@@ -952,7 +952,7 @@ void TestItemRecording::takingTheTracedMultiGraphLeavesTheTracerInert()
     auto graph = plot.add<QCPGraph>(
         std::vector<double>{1, 2, 3}, std::vector<std::vector<double>>{{0.2, 0.3, 0.4}});
     QVERIFY(graph);
-    auto* tracer = new QCPItemTracer(&plot);
+    auto tracer = plot.add<QCPItemTracer>();
     tracer->setGraph(graph.get());
     tracer->setStyle(QCPItemTracer::tsCircle);
     tracer->setSize(9);
@@ -978,7 +978,7 @@ void TestItemRecording::retargetingToAnotherGraphLeavesTheFirst()
     second->setData(std::vector<double>{1, 2, 3},
                     std::vector<std::vector<double>>{{0.6, 0.7, 0.8}, {0.1, 0.1, 0.1}});
 
-    auto* tracer = new QCPItemTracer(&plot);
+    auto tracer = plot.add<QCPItemTracer>();
     tracer->setGraphKey(2);
     tracer->setGraph(first);
     QCOMPARE(tracer->position->value(), 0.3);
@@ -1016,7 +1016,7 @@ void TestItemRecording::theTracerRefusesAnOutOfRangeComponent()
     auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(std::vector<double>{1, 2, 3},
                    std::vector<std::vector<double>>{{0.1, 0.1, 0.1}, {0.2, 0.2, 0.2}});
-    auto* tracer = new QCPItemTracer(&plot);
+    auto tracer = plot.add<QCPItemTracer>();
     tracer->setGraph(graph, 1);
 
     const auto previous = qcp::setMisuseHandler(test_misuse::record);
@@ -1035,7 +1035,7 @@ void TestItemRecording::selectionReRecords()
     // A selected item draws its selected pen and brush: the selection is a content change.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* rect = new RecordingItem<QCPItemRect>(&plot);
+    auto rect = plot.add<RecordingItem<QCPItemRect>>();
     rect->topLeft->setCoords(1.0, 0.8);
     rect->bottomRight->setCoords(4.5, 0.2);
     rect->setPen(QPen(QColor(200, 120, 20), 2));
@@ -1059,7 +1059,7 @@ void TestItemRecording::aSwappedGraphContainerReRecords()
     const QVector<double> first { 0.2, 0.2, 0.2, 0.2 };
     const QVector<double> second { 0.8, 0.8, 0.8, 0.8 };
     graph->setData(keys, first);
-    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    auto tracer = plot.add<RecordingItem<QCPItemTracer>>();
     tracer->setGraph(graph);
     tracer->setGraphKey(3.0);
     tracer->setStyle(QCPItemTracer::tsCircle);

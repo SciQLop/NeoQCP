@@ -51,7 +51,7 @@ private slots:
     void takeCutsOutboundAnchorLinks();
     void pixelPositionOfATakenItemIsNull();
     void addPlottableDuringTeardownIsRefused();
-    void itemsWithoutAxisRectAreRefusedLikePlottables();
+    void anItemWithoutAxisRectJoinsUnbound();
     void layoutCellsFarBeyondTheGridAreRefused();
     void takenPipelinePlottablesOutliveTheirPlot();
     void errorBarsTakeTheirPlottableByHandle();

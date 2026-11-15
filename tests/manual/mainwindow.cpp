@@ -68,59 +68,59 @@ void MainWindow::setupItemAnchorTest(QCustomPlot *customPlot)
   customPlot->xAxis->ticker()->setTickCount(5);
   customPlot->yAxis->ticker()->setTickCount(5);
  
-  QCPItemPixmap *pixmapItem = new QCPItemPixmap(customPlot);
+  QCPItemPixmap *pixmapItem = customPlot->add<QCPItemPixmap>();
   pixmapItem->setPixmap(QPixmap("./gnu.png"));
   pixmapItem->setScaled(true);
   pixmapItem->topLeft->setCoords(-2, 2);
   pixmapItem->bottomRight->setCoords(-1, 1);
   labelItemAnchors(pixmapItem);
   
-  QCPItemPixmap *pixmapItem2 = new QCPItemPixmap(customPlot);
+  QCPItemPixmap *pixmapItem2 = customPlot->add<QCPItemPixmap>();
   pixmapItem2->setPixmap(QPixmap("./gnu.png"));
   pixmapItem2->setScaled(true);
   pixmapItem2->topLeft->setCoords(1, 0.5);
   pixmapItem2->bottomRight->setCoords(0, 2);
   labelItemAnchors(pixmapItem2);
   
-  QCPItemRect *rect = new QCPItemRect(customPlot);
+  QCPItemRect *rect = customPlot->add<QCPItemRect>();
   rect->topLeft->setCoords(-2, 0);
   rect->bottomRight->setCoords(-1, -0.5);
   labelItemAnchors(rect);
   
-  QCPItemRect *rect2 = new QCPItemRect(customPlot);
+  QCPItemRect *rect2 = customPlot->add<QCPItemRect>();
   rect2->topLeft->setCoords(0, -1);
   rect2->bottomRight->setCoords(-0.5, 0);
   labelItemAnchors(rect2);
   
-  QCPItemEllipse *ellipse = new QCPItemEllipse(customPlot);
+  QCPItemEllipse *ellipse = customPlot->add<QCPItemEllipse>();
   ellipse->topLeft->setCoords(0.5, 0);
   ellipse->bottomRight->setCoords(1, -1);
   labelItemAnchors(ellipse);
   
-  QCPItemEllipse *ellipse2 = new QCPItemEllipse(customPlot);
+  QCPItemEllipse *ellipse2 = customPlot->add<QCPItemEllipse>();
   ellipse2->topLeft->setCoords(2, -1);
   ellipse2->bottomRight->setCoords(1.1, 0.2);
   labelItemAnchors(ellipse2);
   
-  QCPItemLine *line = new QCPItemLine(customPlot);
+  QCPItemLine *line = customPlot->add<QCPItemLine>();
   line->start->setCoords(-2, -1.5);
   line->end->setCoords(-1, -1.2);
   labelItemAnchors(line);
   
-  QCPItemCurve *curve = new QCPItemCurve(customPlot);
+  QCPItemCurve *curve = customPlot->add<QCPItemCurve>();
   curve->start->setCoords(0, -1.5);
   curve->startDir->setCoords(1, -1.5);
   curve->endDir->setCoords(1, -1.2);
   curve->end->setCoords(2, -1.2);
   labelItemAnchors(curve);
   
-  QCPItemBracket *bracket = new QCPItemBracket(customPlot);
+  QCPItemBracket *bracket = customPlot->add<QCPItemBracket>();
   bracket->left->setCoords(-2, -2);
   bracket->right->setCoords(2, -2);
   bracket->setLength(12);
   labelItemAnchors(bracket);
   
-  QCPItemText *text = new QCPItemText(customPlot);
+  QCPItemText *text = customPlot->add<QCPItemText>();
   text->position->setCoords(0, -2.6);
   text->setText("QCustomPlot");
   text->setFont(QFont(font().family(), 26));
@@ -132,21 +132,21 @@ void MainWindow::setupItemAnchorTest(QCustomPlot *customPlot)
 
 void MainWindow::setupItemTracerTest(QCustomPlot *customPlot)
 {
-  QCPItemTracer *tracer1 = new QCPItemTracer(customPlot);
+  QCPItemTracer *tracer1 = customPlot->add<QCPItemTracer>();
   tracer1->position->setCoords(1, 3);
   tracer1->setStyle(QCPItemTracer::tsCircle);
   tracer1->setSize(20);
 
-  QCPItemTracer *tracer2 = new QCPItemTracer(customPlot);
+  QCPItemTracer *tracer2 = customPlot->add<QCPItemTracer>();
   tracer2->position->setCoords(2, 2.5);
   tracer2->setStyle(QCPItemTracer::tsCrosshair);
 
-  QCPItemTracer *tracer3 = new QCPItemTracer(customPlot);
+  QCPItemTracer *tracer3 = customPlot->add<QCPItemTracer>();
   tracer3->position->setCoords(3, 2);
   tracer3->setStyle(QCPItemTracer::tsPlus);
   tracer3->setSize(20);
 
-  QCPItemTracer *tracer4 = new QCPItemTracer(customPlot);
+  QCPItemTracer *tracer4 = customPlot->add<QCPItemTracer>();
   tracer4->position->setCoords(4, 1.5);
   tracer4->setStyle(QCPItemTracer::tsSquare);
   tracer4->setSize(20);
@@ -161,7 +161,7 @@ void MainWindow::setupItemTracerTest(QCustomPlot *customPlot)
   }
   graph->setData(x, y);
 
-  QCPItemTracer *graphTracer = new QCPItemTracer(customPlot);
+  QCPItemTracer *graphTracer = customPlot->add<QCPItemTracer>();
   graphTracer->setGraph(graph);
   graphTracer->setGraphKey(2.3);
   graphTracer->setStyle(QCPItemTracer::tsNone);
@@ -170,14 +170,14 @@ void MainWindow::setupItemTracerTest(QCustomPlot *customPlot)
   connect(customPlot, SIGNAL(mouseMove(QMouseEvent*)), this, SLOT(tracerTestMouseMove(QMouseEvent*)));
   graphTracer->setStyle(QCPItemTracer::tsSquare);
 
-  QCPItemText *text = new QCPItemText(customPlot);
+  QCPItemText *text = customPlot->add<QCPItemText>();
   text->setText("Tracer");
   text->setPositionAlignment(Qt::AlignBottom|Qt::AlignHCenter);
   text->position->setType(QCPItemPosition::ptAxisRectRatio);
   text->position->setCoords(0.5, 0.05);
   text->setPen(QPen());
   
-  QCPItemText *vtext = new QCPItemText(customPlot);
+  QCPItemText *vtext = customPlot->add<QCPItemText>();
   vtext->setText("Height");
   vtext->setPositionAlignment(Qt::AlignVCenter|Qt::AlignRight);
   vtext->position->setParentAnchorY(graphTracer->position);
@@ -185,7 +185,7 @@ void MainWindow::setupItemTracerTest(QCustomPlot *customPlot)
   vtext->position->setCoords(1, 0);
   vtext->setPen(QPen());
 
-  QCPItemCurve *curve = new QCPItemCurve(customPlot);
+  QCPItemCurve *curve = customPlot->add<QCPItemCurve>();
   curve->start->setParentAnchor(text->bottom);
   curve->startDir->setParentAnchor(curve->start);
   curve->startDir->setCoords(0, 100);
@@ -396,43 +396,43 @@ void MainWindow::setupSelectTest(QCustomPlot *customPlot)
   
   /*
   // QCPItemPixmap
-  QCPItemPixmap *pixmapItem = new QCPItemPixmap(customPlot);
+  QCPItemPixmap *pixmapItem = customPlot->add<QCPItemPixmap>();
   pixmapItem->setPixmap(QPixmap("./gnu.png"));
   pixmapItem->setScaled(true, Qt::IgnoreAspectRatio);
   pixmapItem->topLeft->setCoords(-0.2, 1);
   pixmapItem->bottomRight->setCoords(0.3, 0);
-  QCPItemPixmap *pixmapItem2 = new QCPItemPixmap(customPlot);
+  QCPItemPixmap *pixmapItem2 = customPlot->add<QCPItemPixmap>();
   pixmapItem2->setPixmap(QPixmap("./gnu.png"));
   pixmapItem2->setScaled(true, Qt::IgnoreAspectRatio);
   pixmapItem2->topLeft->setCoords(1.2, 0);
   pixmapItem2->bottomRight->setCoords(0.7, 1);
   
   // QCPItemRect
-  QCPItemRect *rect = new QCPItemRect(customPlot);
+  QCPItemRect *rect = customPlot->add<QCPItemRect>();
   rect->setBrush(defaultBrush);
   rect->topLeft->setCoords(0, 1);
   rect->bottomRight->setCoords(1, 0);
   
   // QCPItemEllipse
-  QCPItemEllipse *ellipse = new QCPItemEllipse(customPlot);
+  QCPItemEllipse *ellipse = customPlot->add<QCPItemEllipse>();
   ellipse->setBrush(defaultBrush);
   ellipse->topLeft->setCoords(-0.15, 1.1);
   ellipse->bottomRight->setCoords(1.15, 0);
   
 
   // QCPItemLine
-  QCPItemLine *line = new QCPItemLine(customPlot);
+  QCPItemLine *line = customPlot->add<QCPItemLine>();
   line->start->setCoords(-0.1, 0.8);
   line->end->setCoords(1.1, 0.2);
   line->setHead(QCPLineEnding::esSpikeArrow);
   
   // QCPItemStraightLine
-  QCPItemStraightLine *straightLine = new QCPItemStraightLine(customPlot);
+  QCPItemStraightLine *straightLine = customPlot->add<QCPItemStraightLine>();
   straightLine->point1->setCoords(0, 0.4);
   straightLine->point2->setCoords(1, 0.6);
 
   // QCPItemCurve
-  QCPItemCurve *curve = new QCPItemCurve(customPlot);
+  QCPItemCurve *curve = customPlot->add<QCPItemCurve>();
   curve->start->setCoords(0, 1);
   curve->startDir->setCoords(0.5, 1);
   curve->endDir->setCoords(0.7, 0.2);
@@ -441,7 +441,7 @@ void MainWindow::setupSelectTest(QCustomPlot *customPlot)
   curve->setTail(QCPLineEnding::esLineArrow);
 
   // QCPItemBracket
-  QCPItemBracket *bracket = new QCPItemBracket(customPlot);
+  QCPItemBracket *bracket = customPlot->add<QCPItemBracket>();
   bracket->left->setCoords(-0.2, 0.35);
   bracket->right->setCoords(1.2, 0.65);
   bracket->setLength(22);
@@ -1525,7 +1525,7 @@ void MainWindow::labelItemAnchors(QCPItem *item, int fontSize, bool circle, bool
   {
     if (circle)
     {
-      QCPItemEllipse *circ = new QCPItemEllipse(item->parentPlot());
+      QCPItemEllipse *circ = item->parentPlot()->add<QCPItemEllipse>();
       circ->topLeft->setParentAnchor(anchors.at(i));
       circ->bottomRight->setParentAnchor(anchors.at(i));
       circ->topLeft->setCoords(-4, -4);
@@ -1539,7 +1539,7 @@ void MainWindow::labelItemAnchors(QCPItem *item, int fontSize, bool circle, bool
       circ->setPen(p);
       if (dynamic_cast<QCPItemPosition*>(anchors.at(i)))
       {
-        QCPItemEllipse *circ2 = new QCPItemEllipse(item->parentPlot());
+        QCPItemEllipse *circ2 = item->parentPlot()->add<QCPItemEllipse>();
         circ2->topLeft->setParentAnchor(anchors.at(i));
         circ2->bottomRight->setParentAnchor(anchors.at(i));
         circ2->topLeft->setCoords(-2.5, -2.5);
@@ -1550,7 +1550,7 @@ void MainWindow::labelItemAnchors(QCPItem *item, int fontSize, bool circle, bool
     }
     if (fontSize > 0)
     {
-      QCPItemText *label = new QCPItemText(item->parentPlot());
+      QCPItemText *label = item->parentPlot()->add<QCPItemText>();
       label->setFont(QFont(font().family(), fontSize));
       label->setColor(Qt::blue);
       label->setText(QString("%2 (%1)").arg(i).arg(anchors.at(i)->name()));
@@ -1793,7 +1793,7 @@ void MainWindow::colorMapMouseMove(QMouseEvent *event)
     map->data()->cellToCoord(ik, iv, &ck, &cv);
     if (mCustomPlot->itemCount() == 0)
     {
-      QCPItemTracer *t = new QCPItemTracer(mCustomPlot);
+      QCPItemTracer *t = mCustomPlot->add<QCPItemTracer>();
       t->position->setType(QCPItemPosition::ptPlotCoords);
       t->position->setCoords(ck, cv);
       t->position->setAxes(map->keyAxis(), map->valueAxis());

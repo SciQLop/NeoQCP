@@ -51,7 +51,7 @@ public:
     template <typename T>
     using OpsFor = QCPItemCurveOps<T>;
 
-    explicit QCPItemCurve(QCustomPlot* parentPlot);
+    QCPItemCurve();
     virtual ~QCPItemCurve() override;
 
     // getters:

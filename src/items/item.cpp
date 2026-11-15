@@ -142,9 +142,9 @@ std::optional<double> plotSlotAlongScreenAxis(const QCPAxis* slotAxis, const QCP
   you want to make a new item subclass. Use \ref QCPItem::createAnchor instead, as
   explained in the subclassing section of the QCPItem documentation.
 */
-QCPItemAnchor::QCPItemAnchor(QCustomPlot* parentPlot, QCPItem* parentItem,
-                             const QString& name, int anchorId)
-        : mName(name), mParentPlot(parentPlot), mParentItem(parentItem), mAnchorId(anchorId)
+QCPItemAnchor::QCPItemAnchor(QCPItem* parentItem, const QString& name, int anchorId)
+        : mName(name), mParentPlot(parentItem->parentPlot()), mParentItem(parentItem)
+        , mAnchorId(anchorId)
 {
 }
 
@@ -338,9 +338,8 @@ void QCPItemAnchor::removeChildY(QCPItemPosition* pos)
   you want to make a new item subclass. Use \ref QCPItem::createPosition instead, as
   explained in the subclassing section of the QCPItem documentation.
 */
-QCPItemPosition::QCPItemPosition(QCustomPlot* parentPlot, QCPItem* parentItem,
-                                 const QString& name)
-        : QCPItemAnchor(parentPlot, parentItem, name)
+QCPItemPosition::QCPItemPosition(QCPItem* parentItem, const QString& name)
+        : QCPItemAnchor(parentItem, name)
         , mPositionTypeX(ptAbsolute)
         , mPositionTypeY(ptAbsolute)
         , mKey(0)
@@ -781,8 +780,8 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
   For example, if the type is \ref ptAbsolute, \a key and \a value mean the x and y pixel position
   on the QCustomPlot surface. In that case the origin (0, 0) is in the top left corner of the
   QCustomPlot viewport. If the type is \ref ptPlotCoords, \a key and \a value mean a point in the
-  plot coordinate system defined by the axes set by \ref setAxes. By default those are the
-  QCustomPlot's xAxis and yAxis. See the documentation of \ref setType for other available
+  plot coordinate system defined by the axes set by \ref setAxes. By default those are the first
+  bottom and left axes of the area the item is placed in. See the documentation of \ref setType for other available
   coordinate types and their meaning.
 
   If different types were configured for X and Y (\ref setTypeX, \ref setTypeY), \a key and \a
@@ -1358,8 +1357,8 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 
   First you instantiate the item you want to use and add it to the plot:
   \snippet documentation/doc-code-snippets/mainwindow.cpp qcpitemline-creation-1
-  by default, the positions of the item are bound to the x- and y-Axis of the plot. So we can just
-  set the plot coordinates where the line should start/end:
+  by default, the positions of the item are bound to the first bottom and left axes of the area it
+  was added to. So we can just set the plot coordinates where the line should start/end:
   \snippet documentation/doc-code-snippets/mainwindow.cpp qcpitemline-creation-2
   If we don't want the line to be positioned in plot coordinates but a different coordinate system,
   e.g. absolute pixel positions on the QCustomPlot surface, we need to change the position type like
@@ -1399,8 +1398,8 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
   example, the constructor of QCPItemExample could look like this:
 
   \code
-  QCPItemExample::QCPItemExample(QCustomPlot *parentPlot) :
-    QCPItem(parentPlot),
+  QCPItemExample::QCPItemExample() :
+    QCPItem(),
     myPosition(createPosition("myPosition"))
   {
     // other constructor code
@@ -1505,22 +1504,13 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 */
 
 /*!
-  Base class constructor which initializes base class members.
+  Base class constructor which initializes base class members. An item is built without a plot: its
+  positions and anchors belong to it alone until QCustomPlot::add<T>() or QCPAxisRect::add<T>()
+  places it and binds them to the area it lands in.
 */
-QCPItem::QCPItem(QCustomPlot* parentPlot)
-        : QCPLayerable(parentPlot), mClipToAxisRect(false), mSelectable(true), mSelected(false)
+QCPItem::QCPItem()
+        : QCPLayerable(nullptr), mClipToAxisRect(false), mSelectable(true), mSelected(false)
 {
-    if (parentPlot->registerItem(this))
-        mRegisteredPlot = parentPlot;
-
-    // A new item has nothing drawn yet, so the clipping setters' dirty marks are pure waste; and
-    // walking the layout for the whole rect list cost more than the item itself.
-    if (QCPAxisRect* rect = parentPlot->firstAxisRect())
-    {
-        mClipToAxisRect = true;
-        mClipArea = rect;
-        setParentLayerable(rect);
-    }
 }
 
 QCPItem::~QCPItem()
@@ -1805,8 +1795,9 @@ QRect QCPItem::clipRect() const
 {
     if (mClipToAxisRect && mClipArea)
         return mClipArea.data()->rect();
-    else
-        return mParentPlot->viewport();
+    if (!mParentPlot) // built but not placed: there is no viewport yet
+        return { };
+    return mParentPlot->viewport();
 }
 
 /*! \internal
@@ -1858,11 +1849,13 @@ double QCPItem::rectDistance(const QRectF& rect, const QPointF& pos, bool filled
     }
     result = qSqrt(minDistSqr);
 
-    // filled rect, allow click inside to count as hit:
-    if (filledRect && result > mParentPlot->selectionTolerance() * 0.99)
+    // filled rect, allow click inside to count as hit. An item outside a plot has no selection
+    // tolerance to grow the shape by.
+    const double tolerance = mParentPlot ? mParentPlot->selectionTolerance() : 0.0;
+    if (filledRect && result > tolerance * 0.99)
     {
         if (rect.contains(pos))
-            result = mParentPlot->selectionTolerance() * 0.99;
+            result = tolerance * 0.99;
     }
     return result;
 }
@@ -2031,14 +2024,10 @@ QCPItemPosition* QCPItem::createPosition(const QString& name)
 {
     if (hasAnchor(name))
         qDebug() << Q_FUNC_INFO << "anchor/position with name exists already:" << name;
-    QCPItemPosition* newPosition = new QCPItemPosition(mParentPlot, this, name);
+    QCPItemPosition* newPosition = new QCPItemPosition(this, name);
     mPositions.append(newPosition);
     mAnchors.append(newPosition); // every position is also an anchor
-    newPosition->setAxes(mParentPlot->xAxis, mParentPlot->yAxis);
     newPosition->setType(QCPItemPosition::ptPlotCoords);
-    // The first rect raw, not through axisRect(): this runs per position per item (K8).
-    if (QCPAxisRect* firstRect = mParentPlot->firstAxisRect())
-        newPosition->setAxisRect(firstRect);
     newPosition->setCoords(0, 0);
     return newPosition;
 }
@@ -2066,7 +2055,7 @@ QCPItemAnchor* QCPItem::createAnchor(const QString& name, int anchorId)
 {
     if (hasAnchor(name))
         qDebug() << Q_FUNC_INFO << "anchor/position with name exists already:" << name;
-    QCPItemAnchor* newAnchor = new QCPItemAnchor(mParentPlot, this, name, anchorId);
+    QCPItemAnchor* newAnchor = new QCPItemAnchor(this, name, anchorId);
     mAnchors.append(newAnchor);
     return newAnchor;
 }

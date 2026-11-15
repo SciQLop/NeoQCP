@@ -53,8 +53,7 @@ class QCP_LIB_DECL QCPItemAnchor
     friend class QCPLayer; // reads mParentItem to follow an anchor chain for repaint marking
 
 public:
-    QCPItemAnchor(QCustomPlot* parentPlot, QCPItem* parentItem, const QString& name,
-                  int anchorId = -1);
+    QCPItemAnchor(QCPItem* parentItem, const QString& name, int anchorId = -1);
     virtual ~QCPItemAnchor();
 
     // getters:
@@ -136,7 +135,7 @@ public:
     };
     Q_ENUM(PositionType)
 
-    QCPItemPosition(QCustomPlot* parentPlot, QCPItem* parentItem, const QString& name);
+    QCPItemPosition(QCPItem* parentItem, const QString& name);
     virtual ~QCPItemPosition() override;
 
     // getters:
@@ -173,7 +172,7 @@ public:
     //! The area this position measures ratios and pixels in: the axis rect for the cartesian types,
     //! a polar area for a position bound to a polar system.
     [[nodiscard]] QCPHandle<QCPArea> area() const;
-    //! (0, 0) for an item outside a plot (taken, see QCustomPlot::take).
+    //! (0, 0) for an item outside a plot: built but not placed yet, or taken (QCustomPlot::take).
     [[nodiscard]] virtual QPointF pixelPosition() const override;
 
     // setters:
@@ -278,7 +277,7 @@ public:
     template <typename T>
     using OpsFor = QCPItemOps<T>;
 
-    explicit QCPItem(QCustomPlot* parentPlot);
+    QCPItem();
     virtual ~QCPItem() override;
 
     // getters:
@@ -457,10 +456,11 @@ protected:
 };
 
 /*!
-  The fluent handle of an item: what QCustomPlot::add<T>() returns. An item's constructor takes the
-  plot only, so add<T>() needs no arguments. Subclass contract as in QCPObjectOps; the position
-  setters of a concrete item (setStart/setEnd, ...) take coordinates in the position's current type,
-  which is ptPlotCoords on the plot's default axes for a new item (QCPItem::createPosition).
+  The fluent handle of an item: what QCustomPlot::add<T>() and QCPAxisRect::add<T>() return. The item
+  is built from the arguments of add<T>(args...), then placed and bound to the area it lands in.
+  Subclass contract as in QCPObjectOps; the position setters of a concrete item (setStart/setEnd,
+  ...) take coordinates in the position's current type, which is ptPlotCoords for a new item
+  (QCPItem::createPosition).
 */
 template <typename T, typename Self>
 class QCPItemOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPItemOps<T>>>

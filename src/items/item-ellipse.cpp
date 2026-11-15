@@ -69,11 +69,11 @@
 /*!
   Creates an ellipse item and sets default values.
 
-  The created item is automatically registered with \a parentPlot. This QCustomPlot instance takes
-  ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
+  The item is built without a plot: its positions and anchors have no area until it is placed with
+  QCustomPlot::add<T>() or QCPAxisRect::add<T>().
 */
-QCPItemEllipse::QCPItemEllipse(QCustomPlot* parentPlot)
-        : QCPItem(parentPlot)
+QCPItemEllipse::QCPItemEllipse()
+        : QCPItem()
         , topLeft(createPosition(QLatin1String("topLeft")))
         , bottomRight(createPosition(QLatin1String("bottomRight")))
         , topLeftRim(createAnchor(QLatin1String("topLeftRim"), aiTopLeftRim))

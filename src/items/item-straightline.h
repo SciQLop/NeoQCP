@@ -48,7 +48,7 @@ public:
     template <typename T>
     using OpsFor = QCPItemStraightLineOps<T>;
 
-    explicit QCPItemStraightLine(QCustomPlot* parentPlot);
+    QCPItemStraightLine();
     virtual ~QCPItemStraightLine() override;
 
     // getters:

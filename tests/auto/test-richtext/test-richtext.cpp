@@ -18,7 +18,7 @@ void TestRichText::cleanup()
 
 void TestRichText::createAndSetHtml()
 {
-    auto* item = new QCPItemRichText(mPlot);
+    auto item = mPlot->add<QCPItemRichText>();
     QString html = "<b>Bold</b> and <i>italic</i>";
     item->setHtml(html);
     QCOMPARE(item->html(), html);
@@ -26,7 +26,7 @@ void TestRichText::createAndSetHtml()
 
 void TestRichText::clearHtmlSwitchesToPlainText()
 {
-    auto* item = new QCPItemRichText(mPlot);
+    auto item = mPlot->add<QCPItemRichText>();
     item->setHtml("<b>Bold</b>");
     QVERIFY(!item->html().isEmpty());
 
@@ -36,7 +36,7 @@ void TestRichText::clearHtmlSwitchesToPlainText()
 
 void TestRichText::drawDoesNotCrash()
 {
-    auto* item = new QCPItemRichText(mPlot);
+    auto item = mPlot->add<QCPItemRichText>();
     item->setHtml("<h2>Title</h2><p>Some <b>bold</b> text</p>");
     item->position->setCoords(5, 5);
     mPlot->replot();
@@ -45,7 +45,7 @@ void TestRichText::drawDoesNotCrash()
 
 void TestRichText::drawPlainFallback()
 {
-    auto* item = new QCPItemRichText(mPlot);
+    auto item = mPlot->add<QCPItemRichText>();
     item->setText("Plain text only");
     item->position->setCoords(5, 5);
     mPlot->replot();

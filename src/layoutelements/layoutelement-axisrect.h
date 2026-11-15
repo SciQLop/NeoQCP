@@ -130,6 +130,12 @@ public:
         requires std::derived_from<T, QCPPlottable>
     qcp::HandleFor<T> add(QCPAxis* key, QCPAxis* value, Args&&... args);
 
+    // The handle form of an item constructor: built with the item's own arguments, adopted into
+    // this rect, clipped to it and bound to its first bottom and left axes. Defined in construct.h.
+    template <typename T, typename... Args>
+        requires std::derived_from<T, QCPItem>
+    qcp::HandleFor<T> add(Args&&... args);
+
     QCPHandle<QCPAxis> addAxis(QCPAxis::AxisType type, QCPAxis* axis = nullptr);
     QList<QCPHandle<QCPAxis>> addAxes(QCPAxis::AxisTypes types);
     bool removeAxis(QCPAxis* axis);

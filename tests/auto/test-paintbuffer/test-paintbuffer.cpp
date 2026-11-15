@@ -109,7 +109,7 @@ void TestPaintBuffer::axisDelete_dirtiesPlottableLayer()
 void TestPaintBuffer::axisDelete_dirtiesItemLayer()
 {
     QCPLayer* layer = ownBufferedLayer(mPlot, "item_layer");
-    auto* item = new QCPItemLine(mPlot);
+    auto item = mPlot->add<QCPItemLine>();
     item->setLayer(layer);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     auto buf = layer->mPaintBuffer.toStrongRef();
@@ -142,7 +142,7 @@ void TestPaintBuffer::contentDirty_incrementalReplotSkipsCleanBuffers()
 
     QCPGraph* graph = mPlot->addGraph();
     graph->setData({1.0, 2.0, 3.0}, {1.0, 4.0, 2.0});
-    auto* line = new QCPItemLine(mPlot);
+    auto line = mPlot->add<QCPItemLine>();
     line->setLayer(overlay);
     line->start->setCoords(1, 1);
     line->end->setCoords(3, 3);
@@ -167,7 +167,7 @@ void TestPaintBuffer::contentDirty_incrementalReplotPreservesContent()
 
     QCPGraph* graph = mPlot->addGraph();
     graph->setData({1.0, 2.0, 3.0}, {1.0, 4.0, 2.0});
-    auto* line = new QCPItemLine(mPlot);
+    auto line = mPlot->add<QCPItemLine>();
     line->setLayer(overlay);
     line->start->setPixelPosition(QPointF(50, 50));
     line->end->setPixelPosition(QPointF(150, 150));
@@ -313,7 +313,7 @@ void TestPaintBuffer::skipRepaint_disabledWithItems()
     std::vector<double> vals = {1.0, 4.0, 2.0};
     graph2->setData(std::move(keys), std::move(vals));
 
-    auto* line = new QCPItemLine(mPlot);
+    auto line = mPlot->add<QCPItemLine>();
     QVERIFY(line->setLayer(QStringLiteral("main"))); // same layer as the graph
     line->start->setCoords(1, 1);
     line->end->setCoords(3, 3);
@@ -361,7 +361,7 @@ void TestPaintBuffer::setVisible_dirtiesLayerBuffer()
     QCPLayer* overlay = mPlot->layer("vis_test");
     overlay->setMode(QCPLayer::lmBuffered);
 
-    auto* line = new QCPItemLine(mPlot);
+    auto line = mPlot->add<QCPItemLine>();
     line->setLayer(overlay);
     line->start->setCoords(1, 1);
     line->end->setCoords(3, 3);
@@ -392,7 +392,7 @@ void TestPaintBuffer::setVisible_noOpWhenUnchanged()
     QCPLayer* overlay = mPlot->layer("vis_test");
     overlay->setMode(QCPLayer::lmBuffered);
 
-    auto* line = new QCPItemLine(mPlot);
+    auto line = mPlot->add<QCPItemLine>();
     line->setLayer(overlay);
     line->start->setCoords(1, 1);
     line->end->setCoords(3, 3);

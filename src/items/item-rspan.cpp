@@ -5,8 +5,8 @@
 
 #include "../painting/draw-context.h"
 
-QCPItemRSpan::QCPItemRSpan(QCustomPlot* parentPlot)
-    : QCPSpanItem(parentPlot)
+QCPItemRSpan::QCPItemRSpan()
+    : QCPSpanItem()
     , leftEdge(createPosition(QLatin1String("leftEdge")))
     , rightEdge(createPosition(QLatin1String("rightEdge")))
     , topEdge(createPosition(QLatin1String("topEdge")))
@@ -105,7 +105,7 @@ std::optional<double> QCPItemRSpan::hitTest(QCP::Pixels at, QVariant* details) c
     const double pxTop = qMin(topPx, bottomPx);
     const double pxBottom = qMax(topPx, bottomPx);
 
-    const double tolerance = mParentPlot->selectionTolerance();
+    const double tolerance = mParentPlot ? mParentPlot->selectionTolerance() : 0.0;
 
     const bool inXBand = pos.x() >= pxLeft - tolerance && pos.x() <= pxRight + tolerance;
     const bool inYBand = pos.y() >= pxTop - tolerance && pos.y() <= pxBottom + tolerance;

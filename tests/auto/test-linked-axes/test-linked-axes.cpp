@@ -570,7 +570,7 @@ void TestLinkedAxes::aSpanOnALinkedAxisLandsAtItsCoordToPixel()
     QCPAxis* linked = plot.axisRect()->addAxis(QCPAxis::atBottom);
     linked->setVisible(true);
     linked->linkTo(plot.xAxis, reciprocal, reciprocal);
-    auto* span = new QCPItemSpan(&plot, Qt::Vertical);
+    auto span = plot.add<QCPItemSpan>(Qt::Vertical);
     span->lowerEdge->setAxes(linked, plot.yAxis);
     span->upperEdge->setAxes(linked, plot.yAxis);
     span->setBorderPen(Qt::NoPen);

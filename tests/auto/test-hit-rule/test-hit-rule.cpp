@@ -103,7 +103,7 @@ void TestHitRule::nonSelectableLabelTakesPressGraphTakesSelection()
 {
     mPlot->setInteraction(QCP::iSelectPlottables);
     auto* graph = addDiagonalMultiGraph(mPlot);
-    auto* text = new CountingText(mPlot);
+    auto text = mPlot->add<CountingText>();
     text->setText(QStringLiteral("label"));
     text->position->setCoords(5, 5);
     text->setSelectable(QCP::stNone);
@@ -134,10 +134,10 @@ void TestHitRule::axisRectWheelZoomStillWins()
 
 void TestHitRule::topmostWithinToleranceWins()
 {
-    auto* lower = new QCPItemText(mPlot);
+    auto lower = mPlot->add<QCPItemText>();
     lower->setText(QStringLiteral("hit"));
     lower->position->setCoords(5, 5);
-    auto* upper = new QCPItemText(mPlot);
+    auto upper = mPlot->add<QCPItemText>();
     upper->setText(QStringLiteral("hit"));
     upper->position->setCoords(5, 5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -155,7 +155,7 @@ void TestHitRule::topmostWithinToleranceWins()
 void TestHitRule::spanDragStillBeatsRangeDrag()
 {
     mPlot->setInteraction(QCP::iRangeDrag);
-    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);
     span->setRange(QCPRange(3, 7));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 

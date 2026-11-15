@@ -78,17 +78,17 @@ static QWidget* createSpansTab()
     graph->setData(x, y);
     graph->setPen(QPen(Qt::darkGray, 1.5));
 
-    auto* vspan = new QCPItemSpan(plot, Qt::Vertical);
+    auto vspan = plot->add<QCPItemSpan>(Qt::Vertical);
     vspan->setRange(QCPRange(15, 35));
     vspan->setBrush(QBrush(QColor(0, 100, 255, 50)));
     vspan->setBorderPen(QPen(QColor(0, 100, 255), 2));
 
-    auto* hspan = new QCPItemSpan(plot, Qt::Horizontal);
+    auto hspan = plot->add<QCPItemSpan>(Qt::Horizontal);
     hspan->setRange(QCPRange(60, 80));
     hspan->setBrush(QBrush(QColor(255, 100, 0, 50)));
     hspan->setBorderPen(QPen(QColor(255, 100, 0), 2));
 
-    auto* rspan = new QCPItemRSpan(plot);
+    auto rspan = plot->add<QCPItemRSpan>();
     rspan->setKeyRange(QCPRange(55, 85));
     rspan->setValueRange(QCPRange(15, 45));
     rspan->setBrush(QBrush(QColor(0, 180, 0, 50)));
@@ -104,7 +104,7 @@ static QWidget* createSpansTab()
     }
 
     // range label
-    auto* label = new QCPItemText(plot);
+    auto label = plot->add<QCPItemText>();
     label->setPositionAlignment(Qt::AlignTop | Qt::AlignLeft);
     label->position->setType(QCPItemPosition::ptAxisRectRatio);
     label->position->setCoords(0.02, 0.02);
@@ -146,17 +146,17 @@ static QWidget* createSpansTab()
         plot->setItemCreator([plot, type](QCustomPlot* p, QCPAxis*, QCPAxis*) -> QCPItem* {
             QCPItem* item = nullptr;
             if (type == 0) {
-                auto* s = new QCPItemSpan(p, Qt::Vertical);
+                auto s = p->add<QCPItemSpan>(Qt::Vertical);
                 s->setBrush(QBrush(QColor(0, 100, 255, 50)));
                 s->setBorderPen(QPen(QColor(0, 100, 255), 2));
                 item = s;
             } else if (type == 1) {
-                auto* s = new QCPItemSpan(p, Qt::Horizontal);
+                auto s = p->add<QCPItemSpan>(Qt::Horizontal);
                 s->setBrush(QBrush(QColor(255, 100, 0, 50)));
                 s->setBorderPen(QPen(QColor(255, 100, 0), 2));
                 item = s;
             } else {
-                auto* s = new QCPItemRSpan(p);
+                auto s = p->add<QCPItemRSpan>();
                 s->setBrush(QBrush(QColor(0, 180, 0, 50)));
                 s->setBorderPen(QPen(QColor(0, 180, 0), 2));
                 item = s;
@@ -574,14 +574,14 @@ static QWidget* createItemsTab()
     plot->yAxis->setRange(0, 10);
 
     // text item
-    auto* text = new QCPItemText(plot);
+    auto text = plot->add<QCPItemText>();
     text->position->setCoords(2, 9);
     text->setText("Plain Text");
     text->setFont(QFont("Sans", 12, QFont::Bold));
     text->setColor(Qt::darkBlue);
 
     // rich text item
-    auto* rich = new QCPItemRichText(plot);
+    auto rich = plot->add<QCPItemRichText>();
     rich->position->setCoords(6, 9);
     rich->setHtml("<b>Rich</b> <i style='color:red'>HTML</i> Text");
     rich->setFont(QFont("Sans", 12));
@@ -589,48 +589,48 @@ static QWidget* createItemsTab()
     // LaTeX text item -- the third flavour: an ordinary QCPItemText whose `$...$`
     // span is typeset. No separate item type, and the "Plain Text" above proves
     // text without a span is still drawn verbatim.
-    auto* latex = new QCPItemText(plot);
+    auto latex = plot->add<QCPItemText>();
     latex->position->setCoords(4.5, 7.9);
     latex->setText("LaTeX $\\sqrt{\\frac{\\pi}{2}}\\cdot e^{-x^2}$");
     latex->setFont(QFont("Sans", 12));
     latex->setColor(QColor(120, 0, 120));
 
     // line item
-    auto* line = new QCPItemLine(plot);
+    auto line = plot->add<QCPItemLine>();
     line->start->setCoords(1, 7);
     line->end->setCoords(4, 5);
     line->setPen(QPen(Qt::red, 2));
     line->setHead(QCPLineEnding::esSpikeArrow);
 
     // straight line (infinite)
-    auto* sline = new QCPItemStraightLine(plot);
+    auto sline = plot->add<QCPItemStraightLine>();
     sline->point1->setCoords(0, 2);
     sline->point2->setCoords(10, 5);
     sline->setPen(QPen(Qt::gray, 1, Qt::DashLine));
 
     // rect item
-    auto* rect = new QCPItemRect(plot);
+    auto rect = plot->add<QCPItemRect>();
     rect->topLeft->setCoords(5, 7);
     rect->bottomRight->setCoords(8, 5);
     rect->setPen(QPen(Qt::darkGreen, 2));
     rect->setBrush(QBrush(QColor(0, 200, 0, 40)));
 
     // ellipse item
-    auto* ellipse = new QCPItemEllipse(plot);
+    auto ellipse = plot->add<QCPItemEllipse>();
     ellipse->topLeft->setCoords(1, 4);
     ellipse->bottomRight->setCoords(4, 2);
     ellipse->setPen(QPen(Qt::darkMagenta, 2));
     ellipse->setBrush(QBrush(QColor(200, 0, 200, 40)));
 
     // bracket item
-    auto* bracket = new QCPItemBracket(plot);
+    auto bracket = plot->add<QCPItemBracket>();
     bracket->left->setCoords(6, 3);
     bracket->right->setCoords(9, 3);
     bracket->setPen(QPen(Qt::darkCyan, 2));
     bracket->setLength(15);
 
     // curve item (Bezier)
-    auto* curveItem = new QCPItemCurve(plot);
+    auto curveItem = plot->add<QCPItemCurve>();
     curveItem->start->setCoords(6, 2);
     curveItem->startDir->setCoords(7, 4);
     curveItem->endDir->setCoords(8, 0);
@@ -649,7 +649,7 @@ static QWidget* createItemsTab()
     graph->setData(x, y);
     graph->setPen(QPen(Qt::darkGray, 1));
 
-    auto* tracer = new QCPItemTracer(plot);
+    auto tracer = plot->add<QCPItemTracer>();
     tracer->setGraph(graph);
     tracer->setGraphKey(3.0);
     tracer->setStyle(QCPItemTracer::tsCircle);
@@ -658,7 +658,7 @@ static QWidget* createItemsTab()
     tracer->setSize(8);
 
     // annotating a curve is where a typeset item actually earns its keep
-    auto* tracerLabel = new QCPItemText(plot);
+    auto tracerLabel = plot->add<QCPItemText>();
     tracerLabel->position->setCoords(3.2, 2.6);
     tracerLabel->setText("$y = 1 + \\sin(2x)$");
     tracerLabel->setFont(QFont("Sans", 11));
@@ -668,7 +668,7 @@ static QWidget* createItemsTab()
 
     // Shift+click to draw a line item
     plot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) -> QCPItem* {
-        auto* l = new QCPItemLine(p);
+        auto l = p->add<QCPItemLine>();
         l->setPen(QPen(QColor(200, 50, 50), 2));
         l->setHead(QCPLineEnding::esSpikeArrow);
         return l;
@@ -782,7 +782,7 @@ static QWidget* createThemeTab()
     g2->setName("Signal B");
 
     // vspan on dark theme
-    auto* vspan = new QCPItemSpan(plot, Qt::Vertical);
+    auto vspan = plot->add<QCPItemSpan>(Qt::Vertical);
     vspan->setRange(QCPRange(3, 5));
     vspan->setBrush(QBrush(QColor(100, 180, 255, 40)));
     vspan->setBorderPen(QPen(QColor(100, 180, 255, 120), 1));
@@ -1498,7 +1498,7 @@ static QWidget* createLatexTab()
     plot->xAxis->setLabel("frequency $f$ [Hz]");
     plot->yAxis->setLabel("$\\frac{\\partial B_x}{\\partial t}$ [nT$\\cdot$s$^{-1}$]");
 
-    auto* note = new QCPItemText(plot);
+    auto note = plot->add<QCPItemText>();
     note->position->setCoords(3.0, 0.55);
     note->setText("break at $f_0 = 3$ Hz");
     note->setFont(QFont("sans", 11));

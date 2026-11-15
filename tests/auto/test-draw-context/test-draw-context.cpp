@@ -192,7 +192,7 @@ void TestDrawContext::polylinePositionsMatchesHandPainting()
     Fixture fixture;
     QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
                            nullptr);
-    auto* item = new QCPItemLine(fixture.plot.get());
+    auto item = fixture.plot->add<QCPItemLine>();
     item->start->setPixelPosition(QPointF(150, 40));
 
     const std::vector<QCP::Position> positions {
@@ -1027,13 +1027,13 @@ void TestDrawContext::mixedPositionsKeepKeyAndValueOnAVerticalKeyAxis()
     QCPAxis* valueAxis = fixture.plot->xAxis;
     const QRect rect = fixture.plot->axisRect()->rect();
     const QCPDrawFrame frame = qcpMakeFrame(keyAxis, valueAxis, fixture.plot->axisRect(), rect);
-    QCPItemLine item(fixture.plot.get());
-    item.start->setAxes(keyAxis, valueAxis);
+    auto item = fixture.plot->add<QCPItemLine>();
+    item->start->setAxes(keyAxis, valueAxis);
     const auto check = [&](const QCP::Position& position, QPointF expected, const char* what)
     {
-        item.start->set(position);
+        item->start->set(position);
         const QPointF recorded = qcpResolvePosition(frame, position);
-        const QPointF legacy = item.start->pixelPosition();
+        const QPointF legacy = item->start->pixelPosition();
         const auto near
             = [](QPointF a, QPointF b) { return std::hypot(a.x() - b.x(), a.y() - b.y()) <= 0.5; };
         QVERIFY2(

@@ -1419,7 +1419,7 @@ static QCPGraph* renderedMultiGraph(QCustomPlot* plot)
 
 static void dirtyOverlayBuffer(QCustomPlot* plot)
 {
-    auto* text = new QCPItemText(plot);
+    auto text = plot->add<QCPItemText>();
     text->setLayer(QLatin1String("overlay"));
     plot->replot(QCustomPlot::rpImmediateRefresh); // settle the add
     text->setVisible(false);                        // dirties only the overlay buffer

@@ -80,7 +80,7 @@ public:
     };
     Q_ENUM(TracerStyle)
 
-    explicit QCPItemTracer(QCustomPlot* parentPlot);
+    QCPItemTracer();
     virtual ~QCPItemTracer() override;
 
     // getters:

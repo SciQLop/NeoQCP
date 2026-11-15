@@ -129,7 +129,7 @@ void TestItemSystem::cleanup()
 
 void TestItemSystem::aPositionHasTheSystemOfItsAxes()
 {
-    auto* item = new QCPItemLine(mPlot);
+    auto item = mPlot->add<QCPItemLine>();
     QCPItemPosition* position = item->positions().first();
 
     // The item constructor binds the plot's default pair: the position now names the same system
@@ -156,7 +156,7 @@ void TestItemSystem::aOneAxisPositionKeepsTwoXPixels()
     const QRect rect = mPlot->axisRect()->rect();
 
     {
-        auto* item = new QCPItemLine(mPlot);
+        auto item = mPlot->add<QCPItemLine>();
         QCPItemPosition* position = item->positions().first();
         position->setAxes(nullptr, mPlot->yAxis);
         QCOMPARE(position->keyAxis(), nullptr);
@@ -175,7 +175,7 @@ void TestItemSystem::aOneAxisPositionKeepsTwoXPixels()
     }
 
     {
-        auto* item = new QCPItemLine(mPlot);
+        auto item = mPlot->add<QCPItemLine>();
         QCPItemPosition* position = item->positions().first();
         position->setAxes(mPlot->xAxis, nullptr);
         QCOMPARE(position->keyAxis(), mPlot->xAxis);
@@ -200,7 +200,7 @@ void TestItemSystem::aSystemMisuseKeepsTheOldSystem()
     QCPAxis* foreign = second->axis(QCPAxis::atBottom);
     QVERIFY(foreign);
 
-    auto* item = new QCPItemLine(mPlot);
+    auto item = mPlot->add<QCPItemLine>();
     QCPItemPosition* position = item->positions().first();
     QCPCoordinateSystem* before = position->system();
     QVERIFY(before);
@@ -219,7 +219,7 @@ void TestItemSystem::aSystemMisuseKeepsTheOldSystem()
 
 void TestItemSystem::aDeletedAxisLeavesThePositionInert()
 {
-    auto* item = new QCPItemLine(mPlot);
+    auto item = mPlot->add<QCPItemLine>();
     QCPItemPosition* position = item->positions().first();
     QVERIFY(position->system());
 
@@ -264,7 +264,7 @@ void TestItemSystem::theTracerFollowsItsGraphSystem()
     auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVERIFY(graph->system());
 
-    auto* tracer = new QCPItemTracer(mPlot);
+    auto tracer = mPlot->add<QCPItemTracer>();
     tracer->setGraph(graph);
     QCOMPARE(tracer->position->system(), graph->system());
     QCOMPARE(tracer->position->area(), static_cast<QCPArea*>(mPlot->axisRect()));
@@ -273,7 +273,7 @@ void TestItemSystem::theTracerFollowsItsGraphSystem()
 void TestItemSystem::itemClipAreaIsTheCartesianClip()
 {
     QCPAxisRect* second = addSecondRect(mPlot);
-    auto* item = new QCPItemLine(mPlot);
+    auto item = mPlot->add<QCPItemLine>();
     QCOMPARE(item->clipArea(), static_cast<QCPArea*>(mPlot->axisRect()));
     QCOMPARE(item->clipAxisRect(), mPlot->axisRect());
 
@@ -292,7 +292,7 @@ void TestItemSystem::aCreatedItemBindsTheNewRectsSystem()
     QVERIFY(second->rect().isValid());
 
     mPlot->setItemCreator([](QCustomPlot* plot, QCPAxis*, QCPAxis*)
-                          { return new QCPItemLine(plot); });
+                          { return plot->add<QCPItemLine>(); });
     mPlot->setCreationModeEnabled(true);
 
     QSignalSpy created(mPlot, &QCustomPlot::itemCreated);
@@ -316,7 +316,7 @@ void TestItemSystem::aCreatedItemBindsTheNewRectsSystem()
 void TestItemSystem::aTextFollowsAPolarDataPoint()
 {
     QCPPolarArea* area = polarOnly(mPlot);
-    auto* text = new CountingText(mPlot);
+    auto text = mPlot->add<CountingText>();
     text->setText(QStringLiteral("polar"));
     text->setColor(Qt::red);
     text->position->setCoords(90.0, 0.6);
@@ -351,7 +351,7 @@ void TestItemSystem::aTextFollowsAPolarDataPoint()
 void TestItemSystem::aPolarRatioIsAngleAndRadiusFractions()
 {
     QCPPolarArea* area = polarOnly(mPlot);
-    auto* item = new QCPItemLine(mPlot);
+    auto item = mPlot->add<QCPItemLine>();
     QCPItemPosition* position = item->positions().first();
     position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
     position->setType(QCPItemPosition::ptAxisRectRatio);
@@ -370,7 +370,7 @@ void TestItemSystem::aPolarRatioIsAngleAndRadiusFractions()
 void TestItemSystem::aPolarItemClipsToTheDisc()
 {
     QCPPolarArea* area = polarOnly(mPlot);
-    auto* item = new QCPItemEllipse(mPlot);
+    auto item = mPlot->add<QCPItemEllipse>();
     item->setBrush(QBrush(Qt::red));
     item->setPen(Qt::NoPen);
     for (QCPItemPosition* position : item->positions())
@@ -396,7 +396,7 @@ void TestItemSystem::aPolarItemClipsToTheDisc()
 void TestItemSystem::anUnclippedPolarItemIsNotClipped()
 {
     QCPPolarArea* area = polarOnly(mPlot);
-    auto* item = new QCPItemEllipse(mPlot);
+    auto item = mPlot->add<QCPItemEllipse>();
     item->setBrush(QBrush(Qt::red));
     item->setPen(Qt::NoPen);
     for (QCPItemPosition* position : item->positions())
@@ -424,7 +424,7 @@ void TestItemSystem::anUnclippedPolarItemIsNotClipped()
 void TestItemSystem::aPolarItemIsHittable()
 {
     QCPPolarArea* area = polarOnly(mPlot);
-    auto* item = new QCPItemRect(mPlot);
+    auto item = mPlot->add<QCPItemRect>();
     item->setBrush(QBrush(Qt::red));
     item->setPen(Qt::NoPen);
     for (QCPItemPosition* position : item->positions())
@@ -446,7 +446,7 @@ void TestItemSystem::aPolarItemIsHittable()
 void TestItemSystem::deletingThePolarAreaLeavesItsItemsInert()
 {
     QCPPolarArea* area = secondPolar(mPlot);
-    auto* text = new CountingText(mPlot);
+    auto text = mPlot->add<CountingText>();
     text->setText(QStringLiteral("polar"));
     text->setColor(Qt::red);
     text->position->setCoords(90.0, 0.6);
@@ -501,7 +501,7 @@ void TestItemSystem::aPolarSetTypeKeepsThePixel()
 {
     auto* area = polarOnly(mPlot);
     mPlot->replot();
-    auto* item = new QCPItemEllipse(mPlot);
+    auto item = mPlot->add<QCPItemEllipse>();
     QCPItemPosition* position = item->positions().first();
     position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
     position->setType(QCPItemPosition::ptPlotCoords);
@@ -524,7 +524,7 @@ void TestItemSystem::aPolarAreaAbsolutePositionIsFromTheAreaCorner()
 {
     auto* area = polarOnly(mPlot);
     mPlot->replot();
-    auto* item = new QCPItemEllipse(mPlot);
+    auto item = mPlot->add<QCPItemEllipse>();
     QCPItemPosition* position = item->positions().first();
     position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
     position->setType(QCPItemPosition::ptAxisRectAbsolute);
@@ -547,7 +547,7 @@ void TestItemSystem::aCartesianSystemWithAPolarAreaPlacesRatiosByPixel()
 {
     auto* area = polarOnly(mPlot);
     mPlot->replot();
-    auto* item = new QCPItemEllipse(mPlot);
+    auto item = mPlot->add<QCPItemEllipse>();
     QCPItemPosition* position = item->positions().first();
     position->setArea(area);
     position->setType(QCPItemPosition::ptAxisRectRatio);
@@ -573,7 +573,7 @@ void TestItemSystem::aSetAxesAfterAPolarSystemTakesTheRectsArea()
 {
     auto* area = polarOnly(mPlot);
     mPlot->replot();
-    auto* item = new QCPItemEllipse(mPlot);
+    auto item = mPlot->add<QCPItemEllipse>();
     QCPItemPosition* position = item->positions().first();
     position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
     QCOMPARE(position->area(), static_cast<QCPArea*>(area));
@@ -596,7 +596,7 @@ void TestItemSystem::aBindingAPositionToASystemMovesTheClipArea()
     auto* area = new QCPPolarArea(mPlot);
     mPlot->plotLayout()->addElement(1, 0, area);
     mPlot->replot();
-    auto* item = new QCPItemEllipse(mPlot);
+    auto item = mPlot->add<QCPItemEllipse>();
     QCOMPARE(item->clipArea(), static_cast<QCPArea*>(mPlot->axisRect()));
 
     item->positions().first()->setSystem(area->system(area->angularAxis(), area->radialAxis()));
@@ -613,7 +613,7 @@ void TestItemSystem::aBindingAPositionToASystemMovesTheClipArea()
 void TestItemSystem::setAxesNullUnbindsAPolarSystem()
 {
     auto* area = polarOnly(mPlot);
-    auto* item = new QCPItemEllipse(mPlot);
+    auto item = mPlot->add<QCPItemEllipse>();
     QCPItemPosition* position = item->positions().first();
     position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
     QVERIFY(position->system());
@@ -628,7 +628,7 @@ void TestItemSystem::setSystemTwiceRetakesTheArea()
     auto* other = secondPolar(mPlot);
     mPlot->replot();
     QCPCoordinateSystem* system = area->system(area->angularAxis(), area->radialAxis());
-    auto* item = new QCPItemEllipse(mPlot);
+    auto item = mPlot->add<QCPItemEllipse>();
     QCPItemPosition* position = item->positions().first();
     position->setSystem(system);
     position->setArea(other);
@@ -644,7 +644,7 @@ void TestItemSystem::theProjectionsFollowDeletionAndAMoveToAnotherPlot()
 {
     auto* lower = new QCPAxisRect(mPlot);
     mPlot->plotLayout()->addElement(1, 0, lower);
-    auto* item = new QCPItemTracer(mPlot);
+    auto item = mPlot->add<QCPItemTracer>();
     QCPItemPosition* position = item->position;
     position->setAxes(lower->axis(QCPAxis::atBottom), lower->axis(QCPAxis::atLeft));
     QCOMPARE(position->axisRect(), lower);
@@ -686,7 +686,7 @@ void TestItemSystem::theProjectionsFollowEveryFrame()
     // the one axis of a one-axis position (axistag.cpp), null on a polar frame.
     QCPAxisRect* rect = mPlot->axisRect();
     auto* polar = secondPolar(mPlot);
-    auto* item = new QCPItemTracer(mPlot);
+    auto item = mPlot->add<QCPItemTracer>();
     QCPItemPosition* position = item->position;
 
     position->setAxes(mPlot->xAxis, mPlot->yAxis);

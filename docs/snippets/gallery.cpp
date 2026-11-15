@@ -158,7 +158,7 @@ DOC_SNIPPET(gallery_ten_million_points, 800, 520)
     detailRect->axis(QCPAxis::atLeft)->setRange(-2, 4.5);
     detailRect->axis(QCPAxis::atBottom)->setLabel("time [s]");
 
-    auto* marker = new QCPItemRect(customPlot);   // where the detail view looks
+    auto marker = customPlot->add<QCPItemRect>();   // where the detail view looks
     marker->topLeft->setCoords(window.lower - 40, 4.3);
     marker->bottomRight->setCoords(window.upper + 40, -1.8);
     marker->setPen(QPen(QColor(214, 39, 40), 1.5));
@@ -543,7 +543,7 @@ DOC_SNIPPET(gallery_fit_residuals, 680, 560)
     customPlot->plotLayout()->setRowStretchFactors({ 3, 1.2 });
     QCPAxis* residualT = residualRect->axis(QCPAxis::atBottom);
     QCPAxis* residualAxis = residualRect->axis(QCPAxis::atLeft);
-    auto* band = new QCPItemSpan(customPlot, Qt::Horizontal);   // the 1 sigma band
+    auto band = customPlot->add<QCPItemSpan>(Qt::Horizontal);   // the 1 sigma band
     band->setClipAxisRect(residualRect);
     for (QCPItemPosition* edge : { band->lowerEdge, band->upperEdge })
         edge->setAxes(residualT, residualAxis);

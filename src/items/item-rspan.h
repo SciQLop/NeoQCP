@@ -22,7 +22,7 @@ public:
     template <typename T>
     using OpsFor = QCPItemRSpanOps<T>;
 
-    explicit QCPItemRSpan(QCustomPlot* parentPlot);
+    QCPItemRSpan();
 
     QCPRange keyRange() const;
     QCPRange valueRange() const;

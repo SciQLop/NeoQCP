@@ -8,7 +8,7 @@ void TestSpanRhi::init()
     mPlot->resize(400, 300);
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
-    mSpan = new QCPItemSpan(mPlot, Qt::Vertical);
+    mSpan = mPlot->add<QCPItemSpan>(Qt::Vertical);
     mSpan->lowerEdge->setCoords(2, 0);
     mSpan->upperEdge->setCoords(4, 0);
     // Shown so that resize() delivers a resizeEvent (hidden widgets defer it),
@@ -69,7 +69,7 @@ void TestSpanRhi::exportedSpanHasNoOutlineTheScreenLacks()
         QSKIP("No QRhi available — spans are drawn on the GPU only with a real backend");
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
-    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);
     span->setRange(QCPRange(2, 8));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
@@ -92,7 +92,7 @@ void TestSpanRhi::dashedSpanBorderIsDashedOnScreen()
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
     mPlot->xAxis->grid()->setVisible(false);
-    auto* span = new QCPItemSpan(mPlot, Qt::Vertical); // clear of the fixture's span (2..4)
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical); // clear of the fixture's span (2..4)
     span->setRange(QCPRange(5, 8));
     span->setBrush(Qt::NoBrush);
     span->setBorderPen(QPen(Qt::black, 2, Qt::DashLine));
@@ -114,7 +114,7 @@ void TestSpanRhi::gradientSpanBrushLooksTheSameOnScreen()
 {
     if (!waitForRhi(mPlot))
         QSKIP("No QRhi available — spans are drawn on the GPU only with a real backend");
-    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);
     span->setRange(QCPRange(5, 9));
     QLinearGradient gradient(0, 0, 0, 300);
     gradient.setColorAt(0, Qt::red);
@@ -138,7 +138,7 @@ void TestSpanRhi::spanOnALowerLayerStaysUnderTheData()
 {
     if (!waitForRhi(mPlot))
         QSKIP("No QRhi available — spans are drawn on the GPU only with a real backend");
-    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);
     span->setRange(QCPRange(5, 9));
     span->setBrush(QColor(0, 0, 255));
     span->setLayer("background");
@@ -163,7 +163,7 @@ void TestSpanRhi::aRecordedSpanDrawsOnTheGpuPath()
         QSKIP("No QRhi available — spans are drawn on the GPU only with a real backend");
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
-    auto* span = new RecordingSpan(mPlot, Qt::Vertical);
+    auto span = mPlot->add<RecordingSpan>(Qt::Vertical);
     span->setRange(QCPRange(5, 9));
     span->setBrush(QColor(0, 0, 255));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);

@@ -18,7 +18,7 @@ void TestRSpan::cleanup()
 
 void TestRSpan::createAndRanges()
 {
-    auto* span = new QCPItemRSpan(mPlot);
+    auto span = mPlot->add<QCPItemRSpan>();
     span->setKeyRange(QCPRange(2, 8));
     span->setValueRange(QCPRange(3, 7));
 
@@ -30,7 +30,7 @@ void TestRSpan::createAndRanges()
 
 void TestRSpan::selectTestEdges()
 {
-    auto* span = new QCPItemRSpan(mPlot);
+    auto span = mPlot->add<QCPItemRSpan>();
     span->setKeyRange(QCPRange(2, 8));
     span->setValueRange(QCPRange(2, 8));
     mPlot->replot();
@@ -77,7 +77,7 @@ void TestRSpan::selectTestEdges()
 
 void TestRSpan::selectTestFill()
 {
-    auto* span = new QCPItemRSpan(mPlot);
+    auto span = mPlot->add<QCPItemRSpan>();
     span->setKeyRange(QCPRange(2, 8));
     span->setValueRange(QCPRange(2, 8));
     mPlot->replot();
@@ -93,7 +93,7 @@ void TestRSpan::selectTestFill()
 
 void TestRSpan::drawDoesNotCrash()
 {
-    auto* span = new QCPItemRSpan(mPlot);
+    auto span = mPlot->add<QCPItemRSpan>();
     span->setKeyRange(QCPRange(1, 9));
     span->setValueRange(QCPRange(1, 9));
     mPlot->replot();
@@ -102,7 +102,7 @@ void TestRSpan::drawDoesNotCrash()
 
 void TestRSpan::exportFallbackRendersSpan()
 {
-    auto* span = new QCPItemRSpan(mPlot);
+    auto span = mPlot->add<QCPItemRSpan>();
     span->setKeyRange(QCPRange(3, 7));
     span->setValueRange(QCPRange(3, 7));
     span->setBrush(QBrush(QColor(0, 0, 255, 128)));
@@ -121,7 +121,7 @@ void TestRSpan::exportFallbackRendersSpan()
 
 void TestRSpan::dirtyTrackingReplots()
 {
-    auto* span = new QCPItemRSpan(mPlot);
+    auto span = mPlot->add<QCPItemRSpan>();
     span->setKeyRange(QCPRange(2, 8));
     span->setValueRange(QCPRange(2, 8));
     mPlot->replot();
@@ -144,7 +144,7 @@ void TestRSpan::drawOnLogAxis()
     mPlot->xAxis->setRange(1, 1000);
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->yAxis->setRange(1, 1000);
-    auto* span = new QCPItemRSpan(mPlot);
+    auto span = mPlot->add<QCPItemRSpan>();
     span->setKeyRange(QCPRange(10, 100));
     span->setValueRange(QCPRange(10, 100));
     mPlot->replot();
@@ -156,7 +156,7 @@ void TestRSpan::edgesHonourTheirPositionType()
     // The edges are QCPItemPositions, so a non-plot-coords type must be honoured
     // rather than the coords being force-fed to QCPAxis::coordToPixel().
     mPlot->replot();
-    QCPItemRSpan* span = new QCPItemRSpan(mPlot);
+    QCPItemRSpan* span = mPlot->add<QCPItemRSpan>();
     span->leftEdge->setTypeX(QCPItemPosition::ptAxisRectAbsolute);
     span->rightEdge->setTypeX(QCPItemPosition::ptAxisRectAbsolute);
     span->topEdge->setTypeY(QCPItemPosition::ptAxisRectAbsolute);
@@ -184,7 +184,7 @@ void sendMouse(QCustomPlot* plot, QEvent::Type type, QPoint pos, Qt::MouseButton
 // must stop the second.
 void TestRSpan::fillDragSlotDeletingTheSpanIsSafe()
 {
-    auto* span = new QCPItemRSpan(mPlot);
+    auto span = mPlot->add<QCPItemRSpan>();
     span->setKeyRange(QCPRange(3, 7));
     span->setValueRange(QCPRange(3, 7));
     mPlot->replot();
@@ -204,7 +204,7 @@ void TestRSpan::pixelModeDragMovesByPixels()
     mPlot->xAxis->setRange(0, 1000);
     mPlot->yAxis->setRange(0, 1000);
     mPlot->replot();
-    auto* span = new QCPItemRSpan(mPlot);
+    auto span = mPlot->add<QCPItemRSpan>();
     for (auto* edge : {span->leftEdge, span->rightEdge, span->topEdge, span->bottomEdge})
     {
         edge->setTypeX(QCPItemPosition::ptAxisRectAbsolute);
@@ -225,7 +225,7 @@ void TestRSpan::pixelModeDragMovesByPixels()
 
 void TestRSpan::dataDragMovesByMouseDelta()
 {
-    auto* span = new QCPItemRSpan(mPlot);
+    auto span = mPlot->add<QCPItemRSpan>();
     span->setKeyRange(QCPRange(3, 7));
     span->setValueRange(QCPRange(2, 6));
     mPlot->replot();
@@ -246,7 +246,7 @@ void TestRSpan::logAxisDragFollowsTheMouseInPixels()
     mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->xAxis->setRange(1, 1000);
     mPlot->replot();
-    auto* span = new QCPItemRSpan(mPlot);
+    auto span = mPlot->add<QCPItemRSpan>();
     span->setKeyRange(QCPRange(10, 100));
     span->setValueRange(QCPRange(2, 6));
     mPlot->replot();
@@ -262,7 +262,7 @@ void TestRSpan::logAxisDragFollowsTheMouseInPixels()
 
 void TestRSpan::mixedEdgesEachMoveInTheirOwnUnit()
 {
-    auto* span = new QCPItemRSpan(mPlot);
+    auto span = mPlot->add<QCPItemRSpan>();
     span->leftEdge->setTypeX(QCPItemPosition::ptAxisRectAbsolute);
     span->leftEdge->setCoords(100, span->leftEdge->coords().y());
     span->rightEdge->setCoords(7, span->rightEdge->coords().y());

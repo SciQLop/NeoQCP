@@ -239,7 +239,7 @@ QImage itemScene(const char* kind)
             plot.yAxis->setRange(0, 1);
             if (name == QLatin1String("line-arrows"))
             {
-                auto* line = new QCPItemLine(&plot);
+                auto line = plot.add<QCPItemLine>();
                 line->start->setCoords(0.5, 0.2);
                 line->end->setCoords(5.5, 0.8);
                 line->setHead(QCPLineEnding::esSpikeArrow);
@@ -248,14 +248,14 @@ QImage itemScene(const char* kind)
             }
             else if (name == QLatin1String("straightline"))
             {
-                auto* line = new QCPItemStraightLine(&plot);
+                auto line = plot.add<QCPItemStraightLine>();
                 line->point1->setCoords(1.0, 0.1);
                 line->point2->setCoords(4.0, 0.9);
                 line->setPen(QPen(QColor(160, 40, 120), 2));
             }
             else if (name == QLatin1String("curve"))
             {
-                auto* curve = new QCPItemCurve(&plot);
+                auto curve = plot.add<QCPItemCurve>();
                 curve->start->setCoords(0.5, 0.2);
                 curve->startDir->setCoords(2.0, 0.9);
                 curve->endDir->setCoords(4.0, 0.1);
@@ -264,7 +264,7 @@ QImage itemScene(const char* kind)
             }
             else if (name == QLatin1String("bracket"))
             {
-                auto* bracket = new QCPItemBracket(&plot);
+                auto bracket = plot.add<QCPItemBracket>();
                 bracket->left->setCoords(1.0, 0.75);
                 bracket->right->setCoords(5.0, 0.25);
                 bracket->setLength(30);
@@ -272,7 +272,7 @@ QImage itemScene(const char* kind)
             }
             else if (name == QLatin1String("rect"))
             {
-                auto* rect = new QCPItemRect(&plot);
+                auto rect = plot.add<QCPItemRect>();
                 rect->topLeft->setCoords(1.0, 0.8);
                 rect->bottomRight->setCoords(4.5, 0.2);
                 rect->setPen(QPen(QColor(200, 120, 20), 2));
@@ -280,7 +280,7 @@ QImage itemScene(const char* kind)
             }
             else if (name == QLatin1String("ellipse"))
             {
-                auto* ellipse = new QCPItemEllipse(&plot);
+                auto ellipse = plot.add<QCPItemEllipse>();
                 ellipse->topLeft->setCoords(1.5, 0.85);
                 ellipse->bottomRight->setCoords(4.5, 0.15);
                 ellipse->setPen(QPen(QColor(120, 60, 180), 2));
@@ -288,7 +288,7 @@ QImage itemScene(const char* kind)
             }
             else if (name == QLatin1String("pixmap") || name == QLatin1String("pixmap-scaled"))
             {
-                auto* pixmap = new QCPItemPixmap(&plot);
+                auto pixmap = plot.add<QCPItemPixmap>();
                 pixmap->setPixmap(testPixmap());
                 pixmap->topLeft->setCoords(1.0, 0.8);
                 pixmap->bottomRight->setCoords(4.5, 0.2);
@@ -306,7 +306,7 @@ QImage itemScene(const char* kind)
                 }
                 graph->setPen(QPen(Qt::blue, 0));
                 graph->setData(keys, values);
-                auto* tracer = new QCPItemTracer(&plot);
+                auto tracer = plot.add<QCPItemTracer>();
                 tracer->setGraph(graph);
                 tracer->setGraphKey(3.2);
                 tracer->setStyle(QCPItemTracer::tsCircle);
@@ -326,21 +326,21 @@ QImage spanScene(const char* kind)
             plot.yAxis->setRange(0, 1);
             if (name == QLatin1String("h"))
             {
-                auto* span = new QCPItemSpan(&plot, Qt::Horizontal);
+                auto span = plot.add<QCPItemSpan>(Qt::Horizontal);
                 span->setRange(QCPRange(0.3, 0.6));
                 span->setBrush(QColor(40, 90, 200, 50));
                 span->setBorderPen(QPen(QColor(40, 90, 200), 2));
             }
             else if (name == QLatin1String("v"))
             {
-                auto* span = new QCPItemSpan(&plot, Qt::Vertical);
+                auto span = plot.add<QCPItemSpan>(Qt::Vertical);
                 span->setRange(QCPRange(2.0, 4.0));
                 span->setBrush(QColor(200, 60, 40, 50));
                 span->setBorderPen(QPen(QColor(200, 60, 40), 2));
             }
             else if (name == QLatin1String("r"))
             {
-                auto* span = new QCPItemRSpan(&plot);
+                auto span = plot.add<QCPItemRSpan>();
                 span->leftEdge->setCoords(1.5, 0);
                 span->rightEdge->setCoords(4.5, 1);
                 span->topEdge->setCoords(0, 0.8);
@@ -350,7 +350,7 @@ QImage spanScene(const char* kind)
             }
             else if (name == QLatin1String("selected"))
             {
-                auto* span = new QCPItemSpan(&plot, Qt::Vertical);
+                auto span = plot.add<QCPItemSpan>(Qt::Vertical);
                 span->setRange(QCPRange(1.5, 3.5));
                 span->setBrush(QColor(200, 60, 40, 50));
                 span->setBorderPen(QPen(QColor(200, 60, 40), 2));
@@ -708,13 +708,13 @@ QImage polarItemsScene()
                 item->setClipToAxisRect(true);
             };
 
-            auto* line = new QCPItemLine(&plot);
+            auto line = plot.add<QCPItemLine>();
             place(line->start, 150.0, 0.25);
             place(line->end, 300.0, 0.9);
             line->setPen(QPen(QColor(31, 119, 180), 2));
             clip(line);
 
-            auto* ellipse = new QCPItemEllipse(&plot);
+            auto ellipse = plot.add<QCPItemEllipse>();
             ratio(ellipse->topLeft, 0.10, 0.10);
             ratio(ellipse->bottomRight, 0.55, 1.25); // past the rim: the disc cuts the bottom
             ellipse->setPen(QPen(QColor(44, 160, 44), 2));
@@ -723,14 +723,14 @@ QImage polarItemsScene()
 
             // A span-like band across the lower half, in area ratios: its corners land outside the
             // disc, so the clip cuts it with the arc instead of the area rect.
-            auto* band = new QCPItemRect(&plot);
+            auto band = plot.add<QCPItemRect>();
             ratio(band->topLeft, -0.10, 0.85);
             ratio(band->bottomRight, 1.10, 1.25); // a corner past the rim: cut by the arc
             band->setPen(Qt::NoPen);
             band->setBrush(QBrush(QColor(255, 127, 14, 120)));
             clip(band);
 
-            auto* text = new QCPItemText(&plot);
+            auto text = plot.add<QCPItemText>();
             text->setText(QStringLiteral("text"));
             text->setColor(QColor(214, 39, 40));
             place(text->position, 60.0, 0.75);

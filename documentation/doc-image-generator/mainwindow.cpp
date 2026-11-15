@@ -81,13 +81,13 @@ void MainWindow::genScatterStyles()
 void MainWindow::genItemPixmap()
 {
   resetPlot();
-  QCPItemPixmap *pixmapItem = new QCPItemPixmap(customPlot);
+  QCPItemPixmap *pixmapItem = customPlot->add<QCPItemPixmap>();
   pixmapItem->setPixmap(QPixmap(GNU_PNG_PATH));
   pixmapItem->setScaled(true, Qt::IgnoreAspectRatio);
   pixmapItem->topLeft->setCoords(-0.2, 1);
   pixmapItem->bottomRight->setCoords(0.3, 0);
   labelItemAnchors(pixmapItem);
-  QCPItemPixmap *pixmapItem2 = new QCPItemPixmap(customPlot);
+  QCPItemPixmap *pixmapItem2 = customPlot->add<QCPItemPixmap>();
   pixmapItem2->setPixmap(QPixmap(GNU_PNG_PATH));
   pixmapItem2->setScaled(true, Qt::IgnoreAspectRatio);
   pixmapItem2->topLeft->setCoords(1.2, 0);
@@ -99,7 +99,7 @@ void MainWindow::genItemPixmap()
 void MainWindow::genItemRect()
 {
   resetPlot();
-  QCPItemRect *rect = new QCPItemRect(customPlot);
+  QCPItemRect *rect = customPlot->add<QCPItemRect>();
   rect->setBrush(defaultBrush);
   rect->topLeft->setCoords(0, 1);
   rect->bottomRight->setCoords(1, 0);
@@ -110,7 +110,7 @@ void MainWindow::genItemRect()
 void MainWindow::genItemEllipse()
 {
   resetPlot();
-  QCPItemEllipse *ellipse = new QCPItemEllipse(customPlot);
+  QCPItemEllipse *ellipse = customPlot->add<QCPItemEllipse>();
   ellipse->setBrush(defaultBrush);
   ellipse->topLeft->setCoords(-0.15, 1.1);
   ellipse->bottomRight->setCoords(1.1, 0);
@@ -121,7 +121,7 @@ void MainWindow::genItemEllipse()
 void MainWindow::genItemLine()
 {
   resetPlot();
-  QCPItemLine *line = new QCPItemLine(customPlot);
+  QCPItemLine *line = customPlot->add<QCPItemLine>();
   line->start->setCoords(-0.1, 0.8);
   line->end->setCoords(1.1, 0.2);
   line->setHead(QCPLineEnding::esSpikeArrow);
@@ -132,7 +132,7 @@ void MainWindow::genItemLine()
 void MainWindow::genItemStraightLIne()
 {
   resetPlot();
-  QCPItemStraightLine *straightLine = new QCPItemStraightLine(customPlot);
+  QCPItemStraightLine *straightLine = customPlot->add<QCPItemStraightLine>();
   straightLine->point1->setCoords(0, 0.4);
   straightLine->point2->setCoords(1, 0.6);
   labelItemAnchors(straightLine);
@@ -142,7 +142,7 @@ void MainWindow::genItemStraightLIne()
 void MainWindow::genItemCurve()
 {
   resetPlot();
-  QCPItemCurve *curve = new QCPItemCurve(customPlot);
+  QCPItemCurve *curve = customPlot->add<QCPItemCurve>();
   curve->start->setCoords(0, 1);
   curve->startDir->setCoords(0.5, 1);
   curve->endDir->setCoords(0.7, 0.2);
@@ -156,7 +156,7 @@ void MainWindow::genItemCurve()
 void MainWindow::genItemBracket()
 {
   resetPlot();
-  QCPItemBracket *bracket = new QCPItemBracket(customPlot);
+  QCPItemBracket *bracket = customPlot->add<QCPItemBracket>();
   bracket->left->setCoords(-0.2, 0.35);
   bracket->right->setCoords(1.2, 0.65);
   bracket->setLength(12);
@@ -167,13 +167,13 @@ void MainWindow::genItemBracket()
   // generate image of multiple bracket lengths/styles:
   for (int i=0; i<4; ++i)
   {
-    QCPItemBracket *bracket = new QCPItemBracket(customPlot);
+    QCPItemBracket *bracket = customPlot->add<QCPItemBracket>();
     bracket->setStyle(QCPItemBracket::bsCalligraphic);
     bracket->left->setCoords(-0.35+i*0.18, 0.95);
     bracket->right->setCoords(-0.15+i*0.18, 0.05);
     bracket->setLength(10+i*5);
     labelItemAnchors(bracket, 0, true, false);
-    QCPItemText *label = new QCPItemText(customPlot);
+    QCPItemText *label = customPlot->add<QCPItemText>();
     label->setText(QString::number(bracket->length()));
     label->position->setParentAnchor(bracket->right);
     label->position->setCoords(-5, 20);
@@ -181,23 +181,23 @@ void MainWindow::genItemBracket()
   }
   for (int i=0; i<4; ++i)
   {
-    QCPItemBracket *bracket = new QCPItemBracket(customPlot);
+    QCPItemBracket *bracket = customPlot->add<QCPItemBracket>();
     bracket->setStyle(QCPItemBracket::bsSquare);
     bracket->left->setCoords(0.55+i*0.18, 0.95);
     bracket->right->setCoords(0.75+i*0.18, 0.05);
     bracket->setLength(10+i*5);
     labelItemAnchors(bracket, 0, true, false);
-    QCPItemText *label = new QCPItemText(customPlot);
+    QCPItemText *label = customPlot->add<QCPItemText>();
     label->setText(QString::number(bracket->length()));
     label->position->setParentAnchor(bracket->right);
     label->position->setCoords(-5, 20);
     label->setFont(QFont(font().family(), 9));
   }
-  QCPItemText *topLabel1 = new QCPItemText(customPlot);
+  QCPItemText *topLabel1 = customPlot->add<QCPItemText>();
   topLabel1->setText("bsCalligraphic");
   topLabel1->position->setCoords(-0.05, 1.1);
   topLabel1->setFont(QFont(font().family(), 10));
-  QCPItemText *topLabel2 = new QCPItemText(customPlot);
+  QCPItemText *topLabel2 = customPlot->add<QCPItemText>();
   topLabel2->setText("bsSquare");
   topLabel2->position->setCoords(0.85, 1.1);
   topLabel2->setFont(QFont(font().family(), 10));
@@ -207,7 +207,7 @@ void MainWindow::genItemBracket()
 void MainWindow::genItemText()
 {
   resetPlot();
-  QCPItemText *text = new QCPItemText(customPlot);
+  QCPItemText *text = customPlot->add<QCPItemText>();
   text->position->setCoords(0.5, 0.5);
   text->setText("QCustomPlot\nWidget");
   text->setFont(QFont(font().family(), 24));
@@ -229,7 +229,7 @@ void MainWindow::genItemTracer()
   }
   customPlot->graph()->setData(x, y);
   customPlot->graph()->setPen(QPen(Qt::red));
-  QCPItemTracer *tracer = new QCPItemTracer(customPlot);
+  QCPItemTracer *tracer = customPlot->add<QCPItemTracer>();
   tracer->setStyle(QCPItemTracer::tsCrosshair);
   tracer->setGraph(customPlot->graph());
   tracer->setGraphKey(0.8);
@@ -251,12 +251,12 @@ void MainWindow::genLineEnding()
     if (ending.style() == QCPLineEnding::esSkewedBar)
       ending.setInverted(true);
     
-    QCPItemLine *line = new QCPItemLine(customPlot);
+    QCPItemLine *line = customPlot->add<QCPItemLine>();
     line->setPen(QPen(Qt::black, 0, Qt::SolidLine, Qt::FlatCap));
     line->start->setCoords(offset+i*step-0.1, -0.2);
     line->end->setCoords(offset+i*step, 0.5);
     line->setHead(ending);
-    QCPItemText *text = new QCPItemText(customPlot);
+    QCPItemText *text = customPlot->add<QCPItemText>();
     text->position->setParentAnchor(line->end);
     text->position->setCoords(8, -15-(i%2)*15);
     text->setFont(QFont(font().family(), 8));
@@ -291,14 +291,14 @@ void MainWindow::genAlignmentGroup()
   
   QFont textFont;
   textFont.setBold(true);
-  QCPItemText *leftCaption = new QCPItemText(customPlot);
+  QCPItemText *leftCaption = customPlot->add<QCPItemText>();
   leftCaption->position->setType(QCPItemPosition::ptViewportRatio);
   leftCaption->setClipToAxisRect(false);
   leftCaption->position->setCoords(0.25, 0);
   leftCaption->setPositionAlignment(Qt::AlignTop|Qt::AlignHCenter);
   leftCaption->setText("left sides aligned");
   leftCaption->setFont(textFont);
-  QCPItemText *rightCaption = new QCPItemText(customPlot);
+  QCPItemText *rightCaption = customPlot->add<QCPItemText>();
   rightCaption->position->setType(QCPItemPosition::ptViewportRatio);
   rightCaption->position->setCoords(0.75, 0);
   rightCaption->setClipToAxisRect(false);
@@ -306,7 +306,7 @@ void MainWindow::genAlignmentGroup()
   rightCaption->setText("no alignment group");
   rightCaption->setFont(textFont);
   
-  QCPItemLine *splitter = new QCPItemLine(customPlot);
+  QCPItemLine *splitter = customPlot->add<QCPItemLine>();
   splitter->start->setType(QCPItemPosition::ptViewportRatio);
   splitter->start->setCoords(0.5, 0);
   splitter->end->setType(QCPItemPosition::ptViewportRatio);
@@ -345,7 +345,7 @@ void MainWindow::genAxisRectSpacingOverview()
   addBracket(QPointF(200-65, 240), QPointF(200-35, 240), "QCPAxis::tickLabelPadding", QPointF(-1, 7), -50, Qt::AlignRight|Qt::AlignVCenter);
   addBracket(QPointF(200-95-25, 240), QPointF(200-65-25, 240), "QCPAxis::labelPadding", QPointF(-1, 7), -50, Qt::AlignRight|Qt::AlignVCenter);
   
-  QCPItemLine *leftBorder = new QCPItemLine(customPlot);
+  QCPItemLine *leftBorder = customPlot->add<QCPItemLine>();
   leftBorder->setClipToAxisRect(false);
   leftBorder->start->setType(QCPItemPosition::ptViewportRatio);
   leftBorder->end->setType(QCPItemPosition::ptViewportRatio);
@@ -353,7 +353,7 @@ void MainWindow::genAxisRectSpacingOverview()
   leftBorder->end->setCoords(0, 1);
   leftBorder->setPen(QPen(Qt::gray, 0, Qt::DashLine));
   
-  QCPItemText *axisRectLabel = new QCPItemText(customPlot);
+  QCPItemText *axisRectLabel = customPlot->add<QCPItemText>();
   axisRectLabel->position->setType(QCPItemPosition::ptAxisRectRatio);
   axisRectLabel->position->setCoords(0.5, 0.5);
   axisRectLabel->setFont(QFont(QFont().family(), 16));
@@ -993,7 +993,7 @@ void MainWindow::genQCPColorGradient()
     colorMap->rescaleDataRange(true);
     customPlot->rescaleAxes();
     
-    QCPItemText *text = new QCPItemText(customPlot);
+    QCPItemText *text = customPlot->add<QCPItemText>();
     text->setClipToAxisRect(false);
     text->position->setType(QCPItemPosition::ptAxisRectRatio);
     text->position->setCoords(0.5, -0.12);
@@ -1061,7 +1061,7 @@ void MainWindow::genQCPSelectionType()
   for (int i=0; i<50; ++i)
     g->addData(i/25.0, 0.6+qSin(i/15.0*M_PI)*0.6+std::rand()/(double)RAND_MAX*0.4);
   
-  QCPItemRect *rectItem = new QCPItemRect(customPlot);
+  QCPItemRect *rectItem = customPlot->add<QCPItemRect>();
   rectItem->topLeft->setCoords(0.33, 1.8);
   rectItem->bottomRight->setCoords(1.66, 0.7);
   rectItem->setPen(customPlot->selectionRect()->pen());
@@ -1131,14 +1131,14 @@ void MainWindow::genQCPColorMap_Interpolate()
   cm2->rescaleDataRange();
   customPlot->plotLayout()->setMargins(QMargins(0, 5, 0, 0));
   
-  QCPItemText *t1 = new QCPItemText(customPlot);
+  QCPItemText *t1 = customPlot->add<QCPItemText>();
   t1->setText("Interpolate true");
   t1->position->setType(QCPItemPosition::ptAxisRectRatio);
   t1->position->setAxisRect(ar1);
   t1->position->setCoords(0.5, -0.02);
   t1->setPositionAlignment(Qt::AlignHCenter|Qt::AlignBottom);
   t1->setClipToAxisRect(false);
-  QCPItemText *t2 = new QCPItemText(customPlot);
+  QCPItemText *t2 = customPlot->add<QCPItemText>();
   t2->setText("Interpolate false");
   t2->position->setType(QCPItemPosition::ptAxisRectRatio);
   t2->position->setAxisRect(ar2);
@@ -1188,14 +1188,14 @@ void MainWindow::genQCPColorMap_TightBoundary()
   foreach (QCPAxis *axis, QList<QCPAxis*>() << qcp::pointers(ar1->axes()) << qcp::pointers(ar2->axes()))
     axis->setRange(-3, 3);
   
-  QCPItemText *t1 = new QCPItemText(customPlot);
+  QCPItemText *t1 = customPlot->add<QCPItemText>();
   t1->setText("TightBoundary true");
   t1->position->setType(QCPItemPosition::ptAxisRectRatio);
   t1->position->setAxisRect(ar1);
   t1->position->setCoords(0.5, -0.02);
   t1->setPositionAlignment(Qt::AlignHCenter|Qt::AlignBottom);
   t1->setClipToAxisRect(false);
-  QCPItemText *t2 = new QCPItemText(customPlot);
+  QCPItemText *t2 = customPlot->add<QCPItemText>();
   t2->setText("TightBoundary false");
   t2->position->setType(QCPItemPosition::ptAxisRectRatio);
   t2->position->setAxisRect(ar2);
@@ -1256,14 +1256,14 @@ void MainWindow::genQCPColorGradient_LevelCount()
   map2->rescaleDataRange();
   customPlot->rescaleAxes();
   
-  QCPItemText *t1 = new QCPItemText(customPlot);
+  QCPItemText *t1 = customPlot->add<QCPItemText>();
   t1->setText("350 Levels");
   t1->position->setType(QCPItemPosition::ptAxisRectRatio);
   t1->position->setAxisRect(r1);
   t1->position->setCoords(0.5, -0.02);
   t1->setPositionAlignment(Qt::AlignHCenter|Qt::AlignBottom);
   t1->setClipToAxisRect(false);
-  QCPItemText *t2 = new QCPItemText(customPlot);
+  QCPItemText *t2 = customPlot->add<QCPItemText>();
   t2->setText("10 Levels");
   t2->position->setType(QCPItemPosition::ptAxisRectRatio);
   t2->position->setAxisRect(r2);
@@ -1332,14 +1332,14 @@ void MainWindow::genQCPColorGradient_Periodic()
   map2->setDataRange(QCPRange(-0.2, 0.2));
   customPlot->rescaleAxes();
   
-  QCPItemText *t1 = new QCPItemText(customPlot);
+  QCPItemText *t1 = customPlot->add<QCPItemText>();
   t1->setText("Periodic false");
   t1->position->setType(QCPItemPosition::ptAxisRectRatio);
   t1->position->setAxisRect(r1);
   t1->position->setCoords(0.5, -0.02);
   t1->setPositionAlignment(Qt::AlignHCenter|Qt::AlignBottom);
   t1->setClipToAxisRect(false);
-  QCPItemText *t2 = new QCPItemText(customPlot);
+  QCPItemText *t2 = customPlot->add<QCPItemText>();
   t2->setText("Periodic true");
   t2->position->setType(QCPItemPosition::ptAxisRectRatio);
   t2->position->setAxisRect(r2);
@@ -1378,7 +1378,7 @@ void MainWindow::labelItemAnchors(QCPItem *item, double fontSize, bool circle, b
   {
     if (circle)
     {
-      QCPItemEllipse *circ = new QCPItemEllipse(item->parentPlot());
+      QCPItemEllipse *circ = item->parentPlot()->add<QCPItemEllipse>();
       circ->setClipToAxisRect(false);
       circ->topLeft->setParentAnchor(anchors.at(i));
       circ->bottomRight->setParentAnchor(anchors.at(i));
@@ -1393,7 +1393,7 @@ void MainWindow::labelItemAnchors(QCPItem *item, double fontSize, bool circle, b
       circ->setPen(p);
       if (dynamic_cast<QCPItemPosition*>(anchors.at(i)))
       {
-        QCPItemEllipse *circ2 = new QCPItemEllipse(item->parentPlot());
+        QCPItemEllipse *circ2 = item->parentPlot()->add<QCPItemEllipse>();
         circ2->setClipToAxisRect(false);
         circ2->topLeft->setParentAnchor(anchors.at(i));
         circ2->bottomRight->setParentAnchor(anchors.at(i));
@@ -1405,7 +1405,7 @@ void MainWindow::labelItemAnchors(QCPItem *item, double fontSize, bool circle, b
     }
     if (fontSize > 0)
     {
-      QCPItemText *label = new QCPItemText(item->parentPlot());
+      QCPItemText *label = item->parentPlot()->add<QCPItemText>();
       label->setClipToAxisRect(false);
       label->setFont(QFont(font().family(), fontSize));
       label->setColor(Qt::blue);
@@ -1422,7 +1422,7 @@ void MainWindow::labelItemAnchors(QCPItem *item, double fontSize, bool circle, b
 
 void MainWindow::addBracket(QPointF left, QPointF right, QString text, QPointF textOffset, int rotation, Qt::Alignment textAlign, QCPItemBracket::BracketStyle style)
 {
-  QCPItemBracket *bracket = new QCPItemBracket(customPlot);
+  QCPItemBracket *bracket = customPlot->add<QCPItemBracket>();
   bracket->setClipToAxisRect(false);
   bracket->left->setType(QCPItemPosition::ptAbsolute);
   bracket->right->setType(QCPItemPosition::ptAbsolute);
@@ -1432,7 +1432,7 @@ void MainWindow::addBracket(QPointF left, QPointF right, QString text, QPointF t
   bracket->setLength(3);
   bracket->setPen(QPen(Qt::blue));
   
-  QCPItemText *textItem = new QCPItemText(customPlot);
+  QCPItemText *textItem = customPlot->add<QCPItemText>();
   textItem->setClipToAxisRect(false);
   textItem->setText(text);
   textItem->setPositionAlignment(textAlign);
@@ -1444,7 +1444,7 @@ void MainWindow::addBracket(QPointF left, QPointF right, QString text, QPointF t
 
 void MainWindow::addArrow(QPointF target, QPointF textPosition, QString text, Qt::Alignment textAlign)
 {
-  QCPItemText *textItem = new QCPItemText(customPlot);
+  QCPItemText *textItem = customPlot->add<QCPItemText>();
   textItem->setClipToAxisRect(false);
   textItem->setText(text);
   textItem->setPositionAlignment(textAlign);
@@ -1453,7 +1453,7 @@ void MainWindow::addArrow(QPointF target, QPointF textPosition, QString text, Qt
   textItem->setColor(Qt::blue);
   QRectF textRect(textItem->topLeft->pixelPosition(), textItem->bottomRight->pixelPosition());
   
-  QCPItemLine *arrowItem = new QCPItemLine(customPlot);
+  QCPItemLine *arrowItem = customPlot->add<QCPItemLine>();
   arrowItem->setClipToAxisRect(false);
   arrowItem->setHead(QCPLineEnding::esSpikeArrow);
   arrowItem->setPen(QPen(Qt::blue));
@@ -1497,7 +1497,7 @@ void MainWindow::addGridLayoutOutline(QCPLayoutGrid *layout)
     
     qDebug() << elements.at(i) << elements.at(i)->outerRect();
     
-    QCPItemRect *outerRect = new QCPItemRect(customPlot);
+    QCPItemRect *outerRect = customPlot->add<QCPItemRect>();
     outerRect->setClipToAxisRect(false);
     outerRect->setBrush(QColor(0, 0, 0, 25));
     outerRect->setPen(QPen(QColor(180, 180, 180)));
@@ -1506,7 +1506,7 @@ void MainWindow::addGridLayoutOutline(QCPLayoutGrid *layout)
     outerRect->topLeft->setPixelPosition(elements.at(i)->outerRect().topLeft());
     outerRect->bottomRight->setPixelPosition(elements.at(i)->outerRect().bottomRight());
     
-    QCPItemRect *innerRect = new QCPItemRect(customPlot);
+    QCPItemRect *innerRect = customPlot->add<QCPItemRect>();
     innerRect->setClipToAxisRect(false);
     innerRect->setBrush(QColor(230, 100, 100, 25));
     innerRect->setPen(QPen(QColor(180, 180, 180)));

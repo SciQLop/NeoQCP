@@ -68,7 +68,7 @@ public:
     };
     Q_ENUM(BracketStyle)
 
-    explicit QCPItemBracket(QCustomPlot* parentPlot);
+    QCPItemBracket();
     virtual ~QCPItemBracket() override;
 
     // getters:

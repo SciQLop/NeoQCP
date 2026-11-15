@@ -50,7 +50,7 @@ public:
     template <typename T>
     using OpsFor = QCPItemLineOps<T>;
 
-    explicit QCPItemLine(QCustomPlot* parentPlot);
+    QCPItemLine();
     virtual ~QCPItemLine() override;
 
     // getters:

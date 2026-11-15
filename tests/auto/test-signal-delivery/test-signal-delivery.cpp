@@ -776,7 +776,7 @@ void TestSignalDelivery::spanDragSlotDeletingThePlot()
     plot->resize(400, 300);
     plot->xAxis->setRange(0, 10);
     plot->yAxis->setRange(0, 10);
-    auto* span = new QCPItemRSpan(plot);
+    auto span = plot->add<QCPItemRSpan>();
     span->setKeyRange(QCPRange(3, 7));
     span->setValueRange(QCPRange(3, 7));
     plot->replot();

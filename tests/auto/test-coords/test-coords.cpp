@@ -305,8 +305,8 @@ void TestCoords::panDeltaIsMeasuredInsideTheRange()
 void TestCoords::positionSetMatchesSetters()
 {
     auto plot = layoutPlot();
-    auto* item = new QCPItemLine(plot.get());
-    auto* reference = new QCPItemLine(plot.get());
+    auto item = plot->add<QCPItemLine>();
+    auto reference = plot->add<QCPItemLine>();
     QCPItemPosition* position = item->start;
     QCPItemPosition* expected = reference->start;
 
@@ -417,8 +417,8 @@ void TestCoords::positionSetMatchesSetters()
 void TestCoords::refusedAnchorLeavesPositionUntouched()
 {
     auto plot = layoutPlot();
-    auto* a = new QCPItemLine(plot.get());
-    auto* b = new QCPItemLine(plot.get());
+    auto a = plot->add<QCPItemLine>();
+    auto b = plot->add<QCPItemLine>();
     // b->end follows a->start, so pointing a->start at b->end would close a cycle.
     QVERIFY(b->end->setParentAnchor(a->start));
     a->start->setType(QCPItemPosition::ptPlotCoords);
@@ -444,7 +444,7 @@ void TestCoords::ratioTransformMatchesPixels()
     QVERIFY(nearlyEqual(centre.y, plot->axisRect()->top() + plot->axisRect()->height() * 0.5));
 
     // 2.x agreement: an item position of type ptAxisRectRatio lands on the same pixels.
-    auto* item = new QCPItemText(plot.get());
+    auto item = plot->add<QCPItemText>();
     item->position->setAxisRect(plot->axisRect());
     item->position->setType(QCPItemPosition::ptAxisRectRatio);
     item->position->setCoords(0.5, 0.5);
@@ -470,9 +470,9 @@ void TestCoords::anchorOffsetIsPixelsWhateverTheOldType()
     QCustomPlot plot;
     plot.resize(400, 300);
     plot.replot();
-    auto* anchorItem = new QCPItemLine(&plot);
+    auto anchorItem = plot.add<QCPItemLine>();
     anchorItem->start->setCoords(2, 3);
-    auto* item = new QCPItemLine(&plot);
+    auto item = plot.add<QCPItemLine>();
     item->start->setType(QCPItemPosition::ptAxisRectRatio);
     item->start->setCoords(0.5, 0.5);
 

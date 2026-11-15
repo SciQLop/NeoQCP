@@ -58,11 +58,11 @@
 /*!
   Creates a straight line item and sets default values.
 
-  The created item is automatically registered with \a parentPlot. This QCustomPlot instance takes
-  ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
+  The item is built without a plot: its positions and anchors have no area until it is placed with
+  QCustomPlot::add<T>() or QCPAxisRect::add<T>().
 */
-QCPItemStraightLine::QCPItemStraightLine(QCustomPlot* parentPlot)
-        : QCPItem(parentPlot)
+QCPItemStraightLine::QCPItemStraightLine()
+        : QCPItem()
         , point1(createPosition(QLatin1String("point1")))
         , point2(createPosition(QLatin1String("point2")))
 {

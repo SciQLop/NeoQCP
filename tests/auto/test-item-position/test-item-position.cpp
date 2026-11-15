@@ -18,7 +18,7 @@ public:
 QCPItemText* laidOutTextItem(QCustomPlot* plot)
 {
     plot->replot();
-    return new QCPItemText(plot);
+    return plot->add<QCPItemText>();
 }
 }
 
@@ -82,7 +82,7 @@ void TestItemPosition::axisRectAbsoluteRespectsParentAnchor()
     anchorItem->position->setType(QCPItemPosition::ptAbsolute);
     anchorItem->position->setCoords(100, 50);
 
-    QCPItemText* item = new QCPItemText(mPlot);
+    QCPItemText* item = mPlot->add<QCPItemText>();
     item->position->setType(QCPItemPosition::ptAxisRectAbsolute);
     QVERIFY(item->position->setParentAnchor(anchorItem->position));
     item->position->setCoords(10, 20);
@@ -141,7 +141,7 @@ void TestItemPosition::textAnchorParentDeletedKeepsPlace()
     parent->position->setCoords(120, 90);
     parent->setText(QStringLiteral("parent"));
 
-    auto* child = new QCPItemText(mPlot);
+    auto child = mPlot->add<QCPItemText>();
     child->position->setType(QCPItemPosition::ptAbsolute);
     child->position->setParentAnchor(parent->bottomRight);
     child->position->setCoords(5, 7); // an offset from the anchor, in pixels
@@ -165,12 +165,12 @@ void TestItemPosition::oneAxisAnchoredTextFollowsItsAnchor()
     // must be remade; the count is the observable, because a text always re-records on an export.
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
-    auto* anchorItem = new QCPItemText(mPlot);
+    auto anchorItem = mPlot->add<QCPItemText>();
     anchorItem->setText(QStringLiteral("anchor"));
     anchorItem->position->setCoords(2.0, 5.0); // plot coordinates: a pan moves it
     anchorItem->setPositionAlignment(Qt::AlignLeft | Qt::AlignTop);
 
-    auto* text = new CountingText(mPlot);
+    auto text = mPlot->add<CountingText>();
     text->setText(QStringLiteral("label"));
     text->position->setType(QCPItemPosition::ptAxisRectRatio);
     text->position->setCoords(0, 0.5);
@@ -193,7 +193,7 @@ void TestItemPosition::axisRectAbsoluteTextFollowsTheAxisRect()
 {
     // The same snapshot problem in its other form: an axis-rect pixel position follows a margin
     // change, so the recording that holds its pixels must be remade when the frame is redrawn.
-    auto* text = new CountingText(mPlot);
+    auto text = mPlot->add<CountingText>();
     text->setText(QStringLiteral("label"));
     text->position->setType(QCPItemPosition::ptAxisRectAbsolute);
     text->position->setCoords(20, 30);
@@ -228,7 +228,7 @@ void TestItemPosition::parentDeletedBeforeAnyFrameKeepsPlace()
     };
     const auto newText = [this]()
     {
-        auto* text = new QCPItemText(mPlot);
+        auto text = mPlot->add<QCPItemText>();
         text->position->setType(QCPItemPosition::ptAbsolute);
         text->position->setCoords(400, 300);
         text->setText(QStringLiteral("reference"));
@@ -236,7 +236,7 @@ void TestItemPosition::parentDeletedBeforeAnyFrameKeepsPlace()
     };
     const auto newChild = [this]()
     {
-        auto* child = new QCPItemText(mPlot);
+        auto child = mPlot->add<QCPItemText>();
         child->position->setType(QCPItemPosition::ptAbsolute);
         child->position->setCoords(5, 7);
         return child;
@@ -244,13 +244,13 @@ void TestItemPosition::parentDeletedBeforeAnyFrameKeepsPlace()
 
     for (const int axes : { 3, 1, 2 }) // both, x only, y only
     {
-        auto* reference = newText();
+        auto reference = newText();
         QCPItemText* live = newChild();
         attach(reference, live->position, axes);
         mPlot->replot(); // a frame: the anchor reports its pixel
         const QPointF expected = live->position->pixelPosition();
 
-        auto* doomed = newText(); // the same box, so the same anchor pixel
+        auto doomed = newText(); // the same box, so the same anchor pixel
         QCPItemText* orphan = newChild();
         attach(doomed, orphan->position, axes);
         QVERIFY(mPlot->removeItem(doomed)); // no frame and no hit test between attach and delete
@@ -275,9 +275,9 @@ Q_DECLARE_METATYPE(ItemFactory)
 void TestItemPosition::setRefusedAnchorIsReported()
 {
     mPlot->replot();
-    auto* parent = new QCPItemText(mPlot);
+    auto parent = mPlot->add<QCPItemText>();
     parent->position->setCoords(100, 100);
-    auto* child = new QCPItemText(mPlot);
+    auto child = mPlot->add<QCPItemText>();
     child->position->setCoords(200, 200);
 
     // The child follows the parent: an anchor the plot can resolve.
@@ -349,7 +349,7 @@ void TestItemPosition::mixedPlotCoordinatePairsKeepTheKeyAndValueRole()
     {
         QCPAxis* keyAxis = c.keyVertical ? mPlot->yAxis : mPlot->xAxis;
         QCPAxis* valueAxis = c.keyVertical ? mPlot->xAxis : mPlot->yAxis;
-        auto* item = new QCPItemRect(mPlot);
+        auto item = mPlot->add<QCPItemRect>();
         const QList<QCPItemPosition*> positions = item->positions();
         for (QCPItemPosition* position : positions)
         {
@@ -431,19 +431,19 @@ void TestItemPosition::farOffscreenItemsDoNotOverflow_data()
     QTest::addColumn<ItemFactory>("make");
     QTest::addColumn<double>("coord");
     const QList<QPair<const char*, ItemFactory>> items = {
-        {"text", [](QCustomPlot* p) { auto* i = new QCPItemText(p); i->setText("label"); return i; }},
-        {"richtext", [](QCustomPlot* p) { auto* i = new QCPItemRichText(p); i->setHtml("<b>label</b>"); return i; }},
-        {"pixmap", [](QCustomPlot* p) { auto* i = new QCPItemPixmap(p); i->setPixmap(QPixmap(16, 16)); return i; }},
-        {"tracer", [](QCustomPlot* p) { return new QCPItemTracer(p); }},
-        {"rect", [](QCustomPlot* p) { return new QCPItemRect(p); }},
-        {"ellipse", [](QCustomPlot* p) { return new QCPItemEllipse(p); }},
-        {"line", [](QCustomPlot* p) { return new QCPItemLine(p); }},
-        {"curve", [](QCustomPlot* p) { return new QCPItemCurve(p); }},
-        {"bracket", [](QCustomPlot* p) { return new QCPItemBracket(p); }},
-        {"straightline", [](QCustomPlot* p) { return new QCPItemStraightLine(p); }},
-        {"vspan", [](QCustomPlot* p) { return new QCPItemSpan(p, Qt::Vertical); }},
-        {"hspan", [](QCustomPlot* p) { return new QCPItemSpan(p, Qt::Horizontal); }},
-        {"rspan", [](QCustomPlot* p) { return new QCPItemRSpan(p); }},
+        {"text", [](QCustomPlot* p) { auto i = p->add<QCPItemText>(); i->setText("label"); return i; }},
+        {"richtext", [](QCustomPlot* p) { auto i = p->add<QCPItemRichText>(); i->setHtml("<b>label</b>"); return i; }},
+        {"pixmap", [](QCustomPlot* p) { auto i = p->add<QCPItemPixmap>(); i->setPixmap(QPixmap(16, 16)); return i; }},
+        {"tracer", [](QCustomPlot* p) { return p->add<QCPItemTracer>(); }},
+        {"rect", [](QCustomPlot* p) { return p->add<QCPItemRect>(); }},
+        {"ellipse", [](QCustomPlot* p) { return p->add<QCPItemEllipse>(); }},
+        {"line", [](QCustomPlot* p) { return p->add<QCPItemLine>(); }},
+        {"curve", [](QCustomPlot* p) { return p->add<QCPItemCurve>(); }},
+        {"bracket", [](QCustomPlot* p) { return p->add<QCPItemBracket>(); }},
+        {"straightline", [](QCustomPlot* p) { return p->add<QCPItemStraightLine>(); }},
+        {"vspan", [](QCustomPlot* p) { return p->add<QCPItemSpan>(Qt::Vertical); }},
+        {"hspan", [](QCustomPlot* p) { return p->add<QCPItemSpan>(Qt::Horizontal); }},
+        {"rspan", [](QCustomPlot* p) { return p->add<QCPItemRSpan>(); }},
     };
     for (const auto& [name, make] : items)
     {
@@ -481,7 +481,7 @@ void TestItemPosition::setPixelPositionWithAVerticalKeyRoundTrips()
     QCOMPARE(keyAxis->orientation(), Qt::Vertical);
     QCOMPARE(valueAxis->orientation(), Qt::Horizontal);
 
-    auto* item = new QCPItemText(mPlot);
+    auto item = mPlot->add<QCPItemText>();
     QCPItemPosition* position = item->positions().first();
     position->setAxes(keyAxis, valueAxis);
     position->setType(QCPItemPosition::ptPlotCoords);

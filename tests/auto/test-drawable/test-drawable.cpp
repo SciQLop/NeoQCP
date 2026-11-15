@@ -53,12 +53,10 @@ void countAxisMessages(QtMsgType type, const QMessageLogContext& context, const 
 class TestShape : public QCPItem
 {
 public:
-    explicit TestShape(QCustomPlot* plot) : QCPItem(plot)
+    TestShape() : QCPItem()
     {
         mAnchor = createPosition(QStringLiteral("anchor"));
         mAnchor->setCoords(3, 3);
-        setClipAxisRect(plot->axisRect());
-        dirtyCalls = 0; // construction is not a content change
     }
 
     // The old painter virtual is final in the adapter: keep it visible so overriding the new
@@ -446,11 +444,10 @@ public:
 class BareShape : public QCPItem
 {
 public:
-    explicit BareShape(QCustomPlot* plot) : QCPItem(plot)
+    BareShape() : QCPItem()
     {
         mAnchor = createPosition(QStringLiteral("anchor"));
         mAnchor->setCoords(5, 5);
-        setClipAxisRect(plot->axisRect());
     }
 
     void draw(QCPDrawContext& context) const override
@@ -591,7 +588,8 @@ void TestDrawable::cleanup()
 void TestDrawable::panDoesNotReRecord()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
+    shape->dirtyCalls = 0; // placing the item is not a content change
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
 
@@ -604,7 +602,8 @@ void TestDrawable::panDoesNotReRecord()
 void TestDrawable::zoomDoesNotReRecord()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
+    shape->dirtyCalls = 0; // placing the item is not a content change
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
 
@@ -618,7 +617,7 @@ void TestDrawable::zoomDoesNotReRecord()
 void TestDrawable::setterReRecordsOnce()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
 
@@ -634,8 +633,8 @@ void TestDrawable::setterReRecordsOnce()
 void TestDrawable::unrelatedMarkDoesNotReRecord()
 {
     Fixture f;
-    auto* touched = new TestShape(f.plot.get());
-    auto* other = new TestShape(f.plot.get());
+    auto touched = f.plot->add<TestShape>();
+    auto other = f.plot->add<TestShape>();
     f.plot->replot();
     QCOMPARE(touched->drawCalls, 1);
     QCOMPARE(other->drawCalls, 1);
@@ -651,8 +650,8 @@ void TestDrawable::viewEpochReRecordsEscapeHatch()
     Fixture f;
     f.plot->show(); // a hidden widget holds its resize event back
     QVERIFY(QTest::qWaitForWindowExposed(f.plot.get()));
-    auto* plain = new TestShape(f.plot.get());
-    auto* hatch = new TestShape(f.plot.get());
+    auto plain = f.plot->add<TestShape>();
+    auto hatch = f.plot->add<TestShape>();
     hatch->escapeHatch = true;
     f.plot->replot();
     QCOMPARE(plain->drawCalls, 1);
@@ -669,8 +668,8 @@ void TestDrawable::viewEpochReRecordsEscapeHatch()
 void TestDrawable::themeReaderReRecordsOnThemeChange()
 {
     Fixture f;
-    auto* plain = new TestShape(f.plot.get());
-    auto* reader = new TestShape(f.plot.get());
+    auto plain = f.plot->add<TestShape>();
+    auto reader = f.plot->add<TestShape>();
     reader->readsTheme = true;
     f.plot->replot();
     QCOMPARE(plain->drawCalls, 1);
@@ -688,8 +687,9 @@ void TestDrawable::themeReaderReRecordsOnThemeChange()
 void TestDrawable::transformReaderReRecordsOnEveryPan()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->readsTransform = true;
+    shape->dirtyCalls = 0; // placing the item is not a content change
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
 
@@ -706,7 +706,7 @@ void TestDrawable::transformReaderReRecordsOnEveryPan()
 void TestDrawable::everyFrameRecordingRebuildsOncePerFrame()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->everyFrame = true;
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
@@ -729,7 +729,7 @@ void TestDrawable::everyFrameRecordingRebuildsOncePerFrame()
 void TestDrawable::itemTextMeasuresOnceForItsQueries()
 {
     Fixture f;
-    auto* item = new QCPItemText(f.plot.get());
+    auto item = f.plot->add<QCPItemText>();
     item->setText(QStringLiteral("measured once"));
     item->setFont(QFont(QStringLiteral("DejaVu Sans"), 14));
     item->position->setCoords(5, 5);
@@ -750,7 +750,7 @@ void TestDrawable::itemTextMeasuresOnceForItsQueries()
 void TestDrawable::contentChangedInsideDrawIsAMisuse()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->contentChangeInsideDraw = true;
     f.plot->replot();
     QCOMPARE(gMisuseCount, 1);
@@ -781,7 +781,7 @@ void TestDrawable::contentChangedInsideLegendIconIsAMisuse()
 void TestDrawable::recordingFromInsideDrawIsAMisuse()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->rangeInsideDraw = true;
     f.plot->replot(); // must not re-enter draw() from inside draw()
 
@@ -801,7 +801,7 @@ void TestDrawable::recordingFromInsideDrawIsAMisuse()
 void TestDrawable::missingAxisHidesWithAMessage()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mAnchor->setAxes(nullptr, nullptr);
     f.plot->replot();
     f.plot->replot();
@@ -816,7 +816,7 @@ void TestDrawable::panReusesResolvedGeometry()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the extruded vertices are a GPU path only");
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->bars = 10000;
     f.plot->replot();
     const quint64 before = QCPLineExtruder::extruderCallCount();
@@ -836,7 +836,7 @@ void TestDrawable::panBuildsNoFillEither()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the built geometry is a GPU path only");
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->bars = 10000;
     shape->filledBars = true;
     f.plot->replot();
@@ -858,7 +858,7 @@ void TestDrawable::panMovesAllDataEntriesByOneDelta()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the kept geometry is a GPU path only");
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->bars = 10;
     shape->filledBars = true;
     f.plot->replot();
@@ -1012,7 +1012,7 @@ void TestDrawable::rasterPanKeepsImage()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the raster image and the kept triangles are a GPU path only");
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::Raster;
     std::vector<QPointF> points;
     points.reserve(5000);
@@ -1037,7 +1037,7 @@ void TestDrawable::recordedErrorBarsAreDrawn()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the raster fallback is a GPU path");
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::ErrorBars;
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
     const QImage frame = f.plot->grabFramebuffer();
@@ -1058,7 +1058,7 @@ void TestDrawable::brokenDashedPipelineStillDraws()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the dashed pipeline is a GPU path");
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::Dashed;
     shape->mLine
         = std::make_shared<const std::vector<QPointF>>(std::vector<QPointF> { { 1, 5 }, { 9, 5 } });
@@ -1154,12 +1154,12 @@ void TestDrawable::zoomRebuildsOnce()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the kept geometry is a GPU path only");
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->bars = 100;
     shape->filledBars = true;
     // Another object on the same layer, re-recorded before the last frame: it clears the layer, so
     // the replay really runs on a frame where the shape itself changed nothing.
-    auto* ticker = new TestShape(f.plot.get());
+    auto ticker = f.plot->add<TestShape>();
     ticker->escapeHatch = true;
     f.plot->replot();
     const quint64 fills = qcpFillBuildCount();
@@ -1183,7 +1183,7 @@ void TestDrawable::tenThousandBarsAreOneDraw()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the merged entries are a GPU path only");
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->bars = 10000;
     shape->filledBars = true;
     f.plot->replot();
@@ -1207,7 +1207,7 @@ void TestDrawable::gradientBarsStackAsOne()
     QCPGraph* graph = f.plot->addGraph();
     graph->setData(QVector<double> { 1, 9 }, QVector<double> { 2, 2 });
     graph->setPen(QPen(Qt::red, 24));
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->bars = 10;
     shape->filledBars = true;
     shape->gradientBars = true; // more images than one layer can take
@@ -1262,7 +1262,7 @@ void TestDrawable::exportDoesNotPoisonTheResolveCache()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the resolve cache is a GPU path only");
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->withPolyline = true;
     f.plot->replot();
     const quint64 remaps = shape->remaps();
@@ -1284,7 +1284,7 @@ void TestDrawable::drawnPolygonStacksAboveAnEarlierGpuGraph()
     QCPGraph* graph = f.plot->addGraph();
     graph->setData(QVector<double> { 1, 9 }, QVector<double> { 4, 4 });
     graph->setPen(QPen(Qt::red, 24));
-    auto* shape = new TestShape(f.plot.get()); // created after the graph: it must land above it
+    auto shape = f.plot->add<TestShape>(); // created after the graph: it must land above it
     shape->fill = QColor(Qt::blue);
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
 
@@ -1295,7 +1295,7 @@ void TestDrawable::drawnPolygonStacksAboveAnEarlierGpuGraph()
 void TestDrawable::defaultHitTestMatchesGeometry()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get()); // filled polygon over data (2,2)-(6,6)
+    auto shape = f.plot->add<TestShape>(); // filled polygon over data (2,2)-(6,6)
     f.plot->replot();
     const auto at = [&](double key, double value)
     {
@@ -1320,7 +1320,7 @@ void TestDrawable::batchHitTestNamesTheRect()
     // A batch is one command over many rects: the hit test must still say which bar was clicked,
     // and it says it once per scan instead of once per command.
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->bars = 10; // ten data rects: keys 1..9, values 1..3, one pen and one brush
     shape->filledBars = true;
     f.plot->replot();
@@ -1351,7 +1351,7 @@ void TestDrawable::hitTestWithAVerticalKeyAxis()
     // A horizontal plot: the key axis is vertical and the value axis horizontal, so the transform
     // swaps the two pixel coordinates. The bounds check must map each side on its own axis.
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mAnchor->setAxes(f.plot->yAxis, f.plot->xAxis); // drawn through the vertical key frame
     f.plot->replot();
     const auto at = [&](double key, double value)
@@ -1375,7 +1375,7 @@ void TestDrawable::hitTestWithAVerticalKeyAxisChecksEachSideOnItsOwnAxis()
     // values 8..9 a band further right. Each side must be compared with the click coordinate
     // along its own screen axis, or the pre-check rejects a click at the centre.
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::AsymmetricBox;
     shape->mAnchor->setAxes(f.plot->yAxis, f.plot->xAxis); // drawn through the vertical key frame
     f.plot->replot();
@@ -1392,7 +1392,7 @@ void TestDrawable::hitTestWithAVerticalKeyAxisChecksEachSideOnItsOwnAxis()
 void TestDrawable::hitTestBesideTextIsTheGap()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::Image; // a box over data (3,3) to (5,5)
     f.plot->replot();
 
@@ -1414,7 +1414,7 @@ void TestDrawable::hitTestBesideTextIsTheGap()
 void TestDrawable::aWhiskerTipIsHittable()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::Whiskers;
     f.plot->setSelectionTolerance(2);
     f.plot->replot();
@@ -1430,7 +1430,7 @@ void TestDrawable::aWhiskerTipIsHittable()
 void TestDrawable::pixelAnchoredShapeIsHittable()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::Ratio; // data keys, ratio values: the value side is unbounded
     f.plot->replot();
 
@@ -1470,7 +1470,7 @@ void TestDrawable::frameEpochsAreNeverShared()
         plot->yAxis->setRange(0, 10);
         const bool loose = i % 2 == 0;
         plot->axisRect()->setMargins(loose ? QMargins(10, 10, 10, 10) : QMargins(70, 50, 30, 40));
-        auto* shape = new TestShape(plot.get());
+        auto shape = plot->add<TestShape>();
         shape->mode = TestShape::Ratio;
         plot->replot();
         if (i > 0 && plot->frameEpoch() == previousEpoch)
@@ -1503,7 +1503,7 @@ void TestDrawable::twoRectsOneLayerDrawInTheirOwnFrames()
     }
     const auto lineOn = [&plot](QCPAxisRect* rect)
     {
-        auto* line = new QCPItemLine(&plot);
+        auto line = plot.add<QCPItemLine>();
         line->start->setAxes(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
         line->end->setAxes(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
         line->start->setCoords(1, 1);
@@ -1526,7 +1526,7 @@ void TestDrawable::twoRectsOneLayerDrawInTheirOwnFrames()
 void TestDrawable::defaultDataRangeFollowsTheExtentRules()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     f.plot->replot();
 
     const std::optional<QCPDataBox> polygon = shape->drawnDataRange();
@@ -1671,7 +1671,7 @@ void TestDrawable::setPenReRecordsOnce()
 void TestDrawable::setCoordsMovesTheItem()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::FromAnchor; // a box at the item position's coords, (3,3)
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
@@ -1692,7 +1692,7 @@ void TestDrawable::setCoordsMovesTheItem()
 void TestDrawable::selectionChangeReRecords()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
 
@@ -1744,7 +1744,7 @@ void TestDrawable::mixedCornerRectFollowsAPan()
     if (!f.hasRhi())
         QSKIP("No QRhi available - the kept triangles are a GPU path only");
     hideAxes(f.plot.get());
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::MixedRect; // data (2, 2) to pixel (50, 50)
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
     const QRect before = inkedBounds(f.plot->grabFramebuffer());
@@ -1772,10 +1772,10 @@ void TestDrawable::anchoredShapeFollowsItsParent()
     if (!f.hasRhi())
         QSKIP("No QRhi available - the kept triangles are a GPU path only");
     hideAxes(f.plot.get());
-    auto* host = new QCPItemLine(f.plot.get());
+    auto host = f.plot->add<QCPItemLine>();
     host->setPen(QPen(Qt::NoPen)); // the anchor's item must not be part of the ink
     host->start->setCoords(3, 3);
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::Anchored; // a quad at the anchor, 20 px across
     shape->externalAnchor = host->start;
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
@@ -1812,7 +1812,7 @@ void TestDrawable::verticalSpanFollowsAnXPan()
     if (!f.hasRhi())
         QSKIP("No QRhi available - the kept triangles are a GPU path only");
     hideAxes(f.plot.get());
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::Ratio; // keys 2 to 6, values 0.2 to 0.8 of the axis rect
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
     const QRect before = inkedBounds(f.plot->grabFramebuffer());
@@ -1840,7 +1840,7 @@ void TestDrawable::dashedUnderOpaqueRectKeepsTheOrderOnAPan()
     if (!f.hasRhi())
         QSKIP("No QRhi available - the kept triangles are a GPU path only");
     hideAxes(f.plot.get());
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::DashedUnderRect; // blue dashes, then a green rect from (2,2) to (8,8)
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
     QImage frame = f.plot->grabFramebuffer();
@@ -1870,7 +1870,7 @@ void TestDrawable::rasterUnderOpaqueRectKeepsTheOrderOnAPan()
     if (!f.hasRhi())
         QSKIP("No QRhi available - the kept triangles are a GPU path only");
     hideAxes(f.plot.get());
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::RasterUnderRect; // a gradient from (2,2) to (7,7), green over 3..6
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY2(isGreenInk(pixelAt(f.plot->grabFramebuffer(), f.plot.get(), 4.5, 4.5)),
@@ -1917,9 +1917,9 @@ void TestDrawable::pannedTimeAxisKeepsTheShapeOnAxis()
 void TestDrawable::removedAnchorItemDoesNotDangle()
 {
     Fixture f;
-    auto* host = new QCPItemLine(f.plot.get());
+    auto host = f.plot->add<QCPItemLine>();
     host->start->setCoords(3, 3);
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mode = TestShape::Anchored;
     shape->externalAnchor = host->start;
     f.plot->replot();
@@ -2064,7 +2064,7 @@ void TestDrawable::exportStacksLikeTheScreen()
     bars->setPen(QPen(Qt::NoPen));
     bars->setBrush(QColor(Qt::red));
 
-    auto* text = new QCPItemText(f.plot.get()); // after the bars: topmost in the item index
+    auto text = f.plot->add<QCPItemText>(); // after the bars: topmost in the item index
     text->setLayer(QLatin1String("main")); // items default to "annotations", above the bars
     text->setText(QStringLiteral("X"));
     text->setPen(QPen(Qt::black));
@@ -2118,7 +2118,7 @@ void TestDrawable::aPanInsideTheKeyWindowKeepsTheRecording()
     // A recording made for a window wider than the view survives a pan that stays inside it: the
     // replay moves the kept geometry by one delta, exactly like a recording with no window at all.
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->readsKeyWindow = true;
     f.plot->xAxis->setRange(10, 20);
     f.plot->replot();
@@ -2133,7 +2133,7 @@ void TestDrawable::aPanInsideTheKeyWindowKeepsTheRecording()
 void TestDrawable::aPanPastTheKeyWindowRecords()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->readsKeyWindow = true;
     f.plot->xAxis->setRange(10, 20);
     f.plot->replot();
@@ -2149,7 +2149,7 @@ void TestDrawable::aZoomRecords()
     // A zoom changes pixels per key, so the half of the window that is off screen is no longer the
     // half the recording covers.
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->readsKeyWindow = true;
     f.plot->xAxis->setRange(10, 20);
     f.plot->replot();
@@ -2165,7 +2165,7 @@ void TestDrawable::aValueZoomKeepsTheRecording()
     // Only the key scale is part of the window: a value zoom keeps the recording and re-resolves
     // its commands through the frame that replays them.
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->readsKeyWindow = true;
     f.plot->xAxis->setRange(10, 20);
     f.plot->replot();
@@ -2189,7 +2189,7 @@ void TestDrawable::aLogKeyAxisRecordsEveryTransform()
     // Pixels per key are not constant on a log axis, so no window can describe them: the recording
     // is marked transform-dependent and remade on every pan.
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->readsKeyWindow = true;
     f.plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
     f.plot->xAxis->setRange(1, 10);
@@ -2210,7 +2210,7 @@ void TestDrawable::aLogKeyAxisRecordsEveryTransform()
 void TestDrawable::switchingTheKeyAxisToLogRecords()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->readsKeyWindow = true;
     f.plot->xAxis->setRange(1, 10);
     f.plot->replot();
@@ -2224,7 +2224,7 @@ void TestDrawable::switchingTheKeyAxisToLogRecords()
 void TestDrawable::keyWindowCoversOneViewWidthEachSide()
 {
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->readsKeyWindow = true;
     f.plot->xAxis->setRange(10, 20);
     f.plot->replot();
@@ -2246,8 +2246,8 @@ void TestDrawable::aResizeRecords()
     Fixture f;
     f.plot->show();
     QVERIFY(QTest::qWaitForWindowExposed(f.plot.get()));
-    auto* plain = new TestShape(f.plot.get());
-    auto* shape = new TestShape(f.plot.get());
+    auto plain = f.plot->add<TestShape>();
+    auto shape = f.plot->add<TestShape>();
     shape->readsKeyWindow = true;
     f.plot->xAxis->setRange(10, 20);
     f.plot->replot();
@@ -2267,7 +2267,7 @@ void TestDrawable::aVerticalKeyAxisUsesTheSameKeyWindow()
     // pixelsPerKey is a magnitude: the vertical key axis takes its pixels from the axis rect's
     // height, and the same window still lets a pan inside it keep the recording.
     Fixture f;
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->mAnchor->setAxes(f.plot->yAxis, f.plot->xAxis); // key axis vertical, value horizontal
     shape->readsKeyWindow = true;
     f.plot->yAxis->setRange(10, 20);
@@ -2295,7 +2295,7 @@ void TestDrawable::aKeyWindowPanReusesTheKeptGeometry()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the kept geometry is a GPU path only");
-    auto* shape = new TestShape(f.plot.get());
+    auto shape = f.plot->add<TestShape>();
     shape->readsKeyWindow = true;
     f.plot->xAxis->setRange(10, 20);
     f.plot->replot();
@@ -2336,7 +2336,7 @@ void TestDrawable::aPlottableRecordsWithoutTheAdapter()
 void TestDrawable::anItemRecordsWithoutTheAdapter()
 {
     Fixture f;
-    auto* shape = new BareShape(f.plot.get());
+    auto shape = f.plot->add<BareShape>();
     QCOMPARE(shape->recordings(), 0);
     f.plot->replot();
     QCOMPARE(shape->recordings(), 1);

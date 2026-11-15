@@ -99,7 +99,7 @@ void MainWindow::snippetQCPCurve()
 void MainWindow::snippetQCPItemLine()
 {
   //! [qcpitemline-creation-1]
-  QCPItemLine *line = new QCPItemLine(customPlot);
+  QCPItemLine *line = customPlot->add<QCPItemLine>();
   //! [qcpitemline-creation-1]
   
   //! [qcpitemline-creation-2]
@@ -132,7 +132,7 @@ void MainWindow::snippetQCPTextElement()
 
 void MainWindow::snippetQCPLineEnding()
 {
-  QCPItemLine *myItemLine = new QCPItemLine(customPlot);
+  QCPItemLine *myItemLine = customPlot->add<QCPItemLine>();
   //! [qcplineending-sethead]
   myItemLine->setHead(QCPLineEnding::esSpikeArrow);
   //! [qcplineending-sethead]

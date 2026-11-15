@@ -51,7 +51,7 @@ public:
     template <typename T>
     using OpsFor = QCPItemPixmapOps<T>;
 
-    explicit QCPItemPixmap(QCustomPlot* parentPlot);
+    QCPItemPixmap();
     virtual ~QCPItemPixmap() override;
 
     // getters:

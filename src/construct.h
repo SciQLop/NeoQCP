@@ -123,21 +123,17 @@ struct Construct<T>
     }
 };
 
-// add<T>(ctorArgs...): an item takes the plot, then its own arguments.
+// add<T>(ctorArgs...): an item is built from its own arguments, then placed on the plot's axis rect
+// (adopt() binds it, clips it to the rect and puts it on the annotations layer).
 template <detail::Item T>
 struct Construct<T>
 {
     template <typename... Args>
     static HandleFor<T> make(QCustomPlot& plot, Args&&... args)
     {
-        using Handle = HandleFor<T>;
-        static_assert(std::constructible_from<T, QCustomPlot*, Args...>,
-                      "add<T>(args...): T has no constructor taking the plot and these arguments");
-        if (!detail::plotHasAxisRect(plot))
-            return Handle{};
-        Handle handle = makeHandle<Handle>(new T(&plot, std::forward<Args>(args)...));
-        handle.get()->update();
-        return handle;
+        static_assert(std::constructible_from<T, Args...>,
+                      "add<T>(args...): T has no constructor taking these arguments");
+        return plot.add(std::make_unique<T>(std::forward<Args>(args)...));
     }
 };
 
@@ -242,6 +238,25 @@ qcp::HandleFor<T> QCPAxisRect::add(QCPAxis* key, QCPAxis* value, Args&&... args)
     handle.get()->update();
     if constexpr (sizeof...(Args) > 0)
         qcp::detail::setDataOrUndo(*mParentPlot, handle, std::forward<Args>(args)...);
+    return handle;
+}
+
+// The item form of QCPAxisRect::add: built from the item's own arguments, then adopted into this
+// rect, clipped to it and bound to its first bottom and left axes.
+template <typename T, typename... Args>
+    requires std::derived_from<T, QCPItem>
+qcp::HandleFor<T> QCPAxisRect::add(Args&&... args)
+{
+    using Handle = qcp::HandleFor<T>;
+    static_assert(std::constructible_from<T, Args...>,
+                  "add<T>(args...): T has no constructor taking these arguments");
+    QCP_CHECK_OR_RETURN(!mParentPlot->isBeingDestroyed(), "the plot is being destroyed", Handle { });
+    auto created = std::make_unique<T>(std::forward<Args>(args)...);
+    // adopt() reports the refusal itself: one report per refused item, not two.
+    if (!mParentPlot->adopt(created.get(), this))
+        return Handle { };
+    Handle handle = qcp::makeHandle<Handle>(created.release());
+    handle.get()->update();
     return handle;
 }
 
