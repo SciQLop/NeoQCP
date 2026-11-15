@@ -236,3 +236,4 @@ public drawing API only, as a user would: every one is also a torture test of th
 | n8 | Categorical axis (text keys) | project: new plot types | gallery #6 |
 | n9 | Contour labels and per-level styles | project: new plot types | gallery #13 |
 | n10 | Peak-fit editor: drag peaks, resize widths with handles, live fit and residual panel | milestone 6 target 11 | annotations + linked panels |
+| n11 | Data-taking calls tested with third-party arrays: xtensor (`xt::xtensor`, `xt::view`), Eigen vectors and blocks, `std::mdspan` rows, Armadillo, a strided view. Each passes `QCPNumberRange` (or fails with a readable error), copies once, keeps the order | maintainer, 2026-11-15 | `QCPNumberRange` (6b), data constructors, `ax->line` |
