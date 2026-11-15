@@ -368,12 +368,28 @@ An item is clipped to the area it lands in unless it was told otherwise: `setCli
 before or after the add, and across a `take()`/`add()` round trip, keeps an item that draws over the
 axis margins unclipped.
 
+The theme fills only what nobody set: `QCPItemText` keeps a colour given before the add — in a
+`setColor()` call or in a subclass constructor — and the plot's theme colours the rest. The same
+holds for a colour map joining its rect's colour scale: a gradient or data range chosen with
+`setGradient()` or `setDataRange()` before the add is the one kept, and the scale fills what is
+still unset.
+
 An item outside a plot — built and not placed yet, or taken with `QCustomPlot::take()` — answers
 `(0, 0)` from its positions' `pixelPosition()`, and its hit test uses no selection tolerance. Nothing
 warns.
 
 A user item may create and place its positions in its constructor or in a member initialiser, as before;
 `createPosition()` no longer binds them to a plot.
+
+### A text style's colour is unset until someone sets it
+
+`QCPTextStyle::color` now defaults to an invalid `QColor`, meaning "the foreground of whoever draws
+this", instead of black. A recording that never named a colour draws in the painter's colour, and
+`ax->text()` leaves the item's own colour — the one the plot's theme gives it — in place:
+
+| Old | New |
+|---|---|
+| `QCPTextStyle style; style.color = Qt::black;` | `QCPTextStyle style;` (unset) or `style.color = plot->theme()->foreground();` |
 
 ## One-call annotations: `ax->line`, `ax->text`, `ax->ellipse`
 
@@ -404,7 +420,8 @@ value axes: the plottable is built detached and `add<T>()` joins it to a system.
 | `new QCPBars(keyAxis, valueAxis)` | `rect->add<QCPBars>(keyAxis, valueAxis)` (or `rect->add<QCPBars>()` for its first bottom and left axes) |
 | `new QCPIntervals(keyAxis, valueAxis, &lanes)` | `rect->add<QCPIntervals>(&lanes)` |
 | `new QCPPolarGraph(area->angularAxis(), area->radialAxis())` | `area->add<QCPPolarGraph>()` |
-| `new QCPPlottable(customPlot, ...)` subclass | `customPlot->add<MyPlottable>(...)`, plot dropped from the constructor |
+| `MyPlottable : QCPPlottable` with `QCPPlottable(keyAxis, valueAxis)` | `: QCPPlottable()` (or `: QCPPlottable1D<D>()` for a data type), `customPlot->add<MyPlottable>(...)` |
+| `MyItem : QCPItem` with `QCPItem(customPlot)` | `: QCPItem()`, `customPlot->add<MyItem>(...)`; `QCPItemAnchor`/`QCPItemPosition` take the parent item, not the plot |
 
 `add<T>(args...)` on the plot or on an axis rect of the plot joins the plottable to that rect's first
 bottom and left axes. `add<T>(key, value, args...)` on the same rect binds the pair given, which is how

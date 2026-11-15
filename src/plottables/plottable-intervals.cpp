@@ -23,7 +23,6 @@ public:
     {
         setLayer(layer);
         setParentLayerable(owner);
-        setParent(owner);
     }
 
 protected:
@@ -34,6 +33,8 @@ protected:
 
     void draw(QCPPainter* painter) override
     {
+        if (!mOwner) // the plottable left the plot, and the layerable outlives it
+            return;
         if (!mOwner->laidOut()) // its labels were laid out on the lost axis or lanes
             return;
         painter->setFont(mParentPlot->font()); // the font the labels were measured with
@@ -45,7 +46,7 @@ protected:
     }
 
 private:
-    QCPIntervals* mOwner;
+    QPointer<QCPIntervals> mOwner;
 };
 
 namespace {
@@ -125,8 +126,13 @@ QCPIntervals::QCPIntervals(qcp::intervals::Columns columns, QCPLaneLayout* layou
 void QCPIntervals::systemDidChange()
 {
     followArrivalLayout();
-    // The lane labels are layerables of the plot: an intervals plottable built without axes has
-    // none to draw them in until a frame takes it.
+    // The lane labels are layerables of one plot: leaving it drops them, so the next one makes its
+    // own. Without that, a moved plottable would keep drawing through a layer of the plot it left.
+    if (mLabelLayer && (!mSystem || mLabelLayer->parentPlot() != mParentPlot))
+    {
+        delete mLabelLayer;
+        mLabelLayer = nullptr;
+    }
     if (!mSystem || !mParentPlot || mLabelLayer)
         return;
     mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
@@ -194,6 +200,7 @@ QVector<int> QCPIntervals::rowsWithIds(const QVector<qint64>& ids) const
 // Rows on a lane the layout did not know yet were dropped by groupByLane.
 QCPIntervals::~QCPIntervals()
 {
+    delete mLabelLayer; // the plot owns it, so leaving does not take it
     if (mLayout)
         mLayout->removeLaneRows(this);
 }

@@ -108,8 +108,7 @@ plot->replot();
 For large data, move your vectors into a graph. Nothing is copied:
 
 ```cpp
-auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
-mg->setData(std::move(keys), std::move(valueColumns));   // one vector per component
+auto mg = plot->add<QCPGraph>(std::move(keys), std::move(valueColumns)); // one vector per component
 mg->setComponentColors({Qt::red, Qt::green, Qt::blue});
 ```
 

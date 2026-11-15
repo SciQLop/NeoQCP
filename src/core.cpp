@@ -5446,11 +5446,10 @@ bool QCustomPlot::registerItem(QCPItem* item)
         item->setLayer(annotations);
     else if (!item->layer())
         item->setLayer(mCurrentLayer.data());
+    // The theme fills what the caller never set, so a colour chosen before the add survives it.
     if (mTheme) {
-        if (auto* textItem = qobject_cast<QCPItemText*>(item)) {
-            textItem->setColor(mTheme->foreground());
-            textItem->setSelectedColor(mTheme->selection());
-        }
+        if (auto* textItem = qobject_cast<QCPItemText*>(item))
+            textItem->applyThemeColors(mTheme->foreground(), mTheme->selection());
     }
     return true;
 }

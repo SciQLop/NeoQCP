@@ -14,8 +14,8 @@ with a label. It is a complete plot type in 73 lines that only uses public heade
 :language: cpp
 ````
 
-- `RangeBand` derives from `QCPDrawn<QCPPlottable>`, so it is added to the plot by its
-  constructor (`new RangeBand(plot.xAxis, plot.yAxis)`), appears in the legend and can be selected.
+- `RangeBand` derives from `QCPDrawn<QCPPlottable>`, so it is built without a plot
+  (`plot.add<RangeBand>()` places it), appears in the legend and can be selected.
 - A drawn item derives from `QCPDrawn<QCPItem>` instead, and a plottable with a data
   container from `QCPDrawn<QCPPlottable1D<MyData>>`. The base class keeps its data and its
   ranges; the adapter only answers the drawing virtuals (one exception: the value range ignores its

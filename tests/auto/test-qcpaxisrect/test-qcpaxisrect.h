@@ -15,6 +15,7 @@ private slots:
   void lineTakesDataAndOptions();
   void lineWithNoPenDrawsMarkersOnly();
   void textTakesAPositionAndAStyle();
+  void textAppliesEveryStyleField();
   void ellipseTakesTwoCornersInTheirOwnSpaces();
   void axisRemovalConsequencesToPlottables();
   void axisRemovalConsequencesToItems();

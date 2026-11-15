@@ -25,6 +25,7 @@ void QCPColorMapped::setDataRange(const QCPRange& dataRange)
 {
     if (!QCPRange::validRange(dataRange))
         return;
+    mDataRangeChosen = true;
     if (!mColorScale)
     {
         applyDataRange(dataRange);
@@ -53,6 +54,7 @@ void QCPColorMapped::setDataScaleType(QCPAxis::ScaleType scaleType)
 
 void QCPColorMapped::setGradient(const QCPColorGradient& gradient)
 {
+    mGradientChosen = true;
     if (!mColorScale)
     {
         applyGradient(gradient);
@@ -81,7 +83,7 @@ bool QCPColorMapped::hasUserColorScale() const
     return mScaleChoice == ScaleChoice::User && mColorScale;
 }
 
-void QCPColorMapped::attachColorScale(QCPColorScale* colorScale)
+void QCPColorMapped::attachColorScale(QCPColorScale* colorScale, bool keepsChosenValues)
 {
     if (mColorScale == colorScale)
         return;
@@ -103,8 +105,10 @@ void QCPColorMapped::attachColorScale(QCPColorScale* colorScale)
     // Each setter signals, and a slot may delete this plottable or the scale.
     const QPointer<QCPColorMapped> alive(this);
     const QPointer<QCPColorScale> live(colorScale);
-    applyGradient(colorScale->gradient());
-    if (alive && live)
+    // A gradient or range the caller chose before the join is not the scale's to overwrite.
+    if (!keepsChosenValues || !mGradientChosen)
+        applyGradient(colorScale->gradient());
+    if (alive && live && (!keepsChosenValues || !mDataRangeChosen))
         applyDataRange(colorScale->dataRange());
     if (alive && live)
         applyDataScaleType(colorScale->dataScaleType());
@@ -212,7 +216,7 @@ void QCPColorMapped::followKeyAxisRectScale()
         if (!alive)
             return;
     }
-    attachColorScale(scale.get());
+    attachColorScale(scale.get(), true);
     if (!alive)
         return;
     colorMappingChanged();

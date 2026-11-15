@@ -15,8 +15,8 @@
 
 /*!
   Draws \a values against \a keys on this rect's first bottom and left axes, styled by \a options.
-  The data goes straight into the graph's data constructor: the ranges are read once, into the
-  array the graph stores, and no setData() pass follows.
+  The data goes into the graph's data constructor, which is setData() without the call: the same
+  copy, one expression.
 
   Returns an empty handle when the rect has no such axis pair or the system refuses the graph, as
   add<QCPGraph>() does.
@@ -37,8 +37,9 @@ QCPHandle<QCPGraph> QCPAxisRect::line(const K& keys, const V& values, const QCPL
   A text item at \a at, carrying \a text. \a at names its own space (data coordinates, pixels, a
   ratio of this rect, ...), and \a style is the same QCPTextStyle the drawing context takes.
 
-  A style field left at its default leaves the item's own: its alignment, and the colour the plot
-  themes, so text(at, QStringLiteral("x")) reads as a plain annotation.
+  Every style field is applied, whatever its value: the defaults of QCPTextStyle are a drawing
+  context's, not an item's. A style colour that is not valid leaves the item's own, which is the
+  colour the plot's theme gives a plain annotation.
 */
 inline QCPHandle<QCPItemText> QCPAxisRect::text(QCP::Position at, const QString& text,
                                                 const QCPTextStyle& style)
@@ -49,23 +50,15 @@ inline QCPHandle<QCPItemText> QCPAxisRect::text(QCP::Position at, const QString&
     item->setPosition(at);
     item->setText(text);
 
-    const QCPTextStyle defaults;
-    if (style.font != defaults.font)
-        item->setFont(style.font);
-    if (style.color != defaults.color)
+    item->setFont(style.font);
+    if (style.color.isValid())
         item->setColor(style.color);
-    if (style.pen != defaults.pen)
-        item->setPen(style.pen);
-    if (style.brush != defaults.brush)
-        item->setBrush(style.brush);
-    if (style.alignment != defaults.alignment)
-        item->setPositionAlignment(style.alignment);
-    if (style.textFlags != defaults.textFlags)
-        item->setTextAlignment(static_cast<Qt::Alignment>(style.textFlags));
-    if (style.rotationDegrees != defaults.rotationDegrees)
-        item->setRotation(style.rotationDegrees);
-    if (style.padding != defaults.padding)
-        item->setPadding(style.padding.toMargins());
+    item->setPen(style.pen);
+    item->setBrush(style.brush);
+    item->setPositionAlignment(style.alignment);
+    item->setTextAlignment(static_cast<Qt::Alignment>(style.textFlags));
+    item->setRotation(style.rotationDegrees);
+    item->setPadding(style.padding.toMargins());
     return item;
 }
 

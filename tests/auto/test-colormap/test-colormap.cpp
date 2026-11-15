@@ -2028,3 +2028,28 @@ void TestColorMap::noColourMapLayerIsCreated()
     QVERIFY2(QString::fromLatin1(child->metaObject()->className()) != "QCPColormapRhiLayer",
         "no dedicated colour-map layer may be created");
 }
+
+// What a colour map chose before the add wins: the rect's scale fills only what was never set.
+void TestColorMap::QCPColorMap2_aChosenGradientSurvivesTheRectsScale()
+{
+  const std::vector<double> x = { 0, 1, 2 };
+  const std::vector<double> y = { 0, 1 };
+  const std::vector<double> z = { 1, 2, 3, 4, 5, 6 };
+
+  const auto maker = mPlot->axisRect()->add<QCPColorMap2>(x, y, z);
+  QVERIFY(maker);
+  const auto scale = mPlot->axisRect()->colorScale();
+  QVERIFY(scale);
+  scale->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
+
+  auto chosen = std::make_unique<QCPColorMap2>(x, y, z);
+  chosen->setGradient(QCPColorGradient(QCPColorGradient::gpJet));
+  const auto kept = mPlot->add(std::move(chosen));
+  QVERIFY(kept);
+  QVERIFY(kept->gradient() == QCPColorGradient(QCPColorGradient::gpJet));
+
+  // A map that chose nothing takes the scale's, as it always did.
+  const auto plain = mPlot->axisRect()->add<QCPColorMap2>(x, y, z);
+  QVERIFY(plain);
+  QVERIFY(plain->gradient() == QCPColorGradient(QCPColorGradient::gpGrayscale));
+}

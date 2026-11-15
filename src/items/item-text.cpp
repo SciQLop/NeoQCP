@@ -155,6 +155,9 @@ QCPItemText::QCPItemText()
     setSelectedBrush(Qt::NoBrush);
     setColor(Qt::black);
     setSelectedColor(Qt::blue);
+    // The two above are this item's defaults, not a choice: the theme may fill them.
+    mColorFromTheme = true;
+    mSelectedColorFromTheme = true;
 }
 
 QCPItemText::~QCPItemText() { }
@@ -164,6 +167,7 @@ QCPItemText::~QCPItemText() { }
 */
 void QCPItemText::setColor(const QColor& color)
 {
+    mColorFromTheme = false;
     if (color == mColor)
         return;
     update();
@@ -176,11 +180,24 @@ void QCPItemText::setColor(const QColor& color)
 */
 void QCPItemText::setSelectedColor(const QColor& color)
 {
+    mSelectedColorFromTheme = false;
     if (color == mSelectedColor)
         return;
     update();
     mSelectedColor = color;
     qcpEmit(this, mParentPlot, &QCPItemText::selectedColorChanged, selectedColor());
+}
+
+/*!
+  Sets the text and selected-text colours, each only if the caller never set it: what a plot's theme
+  fills when an item is placed. A colour chosen before the add wins over the theme.
+*/
+void QCPItemText::applyThemeColors(const QColor& color, const QColor& selectedColor)
+{
+    if (mColorFromTheme)
+        setColor(color);
+    if (mSelectedColorFromTheme)
+        setSelectedColor(selectedColor);
 }
 
 /*!

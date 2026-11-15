@@ -20,6 +20,20 @@ QCPAxisRect* addSecondRect(QCustomPlot* plot)
     return rect;
 }
 
+//! Deletes itself the moment it lands: the add must survive an item whose signals run mid-add.
+class DoomedLine : public QCPItemLine
+{
+public:
+    DoomedLine()
+    {
+        connect(this, &QCPLayerable::layerChanged, this,
+                [this](QCPLayer*) {
+                    if (QCustomPlot* plot = parentPlot())
+                        plot->removeItem(this);
+                });
+    }
+};
+
 //! A user item whose position is made and placed in the constructor, with no plot in sight.
 class MarkedItem : public QCPItem
 {
@@ -292,5 +306,14 @@ void TestItemWithoutPlot::aSpanOrientationReachesTheRectAdd()
     auto span = second->add<QCPItemSpan>(Qt::Horizontal);
     QVERIFY(span);
     QCOMPARE(span->orientation(), Qt::Horizontal);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestItemWithoutPlot::anItemDeletedDuringItsOwnAddLeavesNoDanglingOne()
+{
+    const int before = mPlot->itemCount();
+    const auto doomed = mPlot->axisRect()->add<DoomedLine>();
+    Q_UNUSED(doomed); // gone before the add returned: the handle is dead, not followed
+    QCOMPARE(mPlot->itemCount(), before);
     QCOMPARE(gMisuses, 0);
 }

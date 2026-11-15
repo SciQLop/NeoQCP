@@ -23,6 +23,7 @@ private slots:
     void coalescing();
     void applyThemePropagatesColorScaleAxis();
     void applyThemeReachesTheRectsOwnScale();
+    void itemColorsGivenBeforeTheAdd();
     void busyIndicatorDefaults();
     void busyIndicatorLightFactory();
 

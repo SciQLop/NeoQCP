@@ -45,7 +45,7 @@ class QCPScatterStyle;
 struct QCP_LIB_DECL QCPTextStyle
 {
     QFont font;
-    QColor color = Qt::black;
+    QColor color; //!< the glyphs; an invalid colour means the foreground of whoever draws them
     QPen pen = Qt::NoPen; //!< the box's border
     QBrush brush = Qt::NoBrush; //!< the box's background
     Qt::Alignment alignment = Qt::AlignLeft | Qt::AlignTop;

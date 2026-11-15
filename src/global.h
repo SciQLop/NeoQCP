@@ -86,8 +86,8 @@
   std::array and a view such as std::views::iota all pass; a range whose elements do not convert to
   double (QStringList, say) does not.
 
-  The data-taking calls read the range once, in order: an input range is enough, no random access
-  needed.
+  The data-taking calls measure a range before they read it, so a forward range is what they need:
+  no random access, no second pass.
 */
 template <typename R>
 concept QCPNumberRange

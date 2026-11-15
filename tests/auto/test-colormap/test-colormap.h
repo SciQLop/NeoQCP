@@ -36,6 +36,7 @@ private slots:
   void QCPColorMap2_contourExportCachesFallback();
   void QCPColorMapData_fillNonFiniteKeepsBoundsDegenerate();
   void QCPColorScale_rescaleDataRangeIncludesColorMap2();
+  void QCPColorMap2_aChosenGradientSurvivesTheRectsScale();
   void QCPColorMap2_drawEmitsNoBusyChange();
   void QCPColorMap2_colourSlotDeletingTheMapIsSafe();
   void QCPHistogram2D_colourSlotDeletingTheMapIsSafe();

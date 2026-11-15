@@ -164,6 +164,24 @@ void TestQCPAxisRect::textTakesAPositionAndAStyle()
   QVERIFY(label->clipToAxisRect());
 }
 
+void TestQCPAxisRect::textAppliesEveryStyleField()
+{
+  QCPAxisRect *ar = mPlot->axisRect();
+  QCPTextStyle style;
+  // These equal QCPTextStyle's own defaults, which the item does not share: the call must still
+  // apply them, not compare against the defaults and skip.
+  QCOMPARE(style.alignment, Qt::Alignment(Qt::AlignLeft | Qt::AlignTop));
+  style.textFlags = Qt::AlignRight | Qt::AlignVCenter;
+  style.color = QColor(); // unset: the plot's foreground shows through
+
+  const QCPHandle<QCPItemText> label =
+      ar->text(QCP::Pixels { 20, 20 }, QStringLiteral("plain"), style);
+  QVERIFY(label);
+  QCOMPARE(label->positionAlignment(), Qt::Alignment(Qt::AlignLeft | Qt::AlignTop));
+  QCOMPARE(label->textAlignment(), Qt::Alignment(Qt::AlignRight | Qt::AlignVCenter));
+  QCOMPARE(label->color(), QColor(Qt::black)); // no theme on this plot, so black is its foreground
+}
+
 void TestQCPAxisRect::ellipseTakesTwoCornersInTheirOwnSpaces()
 {
   QCPAxisRect *ar = mPlot->axisRect();

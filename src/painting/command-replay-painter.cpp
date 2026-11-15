@@ -91,6 +91,8 @@ namespace
 void replayText(const qcp::TextCmd& cmd, QCPPainter& painter, const QCPDrawFrame& frame)
 {
     const QCPTextStyle& style = *cmd.style;
+    // A style with no colour of its own takes the foreground the painter carries.
+    const QColor color = style.color.isValid() ? style.color : painter.pen().color();
     painter.save();
     painter.translate(qcpResolvePosition(frame, cmd.at));
     if (style.rotationDegrees != 0.0)
@@ -103,8 +105,8 @@ void replayText(const qcp::TextCmd& cmd, QCPPainter& painter, const QCPDrawFrame
         painter.drawRect(layout.box);
         painter.setBrush(Qt::NoBrush);
     }
-    QCPLabelRenderer::drawWith(textRenderer(style), &painter, layout.glyphs, style.font,
-                               style.color, cmd.text, style.textFlags);
+    QCPLabelRenderer::drawWith(textRenderer(style), &painter, layout.glyphs, style.font, color,
+                               cmd.text, style.textFlags);
     painter.restore();
 }
 } // namespace

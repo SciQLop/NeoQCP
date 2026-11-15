@@ -96,7 +96,7 @@ public:
 
     /*! The handle form of a plottable constructor, defined in construct.h beside the axis rect's:
       the plottable belongs to this area and draws through its system, which its angular axis and
-      its first radial axis make. \a args go to the handle's setData.
+      its first radial axis make. \a args are the plottable's constructor arguments.
 
       A plottable whose requiredCapabilities() this polar system lacks is refused, because a polar
       system provides none.
@@ -191,7 +191,7 @@ public:
     }
 
     // The handle form of a plottable constructor: the plottable belongs to this area and draws
-    // through its system. args go to the handle's setData, as the area's own add.
+    // through its system. args are the plottable's constructor arguments, as the area's add.
     template <class Graph, typename... Args>
         requires std::derived_from<Graph, QCPPlottable>
     qcp::HandleFor<Graph> add(Args&&... args)

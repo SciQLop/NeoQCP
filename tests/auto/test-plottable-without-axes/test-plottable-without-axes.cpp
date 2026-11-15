@@ -469,6 +469,9 @@ void TestPlottableWithoutAxes::aMovedIntervalsGetsTheNewPlotsLaneLayout()
     QVERIFY(readded);
     QVERIFY(readded->laneLayout());
     QCOMPARE(readded->laneLayout()->parent(), &other);
+    // The lane labels are layerables of one plot: the move gives them to the new one.
+    QVERIFY(readded->labelLayer());
+    QVERIFY(readded->labelLayer()->parentPlot() == &other);
 
     // The new layout is the one followed: naming a lane rebuilds the recording.
     other.replot();
@@ -503,6 +506,8 @@ void TestPlottableWithoutAxes::anIntervalsOutlivesThePlotThatLaidItOut()
     QVERIFY(readded);
     QVERIFY(readded->laneLayout());
     QCOMPARE(readded->laneLayout()->parent(), mPlot);
+    QVERIFY(readded->labelLayer());
+    QVERIFY(readded->labelLayer()->parentPlot() == mPlot);
 
     // The layout made for the new plot is followed, though the old one was followed before.
     mPlot->replot();

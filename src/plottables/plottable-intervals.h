@@ -321,7 +321,9 @@ protected:
     // after their layer's painter output, so text drawn on the plottable's own layer would end up
     // underneath them. This layerable lives one layer above and draws the labels/lane names.
     class LabelLayer;
-    LabelLayer* mLabelLayer = nullptr;
+    //! The plot's layerable for this plottable's labels: it dies with the plot, so a move makes a
+    //! fresh one.
+    QPointer<LabelLayer> mLabelLayer;
 
     friend class TestIntervals;
 };

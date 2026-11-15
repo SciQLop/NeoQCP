@@ -211,6 +211,9 @@ qcp::HandleFor<T> QCPAxisRect::add(Args&&... args)
     static_assert(std::constructible_from<T, Args...>,
                   "add<T>(args...): T has no constructor taking these arguments");
     QCP_CHECK_OR_RETURN(!mParentPlot->isBeingDestroyed(), "the plot is being destroyed", Handle { });
+    // A slot of the item's own (a layerChanged, say) may delete it: deliver those signals once the
+    // handle exists, as the plottable form does.
+    const QCPEmissionScope scope(mParentPlot);
     auto created = std::make_unique<T>(std::forward<Args>(args)...);
     // adopt() reports the refusal itself: one report per refused item, not two.
     if (!mParentPlot->adopt(created.get(), this))

@@ -24,6 +24,7 @@ private slots:
     void aClipFlagGivenBeforeTheAddIsKept();
     void aRectAddWithoutBothAxesRefusesTheItem();
     void aSpanOrientationReachesTheRectAdd();
+    void anItemDeletedDuringItsOwnAddLeavesNoDanglingOne();
 
 private:
     QCustomPlot* mPlot = nullptr;

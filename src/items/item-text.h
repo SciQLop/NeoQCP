@@ -96,6 +96,9 @@ public:
 
     QMargins padding() const { return mPadding; }
 
+    //! Fills the colours a caller never set: the plot's theme, applied when the item is placed.
+    void applyThemeColors(const QColor& color, const QColor& selectedColor);
+
     // setters;
     void setColor(const QColor& color);
     void setSelectedColor(const QColor& color);
@@ -154,6 +157,9 @@ protected:
 
     // property members:
     QColor mColor, mSelectedColor;
+    //! Whether each colour is still the constructor's default, and so the theme's to fill.
+    bool mColorFromTheme = true;
+    bool mSelectedColorFromTheme = true;
     QPen mPen, mSelectedPen;
     QBrush mBrush, mSelectedBrush;
     QFont mFont, mSelectedFont;

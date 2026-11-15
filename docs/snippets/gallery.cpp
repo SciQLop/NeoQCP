@@ -540,10 +540,7 @@ DOC_SNIPPET(gallery_fit_residuals, 680, 560)
     customPlot->plotLayout()->setRowStretchFactors({ 3, 1.2 });
     QCPAxis* residualT = residualRect->axis(QCPAxis::atBottom);
     QCPAxis* residualAxis = residualRect->axis(QCPAxis::atLeft);
-    auto band = customPlot->add<QCPItemSpan>(Qt::Horizontal);   // the 1 sigma band
-    band->setClipAxisRect(residualRect);
-    for (QCPItemPosition* edge : { band->lowerEdge, band->upperEdge })
-        edge->setAxes(residualT, residualAxis);
+    auto band = residualRect->add<QCPItemSpan>(Qt::Horizontal);   // the 1 sigma band
     band->setRange(QCPRange(-1, 1));
     band->setBrush(QColor(127, 127, 127, 45));
     band->setBorderPen(Qt::NoPen);

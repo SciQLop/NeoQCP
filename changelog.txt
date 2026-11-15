@@ -619,6 +619,18 @@ Milestone 6b (plot-free construction). Breaking, in the 3.0 preview line.
         lanes that layout names, and a layout the caller gives is the one kept. That default layout belongs to
         the plot, so a plottable moved to another plot gets the new plot's, and one whose plot died gets a
         fresh one on the next add.
+  - What a caller set before an add wins: the theme fills the text colours of an item, and a
+        colour scale fills the gradient and data range of a colour map, only where the caller set
+        nothing. A QCPItemText given a colour in its constructor, and a colour map given a gradient
+        before it is added, keep them.
+  - ax->text(at, "t", style) applies every QCPTextStyle field, whatever its value. An invalid
+        QColor is that struct's default and means the plot's foreground, which is what a drawing
+        context draws with; QCPItemText still carries its own colour.
+  - The lane labels of an intervals belong to the plot the plottable is in: a plottable moved to
+        another plot draws them there, through that plot's layer, and one whose plot died makes them
+        again.
+  - An item's own signals (a layerChanged, say) are delivered once add<T>() returned and the handle
+        exists, as a plottable's are: a slot may delete the item without breaking the add.
   - Fix: an item outside a plot (built but not placed, or taken) has no viewport to clip to; its hit test
         no longer reads one, spans and text use no selection tolerance there, and a pixel write with
         setPixelPosition() is inert instead of dereferencing the missing viewport.

@@ -1,4 +1,5 @@
 #include "test-theme.h"
+#include <memory>
 
 void TestTheme::lightFactoryDefaults()
 {
@@ -238,5 +239,44 @@ void TestTheme::busyIndicatorLightFactory()
     QCOMPARE(theme->busyFadeAlpha(), 0.3);
     QCOMPARE(theme->busyShowDelayMs(), 500);
     QCOMPARE(theme->busyHideDelayMs(), 500);
+    delete theme;
+}
+
+namespace
+{
+//! Sets its colour in its constructor, as a user item does: the theme leaves it alone.
+class RedTextItem : public QCPItemText
+{
+public:
+    RedTextItem() { setColor(Qt::red); }
+};
+} // namespace
+
+// What a caller set before the add wins: the theme fills only the colours never set.
+void TestTheme::itemColorsGivenBeforeTheAdd()
+{
+    auto* theme = QCPTheme::dark();
+    mPlot->setTheme(theme);
+
+    auto given = std::make_unique<QCPItemText>();
+    given->setColor(Qt::red);
+    given->setSelectedColor(Qt::green);
+    const auto kept = mPlot->add(std::move(given));
+    QVERIFY(kept);
+    QCOMPARE(kept->color(), QColor(Qt::red));
+    QCOMPARE(kept->selectedColor(), QColor(Qt::green));
+
+    const auto fromConstructor = mPlot->add(std::make_unique<RedTextItem>());
+    QVERIFY(fromConstructor);
+    QCOMPARE(fromConstructor->color(), QColor(Qt::red));
+
+    const auto themed = mPlot->add(std::make_unique<QCPItemText>());
+    QVERIFY(themed);
+    QCOMPARE(themed->color(), theme->foreground());
+    QCOMPARE(themed->selectedColor(), theme->selection());
+
+    const auto annotation = mPlot->axisRect()->text(QCP::Pixels { 10, 10 }, QStringLiteral("t"));
+    QVERIFY(annotation);
+    QCOMPARE(annotation->color(), theme->foreground());
     delete theme;
 }

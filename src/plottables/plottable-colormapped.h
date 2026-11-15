@@ -87,6 +87,9 @@ protected:
     QCPRange mDataRange;
     QCPAxis::ScaleType mDataScaleType;
     QCPColorGradient mGradient;
+    //! Whether the caller set each one, and so whether a scale may still fill it when it is joined.
+    bool mGradientChosen = false;
+    bool mDataRangeChosen = false;
 
 private:
     //! Which scale this plottable uses: its rect's (the default), the one setColorScale() picked,
@@ -107,7 +110,10 @@ private:
     //! Whether this plottable maps anything through its scale now: a rect shows its own scale only
     //! while one of its users does. A curve whose values no longer match its data does not.
     [[nodiscard]] virtual bool showsColorScale() const { return true; }
-    void attachColorScale(QCPColorScale* colorScale);
+    //! \a keepsChosenValues is for arriving in a rect whose scale already has one: the values a
+    //! caller chose with setGradient() or setDataRange() are then not the scale's to overwrite.
+    //! setColorScale(), which names a scale the caller picked, takes that scale's values whole.
+    void attachColorScale(QCPColorScale* colorScale, bool keepsChosenValues = false);
     void applyDataRange(const QCPRange& dataRange);
     void applyDataScaleType(QCPAxis::ScaleType scaleType);
     void applyGradient(const QCPColorGradient& gradient);
