@@ -375,6 +375,24 @@ warns.
 A user item may create and place its positions in its constructor or in a member initialiser, as before;
 `createPosition()` no longer binds them to a plot.
 
+## One-call annotations: `ax->line`, `ax->text`, `ax->ellipse`
+
+An axis rect makes the three common annotations without an add and a chain of setters:
+
+| Before | Now |
+| --- | --- |
+| `add<QCPGraph>(keys, values).setPen(p).setName("n")` | `ax->line(keys, values, { .pen = p, .name = "n" })` |
+| `add<QCPGraph>(keys, values).setScatterStyle(s)` with `setPen(Qt::NoPen)` | `ax->line(keys, values, { .pen = Qt::NoPen, .scatterStyle = s })` |
+| `add<QCPItemText>()` + `position->set(...)` + `setText()` + setters | `ax->text(at, "t", style)` |
+| `add<QCPItemEllipse>()` + `topLeft->set(...)` + `bottomRight->set(...)` + `setPen()`/`setBrush()` | `ax->ellipse(a, b, { .pen = p, .brush = b })` |
+
+`QCPLineOptions` is `{ QPen pen; QString name; QCPScatterStyle scatterStyle; }`, field for field the setters it
+feeds, so a designated initialiser list reads as the calls it replaces. `QCPShapeOptions` is `{ QPen pen; QBrush
+brush; }`. The positions are the `QCP::Position` spaces (`QCP::Data`, `QCP::Pixels`, `QCP::AxisRatio`, ...), so an
+ellipse corner in data coordinates and the other in pixels is two arguments, and a text anchor is wherever it
+should sit. A text style field left at its default leaves the item's own (its alignment, and the colour the plot
+themes), so `ax->text(at, "t")` is a plain annotation.
+
 ## Plottables are built without axes
 
 A plottable's constructor takes the plottable's own arguments only. It no longer takes the key and

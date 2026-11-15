@@ -149,6 +149,7 @@ set(NEOQCP_MOC_HEADERS
     src/layout.h
     src/alignment-group.h
     src/layoutelements/area.h
+    src/layoutelements/axisrect-shortcuts.h
     src/layoutelements/layoutelement-axisrect.h
     src/layoutelements/layoutelement-colorscale.h
     src/layoutelements/layoutelement-legend.h

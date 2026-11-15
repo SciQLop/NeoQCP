@@ -102,6 +102,84 @@ void TestQCPAxisRect::cleanup()
   delete mPlot;
 }
 
+void TestQCPAxisRect::lineTakesDataAndOptions()
+{
+  QCPAxisRect *ar = mPlot->axisRect();
+  const std::vector<double> keys { 0, 1, 2 };
+  const std::vector<double> values { 3, 2, 1 };
+  const QCPLineOptions options { .pen = QPen(Qt::red, 3), .name = QStringLiteral("signal") };
+
+  // The data goes through the graph's data constructor: one pass over the ranges, no setData after.
+  const QCPHandle<QCPGraph> graph = ar->line(keys, values, options);
+  QVERIFY(graph);
+  QCOMPARE(graph->pen(), options.pen);
+  QCOMPARE(graph->name(), QStringLiteral("signal"));
+  QCOMPARE(graph->dataCount(), 3);
+  QCOMPARE(graph->dataMainValue(0), 3.0);
+  QCOMPARE(graph->dataMainValue(2), 1.0);
+  QCOMPARE(graph->keyAxis().get(), ar->xAxis().get());
+}
+
+void TestQCPAxisRect::lineWithNoPenDrawsMarkersOnly()
+{
+  QCPAxisRect *ar = mPlot->axisRect();
+  const QCPHandle<QCPGraph> markers =
+      ar->line(std::vector<double> { 0, 1 }, std::vector<int> { 0, 1 },
+               { .pen = QPen(Qt::NoPen),
+                 .scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, 5) });
+  QVERIFY(markers);
+  QCOMPARE(markers->pen().style(), Qt::NoPen);
+  QCOMPARE(markers->scatterStyle().shape(), QCPScatterStyle::ssDisc);
+  QCOMPARE(markers->scatterStyle().size(), 5.0);
+  QVERIFY(markers->name().isEmpty());
+}
+
+void TestQCPAxisRect::textTakesAPositionAndAStyle()
+{
+  QCPAxisRect *ar = mPlot->axisRect();
+  QCPTextStyle style;
+  style.font = QFont(QStringLiteral("Serif"), 14);
+  style.color = QColor(Qt::darkGreen);
+  style.pen = QPen(Qt::darkBlue);
+  style.brush = QBrush(QColor(255, 255, 255, 200));
+  style.alignment = Qt::AlignRight | Qt::AlignBottom;
+  style.rotationDegrees = 12.0;
+  style.padding = QMarginsF(4, 5, 6, 7);
+
+  const QCPHandle<QCPItemText> label =
+      ar->text(QCP::AxisRatio { 0.05, 0.25 }, QStringLiteral("t"), style);
+  QVERIFY(label);
+  QCOMPARE(label->text(), QStringLiteral("t"));
+  QCOMPARE(label->font(), style.font);
+  QCOMPARE(label->color(), style.color);
+  QCOMPARE(label->pen(), style.pen);
+  QCOMPARE(label->brush(), style.brush);
+  QCOMPARE(label->positionAlignment(), style.alignment);
+  QCOMPARE(label->rotation(), style.rotationDegrees);
+  QCOMPARE(label->padding(), QMargins(4, 5, 6, 7));
+
+  // The position keeps the space it was given: a ratio of the rect, not the plot's axes.
+  QCOMPARE(label->position->type(), QCPItemPosition::ptAxisRectRatio);
+  QCOMPARE(label->position->coords(), QPointF(0.05, 0.25));
+  QVERIFY(label->clipToAxisRect());
+}
+
+void TestQCPAxisRect::ellipseTakesTwoCornersInTheirOwnSpaces()
+{
+  QCPAxisRect *ar = mPlot->axisRect();
+  const QBrush fill(QColor(0, 0, 255, 40));
+  const QCPHandle<QCPItemEllipse> shaded = ar->ellipse(
+      QCP::Data { 1, 2 }, QCP::Pixels { 300, 220 }, { .pen = QPen(Qt::darkCyan), .brush = fill });
+  QVERIFY(shaded);
+  QCOMPARE(shaded->topLeft->type(), QCPItemPosition::ptPlotCoords);
+  QCOMPARE(shaded->topLeft->coords(), QPointF(1, 2));
+  QCOMPARE(shaded->bottomRight->type(), QCPItemPosition::ptAbsolute);
+  QCOMPARE(shaded->bottomRight->coords(), QPointF(300, 220));
+  QCOMPARE(shaded->pen().color(), QColor(Qt::darkCyan));
+  QCOMPARE(shaded->brush(), fill);
+  QVERIFY(shaded->clipToAxisRect());
+}
+
 void TestQCPAxisRect::multiAxis()
 {
   QCPAxisRect *ar = mPlot->axisRect();

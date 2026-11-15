@@ -27,7 +27,10 @@
 #define QCP_LAYOUTELEMENT_AXISRECT_H
 
 #include "../axis/axis.h"
+#include "../coords.h"
 #include "../global.h"
+#include "../painting/draw-context.h"
+#include "../scatterstyle.h"
 #include "area.h"
 #include <concepts>
 #include <tuple>
@@ -48,6 +51,8 @@ class QCPAxis;
 class QCPPlottable;
 class QCPGraph;
 class QCPItem;
+class QCPItemEllipse;
+class QCPItemText;
 class QCPColorScale;
 
 template <typename T, typename Self = void>
@@ -55,6 +60,27 @@ class QCPColorScaleOps;
 
 template <typename T, typename Self = void>
 class QCPAxisRectOps;
+
+/*!
+  How QCPAxisRect::line() styles the graph it makes: the three graph setters a one-call line needs.
+  Each field is named after the setter it feeds, so a designated initialiser list reads as the
+  setters it replaces. \a pen with \c Qt::NoPen draws the markers of \a scatterStyle only.
+*/
+struct QCPLineOptions
+{
+    QPen pen;
+    QString name;
+    QCPScatterStyle scatterStyle;
+};
+
+/*!
+  How QCPAxisRect::ellipse() styles the item it makes: its outline pen and its fill brush.
+*/
+struct QCPShapeOptions
+{
+    QPen pen;
+    QBrush brush;
+};
 
 class QCP_LIB_DECL QCPAxisRect : public QCPArea
 {
@@ -119,8 +145,9 @@ public:
     }
 
     // The handle form of a plottable constructor: the plottable belongs to this rect and is drawn
-    // in the system of its bottom and left axes, or of \a key and \a value; args go to the handle's
-    // setData. Defined in construct.h, where the construction rules live.
+    // in the system of its bottom and left axes, or of \a key and \a value; the args are the
+    // plottable's constructor arguments (its data, for the built-in types). Defined in construct.h,
+    // where the construction rules live.
     template <typename T, typename... Args>
         requires std::derived_from<T, QCPPlottable>
               && qcp::FirstArgumentIsNotAnAxis<Args...>
@@ -135,6 +162,19 @@ public:
     template <typename T, typename... Args>
         requires std::derived_from<T, QCPItem>
     qcp::HandleFor<T> add(Args&&... args);
+
+    // A graph of \a keys and \a values on this rect's axes, in one call: the data goes to the
+    // graph's data constructor, and \a options feeds its pen, name and scatter style. Defined in
+    // axisrect-shortcuts.h, after the graph and the items exist.
+    template <QCPNumberRange K, QCPNumberRange V>
+    QCPHandle<QCPGraph> line(const K& keys, const V& values,
+                             const QCPLineOptions& options = { });
+    // A text item at \a at, in whatever space \a at names, carrying \a text and \a style.
+    QCPHandle<QCPItemText> text(QCP::Position at, const QString& text,
+                                const QCPTextStyle& style = { });
+    // The built-in ellipse item between the corners \a a and \a b, each in its own space.
+    QCPHandle<QCPItemEllipse> ellipse(QCP::Position a, QCP::Position b,
+                                      const QCPShapeOptions& options = { });
 
     QCPHandle<QCPAxis> addAxis(QCPAxis::AxisType type, QCPAxis* axis = nullptr);
     QList<QCPHandle<QCPAxis>> addAxes(QCPAxis::AxisTypes types);

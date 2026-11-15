@@ -8,8 +8,15 @@ This page shows how to give it data, how to style it, how missing data is drawn,
 
 ## Draw a line
 
-`add<QCPGraph>()` creates a `QCPGraph` on the default axes. `setData()` takes two `QVector<double>`, keys and values.
-`addGraph()` does the same and names the graph "Graph 1", "Graph 2" and so on. `graph(i)`, `graphs()` and `selectedGraphs()` return handles to the graphs of the plot.
+`ax->line(x, y)` draws a line of data in one call: it makes a `QCPGraph` on the rect's bottom and left axes and
+feeds it the keys and values. The ranges are read once, straight into the graph's data array; the `QCPNumberRange`
+concept says what goes in, so `std::vector`, `QVector`, `std::array` or a view all work, in their own numeric type.
+A second argument styles it: `ax->line(x, y, { .pen = QPen(Qt::red, 2), .name = "signal" })`. `.pen = Qt::NoPen`
+with a `.scatterStyle` draws markers only.
+
+For a graph you place yourself, `ax->add<QCPGraph>()` makes an empty one on the same axes, and `setData()` takes
+two `QVector<double>`, keys and values. `addGraph()` does the same and names the graph "Graph 1", "Graph 2" and
+so on. `graph(i)`, `graphs()` and `selectedGraphs()` return handles to the graphs of the plot.
 
 - `setData()` copies the points and replaces what was there.
 - The points are sorted by key, unless you pass `alreadySorted = true`.

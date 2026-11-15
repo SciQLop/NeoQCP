@@ -12,6 +12,10 @@ private slots:
   void multiAxisMargins();
   void xAxisAndYAxisAreTheFirstBottomAndLeft();
   void xAxisAndYAxisAreEmptyOnceTheAxisIsRemoved();
+  void lineTakesDataAndOptions();
+  void lineWithNoPenDrawsMarkersOnly();
+  void textTakesAPositionAndAStyle();
+  void ellipseTakesTwoCornersInTheirOwnSpaces();
   void axisRemovalConsequencesToPlottables();
   void axisRemovalConsequencesToItems();
   void axisRectRemovalConsequencesToPlottables();

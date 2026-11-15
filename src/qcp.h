@@ -106,6 +106,7 @@
 #include "plottables/plottable-histogram2d.h"
 #include "plottables/plottable-histogram.h"
 #include "construct.h"
+#include "layoutelements/axisrect-shortcuts.h"
 #include "polar/angularaxis.h"
 #include "polar/polar-area.h"
 #include "polar/polargraph.h"

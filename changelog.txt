@@ -577,6 +577,11 @@ Behaviour changes for 2.1 polar users:
   - setSystem() with a non-polar system is refused as misuse.
 
 Milestone 6b (plot-free construction). Breaking, in the 3.0 preview line.
+  - The three annotations an axis rect can make in one call: ax->line(keys, values, options), with
+        QCPLineOptions{pen, name, scatterStyle} feeding setPen/setName/setScatterStyle (the data goes
+        through the graph's data constructor, so it is read once); ax->text(at, "t", style), styled with the
+        same QCPTextStyle the drawing context takes; ax->ellipse(a, b, options), with QCPShapeOptions{pen,
+        brush}. Positions are the QCP::Position spaces: each corner, or the text's anchor, names its own.
   - Items are built without a plot: a constructor takes the item's own arguments only, creates its
         positions and anchors, and the item joins a plot when it is placed. QCPAxisRect::add<T>(args...)
         and QCustomPlot::add<T>(args...) build T(args...), adopt it, clip it to the area and bind the

@@ -119,6 +119,7 @@ neoqcp_moc_headers = [
             'src/alignment-group.h',
             'src/layout.h',
             'src/layoutelements/area.h',
+            'src/layoutelements/axisrect-shortcuts.h',
             'src/layoutelements/layoutelement-axisrect.h',
             'src/layoutelements/layoutelement-colorscale.h',
             'src/layoutelements/layoutelement-legend.h',
@@ -384,7 +385,7 @@ NeoQCP = static_library('NeoQCP',
            cpp_args:cpp_args,
            dependencies: [qtdeps, profiling_hook_dep] + optional_deps + latex_deps,
            install: true,
-           extra_files: [neoqcp_moc_headers, 'src/handle-ops.h', 'src/construct.h', 'src/plottables/graph-fill.h', 'src/datasource/histogram-binner-1d.h', 'src/plottables/graph-errorbars.h', 'src/plottables/plottable-geometry-utils.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/raster-fallback.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
+           extra_files: [neoqcp_moc_headers, 'src/handle-ops.h', 'src/construct.h', 'src/layoutelements/axisrect-shortcuts.h', 'src/plottables/graph-fill.h', 'src/datasource/histogram-binner-1d.h', 'src/plottables/graph-errorbars.h', 'src/plottables/plottable-geometry-utils.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/raster-fallback.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
            )
 
 
