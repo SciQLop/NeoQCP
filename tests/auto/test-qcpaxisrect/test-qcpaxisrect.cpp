@@ -5,6 +5,16 @@
 #if NEOQCP_WITH_LATEX
 #include "axis/latexlabelrenderer.h"
 #endif
+#include <array>
+#include <ranges>
+#include <vector>
+
+// "Any range of numbers goes in": one concept for the keys, the values and the data columns.
+static_assert(QCPNumberRange<std::vector<double>>);
+static_assert(QCPNumberRange<QVector<int>>);
+static_assert(QCPNumberRange<std::array<float, 3>>);
+static_assert(QCPNumberRange<decltype(std::views::iota(0, 3))>);
+static_assert(!QCPNumberRange<QStringList>);
 
 namespace
 {
@@ -145,6 +155,47 @@ void TestQCPAxisRect::multiAxisMargins()
   ar->axis(QCPAxis::atLeft, 1)->setPadding(10);
   mPlot->replot();
   QCOMPARE(leftMarginTwoAxes+10, ar->margins().left()); // +10 because padding is 5 by default and thus included in leftMarginTwoAxes already
+}
+
+void TestQCPAxisRect::xAxisAndYAxisAreTheFirstBottomAndLeft()
+{
+  QCPAxisRect *ar = mPlot->axisRect();
+  const QCPHandle<QCPAxis> bottom = ar->xAxis();
+  const QCPHandle<QCPAxis> left = ar->yAxis();
+  QCOMPARE(bottom.get(), ar->axis(QCPAxis::atBottom).get());
+  QCOMPARE(left.get(), ar->axis(QCPAxis::atLeft).get());
+
+  // The pair add<T> binds to: a plottable added without axes lands on xAxis() and yAxis().
+  const QCPHandle<QCPGraph> graph = ar->add<QCPGraph>();
+  QVERIFY(graph);
+  QCOMPARE(graph->keyAxis().get(), bottom.get());
+  QCOMPARE(graph->valueAxis().get(), left.get());
+
+  // A second axis of a side comes after the first: the rect hands out the first, not the last.
+  ar->addAxis(QCPAxis::atBottom);
+  ar->addAxis(QCPAxis::atLeft);
+  QCOMPARE(ar->xAxis().get(), bottom.get());
+  QCOMPARE(ar->yAxis().get(), left.get());
+}
+
+void TestQCPAxisRect::xAxisAndYAxisAreEmptyOnceTheAxisIsRemoved()
+{
+  QCPAxisRect *ar = mPlot->axisRect();
+  QVERIFY(ar->removeAxis(ar->xAxis()));
+  // Asking for an axis the rect no longer has is a question, not misuse: empty, and silent.
+  gMisuses = 0;
+  const auto previous = qcp::setMisuseHandler(countMisuse);
+  QVERIFY(!ar->xAxis());
+  QCOMPARE(gMisuses, 0);
+  qcp::setMisuseHandler(previous);
+  QVERIFY(ar->yAxis());
+
+  QVERIFY(ar->removeAxis(ar->yAxis()));
+  QVERIFY(!ar->yAxis());
+
+  // The rect regained its bottom axis: xAxis() hands the new one out again.
+  QCPAxis *again = ar->addAxis(QCPAxis::atBottom);
+  QCOMPARE(ar->xAxis().get(), again);
 }
 
 void TestQCPAxisRect::axisRemovalConsequencesToPlottables()

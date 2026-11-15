@@ -315,6 +315,28 @@ QCPHandle<QCPAxis> QCPAxisRect::axis(QCPAxis::AxisType type, int index) const
 }
 
 /*!
+  Returns the first axis on the bottom side of this axis rect: the x axis of the pair add<T>() binds
+  a plottable to. An empty handle when the rect has no bottom axis, which is a question, not misuse.
+
+  \see yAxis, axis
+*/
+QCPHandle<QCPAxis> QCPAxisRect::xAxis() const
+{
+    return QCPHandle<QCPAxis>(mAxes.value(QCPAxis::atBottom).value(0));
+}
+
+/*!
+  Returns the first axis on the left side of this axis rect: the y axis of the pair add<T>() binds a
+  plottable to. An empty handle when the rect has no left axis.
+
+  \see xAxis, axis
+*/
+QCPHandle<QCPAxis> QCPAxisRect::yAxis() const
+{
+    return QCPHandle<QCPAxis>(mAxes.value(QCPAxis::atLeft).value(0));
+}
+
+/*!
   Returns all axes on the axis rect sides specified with \a types.
 
   \a types may be a single \ref QCPAxis::AxisType or an <tt>or</tt>-combination, to get the axes of

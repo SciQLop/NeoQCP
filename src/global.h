@@ -54,8 +54,10 @@
 #include <QtGui/QPixmap>
 #include <QtGui/QWheelEvent>
 #include <algorithm>
+#include <concepts>
 #include <limits>
 #include <qmath.h>
+#include <ranges>
 
 #include <QtNumeric>
 #include <QtPrintSupport/QtPrintSupport>
@@ -77,6 +79,19 @@
 #define QCP_LIB_DECL
 #endif
 
+
+/*!
+  Any range of numbers goes in: the keys, values and column arguments of the data-taking calls are
+  constrained by this concept, not written once per container type. A std::vector, a QVector, a
+  std::array and a view such as std::views::iota all pass; a range whose elements do not convert to
+  double (QStringList, say) does not.
+
+  The data-taking calls read the range once, in order: an input range is enough, no random access
+  needed.
+*/
+template <typename R>
+concept QCPNumberRange
+    = std::ranges::input_range<R> && std::convertible_to<std::ranges::range_value_t<R>, double>;
 
 /*!
   The QCP Namespace contains general enums, QFlags and functions used throughout the QCustomPlot

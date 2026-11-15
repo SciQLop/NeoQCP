@@ -10,6 +10,8 @@ private slots:
   
   void multiAxis();
   void multiAxisMargins();
+  void xAxisAndYAxisAreTheFirstBottomAndLeft();
+  void xAxisAndYAxisAreEmptyOnceTheAxisIsRemoved();
   void axisRemovalConsequencesToPlottables();
   void axisRemovalConsequencesToItems();
   void axisRectRemovalConsequencesToPlottables();

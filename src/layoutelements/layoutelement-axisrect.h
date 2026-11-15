@@ -100,6 +100,10 @@ public:
     // non-property methods:
     int axisCount(QCPAxis::AxisType type) const;
     QCPHandle<QCPAxis> axis(QCPAxis::AxisType type, int index = 0) const;
+    // The rect's first bottom and left axes: the pair add<T>() binds a plottable to. Empty when the
+    // rect has no axis of that side (removed, or not made yet): asking is not misuse.
+    QCPHandle<QCPAxis> xAxis() const;
+    QCPHandle<QCPAxis> yAxis() const;
     QList<QCPHandle<QCPAxis>> axes(QCPAxis::AxisTypes types) const;
     QList<QCPHandle<QCPAxis>> axes() const;
     QList<QCPHandle<QCPAxisBase>> allAxes() const override;
