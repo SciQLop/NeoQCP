@@ -50,6 +50,43 @@ order"; decision 12. Exact signatures: `docs/plans/neoqcp-3/m6-vocabulary.md` ro
 - **C-7** No forwarders, no deprecated aliases. Builds and suites on the Coder workspace `neoqcp`; reference pictures
   locally (fonts); one build per tree at a time.
 
+## Pre-flight rulings (2026-11-15, Opus plan review, 6 blockers / 10 corrections)
+
+These override the Calls above where they differ.
+
+- **P-1 (B1, D10)** Task 1 covers every `std::visit`, `get_if<QCP::`, `holds_alternative<QCP::` and `std::get<QCP::`
+  over a position. One predicate `qcpMovesWithData(const Position&)` (Data, DataOffset) feeds `commandKind`,
+  `isGpuCommand`, `allPositionsIn` and the image branch; `qcpCommandNeedsAxes` counts DataOffset;
+  `qcpResolvePosition` is exhaustive. `QCPItemPosition` stores the pixel offset (never drops it). A DataOffset counts
+  its data point in the data box and leaves the index box unbounded.
+- **P-2 (B2)** A command over the 96-byte budget keeps its payload behind one `shared_ptr` (as `TextCmd`, `ImageCmd`).
+- **P-3 (D9)** Data-radius circle = `ellipse(Data{x-r,y-r}, Data{x+r,y+r})`, Data or DataOffset centre only (other
+  centres: misuse report, nothing recorded). Pixel-radius circle = new `CircleCmd` (GPU fan + stroke via
+  `qcpEllipseRing`). Boxed text wraps at replay, its layout cached in the payload keyed on the box's pixel size. Every
+  new command joins `commandKind`, `isGpuCommand`, `qcpCommandNeedsAxes`, `rasterNeedsOf`, `commandExtent`,
+  `holdsAnchor`, the extent merge, `distanceTo`/`pixelPad`, `paintCommand` and the RHI visit. A box smaller than its
+  padding clamps to an empty inner rect in both replays. Existing `polygon(span)` / `rect(Position, Position)` get the
+  `= { }` brush default; `PixelLength` never converts to `double`.
+- **P-4 (D8 + D1, replaces C-4's "image per command")** Call order by **painter slices**: a layer paints into its
+  buffer as today until the first painter-only paint that comes after GPU content (or markers) on that layer this
+  frame; from then on painting goes into a new slice (a buffer like the layer's: same DPR, cosmetic-pen rule, clip
+  shape, opacity), which is submitted into the plottable layer's ordered draw list as one image; the next GPU
+  submission closes the slice. No per-command budget, no per-command bounds. A recording or layer with no painter-only
+  paint after GPU content takes no slice and replays exactly as today. Plain layerables paint into the current slice
+  too, so C-5's limit goes (the `docs/limits.md` row is not written). Slice textures have a stable key per
+  (layer, slice index), not `QImage::cacheKey`. The kept-run pan reuse learns a "slice" run kind; a frame with a slice
+  is not shifted by the buffer-translate pan path (it repaints). The export replays drawables inline in call order
+  (`All`) and `deferGpuPainter` / `mDeferredGpu` go.
+- **P-5 (D5)** Markers draw over everything else of their layer (scatter layer stays last). A test and a
+  `docs/limits.md` row say so.
+- **P-6 (D3)** Raster and image quads pass the busy-fade `alpha` on build frames too (reproducer first): Task 3.
+- **P-7 (B5)** `QCPItemText::mathText` defaults to true (today's look). `ax->text()` copies `style.mathText`, so a
+  default style gives a plain item (changelog + migration row). The test needs `with_latex` or skips without it.
+- **P-8 (minors)** `line()` must not allocate a vector per call (lollipop records 10k): a fixed two-point command or
+  inline storage. Take the benchmark baseline before Task 1 on Coder, several repeats. The intervals' separate label
+  layer (plottable-intervals.cpp) goes in Task 3 once text stacks in call order, unless a test shows it is still
+  needed (then a ruling). A jagged GPU disc on HiDPI (sample count 1) is checked on the reference picture.
+
 ## Global Constraints
 
 - Each break or behaviour change goes into `docs/migrating.md`, `changelog.txt` (the milestone 6 entry, before 5f) and
