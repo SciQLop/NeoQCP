@@ -3,6 +3,7 @@
 #include <functional>
 
 #include "../../../src/qcp.h"
+#include "../misuse-recorder.h"
 #include "reference-image.h"
 
 namespace
@@ -232,6 +233,26 @@ void TestSpan::drawDoesNotCrash()
     span->setRange(QCPRange(1, 9));
     mPlot->replot();
     QVERIFY(true);
+}
+
+void TestSpan::anEdgeWithAPixelOffsetIsRefused()
+{
+    // A span edge is the range it spans and its band is the axis rect, which no pixel offset can
+    // shift: the drawn edge would leave the range a drag reports. Refused, once, and the edge keeps
+    // what it was given rather than losing the offset silently.
+    auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);
+    span->setRange(QCPRange(2, 8));
+    const QCP::DataOffset nudged = QCP::Data { 5, 0 } + QCP::PixelOffset { 12, 0 };
+    span->lowerEdge->set(nudged);
+
+    test_misuse::calls.clear();
+    qcp::setMisuseHandler(test_misuse::record);
+    mPlot->replot();
+    qcp::setMisuseHandler(nullptr);
+
+    QCOMPARE(test_misuse::calls.size(), size_t(1));
+    QVERIFY2(std::holds_alternative<QCP::DataOffset>(span->lowerEdge->asPosition()),
+             "the edge keeps the position it was given");
 }
 
 void TestSpan::drawOnLogAxis_data()

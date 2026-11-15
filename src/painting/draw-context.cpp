@@ -37,6 +37,9 @@ struct Extent
     double keyUpper = -Limit::infinity();
     double valueLower = Limit::infinity();
     double valueUpper = -Limit::infinity();
+    //! True when a position here is a data point carrying a pixel offset: its box names the point,
+    //! not where the command lands, so it feeds the data extent but never the index.
+    bool holdsOffset = false;
 
     void key(double value)
     {
@@ -72,6 +75,7 @@ struct Extent
         keyUpper = std::max(keyUpper, other.keyUpper);
         valueLower = std::min(valueLower, other.valueLower);
         valueUpper = std::max(valueUpper, other.valueUpper);
+        holdsOffset = holdsOffset || other.holdsOffset;
     }
 };
 
@@ -106,6 +110,7 @@ Extent extentOf(std::span<const QCP::Position> positions)
             // box can hold it.
             extent.key(offset->at.x);
             extent.value(offset->at.y);
+            extent.holdsOffset = true;
         }
         else if (const auto* mixed = std::get_if<QCP::DataXRatioY>(&position))
         {
@@ -160,6 +165,7 @@ Extent extentOfPosition(const QCP::Position& position)
     {
         extent.key(offset->at.x); // the offset is pixels: the data box knows only the point
         extent.value(offset->at.y);
+        extent.holdsOffset = true;
         extent.settle();
         return extent;
     }
@@ -179,77 +185,44 @@ bool holdsAnchor(const QCP::Position& position)
     return std::holds_alternative<QCP::AnchorOffset>(position);
 }
 
-bool anyAnchor(std::span<const QCP::Position> positions)
+//! Whether any position of \a command satisfies \a predicate. The one place a command's positions
+//! are read: a new command registers here once, for anchors and offsets alike.
+template <typename Predicate>
+bool anyPosition(const qcp::QCPDrawCommand& command, Predicate predicate)
 {
-    return std::any_of(positions.begin(), positions.end(),
-                       [](const QCP::Position& position) { return holdsAnchor(position); });
+    const auto anyOf = [&predicate](std::span<const QCP::Position> positions)
+    { return std::any_of(positions.begin(), positions.end(), predicate); };
+    return std::visit(
+        [&anyOf, &predicate](const auto& value) -> bool
+        {
+            using Command = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<Command, qcp::PolylinePositionsCmd>
+                          || std::is_same_v<Command, qcp::PolygonCmd>)
+                return anyOf(value.points);
+            else if constexpr (std::is_same_v<Command, qcp::RectCmd>
+                               || std::is_same_v<Command, qcp::EllipseCmd>
+                               || std::is_same_v<Command, qcp::ImageCmd>
+                               || std::is_same_v<Command, qcp::LineCmd>
+                               || std::is_same_v<Command, qcp::RoundedRectCmd>
+                               || std::is_same_v<Command, qcp::BoxedTextCmd>)
+                return predicate(value.a) || predicate(value.b);
+            else if constexpr (std::is_same_v<Command, qcp::CircleCmd>)
+                return predicate(value.centre);
+            else if constexpr (std::is_same_v<Command, qcp::TextCmd>)
+                return predicate(value.at);
+            else if constexpr (std::is_same_v<Command, qcp::PathCmd>)
+                return predicate(value.origin);
+            else
+                return false;
+        },
+        command);
 }
 
 //! True when a command names a QCP::AnchorOffset, which an item owns and may take away.
 bool holdsAnchor(const qcp::QCPDrawCommand& command)
 {
-    return std::visit(
-        [](const auto& value) -> bool
-        {
-            using Command = std::decay_t<decltype(value)>;
-            if constexpr (std::is_same_v<Command, qcp::PolylinePositionsCmd>
-                          || std::is_same_v<Command, qcp::PolygonCmd>)
-                return anyAnchor(value.points);
-            else if constexpr (std::is_same_v<Command, qcp::RectCmd>
-                               || std::is_same_v<Command, qcp::EllipseCmd>
-                               || std::is_same_v<Command, qcp::ImageCmd>
-                               || std::is_same_v<Command, qcp::LineCmd>
-                               || std::is_same_v<Command, qcp::RoundedRectCmd>
-                               || std::is_same_v<Command, qcp::BoxedTextCmd>)
-                return holdsAnchor(value.a) || holdsAnchor(value.b);
-            else if constexpr (std::is_same_v<Command, qcp::CircleCmd>)
-                return holdsAnchor(value.centre);
-            else if constexpr (std::is_same_v<Command, qcp::TextCmd>)
-                return holdsAnchor(value.at);
-            else if constexpr (std::is_same_v<Command, qcp::PathCmd>)
-                return holdsAnchor(value.origin);
-            else
-                return false;
-        },
-        command);
-}
-
-//! True when a command names a data point with a pixel offset riding on it. The offset moves the
-//! command away from the point its box names, so that box can feed the data extent but never the
-//! index: an index that bounded it would cull a command that is still visible.
-bool holdsDataOffset(const qcp::QCPDrawCommand& command)
-{
-    const auto anyOffset = [](std::span<const QCP::Position> positions)
-    {
-        return std::any_of(positions.begin(), positions.end(), [](const QCP::Position& position)
-                           { return std::holds_alternative<QCP::DataOffset>(position); });
-    };
-    const auto offset = [](const QCP::Position& position)
-    { return std::holds_alternative<QCP::DataOffset>(position); };
-    return std::visit(
-        [&anyOffset, &offset](const auto& value) -> bool
-        {
-            using Command = std::decay_t<decltype(value)>;
-            if constexpr (std::is_same_v<Command, qcp::PolylinePositionsCmd>
-                          || std::is_same_v<Command, qcp::PolygonCmd>)
-                return anyOffset(value.points);
-            else if constexpr (std::is_same_v<Command, qcp::RectCmd>
-                               || std::is_same_v<Command, qcp::EllipseCmd>
-                               || std::is_same_v<Command, qcp::ImageCmd>
-                               || std::is_same_v<Command, qcp::LineCmd>
-                               || std::is_same_v<Command, qcp::RoundedRectCmd>
-                               || std::is_same_v<Command, qcp::BoxedTextCmd>)
-                return offset(value.a) || offset(value.b);
-            else if constexpr (std::is_same_v<Command, qcp::CircleCmd>)
-                return offset(value.centre);
-            else if constexpr (std::is_same_v<Command, qcp::TextCmd>)
-                return offset(value.at);
-            else if constexpr (std::is_same_v<Command, qcp::PathCmd>)
-                return offset(value.origin);
-            else
-                return false;
-        },
-        command);
+    return anyPosition(command, [](const QCP::Position& position)
+                       { return holdsAnchor(position); });
 }
 
 //! An unbounded side of \a extent says nothing about \a box: boxOf() leaves it at ±inf, so merging
@@ -280,9 +253,8 @@ void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& extent
 {
     // A data point with a pixel offset moves the command away from the point this box names: the
     // box feeds the data extent, and the index stays unbounded, as it does for a text at a data
-    // anchor.
-    const bool offThePoint = holdsDataOffset(command);
-    record(list, std::move(command), extent, offThePoint ? unboundedExtent() : extent);
+    // anchor. extentOf() reported the offset, so the points are walked once.
+    record(list, std::move(command), extent, extent.holdsOffset ? unboundedExtent() : extent);
 }
 
 /*!
@@ -473,9 +445,11 @@ QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& posit
     if (const auto* mixed = std::get_if<QCP::RatioXDataY>(&position))
         return keyAndValue(frame.ratio.map(QCP::AxisRatio { mixed->x, mixed->x }),
                            frame.transform.map(QCP::Data { 0.0, mixed->y }));
-    // Every alternative has its branch above: a new one must land there, not fall through to a
-    // std::get that would throw in the middle of a paint.
-    Q_UNREACHABLE_RETURN(QPointF());
+    // Every alternative has its branch above. The assert fails the build, not a paint, when a new
+    // one is added and not handled here.
+    static_assert(std::variant_size_v<QCP::Position> == 7,
+                  "a new QCP::Position alternative needs its branch above");
+    return QPointF();
 }
 
 QCPDrawFrame qcpMakeFrame(const QCPAxis* keyAxis, const QCPAxis* valueAxis,

@@ -543,7 +543,7 @@ void QCPItemPosition::setTypeX(QCPItemPosition::PositionType type)
         if (retainPixelPosition)
             pixel = pixelPosition();
 
-        mPixelOffset = QCP::PixelOffset {}; // a type is not a QCP::DataOffset: the offset is gone
+        setPixelOffset(QCP::PixelOffset {}); // a type is not a QCP::DataOffset: the offset is gone
         mPositionTypeX = type;
 
         if (retainPixelPosition)
@@ -587,7 +587,7 @@ void QCPItemPosition::setTypeY(QCPItemPosition::PositionType type)
         if (retainPixelPosition)
             pixel = pixelPosition();
 
-        mPixelOffset = QCP::PixelOffset {}; // a type is not a QCP::DataOffset: the offset is gone
+        setPixelOffset(QCP::PixelOffset {}); // a type is not a QCP::DataOffset: the offset is gone
         mPositionTypeY = type;
 
         if (retainPixelPosition)
@@ -804,9 +804,18 @@ std::optional<QCPEmissionScope> QCPItemPosition::signallingScope() const
     return std::nullopt;
 }
 
+void QCPItemPosition::setPixelOffset(const QCP::PixelOffset& offset)
+{
+    if (offset.dx == mPixelOffset.dx && offset.dy == mPixelOffset.dy)
+        return;
+    mPixelOffset = offset;
+    if (mParentItem)
+        mParentItem->update();
+}
+
 void QCPItemPosition::setCoords(double key, double value)
 {
-    mPixelOffset = QCP::PixelOffset {}; // the coordinates speak for the data point alone
+    setPixelOffset(QCP::PixelOffset {}); // the coordinates speak for the data point alone
     if (key == mKey && value == mValue)
         return;
     if (mParentItem)
@@ -954,15 +963,17 @@ QPointF QCPItemPosition::pixelPosition() const
             result.ry() = otherSlot(mValue, mPositionTypeY, false, mParentAnchorY);
     }
 
+    // The offset a QCP::DataOffset added rides on top of the data point the slots placed, whatever
+    // the axes did to it.
+    result += QPointF(mPixelOffset.dx, mPixelOffset.dy);
     // coordToPixel can produce NaN (e.g. log axis with negative value); clamp to avoid
-    // Qt assertions in downstream QTransform/QPainter operations.
+    // Qt assertions in downstream QTransform/QPainter operations. The clamp comes after the
+    // offset, so a slot that mapped nowhere lands at the origin here as it does on the frame path.
     if (qIsNaN(result.x()))
         result.rx() = 0;
     if (qIsNaN(result.y()))
         result.ry() = 0;
-    // The offset a QCP::DataOffset added rides on top of the data point the slots placed, whatever
-    // the axes did to it.
-    return result + QPointF(mPixelOffset.dx, mPixelOffset.dy);
+    return result;
 }
 
 /*!
@@ -1028,7 +1039,7 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
     // rule: the write is inert until the item is placed (see pixelPosition()).
     if (!mParentPlot)
         return;
-    mPixelOffset = QCP::PixelOffset {}; // the pixel the caller names includes any offset
+    setPixelOffset(QCP::PixelOffset {}); // the pixel the caller names includes any offset
     const QPointF current = this->pixelPosition();
     if (qFuzzyCompare(current.x() + 1.0, pixelPosition.x() + 1.0)
         && qFuzzyCompare(current.y() + 1.0, pixelPosition.y() + 1.0))
@@ -1268,7 +1279,7 @@ void QCPItemPosition::set(const QCP::Position& position)
     detachFromParent(this);
     setType(ptPlotCoords);
     setCoords(offset->at.x, offset->at.y);
-    mPixelOffset = offset->offset;
+    setPixelOffset(offset->offset);
   }
   else if (const auto* mixed = std::get_if<QCP::DataXRatioY>(&position))
   {

@@ -2006,3 +2006,54 @@ void TestDrawContext::everyHelperDrawsTheSamePicture()
     QVERIFY2(qcp::test::matchesReference(gpu, dir, name, &why, qcp::test::Tolerance { 1500, 64 }),
              qPrintable(why));
 }
+
+void TestDrawContext::dataOffsetRectKeepsItsOffsetOnAPan()
+{
+    // A rect whose corners ride on the data moves with it: a pan re-emits the kept geometry as a
+    // whole, and a zoom resolves the data point again while the offset stays the same number of
+    // pixels. Read where the GPU replay reads it, the recording cache and the resolver: a widget
+    // grab after a pan answers the stall-shifted buffer, which the Xvfb backend leaves unpainted.
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    const QCP::Position topLeft = QCP::Data { 40, 60 } + QCP::PixelOffset { 10, -6 };
+    const QCP::Position bottomRight = QCP::Data { 80, 100 } + QCP::PixelOffset { 10, -6 };
+    context.rect(topLeft, bottomRight, QPen(Qt::NoPen), QBrush(QColor(20, 120, 220)));
+    const QCPDrawList& list = context.drawList();
+    QVERIFY2(qcpRecordingMovesWithTheData(list, true),
+             "a rect of DataOffset corners moves with the data");
+
+    QCPPlottableRhiLayer plottables(nullptr);
+    QCPScatterRhiLayer scatter(nullptr);
+    QCPResolveCache resolve;
+    qcp::QCPRasterFallback fallback;
+    QCPRecordingCache geometry;
+    const QSize outputSize(kWidth, kHeight);
+    const QRect clip = context.frame().clip.toRect(); // what the replay clipped to
+    plottables.clear();
+    qcpReplayWithRhi(list, plottables, scatter, context.frame(), resolve, fallback, 1.0, outputSize,
+                     0, &geometry);
+    geometry.commit();
+
+    // The pan is a translation: the geometry built for the old frame is re-emitted, shifted by the
+    // pixels the view moved, so the offset inside it is neither dropped nor scaled.
+    fixture.plot->xAxis->setRange(10, 210);
+    QPointF shift;
+    QVERIFY2(geometry.reuse(list, QCPTransform(fixture.plot->xAxis, fixture.plot->yAxis), 1.0,
+                            kHeight, clip, &shift),
+             "a pan re-emits the kept geometry instead of building it again");
+    QCOMPARE(shift, QPointF(-10, 0));
+
+    // A zoom cannot be a shift: the data point is resolved again, and the offset is not scaled.
+    const QPointF before = qcpResolvePosition(context.frame(), topLeft)
+        - qcpResolvePosition(context.frame(), QCP::Data { 40, 60 });
+    fixture.plot->xAxis->setRange(0, 100); // twice the pixels per unit
+    const QCPDrawFrame zoomed = frameOf(*fixture.plot);
+    const QPointF after = qcpResolvePosition(zoomed, topLeft)
+        - qcpResolvePosition(zoomed, QCP::Data { 40, 60 });
+    QCOMPARE(before, QPointF(10, -6));
+    QCOMPARE(after, QPointF(10, -6));
+    QVERIFY2(qcpResolvePosition(zoomed, QCP::Data { 40, 60 }).x()
+                 != qcpResolvePosition(context.frame(), QCP::Data { 40, 60 }).x(),
+             "the zoom must move where the data point lands");
+}

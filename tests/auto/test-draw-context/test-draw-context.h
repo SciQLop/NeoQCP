@@ -69,4 +69,5 @@ private slots:
     void colouredPolylinePanReusesTheKeptGeometry();
     void theKeyWindowComesFromTheSystem();
     void everyHelperDrawsTheSamePicture();
+    void dataOffsetRectKeepsItsOffsetOnAPan();
 };

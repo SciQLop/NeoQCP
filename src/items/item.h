@@ -255,6 +255,10 @@ private:
     //! whose ratio does not separate.
     [[nodiscard]] bool needsFrame() const;
 
+    // Writes the pixels a QCP::DataOffset rides on, and repaints when they move: an offset-only
+    // change still changes what the item draws.
+    void setPixelOffset(const QCP::PixelOffset& offset);
+
     // The tracer derives this position from its graph on every draw: storing must not mark, or the
     // draw itself would dirty the layer and the plot would never settle.
     void assignCoords(double key, double value);

@@ -3,6 +3,7 @@
 #include <array>
 
 #include "../core.h"
+#include "../misuse.h"
 #include "../painting/draw-context.h"
 
 namespace
@@ -19,10 +20,6 @@ QCP::Position pinnedToRatio(const QCPItemPosition* edge, Qt::Orientation orienta
             return QCP::DataXRatioY { pinned->x, ratio };
         if (const auto* data = std::get_if<QCP::Data>(&at))
             return QCP::DataXRatioY { data->x, ratio };
-        // The covered side is the axis rect edge, which no pixel offset can shift: the data point
-        // is kept and the offset is dropped, so the band still spans the rect as a span does.
-        if (const auto* offset = std::get_if<QCP::DataOffset>(&at))
-            return QCP::DataXRatioY { offset->at.x, ratio };
     }
     else
     {
@@ -30,10 +27,27 @@ QCP::Position pinnedToRatio(const QCPItemPosition* edge, Qt::Orientation orienta
             return QCP::RatioXDataY { ratio, pinned->y };
         if (const auto* data = std::get_if<QCP::Data>(&at))
             return QCP::RatioXDataY { ratio, data->y };
-        if (const auto* offset = std::get_if<QCP::DataOffset>(&at))
-            return QCP::RatioXDataY { ratio, offset->at.y };
     }
     return at;
+}
+
+//! Whether \a edge is a data point carrying a pixel offset, which a span cannot draw: the band
+//! spans the axis rect, so the offset would move the edge across it while the range the item
+//! reports and drags (rangePixel) moved the other way. Refused once, and the span draws nothing.
+bool refusesAPixelOffset(const QCPItemPosition* edge)
+{
+    [[maybe_unused]] bool snapshot = false;
+    if (!std::holds_alternative<QCP::DataOffset>(edge->asPosition(&snapshot)))
+        return false;
+    static const bool once = []
+    {
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "a span edge cannot carry a pixel offset: the band spans the axis rect, "
+                          "so the offset would move the edge across it; the span is not drawn");
+        return true;
+    }();
+    Q_UNUSED(once);
+    return true;
 }
 
 //! Whether the position is resolved against the axis rect ratio, so a pan re-resolves it.
@@ -111,6 +125,8 @@ void QCPItemSpan::positionMoved(const QCPItemPosition* position, QPointF before)
 
 void QCPItemSpan::draw(QCPDrawContext& context) const
 {
+    if (refusesAPixelOffset(lowerEdge) || refusesAPixelOffset(upperEdge))
+        return;
     const QCP::Position lowStart = pinnedToRatio(lowerEdge, mOrientation, 0.0);
     const QCP::Position lowEnd = pinnedToRatio(lowerEdge, mOrientation, 1.0);
     const QCP::Position highStart = pinnedToRatio(upperEdge, mOrientation, 0.0);

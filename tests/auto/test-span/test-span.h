@@ -22,6 +22,7 @@ private slots:
     void selectTestMiss();
     void movableFlag();
     void drawDoesNotCrash();
+    void anEdgeWithAPixelOffsetIsRefused();
     void drawOnLogAxis_data();
     void drawOnLogAxis();
     void exportFallbackRendersSpan_data();

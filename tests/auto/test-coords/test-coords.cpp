@@ -646,6 +646,24 @@ void TestCoords::dataOffsetItemPositionFollowsTheData()
     // The plain setters speak for the data point alone: the next position is a plain Data.
     position->setCoords(10, 10);
     QVERIFY(std::holds_alternative<QCP::Data>(position->asPosition()));
+
+    // setType drops the offset: it was written in the space the type leaves.
+    position->set(QCP::Data { 40, 60 } + QCP::PixelOffset { 7, -9 });
+    position->setType(QCPItemPosition::ptAxisRectRatio);
+    QVERIFY2(std::holds_alternative<QCP::AxisRatio>(position->asPosition()),
+             "a type change drops the offset with the space it was written in");
+
+    // A pixel write names the pixel the offset was part of, so it drops the offset too.
+    position->set(QCP::Data { 40, 60 } + QCP::PixelOffset { 7, -9 });
+    position->setPixelPosition(position->pixelPosition());
+    QVERIFY2(std::holds_alternative<QCP::Data>(position->asPosition()),
+             "a pixel write drops the offset: it named the pixel, not the data point");
+
+    // An anchored position is the anchor's pixel: no offset rides on it.
+    position->set(QCP::Data { 40, 60 } + QCP::PixelOffset { 7, -9 });
+    position->setParentAnchor(item->end);
+    QVERIFY2(!std::holds_alternative<QCP::DataOffset>(position->asPosition()),
+             "an anchored position cannot carry the offset");
 }
 
 void TestCoords::dataOffsetSurvivesAwkwardAxes()
@@ -727,4 +745,99 @@ void TestCoords::dataOffsetSurvivesAwkwardAxes()
         QCOMPARE(nanData, replayed(shifted.drawList(), shifted.frame()));
         QCOMPARE(nanData.pixelColor(40, 40), QColor(Qt::white));
     }
+}
+
+void TestCoords::offsetOnlyChangeRepaintsTheItem()
+{
+    // The offset is part of what the item draws, so a change to it alone must re-record the item.
+    // The coordinates cannot say so: they did not move.
+    auto plot = canvasPlot();
+    auto item = plot->add<QCPItemRect>();
+    item->topLeft->setAxes(plot->xAxis, plot->yAxis);
+    item->bottomRight->setAxes(plot->xAxis, plot->yAxis);
+    item->topLeft->set(QCP::Data { 40, 60 } + QCP::PixelOffset { 5, 5 });
+    item->bottomRight->set(QCP::Data { 80, 100 } + QCP::PixelOffset { 5, 5 });
+    const auto painted = [&plot] { return plot->toPixmap(kCanvasWidth, kCanvasHeight).toImage(); };
+    plot->replot();
+    const QImage nudged = painted();
+
+    item->topLeft->set(QCP::Data { 40, 60 } + QCP::PixelOffset { 30, 30 });
+    plot->replot();
+    QVERIFY2(painted() != nudged, "a second offset on the same data point must repaint the item");
+
+    // A setter that clears the offset while finding the coordinates unchanged repaints too.
+    const QImage withOffset = painted();
+    item->topLeft->setCoords(40, 60);
+    plot->replot();
+    QVERIFY2(painted() != withOffset, "clearing the offset must repaint the item");
+
+    // And so does a pixel write that lands where the offset put the position.
+    item->topLeft->set(QCP::Data { 40, 60 } + QCP::PixelOffset { 30, 30 });
+    plot->replot();
+    const QImage beforeThePixelWrite = painted();
+    item->topLeft->setPixelPosition(pixelsOf(QCPTransform(plot->xAxis, plot->yAxis), 40, 60));
+    plot->replot();
+    QVERIFY2(painted() != beforeThePixelWrite, "a pixel write that drops the offset must repaint");
+}
+
+void TestCoords::mixedImageCornersAreClassifiedOnce()
+{
+    // An image with one plain data corner and one riding on the data moves with the data: both
+    // replays must read that the same way, or the image is drawn twice or never (B1).
+    auto plot = canvasPlot();
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    QImage image(4, 4, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::red);
+    context.image(QCP::Data { 20, 20 }, QCP::Data { 60, 60 } + QCP::PixelOffset { 5, 5 }, image);
+
+    const qcp::QCPDrawCommand& command = context.drawList().commands.front();
+    const qcp::CommandKind kind = qcp::commandKind(command);
+    QVERIFY2(kind.dataOnly, "a corner that rides on the data moves with it");
+    QVERIFY(!kind.staticOnly);
+    QVERIFY2(kind.gpu == qcp::isGpuCommand(command),
+             "the GPU and the painter pass must agree on who draws the image");
+    QVERIFY2(kind.gpu, "an image of data corners belongs to the GPU pass, once");
+}
+
+void TestCoords::aPointThatMapsNowhereLandsAtTheOrigin()
+{
+    // A NaN point maps nowhere, and the offset is a displacement of that point: it cannot rescue
+    // it. Both pixelPosition() paths clamp the result to the origin, so a hit test or an anchor
+    // never sees (dx, dy) where the drawing has nothing. (A log axis is not this case: it puts a
+    // point of the range's opposite sign 200 pixels outside the rect, as QCPAxis::coordToPixel
+    // does, and that point keeps its offset.)
+    auto plot = layoutPlot();
+    auto item = plot->add<QCPItemLine>();
+    item->start->setAxisRect(plot->axisRect());
+    item->start->setAxes(plot->xAxis, plot->yAxis);
+    plot->replot();
+    item->start->set(QCP::Data { qQNaN(), qQNaN() } + QCP::PixelOffset { 7, 9 });
+    QCOMPARE(item->start->pixelPosition(), QPointF(0, 0));
+
+    // The frame-resolved path a polar position takes agrees.
+    auto polar = std::make_unique<QCustomPlot>();
+    polar->resize(640, 480);
+    polar->plotLayout()->clear();
+    auto* area = new QCPPolarArea(polar.get());
+    polar->plotLayout()->addElement(0, 0, area);
+    polar->replot();
+    QCPCoordinateSystem* system = area->system(area->angularAxis(), area->radialAxis());
+    auto polarItem = polar->add<QCPItemLine>();
+    polarItem->start->setSystem(system);
+    polarItem->start->set(QCP::Data { qQNaN(), qQNaN() } + QCP::PixelOffset { 7, 9 });
+    QCOMPARE(polarItem->start->pixelPosition(), QPointF(0, 0));
+
+    // A log axis puts a non-positive point 200 pixels outside the rect and keeps the offset: the
+    // pixel is finite, and the offset is a displacement of it like any other.
+    plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->xAxis->setRange(1, 1000);
+    plot->yAxis->setRange(1, 1000);
+    plot->replot();
+    item->start->set(QCP::Data { -5, -10 });
+    const QPointF offRect = item->start->pixelPosition();
+    item->start->set(QCP::Data { -5, -10 } + QCP::PixelOffset { 7, 9 });
+    QVERIFY2(std::isfinite(offRect.x()) && std::isfinite(offRect.y()),
+             "a log axis maps a non-positive point off the rect, not to NaN");
+    QCOMPARE(item->start->pixelPosition(), offRect + QPointF(7, 9));
 }

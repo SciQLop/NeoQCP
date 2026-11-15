@@ -21,6 +21,9 @@ private slots:
     void dataOffsetRecordingFollowsTheData();
     void dataOffsetItemPositionFollowsTheData();
     void dataOffsetSurvivesAwkwardAxes();
+    void offsetOnlyChangeRepaintsTheItem();
+    void mixedImageCornersAreClassifiedOnce();
+    void aPointThatMapsNowhereLandsAtTheOrigin();
     void ratioTransformMatchesPixels();
     void mixingSpacesDoesNotCompile();
 };

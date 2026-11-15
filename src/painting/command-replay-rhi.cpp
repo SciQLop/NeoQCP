@@ -837,8 +837,9 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                 }
                 else if constexpr (std::is_same_v<T, qcp::ImageCmd>)
                 {
-                    // Two data corners: the quad. Anything else is the painter's, which draws it
-                    // on the PainterOnly pass; dataOnly is what commandKind() answered above.
+                    // Both corners move with the data: the quad. Anything else is the painter's,
+                    // which draws it on the PainterOnly pass; dataOnly is what commandKind()
+                    // answered above.
                     if (dataOnly)
                         addCommandImage(list, plottables, command, frame, fallback, clip, dpr,
                                         outputHeight, keep);
