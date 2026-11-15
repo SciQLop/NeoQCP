@@ -29,9 +29,11 @@
 #include "spatial-index.h"
 #include <QSet>
 
+#include <QImage>
 #include <QPointer>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -50,6 +52,7 @@ class QCPArea;
 class QCPCoordinateSystem;
 class QCPItem;
 class QCPPlottable;
+class QCPDrawnCore;
 class QCPTheme;
 class QCPContourOverlay;
 class QCPColormapRenderer;
@@ -137,9 +140,26 @@ protected:
     bool mHiDpiScreenPass = false; // drawToPaintBuffer on a device pixel ratio above 1
     quint64 mDirtyGeneration = 0;
     quint64 mDrawnGeneration = 0;
+    //! The images of the painter slices this layer submitted, indexed by slice. Reserved to the
+    //! slice cap once so that a QPainter holding one never outlives its storage.
+    std::vector<QImage> mSliceImages;
+    std::unique_ptr<QCPPainter> mSlicePainter; //!< the painter of the slice that is open, if any
+    QRect mSliceClip; //!< the clip the open slice was opened with
+    int mSliceCount = 0; //!< the slices this pass opened: the next free image index
+    int mOpenSlice = -1; //!< the index of the open slice, or -1
 
     // non-virtual methods:
     void noteDirtied();
+
+    //! Whether painter-only content is currently going into a slice of this layer.
+    [[nodiscard]] bool hasOpenPainterSlice() const { return mOpenSlice >= 0; }
+
+    // The slice a painter-only layerable draws into once GPU content is on its layer: a copy of
+    // \a from's state on a transparent image of the output, submitted over the GPU content when
+    // closed. Null when the layer cannot take one, and the caller then keeps painting into the
+    // buffer, under that GPU content.
+    QCPPainter* painterSlice(const QCPPainter& from, const QRect& clip);
+    void closePainterSlice(QCPPainter& bufferPainter);
 
     [[nodiscard]] bool dirtiedAfterDraw() const { return mDirtyGeneration > mDrawnGeneration; }
 
@@ -234,6 +254,7 @@ private:
     friend class TestHistogramPlottable;
     friend class TestPipeline;
     friend class TestRepaint;
+    friend class QCPDrawnCore;
 };
 
 class QCP_LIB_DECL QCPLayerable : public QObject

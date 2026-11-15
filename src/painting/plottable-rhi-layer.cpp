@@ -140,6 +140,7 @@ void QCPPlottableRhiLayer::clear()
     mImageEntries.resize(0); // the textures stay: a clear and replay must not re-upload them
     mRasterImages = 0;
     mCommandImages = 0;
+    mSlices = 0;
     mDrawOrder.resize(0);
     mDirty = true;
 }
@@ -291,8 +292,8 @@ bool QCPPlottableRhiLayer::addImage(const QImage& image, const QRectF& pixelRect
         return false;
     // A rasterised fill is already at device resolution, so its sampler never interpolates:
     // keep the linear one, as every image did before the commands had a choice.
-    return addImageEntry(image, pixelRect, { }, true, true, clipRect, dpr, outputHeight, offsetX,
-                         offsetY, alpha);
+    return addImageEntry(image, qint64(image.cacheKey()), pixelRect, { }, true, ImageKind::Raster,
+                         clipRect, dpr, outputHeight, offsetX, offsetY, alpha);
 }
 
 bool QCPPlottableRhiLayer::addCommandImage(const QImage& image, const QPointF& a, const QPointF& b,
@@ -305,28 +306,42 @@ bool QCPPlottableRhiLayer::addCommandImage(const QImage& image, const QPointF& a
     // A reversed axis puts b left of or above a: the rect keeps that sign, and the shader mixes
     // the corners, so the quad mirrors instead of flipping back.
     const QRectF pixelRect(a, b);
-    return addImageEntry(image, pixelRect, source, smooth, false, clipRect, dpr, outputHeight,
-                         offsetX, offsetY, alpha);
+    return addImageEntry(image, qint64(image.cacheKey()), pixelRect, source, smooth,
+                         ImageKind::Command, clipRect, dpr, outputHeight, offsetX, offsetY, alpha);
 }
 
-bool QCPPlottableRhiLayer::addImageEntry(const QImage& image, const QRectF& pixelRect,
-                                         const QRectF& source, bool smooth, bool rasterised,
-                                         const QRect& clipRect, double dpr, int outputHeight,
-                                         float offsetX, float offsetY, float alpha)
+bool QCPPlottableRhiLayer::addSliceImage(const QImage& image, qint64 imageKey,
+                                         const QRect& clipRect, double dpr, int outputHeight)
+{
+    if (!canAddSlice())
+        return false;
+    // The slice covers the output texel for texel: the quad's corners are its own bounds, and a
+    // nearest sampler keeps every pixel exactly where the painter wrote it.
+    const QRectF pixelRect(QPointF(0, 0), QSizeF(image.size()));
+    return addImageEntry(image, imageKey, pixelRect, { }, false, ImageKind::Slice, clipRect, dpr,
+                         outputHeight, 0, 0, 1);
+}
+
+bool QCPPlottableRhiLayer::addImageEntry(const QImage& image, qint64 imageKey,
+                                         const QRectF& pixelRect, const QRectF& source, bool smooth,
+                                         ImageKind kind, const QRect& clipRect, double dpr,
+                                         int outputHeight, float offsetX, float offsetY,
+                                         float alpha)
 {
     if (image.isNull() || mImageBroken)
         return false;
-    const qint64 key = qint64(image.cacheKey());
-    ImageTexture*& texture = mImageTextures[key];
+    ImageTexture*& texture = mImageTextures[imageKey];
     if (!texture)
     {
         texture = new ImageTexture;
-        texture->pending = image; // the only place an upload is scheduled
+        texture->pending = image; // the first upload: one per texture
     }
+    else if (kind == ImageKind::Slice)
+        texture->pending = image; // a slice's pixels are this frame's, so it uploads every frame
     texture->used = true;
 
     ImageEntry entry;
-    entry.imageKey = key;
+    entry.imageKey = imageKey;
     entry.pixelRect = pixelRect;
     entry.source = source.isNull() ? QRectF(QPointF(0, 0), QSizeF(image.size())) : source;
     entry.deviceSize = image.size();
@@ -334,11 +349,22 @@ bool QCPPlottableRhiLayer::addImageEntry(const QImage& image, const QRectF& pixe
     entry.offsetY = offsetY;
     entry.alpha = alpha;
     entry.smooth = smooth;
-    entry.rasterised = rasterised;
+    entry.kind = kind;
     entry.scissorRect = qcp::rhi::computeScissor(clipRect, dpr, outputHeight);
     mImageEntries.append(entry);
     mDrawOrder.append({ DrawKind::Image, int(mImageEntries.size()) - 1 });
-    ++(rasterised ? mRasterImages : mCommandImages);
+    switch (kind)
+    {
+        case ImageKind::Raster:
+            ++mRasterImages;
+            break;
+        case ImageKind::Command:
+            ++mCommandImages;
+            break;
+        case ImageKind::Slice:
+            ++mSlices;
+            break;
+    }
     return true;
 }
 
@@ -424,11 +450,11 @@ void QCPPlottableRhiLayer::createImagePipeline(QRhiRenderPassDescriptor* rpDesc,
         }
     }
 
-    // One slot per image, both budgets, created once: a resized UBO would invalidate every image's
+    // One slot per image, every budget, created once: a resized UBO would invalidate every image's
     // SRB.
-    mImageUniformBuffer
-        = createUniformBuffer(mRhi, imageUbufStride() * (kMaxImages + kMaxCommandImages),
-                              "Failed to create image uniform buffer");
+    mImageUniformBuffer = createUniformBuffer(
+        mRhi, imageUbufStride() * (kMaxImages + kMaxCommandImages + kMaxSlices),
+        "Failed to create image uniform buffer");
     if (!mImageUniformBuffer)
         return;
 

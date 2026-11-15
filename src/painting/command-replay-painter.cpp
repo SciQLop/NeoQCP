@@ -176,9 +176,9 @@ void replayBoxedText(const qcp::BoxedTextCmd& cmd, QCPPainter& painter, const QC
                        qMax(0.0, box.height() - style.padding.top() - style.padding.bottom()));
     if (inner.isEmpty() || payload.text.isEmpty())
         return;
-    // simplify: the wrap is cached in the recording and written by every replay, with no lock. Every
-    // replay runs on the GUI thread (a screen repaint, a raster fallback, an export), so one writer
-    // at a time; a second thread replaying would need its own copy.
+    // simplify: the wrap is cached in the recording and written by every replay, with no lock.
+    // Every replay runs on the GUI thread (a screen repaint, a raster fallback, an export), so one
+    // writer at a time; a second thread replaying would need its own copy.
     const int innerWidth = inner.size().toSize().width();
     if (payload.laidOutWidth != innerWidth)
     {
@@ -449,7 +449,8 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
 
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
                           QCPReplayKinds kinds, const qcp::QCPRasterFallback* fallback,
-                          bool dashedAvailable, bool antialiasStrokes, QCPReplayState state)
+                          bool dashedAvailable, bool antialiasStrokes, QCPReplayState state,
+                          int firstCommand, int lastCommand)
 {
     // PainterOnly leaves the GPU kinds to another pass: on screen the RHI replay, in an export the
     // layer's deferred GpuOnly pass. \a fallback, when there is one, draws the kinds the layer
@@ -464,8 +465,10 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
     // A recording the layer could not take whole is painted by this pass like any other recording:
     // the call below draws every one of its commands.
     const bool painterDrawsAll = fallback && fallback->painterDrawsAll(list.id);
-    for (const qcp::QCPDrawCommand& command : list.commands)
+    const int end = lastCommand < 0 ? int(list.commands.size()) : lastCommand;
+    for (int i = firstCommand; i < end; ++i)
     {
+        const qcp::QCPDrawCommand& command = list.commands[std::size_t(i)];
         const bool gpu = qcp::isGpuCommand(command);
         if (kinds == QCPReplayKinds::GpuOnly && !gpu)
             continue;

@@ -1549,6 +1549,26 @@ QCPScatterRhiLayer* QCustomPlot::scatterRhiLayer(QCPLayer* layer)
     return mScatterRhiLayers[layer];
 }
 
+// The GPU content already on the screen where a layer's painter-only content would land: that of
+// the layer itself, and that of the layers below it which share its paint buffer. A layer with a
+// buffer of its own is composited after every earlier layer (see executeRenderPass), so their
+// content already lies under its buffer and does not count.
+bool QCustomPlot::gpuContentBefore(const QCPLayer* layer) const
+{
+    const QCPAbstractPaintBuffer* buffer = layer->mPaintBuffer.toStrongRef().data();
+    for (const auto& candidate : mLayers)
+    {
+        if (candidate != layer && candidate->mPaintBuffer.toStrongRef().data() != buffer)
+            continue;
+        const QCPPlottableRhiLayer* plottables = mPlottableRhiLayers.value(candidate);
+        if (plottables && plottables->hasGeometry())
+            return true;
+        if (candidate == layer)
+            break;
+    }
+    return false;
+}
+
 QSize QCustomPlot::rhiOutputSize() const
 {
     return renderTarget() ? renderTarget()->pixelSize() : QSize();

@@ -4357,3 +4357,92 @@ void TestRepaint::anExportDrawsAPainterCallbackOverAPolyline()
                             .arg(covered.green())
                             .arg(covered.blue())));
 }
+
+// The same three scenes on the screen: a frame read back from the QRhi buffer must stack them like
+// an export does.
+void TestRepaint::aScreenStacksACallOrderInsideOneRecording()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto item = plot->add<CallOrderItem>();
+    item->parts = CallOrderParts::RectThenText;
+    plot->replot();
+    QVERIFY2(textInkInsideTheRect(*plot, screenOf(plot)) > 20,
+             "the text recorded after the rect is not drawn over it on the screen");
+    item->parts = CallOrderParts::TextThenRect;
+    // A recording is what the library keeps: the member it reads changed behind its back.
+    item->update();
+    plot->replot();
+    QCOMPARE(textInkInsideTheRect(*plot, screenOf(plot)), 0);
+}
+
+void TestRepaint::aScreenStacksTwoItemsInAddOrder()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto rect = plot->add<CallOrderItem>();
+    rect->parts = CallOrderParts::Rect;
+    auto text = plot->add<CallOrderItem>();
+    text->parts = CallOrderParts::Text;
+    plot->replot();
+    QVERIFY2(textInkInsideTheRect(*plot, screenOf(plot)) > 20,
+             "the text item added last is not drawn over the rect item on the screen");
+    (void)plot->removeItem(rect.get());
+    plot->replot();
+    auto before = plot->add<CallOrderItem>();
+    before->parts = CallOrderParts::Text;
+    (void)plot->removeItem(before.get());
+    auto over = plot->add<CallOrderItem>();
+    over->parts = CallOrderParts::Rect;
+    plot->replot();
+    QCOMPARE(textInkInsideTheRect(*plot, screenOf(plot)), 0);
+}
+
+void TestRepaint::aScreenDrawsAPainterCallbackOverAPolyline()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto item = plot->add<CallOrderItem>();
+    item->parts = CallOrderParts::LineThenPainter;
+    plot->replot();
+    const QImage image = screenOf(plot);
+    const QColor covered = image.pixelColor(190, int(plot->yAxis->coordToPixel(0.5)));
+    QVERIFY2(covered.green() > 120 && covered.red() < 100,
+             qPrintable(QStringLiteral(
+                            "the painter callback did not cover the line on the screen: %1,%2,%3")
+                            .arg(covered.red())
+                            .arg(covered.green())
+                            .arg(covered.blue())));
+}
+
+// A recording with no painter-only command keeps today's path: no slice, no extra image.
+void TestRepaint::aRecordingWithoutPainterCommandsTakesNoImageSlot()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto item = plot->add<CallOrderItem>();
+    item->parts = CallOrderParts::Rect;
+    plot->replot();
+    // The item's own layer, not the one a new object would join: items default to "annotations".
+    QCPPlottableRhiLayer* layer = qcp::gpuLayer(plot, item->layer(), false);
+    QVERIFY(layer);
+    const int plain = layer->imageDrawEntries().size();
+    item->parts = CallOrderParts::RectThenText;
+    // A recording is what the library keeps: the member it reads changed behind its back.
+    item->update();
+    plot->replot();
+    QVERIFY2(layer->imageDrawEntries().size() > plain,
+             "the text after the rect must go to a slice of its own");
+}

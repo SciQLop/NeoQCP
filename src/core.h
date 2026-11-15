@@ -241,6 +241,9 @@ public:
     [[nodiscard]] QRhi* rhi() const { return mRhi; }
     [[nodiscard]] QCPPlottableRhiLayer* plottableRhiLayer(QCPLayer* layer);
     [[nodiscard]] QCPScatterRhiLayer* scatterRhiLayer(QCPLayer* layer);
+    //! Whether GPU content is already on screen where \a layer's painter-only content would land:
+    //! the layer's own, and that of the layers below it sharing its paint buffer.
+    [[nodiscard]] bool gpuContentBefore(const QCPLayer* layer) const;
     [[nodiscard]] QSize rhiOutputSize() const;
 
     [[nodiscard]] QPixmap background() const { return mBackgroundPixmap; }

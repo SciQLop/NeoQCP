@@ -25,9 +25,17 @@ class QCPLayer;
 class QCPArea;
 class QCPCoordinateSystem;
 class QCPPainter;
+class QCPResolveCache;
+class QCPPlottableRhiLayer;
+class QCPScatterRhiLayer;
 class QCPTheme;
 class QCustomPlot;
 class QVariant;
+
+namespace qcp
+{
+class QCPRasterFallback;
+}
 
 /*!
   \brief What the adapter reads from its object once per frame.
@@ -216,6 +224,15 @@ public:
     [[nodiscard]] QPointF stallOffset(const QCPDrawable& object, const QCPDrawnView& view) const;
 
 private:
+    //! Replays \a list as runs of painter-only and of GPU commands, each in the order it was
+    //! recorded: a GPU run submits to the layer and closes the slice open below it, and a
+    //! painter-only run paints above the GPU content before it (see QCPDrawnCore::paint).
+    static void paintInCallOrder(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
+                                 QCPScatterRhiLayer& scatter, const QCPDrawnView& view,
+                                 QCPPainter& painter, const QCPDrawFrame& frame,
+                                 QCPResolveCache& resolve, qcp::QCPRasterFallback& fallback,
+                                 quint64 generation, bool gpuBefore);
+
     //! \a known is the frame the caller already built when it has one: the paint path hands the
     //! frame it replays with here, so an object that records nothing new builds no transform.
     bool ensureRecording(const QCPDrawable& object, const QCPDrawnView& view,

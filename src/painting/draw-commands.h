@@ -234,7 +234,8 @@ struct ImageCmd
 //! Arbitrary painter code; the escape hatch for what has no command yet.
 struct PainterCmd
 {
-    //! Shared: libc++'s std::function is 16-byte aligned, which grows every command past the budget.
+    //! Shared: libc++'s std::function is 16-byte aligned, which grows every command past the
+    //! budget.
     std::shared_ptr<const std::function<void(QCPPainter&, const QCPTransform&)>> callback;
 };
 
@@ -1041,9 +1042,11 @@ enum class QCPReplayState
 
 //! The commands a full frame could not draw on the GPU (no QRhi, export, or the layer's image cap)
 //! are painted here: in PainterOnly a GPU kind is drawn only when \a fallback says the layer left
-//! it to this pass.
+//! it to this pass. Only \a firstCommand to \a lastCommand (exclusive, -1: the end) are replayed: a
+//! recording walked as runs hands each run its slice of the list.
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
                           QCPReplayKinds kinds = QCPReplayKinds::All,
                           const qcp::QCPRasterFallback* fallback = nullptr,
                           bool dashedAvailable = true, bool antialiasStrokes = false,
-                          QCPReplayState state = QCPReplayState::Save);
+                          QCPReplayState state = QCPReplayState::Save, int firstCommand = 0,
+                          int lastCommand = -1);

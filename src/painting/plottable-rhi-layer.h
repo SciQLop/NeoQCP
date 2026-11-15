@@ -71,11 +71,28 @@ public:
                          const QRectF& source, bool smooth, const QRect& clipRect, double dpr,
                          int outputHeight, float offsetX = 0, float offsetY = 0, float alpha = 1);
 
+    //! Adds the picture of one painter slice: \a image covers the whole output at device resolution
+    //! and is uploaded on every frame it is submitted, since its pixels are this frame's. \a
+    //! imageKey is the slice's stable key, so its texture survives a pan and a rebuild. False when
+    //! the layer cannot take it (kMaxSlices, a broken image pipeline): the caller then paints the
+    //! pixels into the layer's buffer, under this layer's GPU content.
+    bool addSliceImage(const QImage& image, qint64 imageKey, const QRect& clipRect, double dpr,
+                       int outputHeight);
+
+    //! What an image entry is: a rasterised fill the GPU cannot express, a recorded image command,
+    //! or the picture of one painter slice. Each kind has its own budget.
+    enum class ImageKind
+    {
+        Raster,
+        Command,
+        Slice
+    };
+
     //! A rasterised fill the GPU cannot express, drawn as a textured quad in submission order. A
     //! recorded image travels the same path, with its own source rect and sampler.
     struct ImageEntry
     {
-        qint64 imageKey = 0; //!< QImage::cacheKey() of the raster; identifies its texture
+        qint64 imageKey = 0; //!< identifies the texture: a cache key, or a slice's stable one
         QRectF pixelRect; //!< device pixels the quad covers (pan offset applied by the shader)
         QRectF source; //!< texels of \a deviceSize to show
         QSize deviceSize; //!< texture size, device pixels
@@ -84,7 +101,7 @@ public:
         float alpha = 1;
         QRect scissorRect;
         bool smooth = true; //!< a linear sampler, else nearest
-        bool rasterised = true; //!< a raster fallback fill, not a recorded image command
+        ImageKind kind = ImageKind::Raster;
     };
 
     //! One record per submission: which list it went to and where in that list. Drawing walks this
@@ -110,6 +127,10 @@ public:
     //! are the picture the colour maps draw, not a fallback, so they must not be squeezed by the
     //! four a rasterised fill gets. Past it, the painter draws the rest.
     static constexpr int kMaxCommandImages = 16;
+
+    //! At most this many painter slices per layer per frame. Past it, the painter-only content goes
+    //! into the layer's buffer, under the GPU content it was meant to cover.
+    static constexpr int kMaxSlices = 8;
 
     // Offset-only update (no geometry change, no vertex re-upload)
     void setAllOffsets(float offsetX, float offsetY);
@@ -174,6 +195,17 @@ public:
         return first;
     }
 
+    //! False when the layer cannot take another painter slice: no image pipeline, or the cap spent.
+    bool canAddSlice() const { return !mImageBroken && mSlices < kMaxSlices; }
+
+    //! True the first time: the slice cap warns once per layer, for the plot's lifetime.
+    bool warnSliceCapOnce()
+    {
+        const bool first = !mSliceCapWarned;
+        mSliceCapWarned = true;
+        return first;
+    }
+
     //! Test hook: how many rasterised fills reached a texture.
     int imageUploads() const { return mImageUploads; }
 
@@ -193,6 +225,10 @@ public:
 
     //! How many recorded image commands hold a quad now: their cap counts only them.
     int commandImageCount() const { return mCommandImages; }
+
+    //! How many painter slices the layer took in the frame it is building: their cap counts only
+    //! them.
+    int sliceImageCount() const { return mSlices; }
 
 private:
     // Per-draw uniform data, aligned to GPU requirements.
@@ -240,10 +276,11 @@ private:
         bool used = false;
     };
 
-    //! The one place an image entry is created, whether a rasterised fill or a recorded command.
-    bool addImageEntry(const QImage& image, const QRectF& pixelRect, const QRectF& source,
-                       bool smooth, bool rasterised, const QRect& clipRect, double dpr,
-                       int outputHeight, float offsetX, float offsetY, float alpha);
+    //! The one place an image entry is created, whether a rasterised fill, a recorded command or a
+    //! slice.
+    bool addImageEntry(const QImage& image, qint64 imageKey, const QRectF& pixelRect,
+                       const QRectF& source, bool smooth, ImageKind kind, const QRect& clipRect,
+                       double dpr, int outputHeight, float offsetX, float offsetY, float alpha);
 
     void createImagePipeline(QRhiRenderPassDescriptor* rpDesc, int sampleCount);
     bool ensureImageTexture(ImageTexture& texture, const QSize& size);
@@ -297,10 +334,12 @@ private:
     QRhiSampler* mImageNearestSampler = nullptr;
     int mRasterImages = 0; //!< the entries that are rasterised fills
     int mCommandImages = 0; //!< the entries that are recorded image commands
+    int mSlices = 0; //!< the entries that are painter slices
     int mLastImageSampleCount = 0;
     bool mImageBroken = false;
     bool mRasterCapWarned = false; //!< the raster cap warned once for this plot
     bool mCommandImageCapWarned = false; //!< the command image cap warned once
+    bool mSliceCapWarned = false; //!< the slice cap warned once
     bool mImageQuadUploaded = false;
     int mImageUploads = 0;
 

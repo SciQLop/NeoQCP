@@ -2040,10 +2040,8 @@ void TestDrawable::rangeBandLegendIconIsInked()
 
 void TestDrawable::exportStacksLikeTheScreen()
 {
-    // Spec 5: a layer paints its QPainter content first, then the QPainter form of its GPU
-    // commands. The glyph of an item text is painter content, so the bars of its own layer,
-    // submitted before it, still cover it - on screen and in every export. Replaying each object
-    // whole stacked the glyph above the bars in the exports only.
+    // C-4: call order is screen order, in an export too. The glyph of an item text, recorded after
+    // the bars of its own layer, covers them in all three paths alike.
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - this compares the screen with the export paths");
@@ -2085,13 +2083,15 @@ void TestDrawable::exportStacksLikeTheScreen()
 
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
     const int onScreen = inkIn(f.plot->grabFramebuffer(), glyphBox);
-    QVERIFY2(onScreen == 0,
-             qPrintable(QStringLiteral("%1 glyph pixels over the bars on screen").arg(onScreen)));
+    QVERIFY2(onScreen > 20,
+             qPrintable(QStringLiteral("%1 glyph pixels under the bars on screen").arg(onScreen)));
 
     const QImage pixmap = f.plot->toPixmap(300, 200).toImage();
     const int inPixmap = inkIn(pixmap, glyphBox);
-    QVERIFY2(inPixmap == 0,
-             qPrintable(QStringLiteral("%1 glyph pixels over the bars in toPixmap").arg(inPixmap)));
+    QVERIFY2(qAbs(inPixmap - onScreen) <= onScreen / 4 + 2,
+             qPrintable(QStringLiteral("toPixmap stacks %1 glyph pixels, the screen %2")
+                            .arg(inPixmap)
+                            .arg(onScreen)));
 
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
@@ -2100,8 +2100,10 @@ void TestDrawable::exportStacksLikeTheScreen()
     const QImage png = QImage(path).convertToFormat(QImage::Format_ARGB32);
     QVERIFY(!png.isNull());
     const int inPng = inkIn(png, glyphBox);
-    QVERIFY2(inPng == 0,
-             qPrintable(QStringLiteral("%1 glyph pixels over the bars in savePng").arg(inPng)));
+    QVERIFY2(qAbs(inPng - onScreen) <= onScreen / 4 + 2,
+             qPrintable(QStringLiteral("savePng stacks %1 glyph pixels, the screen %2")
+                            .arg(inPng)
+                            .arg(onScreen)));
 }
 
 void TestDrawable::aPanInsideTheKeyWindowKeepsTheRecording()

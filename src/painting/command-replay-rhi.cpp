@@ -609,14 +609,19 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                       QCPScatterRhiLayer& scatter, const QCPDrawFrame& frame,
                       QCPResolveCache& cache, qcp::QCPRasterFallback& fallback, double dpr,
                       const QSize& outputSize, quint64 generation, QCPRecordingCache* geometry,
-                      float alpha)
+                      float alpha, int firstCommand, int lastCommand)
 {
     PROFILE_HERE_N("qcpReplayWithRhi");
     const int outputHeight = outputSize.height();
     const QRect clip = frame.clip.isEmpty() ? QRect() : frame.clip.toAlignedRect();
+    const int end = lastCommand < 0 ? int(list.commands.size()) : lastCommand;
+    // A range is one run of a recording its caller splits in call order: nothing it builds can be
+    // kept, and it never claims the recording whole (the caller's painter pass paints the rest).
+    const bool partial = firstCommand != 0 || end != int(list.commands.size());
 
     QPointF delta;
-    if (geometry && geometry->reuse(list, frame.transform, dpr, outputHeight, clip, &delta))
+    if (!partial && geometry
+        && geometry->reuse(list, frame.transform, dpr, outputHeight, clip, &delta))
     {
         // The images it holds are still the layer's; when the re-recorded plottables took their
         // room, it is painted whole like a recording that does not fit when it is built.
@@ -633,7 +638,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
         return;
     }
 
-    if (rasterOverflows(list, plottables))
+    if (!partial && rasterOverflows(list, plottables))
     {
         // Not one image fits: the painter pass draws this recording whole, under the layer's GPU
         // content, rather than splitting it at the cap.
@@ -643,15 +648,17 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
 
     cache.beginReplay();
     fallback.beginReplay();
-    // The cache the build keeps into: none on a frame whose vertices no later frame can re-emit.
-    QCPRecordingCache* const keep
-        = geometry && geometry->beginBuild(list, frame.transform, dpr, outputHeight, clip)
-        ? geometry
-        : nullptr;
+    // The cache the build keeps into: none on a frame whose vertices no later frame can re-emit,
+    // nor on a range of one.
+    const bool canKeep
+        = !partial && geometry
+        && geometry->beginBuild(list, frame.transform, dpr, outputHeight, clip);
+    QCPRecordingCache* const keep = canKeep ? geometry : nullptr;
     std::vector<QPointF>& pixels = pixelScratch();
 
-    for (const qcp::QCPDrawCommand& command : list.commands)
+    for (int i = firstCommand; i < end; ++i)
     {
+        const qcp::QCPDrawCommand& command = list.commands[std::size_t(i)];
         // One visit answers both halves and the dashes, in every branch.
         // The dashed pipeline is built with the layer, so a layer that failed to build it can only
         // rasterise a dashed stroke; the painter copy would land under the layer's GPU content.

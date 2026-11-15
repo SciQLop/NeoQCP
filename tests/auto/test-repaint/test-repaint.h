@@ -23,6 +23,10 @@ private slots:
     void anExportStacksACallOrderInsideOneRecording();
     void anExportStacksTwoItemsInAddOrder();
     void anExportDrawsAPainterCallbackOverAPolyline();
+    void aScreenStacksACallOrderInsideOneRecording();
+    void aScreenStacksTwoItemsInAddOrder();
+    void aScreenDrawsAPainterCallbackOverAPolyline();
+    void aRecordingWithoutPainterCommandsTakesNoImageSlot();
     void exportShowsReadyStagedData();
     void legendShowsAddedGraphAndItsName();
     void setLayerRepaintsTheLayerLeft();

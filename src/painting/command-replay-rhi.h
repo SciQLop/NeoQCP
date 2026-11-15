@@ -193,12 +193,17 @@ private:
 
   With \a geometry, the replay keeps what it built for this recording and re-emits it on a frame
   that only translates it, instead of building it again.
+
+  Only the commands \a firstCommand to \a lastCommand (exclusive, -1: the end) are replayed. A range
+  owns no kept geometry and is never painted whole: it is one run of a recording the caller walks in
+  call order, so a slice submitted after it lands over it.
 */
 void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                       QCPScatterRhiLayer& scatter, const QCPDrawFrame& frame,
                       QCPResolveCache& cache, qcp::QCPRasterFallback& fallback, double dpr,
                       const QSize& outputSize, quint64 generation = 0,
-                      QCPRecordingCache* geometry = nullptr, float alpha = 1.0f);
+                      QCPRecordingCache* geometry = nullptr, float alpha = 1.0f,
+                      int firstCommand = 0, int lastCommand = -1);
 
 //! Test hook: how many fill vertex sets the replay has built (a pan must not add one). Counts the
 //! fan and ribbon fills together, like QCPLineExtruder::extruderCallCount() counts strokes.

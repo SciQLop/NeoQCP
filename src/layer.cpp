@@ -35,6 +35,7 @@
 #include "layoutelements/layoutelement-axisrect.h"
 #include "painting/painter.h"
 #include "painting/plottable-rhi-layer.h"
+#include "painting/rhi-utils.h"
 #include "painting/scatter-rhi-layer.h"
 #include "items/item.h"
 #include "plottables/plottable.h"
@@ -151,6 +152,8 @@ QCPLayer::QCPLayer(QCustomPlot* parentPlot, const QString& layerName)
 {
     // Note: no need to make sure layerName is unique, because layer
     // management is done with QCustomPlot functions.
+    // A slice's painter holds the address of its QImage: reserve the cap so a slice never moves.
+    mSliceImages.reserve(std::size_t(QCPPlottableRhiLayer::kMaxSlices));
 }
 
 QCPLayer::~QCPLayer()
@@ -263,6 +266,9 @@ void QCPLayer::draw(QCPPainter* painter)
             painter->restore();
         }
     }
+    // Consecutive painter-only layerables shared the slice that is open; the next GPU content, or
+    // the end of the layer, is what closes it.
+    closePainterSlice(*painter);
 }
 
 /*! \internal
@@ -284,6 +290,9 @@ void QCPLayer::drawToPaintBuffer()
             if (painter->isActive())
             {
                 mHiDpiScreenPass = pb->devicePixelRatio() > 1;
+                // Slices belong to one pass: the first painter-only content of this one opens
+                // slice 0 again, and its image is reused.
+                mSliceCount = 0;
                 draw(painter);
                 mHiDpiScreenPass = false;
             }
@@ -297,6 +306,97 @@ void QCPLayer::drawToPaintBuffer()
     }
     else
         qDebug() << Q_FUNC_INFO << "no valid paint buffer associated with this layer";
+}
+
+/*! \internal
+
+  Opens the slice the painter-only content of this layer draws into, once GPU content is on the
+  layer, or returns the slice already open.
+
+  A slice is an image of the whole output, painted after the layer's GPU content, so that a text or
+  a painter callback drawn later in call order lands over a rect drawn earlier. Consecutive
+  painter-only layerables share one slice: one image upload, one ordered draw.
+
+  Returns null when the layer cannot take one (no RHI, no plottable layer, the slice cap spent):
+  the caller then keeps painting into the buffer, under the GPU content.
+*/
+QCPPainter* QCPLayer::painterSlice(const QCPPainter& from, const QRect& clip)
+{
+    if (mOpenSlice >= 0)
+        return mSlicePainter.get();
+    const QSharedPointer<QCPAbstractPaintBuffer> pb = mPaintBuffer.toStrongRef();
+    QRhi* rhi = mParentPlot ? mParentPlot->rhi() : nullptr;
+    if (!pb || !rhi)
+        return nullptr;
+    QCPPlottableRhiLayer* plottables = mParentPlot->plottableRhiLayer(this);
+    if (!plottables || !plottables->canAddSlice())
+    {
+        if (plottables && plottables->warnSliceCapOnce())
+            qDebug() << "NeoQCP: more than" << QCPPlottableRhiLayer::kMaxSlices
+                     << "painter slices in one layer, the painter-only content past the cap is "
+                        "painted under this layer's GPU content";
+        return nullptr;
+    }
+
+    if (std::size_t(mSliceCount) >= mSliceImages.size())
+        mSliceImages.emplace_back();
+    QImage& image = mSliceImages[std::size_t(mSliceCount)];
+    // The layer's buffer sets the frame: same pixels, same format, so a slice is the buffer's
+    // picture of the painter-only content alone.
+    const QSize pixelSize = pb->size() * pb->devicePixelRatio();
+    const QImage::Format format = qcp::rhi::imageFormatFor(qcp::rhi::preferredTextureFormat(rhi));
+    if (image.size() != pixelSize || image.format() != format)
+    {
+        image = QImage(pixelSize, format);
+        image.setDevicePixelRatio(pb->devicePixelRatio());
+    }
+    image.fill(Qt::transparent);
+
+    mSliceClip = clip;
+    mSlicePainter = std::make_unique<QCPPainter>(&image);
+    QCPPainter* painter = mSlicePainter.get();
+    painter->setAntialiasing(from.antialiasing());
+    painter->setOpacity(from.opacity());
+    painter->setMode(QCPPainter::pmNonCosmetic, from.modes().testFlag(QCPPainter::pmNonCosmetic));
+    // The system clip is a path (a polar disc on a rect, a rounded frame): it survives as a path.
+    if (!from.clipPath().isEmpty())
+    {
+        painter->setClipRegion(from.clipRegion());
+        painter->setClipPath(from.clipPath(), Qt::IntersectClip);
+    }
+    else
+        painter->setClipRegion(from.clipRegion());
+    mOpenSlice = mSliceCount++;
+    return painter;
+}
+
+/*! \internal
+
+  Ends the open slice and submits its picture to this layer's plottable RHI layer, over the GPU
+  content drawn before it. Past the slice cap the picture goes into the layer's buffer instead,
+  under that content.
+*/
+void QCPLayer::closePainterSlice(QCPPainter& bufferPainter)
+{
+    if (mOpenSlice < 0)
+        return;
+    const int index = mOpenSlice;
+    mOpenSlice = -1;
+    mSlicePainter->end();
+    mSlicePainter.reset();
+    const QImage& image = mSliceImages[std::size_t(index)];
+    QCPPlottableRhiLayer* plottables = mParentPlot ? mParentPlot->plottableRhiLayer(this) : nullptr;
+    // A negative key never collides with a QImage cache key, and it is stable across frames: the
+    // texture keeps the slice's number, not its pixels.
+    if (plottables
+        && plottables->addSliceImage(image, -(1 + qint64(index)), mSliceClip,
+                                     image.devicePixelRatio(), image.height()))
+        return;
+    bufferPainter.save();
+    bufferPainter.setClipping(false);
+    bufferPainter.setOpacity(1);
+    bufferPainter.drawImage(QPointF(0, 0), image);
+    bufferPainter.restore();
 }
 
 /*!
