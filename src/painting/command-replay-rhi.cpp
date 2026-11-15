@@ -188,7 +188,7 @@ void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
                       const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
                       qcp::QCPRasterFallback& fallback, const QRect& clip, double dpr,
                       const QSize& viewport, quint64 generation, QCPRecordingCache* cache,
-                      bool needed, bool withStroke)
+                      bool needed, bool withStroke, float alpha)
 {
     if (!needed)
         return;
@@ -226,7 +226,7 @@ void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
                          withStroke, &shift);
     const QRectF device(bounds.left() * dpr, bounds.top() * dpr, image.width(), image.height());
     if (!layer.addImage(image, device, clip, dpr, viewport.height(), static_cast<float>(shift.x()),
-                        static_cast<float>(shift.y())))
+                        static_cast<float>(shift.y()), alpha))
     {
         fallback.painterHandles(listId, index);
         return;
@@ -242,7 +242,7 @@ void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
 void addCommandImage(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
                      const qcp::QCPDrawCommand& variant, const QCPDrawFrame& frame,
                      qcp::QCPRasterFallback& fallback, const QRect& clip, double dpr,
-                     int outputHeight, QCPRecordingCache* cache)
+                     int outputHeight, QCPRecordingCache* cache, float alpha)
 {
     const auto& command = std::get<qcp::ImageCmd>(variant);
     const quint64 listId = list.id;
@@ -263,7 +263,7 @@ void addCommandImage(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
     const QPointF a = qcpResolvePosition(frame, command.a);
     const QPointF b = qcpResolvePosition(frame, command.b);
     if (!layer.addCommandImage(image, a * dpr, b * dpr, command.pixels->source,
-                               command.pixels->smooth, clip, dpr, outputHeight))
+                               command.pixels->smooth, clip, dpr, outputHeight, 0, 0, alpha))
     {
         fallback.painterHandles(listId, index);
         return;
@@ -661,7 +661,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
         const auto raster = [&]
         {
             addRasterCommand(list, plottables, command, frame, fallback, clip, dpr, outputSize,
-                             generation, keep, needs.fill || strokeRaster, strokeRaster);
+                             generation, keep, needs.fill || strokeRaster, strokeRaster, alpha);
         };
         const auto stroke = [&](std::span<const QPointF> points, const QPen& pen,
                                 bool closed = false, std::span<const QRgb> colours = { })
@@ -842,7 +842,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     // answered above.
                     if (dataOnly)
                         addCommandImage(list, plottables, command, frame, fallback, clip, dpr,
-                                        outputHeight, keep);
+                                        outputHeight, keep, alpha);
                 }
             },
             command);

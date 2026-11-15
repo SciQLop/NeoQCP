@@ -61,6 +61,7 @@ private slots:
     void aPixelCornerStaysASingleRect();
     void perRectColoursStayOneBatch();
     void rasterBrushRectsStayOneCommandEach();
+    void aBuildFrameFadesItsRasterAndImageQuads();
     void ellipsesStayOneBatch();
     void aHugeEllipseKeepsTheFrame();
     void batchExportsOneRectPerBar();

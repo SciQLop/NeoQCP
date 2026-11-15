@@ -1725,6 +1725,37 @@ void TestDrawContext::rasterBrushRectsStayOneCommandEach()
     QCOMPARE(replay, hand);
 }
 
+void TestDrawContext::aBuildFrameFadesItsRasterAndImageQuads()
+{
+    // A busy fade lowers the whole layer's opacity. A frame that builds the quads must fade them
+    // as a frame that reuses them does, or the layer fades in one step and pops back.
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    QLinearGradient fade(0, 0, 0, 1);
+    fade.setCoordinateMode(QGradient::ObjectBoundingMode);
+    fade.setColorAt(0.0, QColor(200, 40, 40, 160));
+    fade.setColorAt(1.0, QColor(40, 40, 200, 160));
+    context.rect(QCP::Data { 20, 20 }, QCP::Data { 80, 120 }, kPen, QBrush(fade));
+    QImage picture(8, 6, QImage::Format_ARGB32_Premultiplied);
+    picture.fill(QColor(180, 40, 40));
+    context.image(QCP::Data { 100, 20 }, QCP::Data { 160, 120 }, picture);
+
+    QCPPlottableRhiLayer plottables(nullptr);
+    QCPScatterRhiLayer scatter(nullptr);
+    QCPResolveCache resolve;
+    qcp::QCPRasterFallback fallback;
+    QCPRecordingCache geometry;
+    qcpReplayWithRhi(context.drawList(), plottables, scatter, context.frame(), resolve, fallback,
+                     1.0, QSize(kWidth, kHeight), 0, &geometry, 0.5f);
+
+    QCOMPARE(plottables.rasterImageCount(), 1);
+    QCOMPARE(plottables.commandImageCount(), 1);
+    for (const QCPPlottableRhiLayer::ImageEntry& entry : plottables.imageDrawEntries())
+        QVERIFY2(qFuzzyCompare(entry.alpha, 0.5f),
+                 "a build frame must fade its quads like a reused one");
+}
+
 void TestDrawContext::ellipsesStayOneBatch()
 {
     Fixture fixture;
