@@ -1823,8 +1823,10 @@ bool QCustomPlot::adoptPlottable(QCPPlottable* plottable, QCPCoordinateSystem* s
     plottable->initializeParentPlot(this);
     // It joins the frame of the area it arrives in, like a plottable built there, through setSystem
     // so it rewires to the new axes: a plain move would keep following the old ones' signals.
-    plottable->setSystem(system);
+    // The scheduler first: the transform the plottable deferred while it was outside a plot starts
+    // now, and systemDidChange() below reads a plottable that already has one.
     plottable->setPipelineScheduler(mPipelineScheduler);
+    plottable->setSystem(system);
     plottable->setParentLayerable(area);
     if (!registerJoinedPlottable(plottable))
         return false;

@@ -2,6 +2,8 @@
 
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
+#include <memory>
+
 namespace
 {
 int gMisuses = 0;
@@ -754,7 +756,6 @@ void TestOwnership::polarRemoveGraphUnlistsFirst()
     mPlot->plotLayout()->clear();
     auto* area = new QCPPolarArea(mPlot);
     mPlot->plotLayout()->addElement(0, 0, area);
-    QCPPolarAxisAngular* angular = area->angularAxis();
     auto* first = area->add<QCPPolarGraph>().get();
     auto* second = area->add<QCPPolarGraph>().get();
     first->setData(QVector<double> { 0, 90 }, QVector<double> { 1, 2 });
@@ -846,11 +847,13 @@ void TestOwnership::intervalsWithoutLaneLayout()
     mPlot->xAxis->setRange(0, 100);
     mPlot->setInteractions(QCP::iSelectPlottables | QCP::iMultiSelect);
 
+    // An add without a layout gives the plottable one, so it draws with every row in no lane. The
+    // paths that still have no layout are below: an orphaned one, and one that never joined a plot.
     auto* unlaid = mPlot->add<QCPIntervals>(nullptr).get();
-    QVERIFY(unlaid->laneLayout() == nullptr);
-    QCOMPARE(gMisuses, 1);
+    QVERIFY(unlaid->laneLayout());
+    QCOMPARE(gMisuses, 0);
     exerciseIntervals(unlaid, mPlot);
-    QCOMPARE(gMisuses, 1);
+    QCOMPARE(gMisuses, 0);
     QVERIFY(mPlot->removePlottable(unlaid));
 
     gMisuses = 0;
@@ -873,12 +876,17 @@ void TestOwnership::intervalsWithoutLaneLayout()
     exerciseIntervals(orphaned, mPlot);
     QCOMPARE(gMisuses, 1);
 
+    // Built outside a plot, an intervals has no layout and needs none: nothing draws or edits it
+    // there. The add builds one, so no path ever reports the missing layout for a placed plottable.
     gMisuses = 0;
-    auto* inert = new OpenIntervals();
-    exerciseIntervals(inert, mPlot);
-    QVERIFY(gMisuses >= 1); // the missing layout, on every path that needs it
+    auto inert = std::make_unique<OpenIntervals>();
+    QVERIFY(!inert->laneLayout());
     inert->requestRepaint();
-    delete inert;
+    const auto placed = mPlot->add(std::move(inert));
+    QVERIFY(placed);
+    QVERIFY(placed->laneLayout());
+    exerciseIntervals(placed.get(), mPlot);
+    QCOMPARE(gMisuses, 0);
 }
 
 void TestOwnership::deletePolarGraphInLegend()
@@ -935,7 +943,6 @@ void TestOwnership::deletePolarAreaWithGraphs()
 {
     auto* area = new QCPPolarArea(mPlot);
     auto* other = new QCPPolarArea(mPlot);
-    QCPPolarAxisAngular* angular = area->angularAxis();
     mPlot->plotLayout()->addElement(0, 1, area);
     mPlot->plotLayout()->addElement(0, 2, other);
     auto* survivor = area->add<QCPPolarGraph>().get();
@@ -964,7 +971,6 @@ void TestOwnership::movePolarGraphKeepsOneLegendRow()
 {
     auto* area = new QCPPolarArea(mPlot);
     auto* other = new QCPPolarArea(mPlot);
-    QCPPolarAxisAngular* angular = area->angularAxis();
     mPlot->plotLayout()->addElement(0, 1, area);
     mPlot->plotLayout()->addElement(0, 2, other);
     auto* graph = area->add<QCPPolarGraph>().get();

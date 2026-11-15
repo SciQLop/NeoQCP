@@ -107,11 +107,7 @@ QCPIntervals::QCPIntervals(QCPLaneLayout* layout, QCP::Capabilities required)
         : QCPPlottable(required), mLayout(layout)
 {
     setSelectable(QCP::stMultipleDataRanges);
-    if (hasLaneLayout())
-        connect(layout, &QCPLaneLayout::changed, this, [this] {
-            regroupIfLanesWereAdded();
-            update();
-        });
+    followLaneLayout();
     connect(this, &QCPPlottable::selectionChanged, this, &QCPIntervals::markLayersDirty);
     // Keep the label layerable one layer above wherever this plottable itself moves to.
     connect(this, &QCPLayerable::layerChanged, this, [this](QCPLayer* newLayer) {
@@ -128,11 +124,31 @@ QCPIntervals::QCPIntervals(qcp::intervals::Columns columns, QCPLaneLayout* layou
 
 void QCPIntervals::systemDidChange()
 {
+    // The default lane layout add<T>() has always made for an intervals: without one it drops every
+    // row (groupByLane() keeps only lanes the layout names) and draws nothing.
+    if (mSystem && mParentPlot && !mLayout)
+    {
+        mLayout = new QCPLaneLayout(mParentPlot);
+        followLaneLayout();
+    }
     // The lane labels are layerables of the plot: an intervals plottable built without axes has
     // none to draw them in until a frame takes it.
     if (!mSystem || !mParentPlot || mLabelLayer)
         return;
     mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
+}
+
+//! Follows \a mLayout once it exists: a plottable built without axes gets the plot's layout when it
+//! arrives, and a plottable given one in its constructor follows that.
+void QCPIntervals::followLaneLayout()
+{
+    if (!mLayout || mLaneLayoutFollowed)
+        return;
+    mLaneLayoutFollowed = true;
+    connect(mLayout, &QCPLaneLayout::changed, this, [this] {
+        regroupIfLanesWereAdded();
+        update();
+    });
 }
 
 void QCPIntervals::setData(qcp::intervals::Columns columns)

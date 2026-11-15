@@ -69,8 +69,7 @@ public:
     enum OffsetMode { omUniform, omCustom };
     Q_ENUM(OffsetMode)
 
-    explicit QCPWaterfallGraph(QCP::Capabilities required = QCP::capRectangular
-                                                           | QCP::capStraightKey);
+    QCPWaterfallGraph();
     //! One row per (key, value) pair, sorted by key.
     template <QCPNumberRange K, QCPNumberRange V>
     QCPWaterfallGraph(const K& keys, const V& values, bool alreadySorted = false)

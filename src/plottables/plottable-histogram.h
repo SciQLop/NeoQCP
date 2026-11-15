@@ -84,7 +84,13 @@ protected:
     void draw(QCPDrawContext& context) const override;
     void drawLegendIcon(QCPDrawContext& icon) const override;
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
-    void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
+    void setPipelineScheduler(QCPPipelineScheduler* scheduler) override
+    {
+        if (scheduler)
+            mPipeline.setScheduler(scheduler);
+        else
+            mPipeline.deferJobs(); // outside a plot the transforms wait, they never block
+    }
     bool canProduceContent() const override;
     //! An export bins synchronously, so the screen and export recordings differ.
     [[nodiscard]] bool resolvesForTheExport() const override { return true; }

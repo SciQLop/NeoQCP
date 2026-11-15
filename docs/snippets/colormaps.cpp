@@ -223,8 +223,7 @@ DOC_SNIPPET(colormaps_interpolation, 600, 300)
     for (int r = 0; r < 2; ++r)
     {
         QCPAxis* xAxis = rects[r]->axis(QCPAxis::atBottom);
-        auto* map = xAxis->axisRect()->add<QCPColorMap>(
-                xAxis, rects[r]->axis(QCPAxis::atLeft)).get();
+        auto map = rects[r]->add<QCPColorMap>();
         map->data()->setSize(8, 8);
         map->data()->setRange(QCPRange(0, 7), QCPRange(0, 7));
         for (int x = 0; x < 8; ++x)

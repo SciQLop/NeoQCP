@@ -383,8 +383,8 @@ value axes: the plottable is built detached and `add<T>()` joins it to a system.
 | Old | New |
 |---|---|
 | `new QCPGraph(customPlot->xAxis, customPlot->yAxis)` | `customPlot->add<QCPGraph>()` |
-| `new QCPBars(keyAxis, valueAxis)` | `keyAxis->axisRect()->add<QCPBars>(keyAxis, valueAxis)` |
-| `new QCPIntervals(keyAxis, valueAxis, &lanes)` | `keyAxis->axisRect()->add<QCPIntervals>(keyAxis, valueAxis, &lanes)` |
+| `new QCPBars(keyAxis, valueAxis)` | `rect->add<QCPBars>(keyAxis, valueAxis)` (or `rect->add<QCPBars>()` for its first bottom and left axes) |
+| `new QCPIntervals(keyAxis, valueAxis, &lanes)` | `rect->add<QCPIntervals>(&lanes)` |
 | `new QCPPolarGraph(area->angularAxis(), area->radialAxis())` | `area->add<QCPPolarGraph>()` |
 | `new QCPPlottable(customPlot, ...)` subclass | `customPlot->add<MyPlottable>(...)`, plot dropped from the constructor |
 
@@ -416,3 +416,13 @@ subclass a constructor that takes them, or call `setData()` on the returned hand
 
 A plottable that is built and not placed answers its setters, `setData()` and its data accessors, and
 draws nothing; it has no parent plot, so `setSystem()` refuses a system until the plottable is added.
+
+A data constructor keeps the source and does not transform it. A plottable outside a plot has no worker
+pool, so its pipeline (the L1 resample of a dense graph, the binning of a colour map or a histogram)
+waits, and starts on the plot's pool when `add<T>()` joins the plottable: building a graph of a million
+points costs a copy, never a resample on the calling thread. A taken plottable resumes the same way when
+it is added back.
+
+An intervals plottable added without a lane layout gets one, as before: `rect->add<QCPIntervals>()` and
+`rect->add<QCPIntervals>(columns)` draw their rows in the lanes of a layout the plot owns, and a layout
+given to the constructor is the one it keeps.

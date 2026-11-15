@@ -498,7 +498,13 @@ protected:
     void followAxes();
     QList<QMetaObject::Connection> mAxisLinks;
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
-    void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
+    void setPipelineScheduler(QCPPipelineScheduler* scheduler) override
+    {
+        if (scheduler)
+            mPipeline.setScheduler(scheduler);
+        else
+            mPipeline.deferJobs(); // outside a plot the transforms wait, they never block
+    }
 
     void updateBaseSelection();
     [[nodiscard]] bool isDataRow(int index) const;

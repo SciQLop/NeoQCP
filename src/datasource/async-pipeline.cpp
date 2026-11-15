@@ -23,6 +23,7 @@ QCPAsyncPipelineBase::QCPAsyncPipelineBase(QCPPipelineScheduler* scheduler,
                                              QObject* parent)
     : QObject(parent)
     , mScheduler(scheduler)
+    , mDeferJobs(scheduler == nullptr)
     , mDestroyGuard(std::make_shared<DestroyGuard>())
 {
 }
@@ -53,16 +54,69 @@ void QCPAsyncPipelineBase::emitBusyIfNeeded(QMutexLocker<QMutex>& lock)
         Q_EMIT busyChanged(true);
 }
 
+void QCPAsyncPipelineBase::setScheduler(QCPPipelineScheduler* scheduler)
+{
+    // The transform the plottable asked for while it was outside a plot: it starts now, on the pool
+    // when there is one, on this thread when the caller explicitly runs without one.
+    std::function<void()> job;
+    QCPPipelineScheduler::Priority priority = QCPPipelineScheduler::Heavy;
+    {
+        QMutexLocker lock(&mMutex);
+        if (mScheduler == scheduler && !mDeferJobs)
+            return;
+        mScheduler = scheduler;
+        mDeferJobs = false;
+        job = std::move(mDeferredJob);
+        mDeferredJob = nullptr;
+        priority = mDeferredPriority;
+    }
+    if (!job)
+        return;
+    if (scheduler)
+        scheduler->submit(priority, std::move(job));
+    else
+        job();
+}
+
+void QCPAsyncPipelineBase::deferJobs()
+{
+    QMutexLocker lock(&mMutex);
+    mScheduler = nullptr;
+    mDeferJobs = true;
+}
+
+bool QCPAsyncPipelineBase::waitsForScheduler() const
+{
+    QMutexLocker lock(&mMutex);
+    return mDeferredJob != nullptr;
+}
+
 // A busyChanged slot may delete the plottable that owns this pipeline, so the job is handed to
 // the scheduler first and the signal comes last.
 void QCPAsyncPipelineBase::submit(QCPPipelineScheduler::Priority priority,
                                   std::function<void()> job)
 {
-    if (mScheduler)
-        mScheduler->submit(priority, std::move(job));
-    else
-        job(); // no scheduler (a taken plottable): the caller blocks for the whole transform,
-               // and jobs are not coalesced the way the scheduler does it
+    {
+        QMutexLocker lock(&mMutex);
+        if (mScheduler)
+        {
+            QCPPipelineScheduler* scheduler = mScheduler;
+            lock.unlock();
+            scheduler->submit(priority, std::move(job));
+            return;
+        }
+        if (mDeferJobs)
+        {
+            // Outside a plot (built, not placed yet, or taken): running the job here would make
+            // a data constructor block the caller for a whole L1 pass over a large source.
+            // mJobRunning stays true, so a change that comes meanwhile only replaces the pending
+            // job and the newest is the one that runs.
+            mDeferredJob = std::move(job);
+            mDeferredPriority = priority;
+            return;
+        }
+    }
+    job(); // no pool and no deferral: in step with the caller
 }
 
 void QCPAsyncPipelineBase::startJob(QMutexLocker<QMutex>& lock,

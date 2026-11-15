@@ -190,7 +190,7 @@ DOC_SNIPPET(plottables_intervals, 600, 240)
     c.ids = { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     c.labels = { "", "orbit 12", "", "", "", "cal", "", "pass 1", "pass 2" };
 
-    auto* timeline = customPlot->add<QCPIntervals>(lanes).get();
+    auto timeline = customPlot->add<QCPIntervals>(lanes);
     timeline->setCategoryNames({ "burst", "survey", "calibration" });
     timeline->setStackMode(QCPIntervals::skTime);   // overlaps go to a second row
     timeline->setData(std::move(c));

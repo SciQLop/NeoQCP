@@ -196,8 +196,7 @@ DOC_SNIPPET(graphs_shared, 600, 420)
     auto* detailRect = new QCPAxisRect(customPlot);
     customPlot->plotLayout()->addElement(1, 0, detailRect);
     QCPAxis* detailX = detailRect->axis(QCPAxis::atBottom);
-    auto* detail = detailX->axisRect()->add<QCPGraph>(
-            detailX, detailRect->axis(QCPAxis::atLeft)).get();
+    auto detail = detailRect->add<QCPGraph>();
     detail->setDataSource(source);   // same points, no second copy
 
     overview->setPen(QPen(QColor(31, 119, 180), 1));

@@ -417,10 +417,8 @@ void TestBuilder::addEveryPlottable_data()
             columns.lane = {0};
             columns.category = {0};
             columns.ids = {1};
-            QCPLaneLayout lanes;
-            lanes.laneIndices({ "A" });
-            auto i = p.add<QCPIntervals>(columns, &lanes);
-            return i->rowCount() == 1;
+            auto i = p.add<QCPIntervals>(columns);
+            return i->rowCount() == 1 && i->laneLayout();
         });
     row("errorbar",
         [](QCustomPlot& p)
@@ -924,9 +922,7 @@ void TestBuilder::addIntervalsWithBadColumnsLeavesThePlotUnchanged()
     qcp::intervals::Columns bad;
     bad.start = {0.0, 1.0};
     bad.stop = {1.0};
-    QCPLaneLayout lanes;
-    lanes.laneIndices({ "A" });
-    QVERIFY_EXCEPTION_THROWN(plot.add<QCPIntervals>(bad, &lanes), std::invalid_argument);
+    QVERIFY_EXCEPTION_THROWN(plot.add<QCPIntervals>(bad), std::invalid_argument);
     QCOMPARE(plot.plottableCount(), 0);
     QCOMPARE(plot.legend->itemCount(), rows);
     QCOMPARE(gMisuses, 0);

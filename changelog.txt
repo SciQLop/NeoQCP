@@ -606,6 +606,12 @@ Milestone 6b (plot-free construction). Breaking, in the 3.0 preview line.
   - add<T>(args...) always means T(args...): the arguments a plottable add used to forward to setData() are
         gone, with the (keyAxis, valueAxis) constructors of QCPPlottable, QCPPlottable1D and every built-in
         plottable. setData() keeps its forms.
+  - A plottable built outside a plot runs no transform there: a data constructor keeps the source, and its
+        pipeline (the L1 resample of a dense graph, the binning of a colour map or a histogram) starts on the
+        plot's pool when the plottable joins a plot. add<QCPGraph>(keys, values) over a large source never
+        blocks the calling thread, and a taken plottable resumes the same way when it is added back.
+  - An intervals plottable added without a lane layout gets one, as the add always did: its rows draw in the
+        lanes that layout names, and a layout the caller gives is the one kept.
   - Fix: an item outside a plot (built but not placed, or taken) has no viewport to clip to; its hit test
         no longer reads one, spans and text use no selection tolerance there, and a pixel write with
         setPixelPosition() is inert instead of dereferencing the missing viewport.

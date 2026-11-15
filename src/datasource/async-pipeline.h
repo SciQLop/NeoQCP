@@ -43,10 +43,18 @@ public:
 
     bool isBusy() const;
 
-    //! The scheduler the jobs run on. With none (a plottable outside a plot) a job runs on the
-    //! calling thread, and its result is delivered by the event loop as usual.
-    void setScheduler(QCPPipelineScheduler* scheduler) { mScheduler = scheduler; }
+    //! The scheduler the jobs run on. With none, a job runs on the calling thread, in step with the
+    //! caller: that is the explicit way to ask for a transform now, whatever its size (an export).
+    //! A plottable outside a plot does not use that path, it waits (see deferJobs()).
+    void setScheduler(QCPPipelineScheduler* scheduler);
     [[nodiscard]] QCPPipelineScheduler* scheduler() const { return mScheduler; }
+
+    //! Keeps the jobs until a scheduler arrives: the state of a plottable built outside a plot, or
+    //! taken from one. Nothing runs on the calling thread, so a data constructor never blocks it.
+    void deferJobs();
+
+    //! Whether a transform waits for a scheduler: the plottable is outside a plot.
+    [[nodiscard]] bool waitsForScheduler() const;
 
     // Generation bumped by every data/viewport change; finished(gen) reports
     // the generation a delivered result belongs to.
@@ -91,6 +99,11 @@ protected:
     mutable QMutex mMutex;
     std::any mCache;
     std::function<void()> mPending;  // pre-baked job for data changes
+    // Whether the jobs wait for a scheduler instead of running in step with the caller.
+    bool mDeferJobs;
+    // Submitted while they wait: kept until one arrives (setScheduler).
+    std::function<void()> mDeferredJob;
+    QCPPipelineScheduler::Priority mDeferredPriority = QCPPipelineScheduler::Heavy;
     bool mPendingViewport = false;   // deferred viewport job: created at dispatch with restored cache
     QCPPipelineScheduler::Priority mPendingPriority = QCPPipelineScheduler::Heavy;
     uint64_t mRunningGeneration = 0;

@@ -22,6 +22,9 @@ private slots:
     void aRefusedPlottableIsReportedOnceAndDeleted();
     void aRectAddBindsTheGivenAxisPair();
     void plotAddBindsTheFirstRectsDefaultPair();
+    void aDeferredTransformWaitsForItsPlot();
+    void aTakenPlottableResumesWhenItIsAddedBack();
+    void anIntervalsAddedWithoutALaneLayoutGetsOne();
 
 private:
     QCustomPlot* mPlot = nullptr;

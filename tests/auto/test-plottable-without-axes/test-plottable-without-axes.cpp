@@ -1,6 +1,7 @@
 #include "test-plottable-without-axes.h"
 #include "../../../src/qcp.h"
 #include <array>
+#include <cmath>
 #include <memory>
 #include <numeric>
 #include <ranges>
@@ -279,5 +280,105 @@ void TestPlottableWithoutAxes::plotAddBindsTheFirstRectsDefaultPair()
     QCOMPARE(graph->dataCount(), 2);
     QVERIFY(graph->system() == mPlot->axisRect()->system(mPlot->xAxis, mPlot->yAxis));
     QVERIFY(graph->system() != rect->system(rect->xAxis(), rect->yAxis()));
+    QCOMPARE(gMisuses, 0);
+}
+
+// The L1 resample of a big graph runs on the plot's pool, never on the thread that builds it.
+void TestPlottableWithoutAxes::aDeferredTransformWaitsForItsPlot()
+{
+    const int n = 120'000; // above the resample threshold: the graph would ask for an L1 pass
+    std::vector<double> keys(n), values(n), heights(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = 10.0 * i / (n - 1);
+        values[i] = std::sin(0.01 * i);
+        heights[i] = 0.5 + 0.5 * std::cos(0.02 * i);
+    }
+
+    // Built detached, a data constructor only keeps the source: running the transform there would
+    // block this thread for a whole pass, and a data constructor must not.
+    auto graph = std::make_unique<QCPGraph>(keys, values);
+    QVERIFY(graph->pipeline().waitsForScheduler());
+    QCOMPARE(graph->pipeline().scheduler(), nullptr);
+    QCOMPARE(graph->dataCount(), n);
+
+    const auto drawn = mPlot->add(std::move(graph));
+    QVERIFY(drawn);
+    QVERIFY(!drawn->pipeline().waitsForScheduler());
+    QTRY_VERIFY_WITH_TIMEOUT(!drawn->pipeline().isBusy(), 30000);
+    mPlot->replot();
+    QVERIFY(drawn->drawnDataRange().has_value());
+    QCOMPARE(gMisuses, 0);
+
+    // The two plottables whose whole picture comes out of a pipeline defer the same way.
+    auto map = std::make_unique<QCPColorMap2>(keys, values, heights);
+    QVERIFY(map->pipeline().waitsForScheduler());
+    const auto placedMap = mPlot->add(std::move(map));
+    QVERIFY(placedMap);
+    QVERIFY(!placedMap->pipeline().waitsForScheduler());
+    QTRY_VERIFY_WITH_TIMEOUT(!placedMap->pipeline().isBusy(), 30000);
+
+    auto histogram = std::make_unique<QCPHistogram2D>(keys, values);
+    QVERIFY(histogram->pipeline().waitsForScheduler());
+    const auto placedHistogram = mPlot->add(std::move(histogram));
+    QVERIFY(placedHistogram);
+    QVERIFY(!placedHistogram->pipeline().waitsForScheduler());
+    QTRY_VERIFY_WITH_TIMEOUT(!placedHistogram->pipeline().isBusy(), 30000);
+
+    mPlot->replot();
+    QCOMPARE(gMisuses, 0);
+}
+
+// A taken plottable asks for nothing while it is out, and the add that takes it back starts what
+// it needs: its data is the data it had.
+void TestPlottableWithoutAxes::aTakenPlottableResumesWhenItIsAddedBack()
+{
+    const std::vector<double> keys { 0, 1, 2 }, values { 3, 2, 1 };
+    const auto graph = mPlot->add<QCPGraph>(keys, values);
+    QVERIFY(graph);
+    mPlot->replot();
+
+    auto taken = mPlot->take(graph);
+    QVERIFY(taken);
+    QCOMPARE(taken->parentPlot(), nullptr);
+    QCOMPARE(mPlot->graphCount(), 0);
+
+    const auto readded = mPlot->add(std::move(taken));
+    QVERIFY(readded);
+    QCOMPARE(readded->dataCount(), 3);
+    QVERIFY(!readded->pipeline().waitsForScheduler());
+    QTRY_VERIFY_WITH_TIMEOUT(!readded->pipeline().isBusy(), 10000);
+    mPlot->replot();
+    QVERIFY(readded->drawnDataRange().has_value());
+    QCOMPARE(mPlot->graphCount(), 1);
+    QCOMPARE(gMisuses, 0);
+}
+
+// An intervals added without a lane layout draws the rows of the lanes its default layout names,
+// exactly as the add that built one for it did before.
+void TestPlottableWithoutAxes::anIntervalsAddedWithoutALaneLayoutGetsOne()
+{
+    const auto rect = mPlot->axisRect();
+
+    const auto plain = rect->add<QCPIntervals>();
+    QVERIFY(plain);
+    QVERIFY(plain->laneLayout());
+    QCOMPARE(gMisuses, 0);
+
+    const auto laid = rect->add<QCPIntervals>(columns({ 0, 1 }, { 1, 2 }));
+    QVERIFY(laid);
+    QVERIFY(laid->laneLayout());
+    QCOMPARE(laid->rowCount(), 2);
+    QCOMPARE(gMisuses, 0);
+
+    // A layout the caller gave is the one it keeps.
+    QCPLaneLayout lanes;
+    lanes.laneIndices({ QStringLiteral("A") });
+    const auto given = rect->add<QCPIntervals>(&lanes);
+    QVERIFY(given);
+    QVERIFY(given->laneLayout() == &lanes);
+    QCOMPARE(gMisuses, 0);
+
+    mPlot->replot();
     QCOMPARE(gMisuses, 0);
 }

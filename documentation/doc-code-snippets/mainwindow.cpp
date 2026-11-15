@@ -39,7 +39,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::snippetQCPColorGradient()
 {
-  QCPColorMap *colorMap = customPlot->add<QCPColorMap>().get();
+  auto colorMap = customPlot->add<QCPColorMap>();
   
   //! [qcpcolorgradient-setgradient]
   colorMap->setGradient(QCPColorGradient::gpHot);
@@ -66,7 +66,7 @@ void MainWindow::snippetQCPColorScale()
 void MainWindow::snippetQCPColorMap()
 {
   //! [qcpcolormap-creation-1]
-  QCPColorMap *colorMap = customPlot->add<QCPColorMap>().get();
+  auto colorMap = customPlot->add<QCPColorMap>();
   //! [qcpcolormap-creation-1]
 
   //! [qcpcolormap-creation-2]
@@ -87,7 +87,7 @@ void MainWindow::snippetQCPCurve()
   QVector<double> tData, xData, yData;
   
   //! [qcpcurve-creation-1]
-  QCPCurve *newCurve = customPlot->add<QCPCurve>().get();
+  auto newCurve = customPlot->add<QCPCurve>();
   //! [qcpcurve-creation-1]
   
   //! [qcpcurve-creation-2]
@@ -162,8 +162,8 @@ void MainWindow::snippetQCPScatterStyle()
 
 void MainWindow::snippetQCPBarsGroup()
 {
-  QCPBars *bars1 = customPlot->add<QCPBars>().get();
-  QCPBars *bars2 = customPlot->add<QCPBars>().get();
+  auto bars1 = customPlot->add<QCPBars>();
+  auto bars2 = customPlot->add<QCPBars>();
   
   //! [qcpbarsgroup-creation]
   QCPBarsGroup *group = new QCPBarsGroup(customPlot);
@@ -177,7 +177,7 @@ void MainWindow::snippetQCPBars()
   QVector<double> xData, yData;
   
   //! [qcpbars-creation-1]
-  QCPBars *newBars = customPlot->add<QCPBars>().get();
+  auto newBars = customPlot->add<QCPBars>();
   //! [qcpbars-creation-1]
   
   //! [qcpbars-creation-2]
@@ -189,7 +189,7 @@ void MainWindow::snippetQCPBars()
 void MainWindow::snippetQCPStatisticalBox()
 {
   //! [qcpstatisticalbox-creation-1]
-  QCPStatisticalBox *newStatistical = customPlot->add<QCPStatisticalBox>().get();
+  auto newStatistical = customPlot->add<QCPStatisticalBox>();
   //! [qcpstatisticalbox-creation-1]
   
   //! [qcpstatisticalbox-creation-2]
@@ -202,7 +202,7 @@ void MainWindow::snippetQCPFinancial()
 {
   QVector<double> time, price;
   //! [qcpfinancial-creation-1]
-  QCPFinancial *newFinancial = customPlot->add<QCPFinancial>().get();
+  auto newFinancial = customPlot->add<QCPFinancial>();
   //! [qcpfinancial-creation-1]
   
   //! [qcpfinancial-creation-2]
@@ -229,8 +229,8 @@ void MainWindow::snippetQCPAxisTickers()
 
 void MainWindow::snippetQCPCurveDataSharing()
 {
-  QCPCurve *curve1 = customPlot->add<QCPCurve>().get();
-  QCPCurve *curve2 = customPlot->add<QCPCurve>().get();
+  auto curve1 = customPlot->add<QCPCurve>();
+  auto curve2 = customPlot->add<QCPCurve>();
   //! [qcpcurve-datasharing-1]
   curve2->setData(curve1->data()); // curve1 and curve2 now share data container
   //! [qcpcurve-datasharing-1]
@@ -242,8 +242,8 @@ void MainWindow::snippetQCPCurveDataSharing()
 
 void MainWindow::snippetQCPBarsDataSharing()
 {
-  QCPBars *bars1 = customPlot->add<QCPBars>().get();
-  QCPBars *bars2 = customPlot->add<QCPBars>().get();
+  auto bars1 = customPlot->add<QCPBars>();
+  auto bars2 = customPlot->add<QCPBars>();
   //! [qcpbars-datasharing-1]
   bars2->setData(bars1->data()); // bars1 and bars2 now share data container
   //! [qcpbars-datasharing-1]
@@ -255,8 +255,8 @@ void MainWindow::snippetQCPBarsDataSharing()
 
 void MainWindow::snippetQCPStatisticalBoxDataSharing()
 {
-  QCPStatisticalBox *statBox1 = customPlot->add<QCPStatisticalBox>().get();
-  QCPStatisticalBox *statBox2 = customPlot->add<QCPStatisticalBox>().get();
+  auto statBox1 = customPlot->add<QCPStatisticalBox>();
+  auto statBox2 = customPlot->add<QCPStatisticalBox>();
   //! [qcpstatisticalbox-datasharing-1]
   statBox2->setData(statBox1->data()); // statBox1 and statBox2 now share data container
   //! [qcpstatisticalbox-datasharing-1]
@@ -268,8 +268,8 @@ void MainWindow::snippetQCPStatisticalBoxDataSharing()
 
 void MainWindow::snippetQCPFinancialDataSharing()
 {
-  QCPFinancial *financial1 = customPlot->add<QCPFinancial>().get();
-  QCPFinancial *financial2 = customPlot->add<QCPFinancial>().get();
+  auto financial1 = customPlot->add<QCPFinancial>();
+  auto financial2 = customPlot->add<QCPFinancial>();
   //! [qcpfinancial-datasharing-1]
   financial2->setData(financial1->data()); // financial1 and financial2 now share data container
   //! [qcpfinancial-datasharing-1]
@@ -281,8 +281,8 @@ void MainWindow::snippetQCPFinancialDataSharing()
 
 void MainWindow::snippetQCPErrorBarsDataSharing()
 {
-  QCPErrorBars *errorBars1 = customPlot->add<QCPErrorBars>().get();
-  QCPErrorBars *errorBars2 = customPlot->add<QCPErrorBars>().get();
+  auto errorBars1 = customPlot->add<QCPErrorBars>();
+  auto errorBars2 = customPlot->add<QCPErrorBars>();
   //! [qcperrorbars-datasharing-1]
   errorBars2->setData(errorBars1->data()); // errorBars1 and errorBars2 now share data container
   //! [qcperrorbars-datasharing-1]
@@ -331,7 +331,7 @@ void MainWindow::snippetQCPDataSelectionPointAtPos()
 
 void MainWindow::websiteBasicPlottingBars()
 {
-  QCPBars *myBars = customPlot->add<QCPBars>().get();
+  auto myBars = customPlot->add<QCPBars>();
   // now we can modify properties of myBars:
   myBars->setName("Bars Series 1");
   QVector<double> keyData;

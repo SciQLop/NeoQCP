@@ -116,7 +116,8 @@ std::vector<QPointF> QCPWaterfallDataAdapter::linesInData(int column, int begin,
   signals.
 */
 
-QCPWaterfallGraph::QCPWaterfallGraph(QCP::Capabilities required) : QCPGraph(required)
+QCPWaterfallGraph::QCPWaterfallGraph()
+        : QCPGraph(QCP::capRectangular | QCP::capStraightKey)
 {
 }
 

@@ -27,8 +27,7 @@ DOC_SNIPPET(polar_basic, 600, 420)
             angle[i] = i;
             gain[i] = std::abs(a + (1 - a) * std::cos(i * std::numbers::pi / 180));
         }
-        auto* graph = area->add<QCPPolarGraph>().get();
-        graph->setData(angle, gain);
+        auto graph = area->add<QCPPolarGraph>(angle, gain);
         graph->setPen(QPen(color, 2));
     }
     // [/polar_basic]
@@ -56,8 +55,7 @@ DOC_SNIPPET(polar_radians, 600, 420)
         theta[i] = i * std::numbers::pi / 360;   // 0 to 2 pi
         r[i] = std::abs(std::cos(3 * theta[i]));  // a six-petal rose
     }
-    auto* rose = area->add<QCPPolarGraph>().get();
-    rose->setData(theta, r);
+    auto rose = area->add<QCPPolarGraph>(theta, r);
     rose->setPen(QPen(QColor(148, 103, 189), 2));
     rose->setBrush(QColor(148, 103, 189, 60));
     // [/polar_radians]

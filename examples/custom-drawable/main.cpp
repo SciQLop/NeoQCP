@@ -13,7 +13,7 @@ int main(int argc, char** argv)
     plot.xAxis->setLabel(QStringLiteral("key"));
     plot.yAxis->setLabel(QStringLiteral("value"));
 
-    auto* band = plot.add<RangeBand>().get();
+    auto band = plot.add<RangeBand>();
     QVector<double> keys, lower, upper;
     for (int i = 0; i <= 60; ++i)
     {
