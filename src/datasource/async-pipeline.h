@@ -47,7 +47,11 @@ public:
     //! caller: that is the explicit way to ask for a transform now, whatever its size (an export).
     //! A plottable outside a plot does not use that path, it waits (see deferJobs()).
     void setScheduler(QCPPipelineScheduler* scheduler);
-    [[nodiscard]] QCPPipelineScheduler* scheduler() const { return mScheduler; }
+    [[nodiscard]] QCPPipelineScheduler* scheduler() const
+    {
+        QMutexLocker lock(&mMutex);
+        return mScheduler;
+    }
 
     //! Keeps the jobs until a scheduler arrives: the state of a plottable built outside a plot, or
     //! taken from one. Nothing runs on the calling thread, so a data constructor never blocks it.

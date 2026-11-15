@@ -109,8 +109,8 @@ void QCPAsyncPipelineBase::submit(QCPPipelineScheduler::Priority priority,
         {
             // Outside a plot (built, not placed yet, or taken): running the job here would make
             // a data constructor block the caller for a whole L1 pass over a large source.
-            // mJobRunning stays true, so a change that comes meanwhile only replaces the pending
-            // job and the newest is the one that runs.
+            // mJobRunning stays true, and a change that comes meanwhile replaces this job (see
+            // onDataChanged), so only the newest transform runs when the plottable joins a plot.
             mDeferredJob = std::move(job);
             mDeferredPriority = priority;
             return;
@@ -141,7 +141,22 @@ void QCPAsyncPipelineBase::onDataChanged()
     uint64_t gen = ++mGeneration;
     mCache = std::any{};
 
-    if (mJobRunning)
+    if (mJobRunning && mDeferredJob)
+    {
+        // Nothing runs yet: the job waits for a plot. The newest data replaces it, and anything
+        // queued behind it, so arrival runs one transform, not one per change.
+        mDeferredJob = makeJob(mLastViewport, std::any{}, gen);
+        mDeferredPriority = QCPPipelineScheduler::Heavy;
+        mPending = nullptr;
+        mPendingViewport = false;
+        if (!mDeferredJob)
+        {
+            mJobRunning = false;
+            settleIdle(lock, gen);
+            return;
+        }
+    }
+    else if (mJobRunning)
     {
         mPending = makeJob(mLastViewport, std::any{}, gen);
         mPendingViewport = false;
@@ -217,7 +232,22 @@ void QCPAsyncPipelineBase::onViewportChanged(const ViewportParams& vp)
     uint64_t gen = ++mGeneration;
     mLastViewport = vp;
 
-    if (mJobRunning)
+    if (mJobRunning && mDeferredJob)
+    {
+        // The waiting job has not started either: the newest viewport replaces it, with the cache
+        // it left untouched.
+        mDeferredJob = makeJob(vp, std::move(mCache), gen);
+        mDeferredPriority = QCPPipelineScheduler::Fast;
+        mPending = nullptr;
+        mPendingViewport = false;
+        if (!mDeferredJob)
+        {
+            mJobRunning = false;
+            settleIdle(lock, gen);
+            return;
+        }
+    }
+    else if (mJobRunning)
     {
         mPendingViewport = true;
         mPendingPriority = QCPPipelineScheduler::Fast;

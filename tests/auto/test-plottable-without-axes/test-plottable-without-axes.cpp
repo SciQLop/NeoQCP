@@ -1,8 +1,10 @@
 #include "test-plottable-without-axes.h"
+#include "../../../src/datasource/async-pipeline.h"
 #include "../../../src/qcp.h"
 #include <array>
 #include <cmath>
 #include <memory>
+#include <atomic>
 #include <numeric>
 #include <ranges>
 #include <vector>
@@ -24,6 +26,41 @@ QCPAxisRect* addSecondRect(QCustomPlot* plot)
     plot->replot();
     return rect;
 }
+
+//! A pipeline whose job only counts: what a test asserts is how many transforms reach a
+//! scheduler, not what they compute.
+class CountingPipeline : public QCPAsyncPipelineBase
+{
+public:
+    explicit CountingPipeline(TransformKind kind = TransformKind::ViewportIndependent)
+            : QCPAsyncPipelineBase(nullptr)
+    {
+        mKind = kind;
+    }
+
+    [[nodiscard]] int runs() const { return mRuns.load(); }
+
+protected:
+    std::function<void()> makeJob(const ViewportParams&, std::any, uint64_t generation) override
+    {
+        return [this, generation]
+        {
+            QMetaObject::invokeMethod(
+                    this,
+                    [this, generation]
+                    {
+                        ++mRuns;
+                        deliverResult(generation, std::any { }, std::any { });
+                    },
+                    Qt::QueuedConnection);
+        };
+    }
+
+    void applyResult(uint64_t, std::any) override { }
+
+private:
+    std::atomic<int> mRuns { 0 };
+};
 
 qcp::intervals::Columns columns(std::vector<double> start, std::vector<double> stop)
 {
@@ -380,5 +417,98 @@ void TestPlottableWithoutAxes::anIntervalsAddedWithoutALaneLayoutGetsOne()
     QCOMPARE(gMisuses, 0);
 
     mPlot->replot();
+    QCOMPARE(gMisuses, 0);
+}
+
+// A plottable built outside a plot keeps one job, not one per change: the newest.
+void TestPlottableWithoutAxes::oneDeferredJobRunsWhateverCameBefore()
+{
+    CountingPipeline pipeline;
+    pipeline.onDataChanged();
+    pipeline.onDataChanged();
+    pipeline.onDataChanged();
+    QVERIFY(pipeline.waitsForScheduler());
+
+    QCPPipelineScheduler scheduler;
+    pipeline.setScheduler(&scheduler);
+    QTRY_COMPARE_WITH_TIMEOUT(pipeline.runs(), 1, 5000);
+    QTest::qWait(50);
+    QCOMPARE(pipeline.runs(), 1);
+
+    // The same for a viewport change: it rebuilds the job that waits, it does not queue one more.
+    CountingPipeline viewport(TransformKind::ViewportDependent);
+    ViewportParams vp;
+    vp.keyRange = QCPRange(0, 10);
+    vp.valueRange = QCPRange(0, 10);
+    viewport.onViewportChanged(vp);
+    vp.keyRange = QCPRange(0, 20);
+    viewport.onViewportChanged(vp);
+    viewport.onViewportChanged(vp);
+    QVERIFY(viewport.waitsForScheduler());
+
+    QCPPipelineScheduler fastScheduler;
+    viewport.setScheduler(&fastScheduler);
+    QTRY_COMPARE_WITH_TIMEOUT(viewport.runs(), 1, 5000);
+    QTest::qWait(50);
+    QCOMPARE(viewport.runs(), 1);
+}
+
+// The default lane layout is the plot's: a plottable that moves gets the new plot's.
+void TestPlottableWithoutAxes::aMovedIntervalsGetsTheNewPlotsLaneLayout()
+{
+    QCustomPlot other(nullptr);
+    other.resize(640, 480);
+    other.show();
+
+    const auto bars = mPlot->axisRect()->add<QCPIntervals>(columns({ 0, 1 }, { 1, 2 }));
+    QVERIFY(bars);
+    QVERIFY(bars->laneLayout());
+    QCOMPARE(bars->laneLayout()->parent(), mPlot);
+
+    const auto readded = other.add(mPlot->take(bars));
+    QVERIFY(readded);
+    QVERIFY(readded->laneLayout());
+    QCOMPARE(readded->laneLayout()->parent(), &other);
+
+    // The new layout is the one followed: naming a lane rebuilds the recording.
+    other.replot();
+    const quint64 before = readded->buildCount();
+    readded->laneLayout()->laneIndices({ QStringLiteral("A") });
+    other.replot();
+    QVERIFY(readded->buildCount() > before);
+
+    // A layout the caller gave is never replaced by a move.
+    QCPLaneLayout lanes;
+    const auto given = other.axisRect()->add<QCPIntervals>(columns({ 0 }, { 1 }), &lanes);
+    const auto moved = mPlot->add(other.take(given));
+    QVERIFY(moved);
+    QVERIFY(moved->laneLayout() == &lanes);
+    QCOMPARE(gMisuses, 0);
+}
+
+// The default layout dies with the plot that made it: the next plot makes a new one.
+void TestPlottableWithoutAxes::anIntervalsOutlivesThePlotThatLaidItOut()
+{
+    auto* first = new QCustomPlot(nullptr);
+    first->resize(640, 480);
+    first->show();
+    const auto bars = first->axisRect()->add<QCPIntervals>(columns({ 0 }, { 1 }));
+    QVERIFY(bars);
+    QVERIFY(bars->laneLayout());
+
+    auto taken = first->take(bars);
+    delete first;
+
+    const auto readded = mPlot->add(std::move(taken));
+    QVERIFY(readded);
+    QVERIFY(readded->laneLayout());
+    QCOMPARE(readded->laneLayout()->parent(), mPlot);
+
+    // The layout made for the new plot is followed, though the old one was followed before.
+    mPlot->replot();
+    const quint64 before = readded->buildCount();
+    readded->laneLayout()->laneIndices({ QStringLiteral("A") });
+    mPlot->replot();
+    QVERIFY(readded->buildCount() > before);
     QCOMPARE(gMisuses, 0);
 }

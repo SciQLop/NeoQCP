@@ -104,7 +104,7 @@ QCPLayer* layerAbove(QCustomPlot* plot, QCPLayer* base)
 */
 
 QCPIntervals::QCPIntervals(QCPLaneLayout* layout, QCP::Capabilities required)
-        : QCPPlottable(required), mLayout(layout)
+        : QCPPlottable(required), mLayout(layout), mCallerLayout(layout != nullptr)
 {
     setSelectable(QCP::stMultipleDataRanges);
     followLaneLayout();
@@ -124,13 +124,7 @@ QCPIntervals::QCPIntervals(qcp::intervals::Columns columns, QCPLaneLayout* layou
 
 void QCPIntervals::systemDidChange()
 {
-    // The default lane layout add<T>() has always made for an intervals: without one it drops every
-    // row (groupByLane() keeps only lanes the layout names) and draws nothing.
-    if (mSystem && mParentPlot && !mLayout)
-    {
-        mLayout = new QCPLaneLayout(mParentPlot);
-        followLaneLayout();
-    }
+    followArrivalLayout();
     // The lane labels are layerables of the plot: an intervals plottable built without axes has
     // none to draw them in until a frame takes it.
     if (!mSystem || !mParentPlot || mLabelLayer)
@@ -138,13 +132,33 @@ void QCPIntervals::systemDidChange()
     mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
 }
 
-//! Follows \a mLayout once it exists: a plottable built without axes gets the plot's layout when it
-//! arrives, and a plottable given one in its constructor follows that.
+//! The lane layout of the plot the plottable arrives in: the default one add<T>() has always made
+//! for an intervals (without a layout it drops every row: groupByLane() keeps only lanes the layout
+//! names, and it draws nothing), unless the caller gave one.
+void QCPIntervals::followArrivalLayout()
+{
+    if (!mSystem || !mParentPlot)
+        return;
+    // A default layout belongs to the plot that made it, so a plottable arriving in another plot
+    // gets a fresh one there. A layout the caller gave stays, wherever the plottable goes.
+    if (!mCallerLayout && mLayout && mLayout->parent() != mParentPlot)
+        mLayout = nullptr;
+    if (!mCallerLayout && !mLayout)
+        mLayout = new QCPLaneLayout(mParentPlot);
+    followLaneLayout();
+}
+
+//! Listens to the layout the plottable works with now, and only to that one: a layout replaced at
+//! arrival (or one that died with its plot) must not keep a connection into this plottable.
 void QCPIntervals::followLaneLayout()
 {
-    if (!mLayout || mLaneLayoutFollowed)
+    if (mFollowedLayout == mLayout)
         return;
-    mLaneLayoutFollowed = true;
+    if (mFollowedLayout)
+        disconnect(mFollowedLayout, nullptr, this, nullptr);
+    mFollowedLayout = mLayout;
+    if (!mLayout)
+        return;
     connect(mLayout, &QCPLaneLayout::changed, this, [this] {
         regroupIfLanesWereAdded();
         update();

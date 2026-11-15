@@ -425,4 +425,8 @@ it is added back.
 
 An intervals plottable added without a lane layout gets one, as before: `rect->add<QCPIntervals>()` and
 `rect->add<QCPIntervals>(columns)` draw their rows in the lanes of a layout the plot owns, and a layout
-given to the constructor is the one it keeps.
+given to the constructor is the one it keeps. The default layout is the plot's, so a plottable taken and
+added to another plot gets that plot's layout (the old one stays behind with its plot).
+
+A plottable built outside a plot keeps one pipeline job, the newest: calling `setData` several times before
+the add, or resizing a viewport it does not own yet, runs one transform when it joins, not one per call.

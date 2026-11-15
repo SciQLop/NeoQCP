@@ -187,6 +187,7 @@ protected:
     //! Makes the lane labels' layerable once a plot takes this plottable.
     void systemDidChange() override;
 
+    void followArrivalLayout();
     void followLaneLayout();
     void regroupIfLanesWereAdded();
     void updateSubRows();
@@ -284,7 +285,10 @@ protected:
     std::optional<QRectF> mRubberBand;
 
     QPointer<QCPLaneLayout> mLayout;
-    bool mLaneLayoutFollowed = false;
+    //! The layout whose changed() this plottable listens to, so a new one replaces the old listen.
+    QPointer<QCPLaneLayout> mFollowedLayout;
+    //! A layout the caller gave: never replaced, wherever the plottable goes.
+    bool mCallerLayout = false;
     mutable bool mReportedNoLayout = false; // one misuse per loss, not one per call
     qcp::intervals::Columns mColumns;
     std::vector<qcp::intervals::LaneRows> mLanes;

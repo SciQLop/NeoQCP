@@ -611,7 +611,9 @@ Milestone 6b (plot-free construction). Breaking, in the 3.0 preview line.
         plot's pool when the plottable joins a plot. add<QCPGraph>(keys, values) over a large source never
         blocks the calling thread, and a taken plottable resumes the same way when it is added back.
   - An intervals plottable added without a lane layout gets one, as the add always did: its rows draw in the
-        lanes that layout names, and a layout the caller gives is the one kept.
+        lanes that layout names, and a layout the caller gives is the one kept. That default layout belongs to
+        the plot, so a plottable moved to another plot gets the new plot's, and one whose plot died gets a
+        fresh one on the next add.
   - Fix: an item outside a plot (built but not placed, or taken) has no viewport to clip to; its hit test
         no longer reads one, spans and text use no selection tolerance there, and a pixel write with
         setPixelPosition() is inert instead of dereferencing the missing viewport.

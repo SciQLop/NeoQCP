@@ -25,6 +25,9 @@ private slots:
     void aDeferredTransformWaitsForItsPlot();
     void aTakenPlottableResumesWhenItIsAddedBack();
     void anIntervalsAddedWithoutALaneLayoutGetsOne();
+    void oneDeferredJobRunsWhateverCameBefore();
+    void aMovedIntervalsGetsTheNewPlotsLaneLayout();
+    void anIntervalsOutlivesThePlotThatLaidItOut();
 
 private:
     QCustomPlot* mPlot = nullptr;
