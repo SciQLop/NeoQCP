@@ -105,6 +105,8 @@ private slots:
     void aPanReusesGeometryAndMatchesAFreshReplot_data();
     void aPanReusesGeometryAndMatchesAFreshReplot();
     void aLineCrossingZeroIsContinuous();
+    void aLogZoomIsNotReplayedAsAPan_data();
+    void aLogZoomIsNotReplayedAsAPan();
     void gpuRectFillsBeforeStroking();
     void mergeStopsAtAnUnlikeNeighbour();
     void dashesMergeOnlyWithEqualPhase();

@@ -817,14 +817,15 @@ void QCPFinancial::recordSegment(QCPDrawContext& context, const QCPDataRange& se
     QCPAxis* valueAxis = valueAxisRaw();
     if (!keyAxis || !valueAxis)
         return;
-    // 2.x centred a plot-coordinate body symmetrically in pixels. On a log key axis the two data
-    // halves are not equal on screen, so such a body is recorded in pixels, as a pixel width is.
+    // 2.x centred a plot-coordinate body symmetrically in pixels. On a non-linear key axis the two
+    // data halves are not equal on screen, so such a body is recorded in pixels, as a pixel width
+    // is.
     const bool logKey = !keyAxis->scale().isLinear();
     const bool dataSpace = mWidthType == wtPlotCoords && !logKey;
     if (!dataSpace)
-        (void)context.transform(); // a pixel width (or a log key axis): this geometry is this view's
-    // A bar straddles its key by half its width, so the window grows by that much in keys. A window
-    // is only recorded on a linear key axis, so a log one culls nothing.
+        (void)context.transform(); // a pixel width (or a non-linear key axis): this view's geometry
+    // A bar straddles its key by half its width, so the window grows by that much in keys. A
+    // non-linear key axis culls nothing: its data widths are not equal on screen.
     const QCPKeyWindow window = logKey ? QCPKeyWindow { } : context.keyWindow();
     const double halfPixel = logKey ? 0.0 : qAbs(getPixelWidth(window.keys.lower, 0.0));
     const double margin = dataSpace

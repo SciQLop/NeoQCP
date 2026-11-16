@@ -346,6 +346,60 @@ void TestCoords::panDeltaIsMeasuredInsideTheRange()
     }
 }
 
+// A log mapping is a line in log space: two log snapshots of the same span are translations, two of
+// different spans are not. Comparing the linear slope (zero on a log snapshot) made every log pair a
+// translation, so a log zoom was replayed as a pan of the old pixels.
+void TestCoords::aLogScaleZoomIsNotATranslation()
+{
+    auto plot = layoutPlot();
+    // Fix the rect: a wider tick label would otherwise re-lay the margins out between snapshots and
+    // move the pixels for a reason that has nothing to do with the axis mapping.
+    plot->axisRect()->setAutoMargins(QCP::msNone);
+    plot->xAxis->setScale(QCPScale::log());
+    plot->yAxis->setRange(0, 10);
+
+    plot->xAxis->setRange(1, 100);
+    plot->replot();
+    const QCPTransform before(plot->xAxis, plot->yAxis);
+    QVERIFY(before.valid());
+
+    plot->xAxis->setRange(10, 1000); // a pan: the same ratio, ten times the values
+    plot->replot();
+    const QCPTransform panned(plot->xAxis, plot->yAxis);
+    QVERIFY2(before.isTranslationOf(panned), "a log pan keeps the log span, so it is a translation");
+
+    plot->xAxis->setRange(2, 400); // a zoom: the ratio changed
+    plot->replot();
+    QVERIFY2(!before.isTranslationOf(QCPTransform(plot->xAxis, plot->yAxis)),
+             "a log zoom changes the log span: the data-to-pixel scale changed");
+
+    plot->xAxis->setRange(4, 400); // the same ratio again, so this is a pan too: every value times 0.4
+    plot->replot();
+    QVERIFY2(panned.isTranslationOf(QCPTransform(plot->xAxis, plot->yAxis)),
+             "a pan multiplies every value by one factor, so both edges stay the same distance apart");
+
+    plot->xAxis->setRange(10, 400); // one edge held, the ratio changed
+    plot->replot();
+    QVERIFY2(!panned.isTranslationOf(QCPTransform(plot->xAxis, plot->yAxis)),
+             "a log zoom is not a translation even when both edges keep their sign");
+
+    // A value axis too: the same rule, one axis over.
+    plot->xAxis->setScale(QCPScale::linear());
+    plot->xAxis->setRange(0, 100);
+    plot->yAxis->setScale(QCPScale::log());
+    plot->yAxis->setRange(1, 100);
+    plot->replot();
+    const QCPTransform logValue(plot->xAxis, plot->yAxis);
+    plot->yAxis->setRange(10, 1000); // the same ratio: a pan
+    plot->replot();
+    QVERIFY2(logValue.isTranslationOf(QCPTransform(plot->xAxis, plot->yAxis)),
+             "a log value pan is a translation");
+    plot->yAxis->setRange(20, 1000); // the ratio changed: a zoom
+    plot->replot();
+    QVERIFY2(!logValue.isTranslationOf(QCPTransform(plot->xAxis, plot->yAxis)),
+             "a log value zoom is not a translation");
+}
+
 void TestCoords::positionSetMatchesSetters()
 {
     auto plot = layoutPlot();

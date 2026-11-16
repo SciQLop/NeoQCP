@@ -328,8 +328,9 @@ void QCPAxisBase::setSelectedParts(const QCPAxisBase::SelectableParts& selectedP
 }
 
 /*!
-  Moves the range by \a diff: an offset in coordinates on a linear or symlog scale, and a factor on
-  a logarithmic scale.
+  Moves the range by \a diff: an offset in data coordinates on a linear scale, an offset in the
+  scale's own space (\ref QCPScale::toScale units) on a symlog scale, and a factor on a logarithmic
+  scale.
 */
 void QCPAxisBase::moveRange(double diff)
 {

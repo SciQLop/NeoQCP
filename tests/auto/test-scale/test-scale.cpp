@@ -304,6 +304,40 @@ void TestScale::dragAndZoomWorkInScaleSpace()
     QVERIFY2(samePixel(plot.xAxis->coordToPixel(0.0), centrePixel),
              "the zoom centre must keep its pixel");
 
+    // A zoom about x = 10: that value keeps its place in the axis rect, and both sides of it scale
+    // by the same factor in the scale's own space. A linear fallback would hold the linear span,
+    // which is a different factor on each side of the band. The place is measured as a fraction of
+    // the rect: a wheel zoom switches the plot's antialiasing off, and that re-lays the margins out.
+    const auto placeOf = [&plot](double value)
+    {
+        const QRect rect = plot.xAxis->axisRect()->rect();
+        return (plot.xAxis->coordToPixel(value) - rect.left()) / double(rect.width());
+    };
+    plot.xAxis->setRange(-100, 100);
+    settle(plot);
+    const double anchor = 10.0;
+    const double anchorPlace = placeOf(anchor);
+    const double spanAcross = scale.toScale(100.0) - scale.toScale(-100.0);
+    const QPointF anchorPoint(plot.xAxis->coordToPixel(anchor), 150);
+    QWheelEvent aboutAnchor(anchorPoint, plot.mapToGlobal(anchorPoint.toPoint()), QPoint(),
+                            QPoint(0, 120), Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase,
+                            false);
+    QCoreApplication::sendEvent(&plot, &aboutAnchor);
+    settle(plot);
+    const QCPRange aboutTen = plot.xAxis->range();
+    QVERIFY(std::isfinite(aboutTen.lower) && std::isfinite(aboutTen.upper));
+    QVERIFY2(samePixel(placeOf(anchor), anchorPlace),
+             "a zoom about x = 10 must keep x = 10 where it was on the axis");
+    const double factor
+        = (scale.toScale(aboutTen.upper) - scale.toScale(aboutTen.lower)) / spanAcross;
+    QVERIFY2(factor < 1.0, "the zoom must shrink the range");
+    const double below = scale.toScale(anchor) - scale.toScale(aboutTen.lower);
+    const double above = scale.toScale(aboutTen.upper) - scale.toScale(anchor);
+    QVERIFY2(samePixel(below, factor * (scale.toScale(anchor) - scale.toScale(-100.0))),
+             "a symlog zoom scales the keys below its centre by the same factor in scale space");
+    QVERIFY2(samePixel(above, factor * (scale.toScale(100.0) - scale.toScale(anchor))),
+             "a symlog zoom scales the keys above its centre by the same factor in scale space");
+
     // A drag of a range that straddles the band: finite bounds, a finite mapping every way.
     plot.xAxis->setRange(-5, 3);
     settle(plot);
@@ -351,6 +385,27 @@ void TestScale::aRadialAxisTakesSymlog()
              "r = 2 and r = -2 must sit the same distance from the centre");
     QVERIFY(radial->coordToRadius(2.0) > radial->coordToRadius(0.0));
     QVERIFY(radial->coordToRadius(0.0) > radial->coordToRadius(-2.0));
+
+    // An asymmetric radius pins the mapping: a linear fallback puts r = 8 at 0.9 of the radius and
+    // r = -8 at 0.1, the scale's own space puts them at 0.97323 and 0.02677.
+    const double edge = radial->coordToRadius(10.0);
+    QVERIFY(edge > 0.0);
+    QVERIFY2(close(radial->coordToRadius(8.0) / edge, 0.97323),
+             qPrintable(QStringLiteral("r = 8 at %1 of the radius")
+                            .arg(radial->coordToRadius(8.0) / edge)));
+    QVERIFY2(close(radial->coordToRadius(-8.0) / edge, 0.02677),
+             qPrintable(QStringLiteral("r = -8 at %1 of the radius")
+                            .arg(radial->coordToRadius(-8.0) / edge)));
+
+    // The polar snapshot maps through the same scale space, and comes back.
+    const QCPTransform transform = QCPTransform::polar(*area->angularAxis(), *radial);
+    QVERIFY(transform.valid());
+    const QCP::Pixels mapped = transform.map(QCP::Data { 90.0, 8.0 });
+    const QPointF axisPixel = radial->coordToPixel(90.0, 8.0);
+    QVERIFY2(samePixel(mapped.x, axisPixel.x()) && samePixel(mapped.y, axisPixel.y()),
+             "the polar snapshot must map r = 8 where the radial axis maps it");
+    QVERIFY2(samePixel(transform.inverse(axisPixel).y, 8.0),
+             "the polar snapshot must map its own pixel back to r = 8");
 }
 
 // A log colour scale gives the same colours as the gradient's logarithmic flag did.

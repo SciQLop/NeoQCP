@@ -13,6 +13,7 @@ private slots:
     void translationDetected();
     void dragPanOnATimeRangeIsATranslation();
     void panDeltaIsMeasuredInsideTheRange();
+    void aLogScaleZoomIsNotATranslation();
     void positionSetMatchesSetters();
     void refusedAnchorLeavesPositionUntouched();
     void anchorOffsetIsPixelsWhateverTheOldType();

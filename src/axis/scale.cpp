@@ -24,6 +24,12 @@ double symlogSlope(double base, double linearScale)
 {
     return linearScale / (1.0 - 1.0 / base);
 }
+
+//! The sign of a log range: the log mapping is of the magnitude, the axis owns the sign rule.
+double rangeSign(const QCPRange& range)
+{
+    return range.upper < 0.0 ? -1.0 : 1.0;
+}
 } // namespace
 
 QCPScale::QCPScale(Kind kind, double base, double threshold, double linearScale)
@@ -110,21 +116,23 @@ QCPRange QCPScale::shifted(const QCPRange& range, double scaleDelta) const
 {
     if (isLinear())
         return QCPRange(range.lower + scaleDelta, range.upper + scaleDelta);
-    return QCPRange(fromScale(toScale(range.lower) + scaleDelta),
-                    fromScale(toScale(range.upper) + scaleDelta));
+    const double sign = isLog() ? rangeSign(range) : 1.0;
+    return QCPRange(sign * fromScale(toScale(range.lower) + scaleDelta),
+                    sign * fromScale(toScale(range.upper) + scaleDelta));
 }
 
 QCPRange QCPScale::scaled(const QCPRange& range, double factor, double center) const
 {
     if (isLinear())
     {
-        const double newCenter = center + (range.center() - center) * factor;
-        const double half = 0.5 * range.size() * std::abs(factor);
-        return QCPRange(newCenter - half, newCenter + half);
+        // The axis' own linear rule, end point by end point.
+        return QCPRange((range.lower - center) * factor + center,
+                        (range.upper - center) * factor + center);
     }
+    const double sign = isLog() ? rangeSign(range) : 1.0;
     const double at = toScale(center);
-    return QCPRange(fromScale(at + (toScale(range.lower) - at) * factor),
-                    fromScale(at + (toScale(range.upper) - at) * factor));
+    return QCPRange(sign * fromScale(at + (toScale(range.lower) - at) * factor),
+                    sign * fromScale(at + (toScale(range.upper) - at) * factor));
 }
 
 size_t qHash(const QCPScale& scale, size_t seed)

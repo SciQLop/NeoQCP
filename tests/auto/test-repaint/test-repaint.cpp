@@ -17,6 +17,7 @@
 #include "layoutelements/layoutelement-legend.h"
 #include "layoutelements/layoutelement-textelement.h"
 #include "painting/command-replay-rhi.h"
+#include "painting/line-extruder.h"
 #include "painting/draw-commands.h"
 #include "painting/draw-context.h"
 #include "painting/plottable-rhi-layer.h"
@@ -3232,6 +3233,105 @@ void TestRepaint::aLineCrossingZeroIsContinuous()
     check(plot->toPixmap(400, 300, plot->bufferDevicePixelRatio()).toImage(),
           QStringLiteral("the export"));
     check(plot->toPixmap(400, 300, 3).toImage(), QStringLiteral("the print-sized raster"));
+}
+
+// A wheel zoom on a log axis changes the log-space slope: the recorded geometry must be built
+// again, not shifted as a pan of the pixels it was recorded at. A plottable's line and an item (a
+// recording with no key window) take the same path.
+void TestRepaint::aLogZoomIsNotReplayedAsAPan_data()
+{
+    QTest::addColumn<QString>("subject");
+    QTest::addColumn<QString>("axis");
+    QTest::newRow("line, log key axis") << QStringLiteral("line") << QStringLiteral("key");
+    QTest::newRow("line, log value axis") << QStringLiteral("line") << QStringLiteral("value");
+    QTest::newRow("item, log key axis") << QStringLiteral("item") << QStringLiteral("key");
+    QTest::newRow("item, log value axis") << QStringLiteral("item") << QStringLiteral("value");
+}
+
+void TestRepaint::aLogZoomIsNotReplayedAsAPan()
+{
+    QFETCH(QString, subject);
+    QFETCH(QString, axis);
+    const bool logKey = axis == QLatin1String("key");
+    const QCPRange range(1.0, 1000.0);
+
+    const auto build = [&](QWidget& host)
+    {
+        QCustomPlot* plot = shownGpuPlot(host);
+        if (!plot)
+            return static_cast<QCustomPlot*>(nullptr);
+        plot->xAxis->setRange(range);
+        plot->yAxis->setRange(range);
+        (logKey ? plot->xAxis : plot->yAxis)->setScale(QCPScale::log());
+        plot->axisRect()->setRangeZoom(logKey ? Qt::Horizontal : Qt::Vertical);
+        // Fix the rect: a wider tick label would otherwise re-lay the margins out and move the
+        // pixels for a reason that is not the axis mapping. The test is about the mapping.
+        plot->axisRect()->setAutoMargins(QCP::msNone);
+        if (subject == QLatin1String("line"))
+        {
+            QVector<double> keys, values;
+            for (int i = 0; i <= 200; ++i)
+            {
+                const double t = double(i) / 200.0;
+                keys << qPow(1000.0, t);
+                values << qPow(1000.0, 0.5 + 0.4 * qSin(6.0 * t));
+            }
+            plot->addGraph()->setData(keys, values);
+            plot->graph(0)->setPen(QPen(Qt::black, 3));
+        }
+        else
+        {
+            QCPItemLine* item = plot->add<QCPItemLine>();
+            item->start->setCoords(2.0, 3.0);
+            item->end->setCoords(300.0, 400.0);
+            item->setPen(QPen(Qt::black, 3));
+        }
+        plot->replot();
+        return plot;
+    };
+
+    QWidget host;
+    QCustomPlot* plot = build(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    waitUntilSettled(*plot);
+
+    const quint64 strokes = QCPLineExtruder::extruderCallCount();
+    plot->setInteractions(QCP::iRangeZoom);
+    const QPoint at = plot->axisRect()->rect().center();
+    QWheelEvent wheel(at, plot->mapToGlobal(at), QPoint(), QPoint(0, 120), Qt::NoButton,
+                      Qt::NoModifier, Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(plot, &wheel);
+    waitUntilSettled(*plot);
+
+    QVERIFY2(plot->xAxis->range() != range || plot->yAxis->range() != range,
+             "the wheel did not zoom the log axis");
+    QVERIFY2(QCPLineExtruder::extruderCallCount() > strokes,
+             "the zoom shifted the pixels it had instead of building at the new log scale");
+
+    // A wheel turns antialiasing off while it zooms and restores it 300 ms later, with a replot:
+    // wait the restoring replot out, or the two frames differ in text antialiasing rather than in
+    // the drawing the test is about.
+    QTest::qWait(350);
+    waitUntilSettled(*plot);
+
+    QWidget freshHost;
+    QCustomPlot* fresh = build(freshHost);
+    QVERIFY(fresh);
+    fresh->xAxis->setRange(plot->xAxis->range());
+    fresh->yAxis->setRange(plot->yAxis->range());
+    waitUntilSettled(*fresh);
+
+    const QImage zoomed = screenOf(plot);
+    const QImage replotted = screenOf(fresh);
+    if (!framesMatch(zoomed, replotted, qcp::test::Tolerance {}))
+    {
+        keepImagesForCi(QStringLiteral("aLogZoomIsNotReplayedAsAPan-") + subject + axis, zoomed,
+                        replotted);
+        QFAIL(qPrintable(QStringLiteral("the zoomed frame is not the frame a fresh plot at the "
+                                        "same range draws (%1, log %2 axis)")
+                             .arg(subject, axis)));
+    }
 }
 
 void TestRepaint::gpuRectFillsBeforeStroking()

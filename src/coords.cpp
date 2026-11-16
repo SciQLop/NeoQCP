@@ -688,10 +688,18 @@ bool QCPTransform::isTranslationOf(const QCPTransform& other, QPointF* delta) co
     // (|delta slope| times the span is exactly that drift). A log or symlog slope is per unit of
     // its own scale space, so the span it is measured over is a scale-space span, and a different
     // scale altogether is a different mapping, not a translation.
+    // A log snapshot fills logSlope, a linear or symlog one fills slope: compare like with like,
+    // over the span that slope is measured in (the log span for a log mapping). Comparing the
+    // linear slope on a log pair compared 0 with 0, which made every log pair a translation.
     const auto sameScale = [](const Snapshot& a, const Snapshot& b)
     {
         if (!(a.scale == b.scale))
             return false;
+        if (a.scale.isLog())
+        {
+            const double span = std::abs(std::log(a.upper / a.lower));
+            return std::abs(a.logSlope - b.logSlope) * span < 1e-3;
+        }
         const double span = a.scale.toScale(a.upper) - a.scale.toScale(a.lower);
         return std::abs(a.slope - b.slope) * std::abs(span) < 1e-3;
     };

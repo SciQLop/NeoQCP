@@ -71,12 +71,23 @@ public:
     double fromScale(double s) const;
     //! The range as this scale can show it: the log rule on a log scale, else the linear rule.
     [[nodiscard]] QCPRange sanitized(const QCPRange& range) const;
-    //! \a range moved by \a scaleDelta in scale space: a pan of any scale.
+    /*!
+      \a range moved by \a scaleDelta in scale space: a pan of any scale. A log range keeps its
+      sign, which the log mapping itself does not carry.
+    */
     [[nodiscard]] QCPRange shifted(const QCPRange& range, double scaleDelta) const;
-    //! \a range scaled by \a factor in scale space, about \a center of the data space.
+    /*!
+      \a range scaled by \a factor in scale space, about \a center of the data space, as
+      QCPAxisBase::scaleRange does for a linear or symlog scale. A log range keeps its sign.
+    */
     [[nodiscard]] QCPRange scaled(const QCPRange& range, double factor, double center) const;
 
-    bool operator==(const QCPScale& other) const = default;
+    //! Same kind and same parameters. The two caches are derived from them, so they do not count.
+    bool operator==(const QCPScale& other) const
+    {
+        return mKind == other.mKind && mBase == other.mBase && mThreshold == other.mThreshold
+            && mLinearScale == other.mLinearScale;
+    }
 
 private:
     QCPScale(Kind kind, double base, double threshold, double linearScale);
@@ -85,8 +96,10 @@ private:
     double mBase = kDefaultBase;
     double mThreshold = kDefaultThreshold;
     double mLinearScale = kDefaultLinearScale;
+    //! The nearest double to ln(10), the log base a scale starts from.
+    static constexpr double kLn10 = 2.302585092994045684;
     //! 1/ln(base) and symlog's slope, so a mapping does not recompute them per value.
-    double mInvLogBase = 1.0 / 2.302585092994046;
+    double mInvLogBase = 1.0 / kLn10;
     double mSymlogSlope = kDefaultLinearScale / (1.0 - 1.0 / kDefaultBase);
 };
 
