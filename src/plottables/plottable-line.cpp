@@ -322,7 +322,7 @@ QCPRange QCPLine::colorDataBounds(bool& found) const
     found = false;
     if (!mColor.values())
         return { };
-    const bool log = dataScaleType() == QCPAxis::stLogarithmic;
+    const bool log = dataScale().isLog();
     QCPRange bounds;
     for (const double value : *mColor.values())
     {
@@ -341,6 +341,6 @@ void QCPLine::colorMappingChanged()
 {
     mColor.setGradient(gradient());
     mColor.setRange(dataRange());
-    mColor.setScaleType(dataScaleType());
+    mColor.setScale(dataScale());
     lineChanged();
 }

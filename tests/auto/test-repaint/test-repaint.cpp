@@ -581,7 +581,7 @@ const QVector<AxisAppearanceCase>& axisAppearanceCases()
         { "grid.setZeroLinePen",
           [](QCustomPlot& plot) { plot.xAxis->grid()->setZeroLinePen(QPen(Qt::darkMagenta)); } },
         { "axis.setScaleType",
-          [](QCustomPlot& plot) { plot.xAxis->setScaleType(QCPAxis::stLogarithmic); } },
+          [](QCustomPlot& plot) { plot.xAxis->setScale(QCPScale::log()); } },
         { "axis.setSelectedParts",
           [](QCustomPlot& plot) { plot.xAxis->setSelectedParts(QCPAxis::spAxis); } },
         { "axis.setTicker", [](QCustomPlot& plot)
@@ -799,7 +799,7 @@ const QVector<PlottableAppearanceCase>& plottableAppearanceCases()
           { static_cast<QCPColorMap*>(p)->setDataRange(QCPRange(0, 5)); } },
         { "colormap.setDataScaleType", [](Plot plot) -> QCPPlottable*
           { return plot.add<QCPColorMap>().get(); }, [](QCPPlottable* p)
-          { static_cast<QCPColorMap*>(p)->setDataScaleType(QCPAxis::stLogarithmic); } },
+          { static_cast<QCPColorMap*>(p)->setDataScale(QCPScale::log()); } },
         { "colormap.setGradient", [](Plot plot) -> QCPPlottable*
           { return plot.add<QCPColorMap>().get(); }, [](QCPPlottable* p)
           { static_cast<QCPColorMap*>(p)->setGradient(QCPColorGradient::gpJet); } },

@@ -65,8 +65,8 @@ QList<QPointer<QCPColorMapped>> liveUsers(const QList<QCPColorMapped*>& users)
   orientation and the side where the numbers appear is controlled with \ref setType.
 
   Use \ref QCPColorMap::setColorScale to connect a color map with a color scale. Once they are
-  connected, they share their gradient, data range and data scale type (\ref setGradient, \ref
-  setDataRange, \ref setDataScaleType). Multiple color maps may be associated with a single color
+  connected, they share their gradient, data range and data scale (\ref setGradient, \ref
+  setDataRange, \ref setDataScale). Multiple color maps may be associated with a single color
   scale, to make them all synchronize these properties.
 
   To have finer control over the number display and axis behaviour, you can directly access the
@@ -129,7 +129,7 @@ QList<QPointer<QCPColorMapped>> liveUsers(const QList<QCPColorMapped*>& users)
   Returns the internal \ref QCPAxis instance of this color scale. You can access it to alter the
   appearance and behaviour of the axis. \ref QCPColorScale duplicates some properties in its
   interface for convenience. Those are \ref setDataRange (\ref QCPAxis::setRange), \ref
-  setDataScaleType (\ref QCPAxis::setScaleType), and the method \ref setLabel (\ref
+  setDataScale (\ref QCPAxis::setScale), and the method \ref setLabel (\ref
   QCPAxis::setLabel). As they each are connected, it does not matter whether you use the method on
   the QCPColorScale or on its QCPAxis.
 
@@ -147,11 +147,11 @@ QList<QPointer<QCPColorMapped>> liveUsers(const QList<QCPColorMapped*>& users)
   \see setDataRange
 */
 
-/*! \fn void QCPColorScale::dataScaleTypeChanged(QCPAxis::ScaleType scaleType);
+/*! \fn void QCPColorScale::dataScaleChanged(const QCPScale &scale);
 
-  This signal is emitted when the data scale type changes.
+  This signal is emitted when the data scale changes.
 
-  \see setDataScaleType
+  \see setDataScale
 */
 
 /*! \fn void QCPColorScale::gradientChanged(const QCPColorGradient &newGradient);
@@ -172,9 +172,8 @@ QList<QPointer<QCPColorMapped>> liveUsers(const QList<QCPColorMapped*>& users)
 QCPColorScale::QCPColorScale(QCustomPlot* parentPlot)
         : QCPLayoutElement(parentPlot)
         , mType(QCPAxis::atTop)
-        , // set to atTop such that setType(QCPAxis::atRight) below doesn't skip work because it
-          // thinks it's already atRight
-        mDataScaleType(QCPAxis::stLinear)
+        // atTop such that setType(QCPAxis::atRight) below doesn't skip work because it thinks
+        // it's already atRight
         , mGradient(QCPColorGradient::gpCold)
         , mBarWidth(20)
         , mAxisRect(new QCPColorScaleAxisRectPrivate(this))
@@ -291,7 +290,8 @@ void QCPColorScale::setType(QCPAxis::AxisType type)
                        &QCPColorScale::labelChanged);
             mColorAxis.data()->setLabel(QString());
             disconnect(mColorAxis.data(), &QCPAxis::rangeChanged, this, &QCPColorScale::setDataRange);
-            disconnect(mColorAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPColorScale::setDataScaleType);
+            disconnect(mColorAxis.data(), &QCPAxis::scaleChanged, this,
+                       &QCPColorScale::setDataScale);
         }
         const QList<QCPAxis::AxisType> allAxisTypes = QList<QCPAxis::AxisType>()
             << QCPAxis::atLeft << QCPAxis::atRight << QCPAxis::atBottom << QCPAxis::atTop;
@@ -313,7 +313,7 @@ void QCPColorScale::setType(QCPAxis::AxisType type)
             mColorAxis.data()->setTicker(tickerTransfer);
         }
         connect(mColorAxis.data(), &QCPAxis::rangeChanged, this, &QCPColorScale::setDataRange);
-        connect(mColorAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPColorScale::setDataScaleType);
+        connect(mColorAxis.data(), &QCPAxis::scaleChanged, this, &QCPColorScale::setDataScale);
         // The label lives on the colour axis, which a caller can reach (axis()): its signal is
         // ours.
         connect(mColorAxis.data(), &QCPAxis::labelChanged, this, &QCPColorScale::labelChanged);
@@ -336,7 +336,7 @@ void QCPColorScale::setType(QCPAxis::AxisType type)
   also equivalent to directly accessing the \ref axis and setting its range with \ref
   QCPAxis::setRange.
 
-  \see setDataScaleType, setGradient, rescaleDataRange
+  \see setDataScale, setGradient, rescaleDataRange
 */
 void QCPColorScale::setDataRange(const QCPRange& dataRange)
 {
@@ -362,12 +362,11 @@ void QCPColorScale::setDataRange(const QCPRange& dataRange)
 }
 
 /*!
-  Sets the scale type of the color scale, i.e. whether values are associated with colors linearly
-  or logarithmically.
+  Sets the data scale of the color scale, i.e. how a value is associated with a color.
 
-  It is equivalent to calling QCPColorMap::setDataScaleType on any of the connected color maps. It
-  is also equivalent to directly accessing the \ref axis and setting its scale type with \ref
-  QCPAxis::setScaleType.
+  It is equivalent to calling QCPColorMap::setDataScale on any of the connected color maps. It is
+  also equivalent to directly accessing the \ref axis and setting its scale with \ref
+  QCPAxis::setScale.
 
   Note that this method controls the coordinate transformation. For logarithmic scales, you will
   likely also want to use a logarithmic tick spacing and labeling, which can be achieved by setting
@@ -380,24 +379,24 @@ void QCPColorScale::setDataRange(const QCPRange& dataRange)
 
   \see setDataRange, setGradient
 */
-void QCPColorScale::setDataScaleType(QCPAxis::ScaleType scaleType)
+void QCPColorScale::setDataScale(const QCPScale& scale)
 {
-    if (mDataScaleType != scaleType)
+    if (mDataScale != scale)
     {
         const QCPEmissionScope scope(mParentPlot);
         update();
-        mDataScaleType = scaleType;
+        mDataScale = scale;
         if (mColorAxis)
-            mColorAxis.data()->setScaleType(mDataScaleType);
-        if (mDataScaleType == QCPAxis::stLogarithmic)
+            mColorAxis.data()->setScale(mDataScale);
+        if (mDataScale.isLog())
             setDataRange(mDataRange.sanitizedForLogScale());
-        qcpEmitCurrent(this, mParentPlot, &QCPColorScale::dataScaleTypeChanged,
-                       [this] { return mDataScaleType; });
+        qcpEmitCurrent(this, mParentPlot, &QCPColorScale::dataScaleChanged,
+                       [this] { return mDataScale; });
         const QPointer<QCPColorScale> alive(this);
         for (const auto& user : liveUsers(mUsers))
         {
             if (user)
-                user->applyDataScaleType(mDataScaleType);
+                user->applyDataScale(mDataScale);
             if (!alive)
                 return;
         }
@@ -409,7 +408,7 @@ void QCPColorScale::setDataScaleType(QCPAxis::ScaleType scaleType)
 
   It is equivalent to calling QCPColorMap::setGradient on any of the connected color maps.
 
-  \see setDataRange, setDataScaleType
+  \see setDataRange, setDataScale
 */
 void QCPColorScale::setGradient(const QCPColorGradient& gradient)
 {
@@ -558,7 +557,7 @@ void QCPColorScale::rescaleDataRange(bool onlyVisibleMaps)
     QCPRange newRange;
     bool haveRange = false;
     QCP::SignDomain sign = QCP::sdBoth;
-    if (mDataScaleType == QCPAxis::stLogarithmic)
+    if (mDataScale.isLog())
         sign = (mDataRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive);
     auto include = [&](QCPRange mapRange) {
         if (sign == QCP::sdPositive)
@@ -603,12 +602,12 @@ void QCPColorScale::rescaleDataRange(bool onlyVisibleMaps)
             double center = (newRange.lower + newRange.upper)
                 * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
                        // validRange returned false for other reason
-            if (mDataScaleType == QCPAxis::stLinear)
+            if (mDataScale.isLinear())
             {
                 newRange.lower = center - mDataRange.size() / 2.0;
                 newRange.upper = center + mDataRange.size() / 2.0;
             }
-            else // mScaleType == stLogarithmic
+            else // a non-linear scale, log today
             {
                 newRange.lower = center / qSqrt(mDataRange.upper / mDataRange.lower);
                 newRange.upper = center * qSqrt(mDataRange.upper / mDataRange.lower);
@@ -762,10 +761,10 @@ QCPColorScaleAxisRectPrivate::QCPColorScaleAxisRectPrivate(QCPColorScale* parent
     connect(axis(QCPAxis::atRight), &QCPAxis::rangeChanged, axis(QCPAxis::atLeft), qOverload<const QCPRange&>(&QCPAxis::setRange));
     connect(axis(QCPAxis::atBottom), &QCPAxis::rangeChanged, axis(QCPAxis::atTop), qOverload<const QCPRange&>(&QCPAxis::setRange));
     connect(axis(QCPAxis::atTop), &QCPAxis::rangeChanged, axis(QCPAxis::atBottom), qOverload<const QCPRange&>(&QCPAxis::setRange));
-    connect(axis(QCPAxis::atLeft), &QCPAxis::scaleTypeChanged, axis(QCPAxis::atRight), &QCPAxis::setScaleType);
-    connect(axis(QCPAxis::atRight), &QCPAxis::scaleTypeChanged, axis(QCPAxis::atLeft), &QCPAxis::setScaleType);
-    connect(axis(QCPAxis::atBottom), &QCPAxis::scaleTypeChanged, axis(QCPAxis::atTop), &QCPAxis::setScaleType);
-    connect(axis(QCPAxis::atTop), &QCPAxis::scaleTypeChanged, axis(QCPAxis::atBottom), &QCPAxis::setScaleType);
+    connect(axis(QCPAxis::atLeft), &QCPAxis::scaleChanged, axis(QCPAxis::atRight), &QCPAxis::setScale);
+    connect(axis(QCPAxis::atRight), &QCPAxis::scaleChanged, axis(QCPAxis::atLeft), &QCPAxis::setScale);
+    connect(axis(QCPAxis::atBottom), &QCPAxis::scaleChanged, axis(QCPAxis::atTop), &QCPAxis::setScale);
+    connect(axis(QCPAxis::atTop), &QCPAxis::scaleChanged, axis(QCPAxis::atBottom), &QCPAxis::setScale);
 
     // make layer transfers of color scale transfer to axis rect and axes
     // the axes must be set after axis rect, such that they appear above color gradient drawn by

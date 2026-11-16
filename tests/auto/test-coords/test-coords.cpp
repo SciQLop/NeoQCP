@@ -112,9 +112,9 @@ std::vector<double> sampleValues(std::mt19937& rng)
 
 void configureLogAxes(QCPAxis* keyAxis, QCPAxis* valueAxis, const ScaleCase& testCase)
 {
-    const auto scale = testCase.logarithmic ? QCPAxis::stLogarithmic : QCPAxis::stLinear;
-    keyAxis->setScaleType(scale);
-    valueAxis->setScaleType(scale);
+    const auto scale = testCase.logarithmic ? QCPScale::log() : QCPScale::linear();
+    keyAxis->setScale(scale);
+    valueAxis->setScale(scale);
     keyAxis->setRange(1, 1000);
     valueAxis->setRange(1, 1000);
     keyAxis->setRangeReversed(testCase.reversed);
@@ -267,12 +267,12 @@ void TestCoords::translationDetected()
     QVERIFY(!before.isTranslationOf(QCPTransform(plot->xAxis, plot->yAxis), &delta));
 
     plot->xAxis->setRange(1, 100);
-    plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->xAxis->setScale(QCPScale::log());
     plot->replot();
     QVERIFY2(!before.isTranslationOf(QCPTransform(plot->xAxis, plot->yAxis), &delta),
              "a log axis is not treated as a translation");
 
-    plot->xAxis->setScaleType(QCPAxis::stLinear);
+    plot->xAxis->setScale(QCPScale::linear());
     plot->xAxis->setRange(0, 100);
     plot->xAxis->setRangeReversed(true);
     plot->replot();
@@ -829,8 +829,8 @@ void TestCoords::aPointThatMapsNowhereLandsAtTheOrigin()
 
     // A log axis puts a non-positive point 200 pixels outside the rect and keeps the offset: the
     // pixel is finite, and the offset is a displacement of it like any other.
-    plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
-    plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->xAxis->setScale(QCPScale::log());
+    plot->yAxis->setScale(QCPScale::log());
     plot->xAxis->setRange(1, 1000);
     plot->yAxis->setRange(1, 1000);
     plot->replot();

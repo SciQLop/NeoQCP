@@ -250,7 +250,7 @@ DOC_SNIPPET(plottables_histogram_log, 600, 320)
     }
     using Source = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
 
-    customPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);   // the bins follow the key axis
+    customPlot->xAxis->setScale(QCPScale::log());   // the bins follow the key axis
     customPlot->xAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
     auto histogram = customPlot->add<QCPHistogram>();
     histogram->setBins(40);

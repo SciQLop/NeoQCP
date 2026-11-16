@@ -8,6 +8,7 @@
 #include <rhi/qrhi.h>
 
 #include "../axis/range.h"
+#include "../axis/scale.h"
 
 class QCPAxis;
 class QCPAxisRect;
@@ -116,9 +117,9 @@ private:
         // change the tick vertex count, so they must be part of the signature.
         bool axisVisible = false;
         bool ticksVisible = false;
-        // Same for setScaleType()/setRangeReversed(): the range value is
+        // Same for setScale()/setRangeReversed(): the range value is
         // unchanged but every baked tick pixel moves.
-        int scaleType = 0;
+        QCPScale scale;
         bool rangeReversed = false;
         // Tick marks are baked to pixels at rebuild time; this is the range that
         // baking used, so uploadResources() can detect a pan (same ticks, moved

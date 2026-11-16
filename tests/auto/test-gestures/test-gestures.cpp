@@ -56,7 +56,7 @@ void TestGestures::swipePansWithGestures()
 void TestGestures::swipePansALogAxis()
 {
     mPlot->setInteraction(QCP::iGestures);
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(1, 1000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     const double expectedLower = mPlot->xAxis->pixelToCoord(mPlot->xAxis->coordToPixel(1) - 40);

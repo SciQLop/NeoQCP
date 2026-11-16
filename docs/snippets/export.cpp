@@ -37,8 +37,8 @@ DOC_SNIPPET(export_pdf, 600, 360)
         power[i] = 1 / (1 + std::pow(f[i] / 3, 5.0 / 3.0 * 2));
     }
     customPlot->addGraph()->setData(f, power);
-    customPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
-    customPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    customPlot->xAxis->setScale(QCPScale::log());
+    customPlot->yAxis->setScale(QCPScale::log());
     customPlot->xAxis->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
     customPlot->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
     customPlot->xAxis->setLabel("frequency (Hz)");

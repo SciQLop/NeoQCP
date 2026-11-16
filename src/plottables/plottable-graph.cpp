@@ -77,7 +77,7 @@ double QCPGraph::dataSpaceBaseline() const
     // 2.x closes toward zero: on a linear axis that is value 0, on a log axis the range bound on
     // zero's side (upper on a negative range, lower on a positive one).
     const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
-    if (valueAxis && valueAxis->scaleType() == QCPAxis::stLogarithmic)
+    if (valueAxis && valueAxis->scale().isLog())
     {
         const QCPRange range = valueAxis->range();
         return range.upper < 0 ? range.upper : range.lower;
@@ -120,11 +120,11 @@ void QCPGraph::followAxes()
     {
         mAxisLinks << connect(keyAxisRaw(), &QCPAxis::rangeChanged, this,
                               &QCPGraph::onViewportChanged);
-        mAxisLinks << connect(keyAxisRaw(), &QCPAxis::scaleTypeChanged, this,
+        mAxisLinks << connect(keyAxisRaw(), &QCPAxis::scaleChanged, this,
                               [this] { linesChanged(); });
     }
     if (valueAxisRaw())
-        mAxisLinks << connect(valueAxisRaw(), &QCPAxis::scaleTypeChanged, this,
+        mAxisLinks << connect(valueAxisRaw(), &QCPAxis::scaleChanged, this,
                               [this] { linesChanged(); });
     linesChanged(); // pixels computed for the old axes mean nothing on the new ones
     mL2Dirty = mL1Cache != nullptr; // nor do the bins resampled for the old key range
@@ -2020,7 +2020,7 @@ void QCPGraph::draw(QCPDrawContext& context) const
     if (mL2Result)
         ds = mL2Result.get();
     else if (!mNeedsResampling || mL1Cache || context.exporting()
-             || keyAxisRaw()->scaleType() == QCPAxis::stLogarithmic)
+             || keyAxisRaw()->scale().isLog())
         ds = mDataSource.get();
     else
         return;
@@ -2042,7 +2042,7 @@ void QCPGraph::draw(QCPDrawContext& context) const
     if (begin >= end)
         return;
 
-    const bool logKeyAxis = keyAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
+    const bool logKeyAxis = keyAxisRaw()->scale().isLog();
     // The thinning buckets are equal spans of the key, mapped to equal pixel spans: on a log axis
     // that span is a decade, so pixelsPerKey counts pixels per decade there.
     const double axisPixels = window.pixelsPerKey > 0.0
@@ -2069,7 +2069,7 @@ void QCPGraph::draw(QCPDrawContext& context) const
 
     // In data space the impulse baseline is a value: zero, or on a log value axis the range bound
     // nearer zero, as 2.x closed it.
-    const bool logValueAxis = valueAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
+    const bool logValueAxis = valueAxisRaw()->scale().isLog();
     const double impulseBaseline = dataSpaceBaseline();
     const bool impulses = std::any_of(mComponents.begin(), mComponents.end(), [](const QCPGraphComponent& c)
                                       { return c.visible && c.lineStyle == lsImpulse; });
@@ -2120,12 +2120,12 @@ void QCPGraph::drawInDataSpace(QCPDrawContext& context) const
     const bool logKeyAxis = [this]
     {
         const QCPAxis* axis = qobject_cast<const QCPAxis*>(keyAxisBase());
-        return axis && axis->scaleType() == QCPAxis::stLogarithmic;
+        return axis && axis->scale().isLog();
     }();
     const bool logValueAxis = [this]
     {
         const QCPAxis* axis = qobject_cast<const QCPAxis*>(valueAxisBase());
-        return axis && axis->scaleType() == QCPAxis::stLogarithmic;
+        return axis && axis->scale().isLog();
     }();
     const bool impulses = std::any_of(mComponents.begin(), mComponents.end(), [](const QCPGraphComponent& c)
                                       { return c.visible && c.lineStyle == lsImpulse; });
@@ -2433,7 +2433,7 @@ std::vector<qcp::fill::StripPoint> QCPGraph::fillRows(const Fill& fill,
 // recording then follows that bound, so it is transform-dependent.
 double QCPGraph::fillValue(const QCPAxis& valueAxis, double value)
 {
-    if (valueAxis.scaleType() == QCPAxis::stLinear || std::isnan(value))
+    if (!valueAxis.scale().isLog() || std::isnan(value))
         return value;
     const QCPRange range = valueAxis.range();
     if (range.upper < 0)
@@ -2452,7 +2452,7 @@ std::vector<qcp::fill::StripPoint> QCPGraph::shapeFillRows(
     // The system's key axis is the one a straight-segment frame draws in log space.
     const QCPAxis* keyAxis = drawsInDataSpace() ? qobject_cast<const QCPAxis*>(keyAxisBase())
                                                 : keyAxisRaw();
-    const bool logKeyAxis = keyAxis && keyAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool logKeyAxis = keyAxis && keyAxis->scale().isLog();
     return steppedOnScreen(std::move(rows), ownerStep(mComponents[fill.owner]), logKeyAxis);
 }
 
@@ -2518,7 +2518,7 @@ std::vector<qcp::fill::StripPoint> QCPGraph::binnedWhenDense(
     if (rows.size() <= 4 * std::size_t(std::max(0, pixelLength)))
         return rows;
     const double quarterPixel = 4.0 * std::max(1, pixelLength);
-    if (keyAxisRaw()->scaleType() == QCPAxis::stLogarithmic)
+    if (keyAxisRaw()->scale().isLog())
     {
         const QCPRange range = keyAxisRaw()->range();
         if (range.lower <= 0.0 || range.upper <= 0.0)
@@ -2608,7 +2608,7 @@ void QCPGraph::recordFills(QCPDrawContext& context, const QCPMultiDataSource& ds
             continue;
 
         const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
-        if (valueAxis && valueAxis->scaleType() == QCPAxis::stLogarithmic)
+        if (valueAxis && valueAxis->scale().isLog())
             (void)context.transform(); // the baseline follows the axis' bound nearer zero
 
         const auto recordRun = [&](std::size_t first, std::size_t last, bool selected) {

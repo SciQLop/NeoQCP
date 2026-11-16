@@ -215,8 +215,7 @@ void QCPColorGradient::setPeriodic(bool enabled)
   This method is used to quickly convert a \a data array to colors. The colors will be output in
   the array \a scanLine. Both \a data and \a scanLine must have the length \a n when passed to this
   function. The data range that shall be used for mapping the data value to the gradient is passed
-  in \a range. \a logarithmic indicates whether the data values shall be mapped to colors
-  logarithmically.
+  in \a range. \a scale says how the data values map to colors: linearly, or logarithmically.
 
   if \a data actually contains 2D-data linearized via <tt>[row*columnCount + column]</tt>, you can
   set \a dataIndexFactor to <tt>columnCount</tt> to convert a column instead of a row of the data
@@ -242,7 +241,7 @@ double positionToIndexFactor(int levelCount, const QCPRange& range, bool logarit
 } // namespace
 
 void QCPColorGradient::colorize(const double* data, const QCPRange& range, QRgb* scanLine, int n,
-                                int dataIndexFactor, bool logarithmic)
+                                int dataIndexFactor, const QCPScale& scale)
 {
     // If you change something here, make sure to also adapt color() and the other colorize()
     // overload
@@ -260,6 +259,9 @@ void QCPColorGradient::colorize(const double* data, const QCPRange& range, QRgb*
         updateColorBuffer();
 
     const bool skipNanCheck = mNanHandling == nhNone;
+    // Log is the only non-linear colour mapping: a symlog scale takes the linear path until the
+    // scale-space colour math lands.
+    const bool logarithmic = scale.isLog();
     const double posToIndexFactor = positionToIndexFactor(mLevelCount, range, logarithmic);
     for (int i = 0; i < n; ++i)
     {
@@ -313,7 +315,7 @@ void QCPColorGradient::colorize(const double* data, const QCPRange& range, QRgb*
 */
 void QCPColorGradient::colorize(const double* data, const unsigned char* alpha,
                                 const QCPRange& range, QRgb* scanLine, int n, int dataIndexFactor,
-                                bool logarithmic)
+                                const QCPScale& scale)
 {
     // If you change something here, make sure to also adapt color() and the other colorize()
     // overload
@@ -336,6 +338,9 @@ void QCPColorGradient::colorize(const double* data, const unsigned char* alpha,
         updateColorBuffer();
 
     const bool skipNanCheck = mNanHandling == nhNone;
+    // Log is the only non-linear colour mapping: a symlog scale takes the linear path until the
+    // scale-space colour math lands.
+    const bool logarithmic = scale.isLog();
     const double posToIndexFactor = positionToIndexFactor(mLevelCount, range, logarithmic);
     for (int i = 0; i < n; ++i)
     {
@@ -395,7 +400,7 @@ void QCPColorGradient::colorize(const double* data, const unsigned char* alpha,
 
   This method is used to colorize a single data value given in \a position, to colors. The data
   range that shall be used for mapping the data value to the gradient is passed in \a range. \a
-  logarithmic indicates whether the data value shall be mapped to a color logarithmically.
+  scale says how the data value maps to a color: linearly, or logarithmically.
 
   If an entire array of data values shall be converted, rather use \ref colorize, for better
   performance.
@@ -403,7 +408,7 @@ void QCPColorGradient::colorize(const double* data, const unsigned char* alpha,
   The returned QRgb has its r, g and b components premultiplied with alpha (see
   QImage::Format_ARGB32_Premultiplied).
 */
-QRgb QCPColorGradient::color(double position, const QCPRange& range, bool logarithmic)
+QRgb QCPColorGradient::color(double position, const QCPRange& range, const QCPScale& scale)
 {
     // If you change something here, make sure to also adapt ::colorize()
     if (mColorBufferInvalidated)
@@ -427,6 +432,7 @@ QRgb QCPColorGradient::color(double position, const QCPRange& range, bool logari
         }
     }
 
+    const bool logarithmic = scale.isLog();
     const double posToIndexFactor = positionToIndexFactor(mLevelCount, range, logarithmic);
     int index = int((!logarithmic ? position - range.lower : qLn(position / range.lower))
                     * posToIndexFactor);

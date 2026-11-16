@@ -639,21 +639,21 @@ void TestSignalDelivery::rangeSlotSeesTheNewScaleType()
     QCPAxis* axis = plot.xAxis;
     axis->setRange(-5, 10);
     QStringList order;
-    QCPAxis::ScaleType seenType = QCPAxis::stLinear;
+    QCPScale seenType = QCPScale::linear();
     QCPRange seenRange;
     connect(axis, &QCPAxis::rangeChanged, &plot,
             [&](const QCPRange&, const QCPRange&)
             {
                 order << QStringLiteral("rangeChanged");
-                seenType = axis->scaleType();
+                seenType = axis->scale();
                 seenRange = axis->range();
             });
-    connect(axis, &QCPAxis::scaleTypeChanged, &plot,
-            [&order](QCPAxis::ScaleType) { order << QStringLiteral("scaleTypeChanged"); });
-    axis->setScaleType(QCPAxis::stLogarithmic);
+    connect(axis, &QCPAxis::scaleChanged, &plot,
+            [&order](QCPScale) { order << QStringLiteral("scaleChanged"); });
+    axis->setScale(QCPScale::log());
     QCOMPARE(order,
-             QStringList({ QStringLiteral("rangeChanged"), QStringLiteral("scaleTypeChanged") }));
-    QCOMPARE(seenType, QCPAxis::stLogarithmic);
+             QStringList({ QStringLiteral("rangeChanged"), QStringLiteral("scaleChanged") }));
+    QCOMPARE(seenType, QCPScale::log());
     QCOMPARE(seenRange, axis->range());
     QVERIFY2(seenRange.lower > 0, "the slot saw the range from before the log sanitisation");
 }
@@ -690,8 +690,8 @@ void TestSignalDelivery::slotDeletingThePlotDropsTheRestOfTheChain()
                 sawRangeChanged = true;
                 delete plot;
             });
-    connect(plot->xAxis, &QCPAxis::scaleTypeChanged, plot, [&scaleTypes] { ++scaleTypes; });
-    plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    connect(plot->xAxis, &QCPAxis::scaleChanged, plot, [&scaleTypes] { ++scaleTypes; });
+    plot->xAxis->setScale(QCPScale::log());
     QVERIFY(sawRangeChanged);
     QVERIFY(!alive);
     QCOMPARE(scaleTypes, 0);
@@ -729,15 +729,15 @@ void TestSignalDelivery::slotReenteringAScopedSetterLeavesTheLastSignalCurrent()
     QCustomPlot plot;
     QCPAxis* axis = plot.xAxis;
     axis->setRange(-5, 10);
-    QList<QCPAxis::ScaleType> received;
+    QList<QCPScale> received;
     connect(axis, &QCPAxis::rangeChanged, &plot,
-            [axis](const QCPRange&, const QCPRange&) { axis->setScaleType(QCPAxis::stLinear); });
-    connect(axis, &QCPAxis::scaleTypeChanged, &plot,
-            [&received](QCPAxis::ScaleType type) { received << type; });
-    axis->setScaleType(QCPAxis::stLogarithmic);
-    QCOMPARE(axis->scaleType(), QCPAxis::stLinear);
+            [axis](const QCPRange&, const QCPRange&) { axis->setScale(QCPScale::linear()); });
+    connect(axis, &QCPAxis::scaleChanged, &plot,
+            [&received](QCPScale type) { received << type; });
+    axis->setScale(QCPScale::log());
+    QCOMPARE(axis->scale(), QCPScale::linear());
     QVERIFY(!received.isEmpty());
-    QCOMPARE(received.last(), axis->scaleType());
+    QCOMPARE(received.last(), axis->scale());
 }
 
 void TestSignalDelivery::colorMapGradientSlotDeletingThePlot()

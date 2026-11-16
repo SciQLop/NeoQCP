@@ -4,11 +4,6 @@
 
 namespace
 {
-//! The defaults of log() and symlog(), which a refused parameter gives back.
-constexpr double kDefaultBase = 10.0;
-constexpr double kDefaultThreshold = 2.0;
-constexpr double kDefaultLinearScale = 1.0;
-
 bool aValidBase(double base)
 {
     return std::isfinite(base) && base > 1.0;

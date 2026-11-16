@@ -236,7 +236,7 @@ void QCPPolarGraph::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) const
     }
 
     QCP::SignDomain signDomain = QCP::sdBoth;
-    if (valueAxis->scaleType() == QCPPolarAxisRadial::stLogarithmic)
+    if (valueAxis->scale().isLog())
         signDomain = (valueAxis->range().upper < 0 ? QCP::sdNegative : QCP::sdPositive);
 
     bool foundRange;
@@ -249,7 +249,7 @@ void QCPPolarGraph::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) const
         if (!QCPRange::validRange(newRange))
         {
             const double center = (newRange.lower + newRange.upper) * 0.5;
-            if (valueAxis->scaleType() == QCPPolarAxisRadial::stLinear)
+            if (valueAxis->scale().isLinear())
             {
                 newRange.lower = center - valueAxis->range().size() / 2.0;
                 newRange.upper = center + valueAxis->range().size() / 2.0;
@@ -276,7 +276,7 @@ quint64 QCPPolarGraph::dependencyRevision() const
     // non-periodic graph: everything else it reads, through the frame, is the frame's business.
     quint64 revision = qHashMulti(mDataContainer ? mDataContainer->revision() : quint64(0),
                                   radial->range().lower, radial->range().upper,
-                                  static_cast<int>(radial->scaleType()), radial->rangeReversed(),
+                                  radial->scale(), radial->rangeReversed(),
                                   angular->range().size());
     if (!mPeriodic)
         revision = qHashMulti(revision, angular->range().lower, angular->range().upper);

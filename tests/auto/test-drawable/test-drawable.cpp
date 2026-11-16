@@ -1435,7 +1435,7 @@ void TestDrawable::pixelAnchoredShapeIsHittable()
     // The same on a log value axis: the box reaches zero, so that side cannot be indexed either.
     shape->mode = TestShape::ZeroValue; // data (2,0) to (6,6)
     shape->touch();
-    f.plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    f.plot->yAxis->setScale(QCPScale::log());
     f.plot->yAxis->setRange(0.1, 100);
     f.plot->replot();
 
@@ -1557,7 +1557,7 @@ void TestDrawable::defaultDataRangeFollowsTheExtentRules()
 
     shape->mode = TestShape::ZeroValue; // a box reaching zero cannot be indexed on a log axis
     shape->touch();
-    f.plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    f.plot->yAxis->setScale(QCPScale::log());
     f.plot->yAxis->setRange(0.1, 100);
     f.plot->replot();
     const std::optional<QCPDataBox> logarithmic = shape->drawnDataRange();
@@ -1638,7 +1638,7 @@ void TestDrawable::logAxisRescaleKeepsThePositivePart()
     auto* line = f.plot->add<TestLine>().get();
     line->mLine = std::make_shared<const std::vector<QPointF>>(
         std::initializer_list<QPointF> { { 1, 0 }, { 2, 5 }, { 3, 10 } });
-    f.plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    f.plot->yAxis->setScale(QCPScale::log());
     f.plot->yAxis->setRange(0.1, 100);
 
     f.plot->yAxis->rescale();
@@ -2184,7 +2184,7 @@ void TestDrawable::aLogKeyAxisRecordsEveryTransform()
     Fixture f;
     auto shape = f.plot->add<TestShape>();
     shape->readsKeyWindow = true;
-    f.plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    f.plot->xAxis->setScale(QCPScale::log());
     f.plot->xAxis->setRange(1, 10);
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
@@ -2209,7 +2209,7 @@ void TestDrawable::switchingTheKeyAxisToLogRecords()
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
 
-    f.plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    f.plot->xAxis->setScale(QCPScale::log());
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 2);
 }

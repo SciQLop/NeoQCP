@@ -18,4 +18,9 @@ private slots:
     void roundTrips();
     void badParametersAreRefused();
     void hashMatchesEquality();
+
+    void anAxisTakesAScale();
+    void aLogAxisMapsAsBefore();
+    void aLogColourScaleMapsAsBefore();
+    void aDataScaleSetBeforeTheAddWins();
 };

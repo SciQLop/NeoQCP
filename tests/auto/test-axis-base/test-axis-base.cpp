@@ -164,8 +164,8 @@ void TestAxisBase::everyAxisSharesTheRangeModel()
     if (logarithmic)
     {
         // A log scale sanitises a range that reaches through zero.
-        axis->setScaleType(QCPAxisBase::stLogarithmic);
-        QCOMPARE(axis->scaleType(), QCPAxisBase::stLogarithmic);
+        axis->setScale(QCPScale::log());
+        QCOMPARE(axis->scale(), QCPScale::log());
         axis->setRange(-1, 10);
         QVERIFY2(axis->range().lower > 0.0 && axis->range().upper > 0.0,
                  qPrintable(QStringLiteral("%1..%2")
@@ -201,17 +201,17 @@ void TestAxisBase::cartesianAxisApiStillCompiles()
     QCustomPlot plot;
     QCPAxis* axis = plot.xAxis;
 
-    QCOMPARE(axis->scaleType(), QCPAxis::stLinear);
-    axis->setScaleType(QCPAxis::stLogarithmic);
-    QCOMPARE(axis->scaleType(), QCPAxis::stLogarithmic);
+    QCOMPARE(axis->scale(), QCPScale::linear());
+    axis->setScale(QCPScale::log());
+    QCOMPARE(axis->scale(), QCPScale::log());
 
     const QCPAxis::SelectableParts parts = QCPAxis::spAxis | QCPAxis::spTickLabels;
     QVERIFY(parts.testFlag(QCPAxis::spTickLabels));
     QVERIFY(parts.testFlag(QCPAxis::spAxisLabel) == false);
 
     int fired = 0;
-    connect(axis, &QCPAxis::scaleTypeChanged, &plot, [&fired](QCPAxis::ScaleType) { ++fired; });
-    axis->setScaleType(QCPAxis::stLinear);
+    connect(axis, &QCPAxis::scaleChanged, &plot, [&fired](QCPScale) { ++fired; });
+    axis->setScale(QCPScale::linear());
     QCOMPARE(fired, 1);
 
     // getPartAt is 2.x public API: hover cursors and context menus call it from outside.
@@ -224,10 +224,10 @@ void TestAxisBase::axisPropertiesStillNotify()
     QCPAxis* axis = plot.xAxis;
     const QMetaObject* meta = axis->metaObject();
 
-    const QMetaProperty scaleType = meta->property(meta->indexOfProperty("scaleType"));
-    QVERIFY(scaleType.isValid());
-    QVERIFY(scaleType.hasNotifySignal());
-    QVERIFY(scaleType.notifySignal() == QMetaMethod::fromSignal(&QCPAxis::scaleTypeChanged));
+    const QMetaProperty scale = meta->property(meta->indexOfProperty("scale"));
+    QVERIFY(scale.isValid());
+    QVERIFY(scale.hasNotifySignal());
+    QVERIFY(scale.notifySignal() == QMetaMethod::fromSignal(&QCPAxis::scaleChanged));
 
     const QMetaProperty selectedParts = meta->property(meta->indexOfProperty("selectedParts"));
     QVERIFY(selectedParts.isValid());
@@ -235,9 +235,9 @@ void TestAxisBase::axisPropertiesStillNotify()
     QVERIFY(selectedParts.notifySignal() == QMetaMethod::fromSignal(&QCPAxis::selectionChanged));
 
     int scaleTypes = 0, selections = 0;
-    connect(axis, &QCPAxis::scaleTypeChanged, &plot, [&scaleTypes] { ++scaleTypes; });
+    connect(axis, &QCPAxis::scaleChanged, &plot, [&scaleTypes] { ++scaleTypes; });
     connect(axis, &QCPAxis::selectionChanged, &plot, [&selections] { ++selections; });
-    axis->setScaleType(QCPAxis::stLogarithmic);
+    axis->setScale(QCPScale::log());
     QCOMPARE(scaleTypes, 1);
     axis->setSelectedParts(QCPAxis::spAxis);
     QVERIFY(axis->selectedParts().testFlag(QCPAxis::spAxis));

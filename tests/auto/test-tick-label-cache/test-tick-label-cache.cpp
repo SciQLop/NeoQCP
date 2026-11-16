@@ -326,7 +326,7 @@ void TestTickLabelCache::logAxisBeautifulPowersMatch()
 {
     const Step logAxis = [](LivePlot* p)
     {
-        p->yAxis->setScaleType(QCPAxis::stLogarithmic);
+        p->yAxis->setScale(QCPScale::log());
         p->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
         p->yAxis->setNumberFormat("eb");
         p->yAxis->setNumberPrecision(0);
@@ -354,7 +354,7 @@ void TestTickLabelCache::linearToLogSwitchRefreshesPowers()
     };
     const Step toLog = [](LivePlot* p)
     {
-        p->yAxis->setScaleType(QCPAxis::stLogarithmic);
+        p->yAxis->setScale(QCPScale::log());
         p->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
         p->yAxis->setRange(500, 3500);
     };

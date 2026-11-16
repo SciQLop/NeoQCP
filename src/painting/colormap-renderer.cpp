@@ -35,21 +35,20 @@ void QCPColormapRenderer::setDataRange(const QCPRange& range)
 {
     if (!QCPRange::validRange(range))
         return;
-    QCPRange newRange = (mDataScaleType == QCPAxis::stLogarithmic) ? range.sanitizedForLogScale()
-                                                                   : range.sanitizedForLinScale();
+    const QCPRange newRange = mDataScale.sanitized(range);
     if (mDataRange.lower == newRange.lower && mDataRange.upper == newRange.upper)
         return;
     mDataRange = newRange;
     mMapImageInvalidated = true;
 }
 
-void QCPColormapRenderer::setDataScaleType(QCPAxis::ScaleType type)
+void QCPColormapRenderer::setDataScale(const QCPScale& scale)
 {
-    if (mDataScaleType == type)
+    if (mDataScale == scale)
         return;
-    mDataScaleType = type;
+    mDataScale = scale;
     mMapImageInvalidated = true;
-    if (type == QCPAxis::stLogarithmic && QCPRange::validRange(mDataRange))
+    if (scale.isLog() && QCPRange::validRange(mDataRange))
         mDataRange = mDataRange.sanitizedForLogScale();
 }
 
@@ -64,7 +63,7 @@ void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, bool keyIs
     if (keySize == 0 || valueSize == 0)
         return;
 
-    const bool isLog = (mDataScaleType == QCPAxis::stLogarithmic);
+    const QCPScale scale = mDataScale;
     const double* rawData = data->rawData();
     mKeyIsVertical = keyIsVertical;
     if (!keyIsVertical)
@@ -73,7 +72,7 @@ void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, bool keyIs
         for (int y = 0; y < valueSize; ++y)
         {
             QRgb* pixels = reinterpret_cast<QRgb*>(argbImage.scanLine(valueSize - 1 - y));
-            mGradient.colorize(rawData + y * keySize, mDataRange, pixels, keySize, 1, isLog);
+            mGradient.colorize(rawData + y * keySize, mDataRange, pixels, keySize, 1, scale);
         }
         mMapImage = std::move(argbImage);
     }
@@ -85,7 +84,7 @@ void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, bool keyIs
         for (int k = 0; k < keySize; ++k)
         {
             QRgb* pixels = reinterpret_cast<QRgb*>(argbImage.scanLine(keySize - 1 - k));
-            mGradient.colorize(rawData + k, mDataRange, pixels, valueSize, keySize, isLog);
+            mGradient.colorize(rawData + k, mDataRange, pixels, valueSize, keySize, scale);
         }
         mMapImage = std::move(argbImage);
     }
@@ -97,13 +96,13 @@ void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, bool keyIs
 QImage QCPColormapRenderer::gradientImage(int width, int height)
 {
     const QCPRange range = QCPRange::validRange(mDataRange) ? mDataRange : QCPRange(0, 1);
-    const bool isLog = mDataScaleType == QCPAxis::stLogarithmic;
+    const QCPScale scale = mDataScale;
     std::vector<double> values(static_cast<size_t>(width));
     for (int x = 0; x < width; ++x)
         values[size_t(x)] = range.lower + (x + 0.5) / width * range.size();
     QImage swatch(width, height, QImage::Format_ARGB32_Premultiplied);
     for (int y = 0; y < height; ++y)
-        mGradient.colorize(values.data(), range, reinterpret_cast<QRgb*>(swatch.scanLine(y)), width, 1,
-                           isLog);
+        mGradient.colorize(values.data(), range, reinterpret_cast<QRgb*>(swatch.scanLine(y)), width,
+                           1, scale);
     return swatch;
 }

@@ -394,7 +394,7 @@ void TestPolar::aRimCrossingIsOnTheChord()
     QCPPolarAxisRadial* radial = area->radialAxis();
     angular->setRange(0, 360);
     radial->setRange(lower, upper);
-    radial->setScaleType(logarithmic ? QCPAxisBase::stLogarithmic : QCPAxisBase::stLinear);
+    radial->setScale(logarithmic ? QCPScale::log() : QCPScale::linear());
     radial->setRangeReversed(reversed);
     // Out of the disc, then back in: the series the polar-clamped picture draws.
     auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 30, 60 },
@@ -426,7 +426,7 @@ void TestPolar::aValueTheRadialScaleCannotTakeIsAGap()
     QCPPolarAxisRadial* radial = area->radialAxis();
     area->angularAxis()->setRange(0, 360);
     radial->setRange(0.1, 10);
-    radial->setScaleType(QCPAxisBase::stLogarithmic);
+    radial->setScale(QCPScale::log());
     auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 60, 120, 180, 240, 300 },
                                           QVector<double> { 1, 2, 0, -1, 3, 4 });
     QVERIFY(graph);
@@ -996,7 +996,7 @@ void TestPolar::aRunLeavingTheRimFollowsIt()
     QCPPolarAxisRadial* radial = area->radialAxis();
     angular->setRange(0, 360);
     radial->setRange(lower, upper);
-    radial->setScaleType(logarithmic ? QCPAxisBase::stLogarithmic : QCPAxisBase::stLinear);
+    radial->setScale(logarithmic ? QCPScale::log() : QCPScale::linear());
     radial->setRangeReversed(reversed);
     auto graph = area->add<QCPPolarGraph>(QVector<double> { 90, 140 },
                                           QVector<double> { beyond, justInside });
@@ -1088,7 +1088,7 @@ void TestPolar::aClampedRunFollowsTheArc()
     QCPPolarAxisRadial* radial = area->radialAxis();
     angular->setRange(0, 360);
     radial->setRange(lower, upper);
-    radial->setScaleType(logarithmic ? QCPAxisBase::stLogarithmic : QCPAxisBase::stLinear);
+    radial->setScale(logarithmic ? QCPScale::log() : QCPScale::linear());
     radial->setRangeReversed(reversed);
     // A run that stays beyond the rim from angle 0 to angle 90.
     auto graph
@@ -1336,8 +1336,8 @@ void TestPolar::theAngularAxisRefusesALogScale()
     QCustomPlot plot;
     auto* area = polarArea(plot);
     QCPPolarAxisAngular* angular = area->angularAxis();
-    angular->setScaleType(QCPAxisBase::stLogarithmic);
-    QCOMPARE(angular->scaleType(), QCPAxisBase::stLinear);
+    angular->setScale(QCPScale::log());
+    QCOMPARE(angular->scale(), QCPScale::linear());
     QCOMPARE(int(test_misuse::calls.size()), 1);
     test_misuse::calls.clear();
 }

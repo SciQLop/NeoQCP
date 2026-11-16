@@ -421,7 +421,7 @@ void MainWindow::genAxisTickers()
   customPlot->xAxis->setTicker(logTicker);
   // don't forget to also set the scale type accordingly, otherwise you'll have
   // logarithmically spaced ticks on a linear axis:
-  customPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+  customPlot->xAxis->setScale(QCPScale::log());
   //! [axistickerlog-creation]
   customPlot->xAxis->ticker()->setTickCount(9);
   savePng("axisticker-log.png", 600, 50);
@@ -431,10 +431,10 @@ void MainWindow::genAxisTickers()
   customPlot->xAxis->setNumberFormat("eb");
   customPlot->xAxis->setNumberPrecision(0);
   savePng("axisticker-log-powers.png", 600, 50);
-  customPlot->xAxis->setScaleType(QCPAxis::stLinear);
+  customPlot->xAxis->setScale(QCPScale::linear());
   customPlot->xAxis->setNumberFormat(formatBefore);
   customPlot->xAxis->setNumberPrecision(precBefore);
-  customPlot->xAxis->setScaleType(QCPAxis::stLinear);
+  customPlot->xAxis->setScale(QCPScale::linear());
   
   
   // QCPAxisTickerDateTime:
@@ -927,7 +927,7 @@ void MainWindow::genQCPColorScale()
   customPlot->plotLayout()->addElement(0, 1, colorScaleV);
   colorScaleV->setGradient(QCPColorGradient::gpThermal);
   QCPAlignmentGroup::create({customPlot->axisRect(), colorScaleV}, QCP::msTop|QCP::msBottom);
-  colorScaleV->setDataScaleType(QCPAxis::stLogarithmic);
+  colorScaleV->setDataScale(QCPScale::log());
   colorScaleV->setDataRange(QCPRange(1, 1000));
   colorScaleV->axis()->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
   colorScaleV->axis()->setNumberFormat("eb");

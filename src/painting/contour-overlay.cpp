@@ -86,7 +86,7 @@ QPointF dataPoint(const QCPColorMapData* grid, const QLineF& segment, bool secon
 } // namespace
 
 QVector<double> QCPContourOverlay::resolveLevels(const QCPColorMapData* grid,
-                                                 QCPAxis::ScaleType dataScaleType) const
+                                                 const QCPScale& dataScale) const
 {
     QVector<double> levels;
     if (!mLevels.isEmpty())
@@ -96,7 +96,7 @@ QVector<double> QCPContourOverlay::resolveLevels(const QCPColorMapData* grid,
         return levels;
     }
     const QCPRange bounds = grid->dataBounds();
-    if (dataScaleType == QCPAxis::stLogarithmic && bounds.lower > 0 && bounds.upper > 0)
+    if (dataScale.isLog() && bounds.lower > 0 && bounds.upper > 0)
     {
         // Geometric spacing: equal ratios put one line per decade band
         // instead of bunching every line at the top decade.
@@ -134,7 +134,7 @@ void QCPContourOverlay::clear()
 }
 
 void QCPContourOverlay::update(const QCPColorMapData* grid, QCPDrawContext& context,
-                               QCPAxis::ScaleType dataScaleType, const QCPAxis* keyAxis,
+                               const QCPScale& dataScale, const QCPAxis* keyAxis,
                                const QCPAxis* valueAxis)
 {
     if (!active() || !drawable(grid) || !keyAxis || !valueAxis)
@@ -146,7 +146,7 @@ void QCPContourOverlay::update(const QCPColorMapData* grid, QCPDrawContext& cont
     // Keyed on the resolution actually marched, so a grid smaller than the screen limit is
     // marched once for both screen and export.
     const int fullDim = std::max(grid->keySize(), grid->valueSize());
-    Key key { mGeneration, resolveLevels(grid, dataScaleType), std::min(kScreenMaxDim, fullDim) };
+    Key key { mGeneration, resolveLevels(grid, dataScale), std::min(kScreenMaxDim, fullDim) };
     mDrawn = &linesFor(grid, key, false);
     if (exportMode)
     {
@@ -155,9 +155,7 @@ void QCPContourOverlay::update(const QCPColorMapData* grid, QCPDrawContext& cont
     }
     // The axes' scales are what the bins and the resampler followed: a log axis spans its
     // columns or rows geometrically, a linear one evenly (see dataPoint).
-    recordLines(context, grid, *mDrawn,
-                keyAxis->scaleType() == QCPAxis::stLogarithmic,
-                valueAxis->scaleType() == QCPAxis::stLogarithmic);
+    recordLines(context, grid, *mDrawn, keyAxis->scale().isLog(), valueAxis->scale().isLog());
     mLastLevels = key.levels;
     mLastLabels.clear();
     if (mLabelsEnabled && keyAxis->axisRectRaw() && !mDrawn->lines.isEmpty())

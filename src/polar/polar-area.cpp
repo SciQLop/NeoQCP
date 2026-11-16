@@ -451,12 +451,12 @@ void QCPPolarArea::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
             double angleCoord, radiusCoord;
             axis->pixelToCoord(startPos, angleCoordStart, radiusCoordStart);
             axis->pixelToCoord(event->pos(), angleCoord, radiusCoord);
-            if (axis->scaleType() == QCPPolarAxisRadial::stLinear)
+            if (axis->scale().isLinear())
             {
                 double diff = radiusCoordStart - radiusCoord;
                 axis->setRange(start.lower + diff, start.upper + diff);
             }
-            else if (axis->scaleType() == QCPPolarAxisRadial::stLogarithmic)
+            else if (axis->scale().isLog())
             {
                 if (radiusCoord != 0)
                 {

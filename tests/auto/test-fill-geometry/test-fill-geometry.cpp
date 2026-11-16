@@ -234,7 +234,7 @@ struct LogAxisPlot
     LogAxisPlot(double lower, double upper)
     {
         plot.resize(400, 300);
-        plot.yAxis->setScaleType(QCPAxis::stLogarithmic);
+        plot.yAxis->setScale(QCPScale::log());
         plot.yAxis->setRange(lower, upper);
         plot.replot();
     }

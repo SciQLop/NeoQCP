@@ -726,10 +726,10 @@ void TestQCustomPlot::radialRangeSlotDeletingTheAreaIsSafe()
     radial->setRange(-1, 10);
     const QPointer<QCPPolarArea> alive(area);
     int scaleTypes = 0;
-    connect(radial, &QCPPolarAxisRadial::scaleTypeChanged, area, [&scaleTypes] { ++scaleTypes; });
+    connect(radial, &QCPPolarAxisRadial::scaleChanged, area, [&scaleTypes] { ++scaleTypes; });
     deleteOwnerOnRangeChange(radial, area);
     if (viaScaleType)
-      radial->setScaleType(QCPPolarAxisRadial::stLogarithmic); // sanitises the range first
+      radial->setScale(QCPScale::log()); // sanitises the range first
     else
       radial->setRange(2, 3);
     QVERIFY(!alive);

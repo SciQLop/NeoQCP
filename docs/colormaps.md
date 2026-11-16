@@ -89,9 +89,9 @@ This also covers NaN values in z, and pixels no column reaches.
 
 - A logarithmic **y** axis is supported. The rows are resampled in log space, so every channel keeps its true height on screen.
 - A logarithmic **x** axis is not: x is always resampled linearly.
-- For a logarithmic **z**, set the data scale type to `QCPAxis::stLogarithmic`, on the map or on its colour scale. Cells that fall in one pixel are then averaged in log space (a geometric mean), so a few large values do not swamp the rest. Values at or below zero are left out of that mean.
+- For a logarithmic **z**, pass `QCPScale::log()` to `setDataScale()` on the map or on its colour scale. Cells that fall in one pixel are then averaged in log space (a geometric mean), so a few large values do not swamp the rest. Values at or below zero are left out of that mean.
 
-Also give each log axis a `QCPAxisTickerLog`. Changing the scale type does not change the ticker.
+Also give each log axis a `QCPAxisTickerLog`. Changing the scale does not change the ticker.
 {doc}`axes` has the details.
 
 `rescaleDataRange(true)` reads the z range straight from your data, so it works right after `setData()`.

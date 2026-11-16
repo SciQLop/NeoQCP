@@ -460,9 +460,9 @@ protected:
     // introduced virtual methods:
     virtual int calculateMargin();
     void applyTickLabelFormat();
-    // A scale type change stales the margin and every item tree of the plot, then moves the axes
-    // that follow this one.
-    virtual bool scaleTypeWillChange(ScaleType type) override;
+    // A scale change stales the margin and every item tree of the plot, then moves the axes that
+    // follow this one.
+    virtual bool scaleWillChange(const QCPScale& scale) override;
     // A look change moves every axis, grid and plottable of the rect.
     virtual void markAppearanceDirty() override;
     virtual bool checkLinkSource(const QCPAxisBase* source) const override;
@@ -634,9 +634,9 @@ public:
     {
         return this->apply([&](T& a) { a.setRange(lower, upper); });
     }
-    Ret setScaleType(QCPAxis::ScaleType type)
+    Ret setScale(const QCPScale& scale)
     {
-        return this->apply([&](T& a) { a.setScaleType(type); });
+        return this->apply([&](T& a) { a.setScale(scale); });
     }
     Ret setColor(const QColor& color)
     {

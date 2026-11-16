@@ -318,8 +318,8 @@ void MainWindow::setupExportMapTest(QCustomPlot *customPlot)
   m->rescaleDataRange(true);
   m->setInterpolate(false);
   m->setTightBoundary(false);
-  customPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
-  customPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+  customPlot->xAxis->setScale(QCPScale::log());
+  customPlot->yAxis->setScale(QCPScale::log());
   customPlot->xAxis->setRange(1, 1000);
   customPlot->yAxis->setRange(1, 10000);
   customPlot->setAntialiasedElement(QCP::aeAxes, true);
@@ -330,7 +330,7 @@ void MainWindow::setupExportMapTest(QCustomPlot *customPlot)
 
 void MainWindow::setupLogErrorsTest(QCustomPlot *customPlot)
 {
-  customPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+  customPlot->yAxis->setScale(QCPScale::log());
   customPlot->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
   customPlot->yAxis->setNumberFormat("eb");
   customPlot->yAxis->setNumberPrecision(0);
@@ -362,14 +362,14 @@ void MainWindow::setupLogErrorsTest(QCustomPlot *customPlot)
 
 void MainWindow::setupLogCurveTest(QCustomPlot *customPlot)
 {
-  customPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+  customPlot->yAxis->setScale(QCPScale::log());
   customPlot->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
-  customPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+  customPlot->yAxis2->setScale(QCPScale::log());
   customPlot->yAxis2->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
   
-  customPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+  customPlot->xAxis->setScale(QCPScale::log());
   customPlot->xAxis->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
-  customPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+  customPlot->xAxis2->setScale(QCPScale::log());
   customPlot->xAxis2->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
   
   QCPCurve *curve =  customPlot->add<QCPCurve>().get();
@@ -1298,7 +1298,7 @@ void MainWindow::setupPolarAxisTest(QCustomPlot *customPlot)
   polarAxis->setTickLabelMode(QCPPolarAxisAngular::lmUpright);
   
   area->radialAxis()->setTickLabelMode(QCPPolarAxisRadial::lmUpright);
-  //area->radialAxis()->setScaleType(QCPPolarAxisRadial::stLogarithmic);
+  //area->radialAxis()->setScale(QCPScale::log());
   //area->radialAxis()->setTicker(QSharedPointer<QCPAxisTicker>(new QCPAxisTickerLog));
   //area->radialAxis()->setRange(0.001, 1e1);
   area->radialAxis()->setTickLabelRotation(0);

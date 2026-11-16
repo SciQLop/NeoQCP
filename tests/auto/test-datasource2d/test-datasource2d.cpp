@@ -783,7 +783,7 @@ void TestDataSource2D::resampleLogYResolutionNotCoarse()
     QSignalSpy spy(&cm->pipeline(), &QCPColormapPipeline::finished);
 
     // Log-Y axis, zoomed out: data covers 5 decades, viewport covers 10
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     mPlot->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
     mPlot->xAxis->setRange(0, 50);
     mPlot->yAxis->setRange(0.01, 1e8);
@@ -904,7 +904,7 @@ void TestDataSource2D::colormap2LogZResamplesInLogSpace()
     cm->setData(std::move(x), std::vector<double>{0, 1}, std::move(z));
     mPlot->xAxis->setRange(0, nx - 1);
     mPlot->yAxis->setRange(0, 1);
-    cm->setDataScaleType(QCPAxis::stLogarithmic);
+    cm->setDataScale(QCPScale::log());
 
     auto maxCell = [cm] {
         auto* r = cm->pipeline().result();
@@ -935,25 +935,25 @@ void TestDataSource2D::colormap2DataScaleTypeSync()
     auto* cs = new QCPColorScale(mPlot);
     mPlot->plotLayout()->addElement(0, 1, cs);
 
-    QCOMPARE(cm->dataScaleType(), QCPAxis::stLinear);
+    QCOMPARE(cm->dataScale(), QCPScale::linear());
 
-    cs->setDataScaleType(QCPAxis::stLogarithmic);
+    cs->setDataScale(QCPScale::log());
     cm->setColorScale(cs);
-    QCOMPARE(cm->dataScaleType(), QCPAxis::stLogarithmic);
+    QCOMPARE(cm->dataScale(), QCPScale::log());
 
     // Changing scale type on color scale propagates to colormap
-    cs->setDataScaleType(QCPAxis::stLinear);
-    QCOMPARE(cm->dataScaleType(), QCPAxis::stLinear);
+    cs->setDataScale(QCPScale::linear());
+    QCOMPARE(cm->dataScale(), QCPScale::linear());
 
-    cs->setDataScaleType(QCPAxis::stLogarithmic);
-    QCOMPARE(cm->dataScaleType(), QCPAxis::stLogarithmic);
+    cs->setDataScale(QCPScale::log());
+    QCOMPARE(cm->dataScale(), QCPScale::log());
 
     // Reverse direction: colormap -> color scale
-    cm->setDataScaleType(QCPAxis::stLinear);
-    QCOMPARE(cs->dataScaleType(), QCPAxis::stLinear);
+    cm->setDataScale(QCPScale::linear());
+    QCOMPARE(cs->dataScale(), QCPScale::linear());
 
-    cm->setDataScaleType(QCPAxis::stLogarithmic);
-    QCOMPARE(cs->dataScaleType(), QCPAxis::stLogarithmic);
+    cm->setDataScale(QCPScale::log());
+    QCOMPARE(cs->dataScale(), QCPScale::log());
 }
 
 void TestDataSource2D::colormap2Creation()

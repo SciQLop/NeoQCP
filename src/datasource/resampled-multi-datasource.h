@@ -347,7 +347,7 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2Multi(
 {
     PROFILE_HERE_N("resampleL2Multi");
     const auto& l1 = l1Cache.level1;
-    if (vp.keyLogScale || l1.keys.empty() || l1.numColumns == 0 || fewEnoughToDrawRaw(raw, vp))
+    if (vp.keyScale.isLog() || l1.keys.empty() || l1.numColumns == 0 || fewEnoughToDrawRaw(raw, vp))
         return nullptr;
 
     const bool withOrigin = !l1.origin.empty();

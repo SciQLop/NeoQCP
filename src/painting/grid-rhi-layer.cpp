@@ -30,7 +30,7 @@ void QCPGridRhiLayer::markGeometryDirty() { mGeometryDirty = true; }
 
 double QCPGridRhiLayer::axisOrigin(QCPAxis* axis) const
 {
-    return axis->scaleType() == QCPAxis::stLinear ? axis->range().lower : 0.0;
+    return axis->scale().isLinear() ? axis->range().lower : 0.0;
 }
 
 void QCPGridRhiLayer::registerAxis(QCPAxis* axis)
@@ -380,7 +380,7 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
                 || cached.subTicksVisible != axis->subTicks()
                 || cached.axisVisible != axis->visible()
                 || cached.ticksVisible != axis->ticks()
-                || cached.scaleType != int(axis->scaleType())
+                || !(cached.scale == axis->scale())
                 || cached.rangeReversed != axis->rangeReversed())
             {
                 mGeometryDirty = true;
@@ -491,7 +491,7 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
             cached.subTicksVisible = axis->subTicks();
             cached.axisVisible = axis->visible();
             cached.ticksVisible = axis->ticks();
-            cached.scaleType = int(axis->scaleType());
+            cached.scale = axis->scale();
             cached.rangeReversed = axis->rangeReversed();
             cached.lastRange = axis->range();
             cached.originValue = axisOrigin(axis);
@@ -571,12 +571,12 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
             float(hAxis->range().upper - hOrigin),
             keyOffset,
             keyLength,
-            (hAxis->scaleType() == QCPAxis::stLogarithmic) ? 1.0f : 0.0f,
+            hAxis->scale().isLog() ? 1.0f : 0.0f,
             float(vAxis->range().lower - vOrigin),
             float(vAxis->range().upper - vOrigin),
             valOffset,
             valLength,
-            (vAxis->scaleType() == QCPAxis::stLogarithmic) ? 1.0f : 0.0f,
+            vAxis->scale().isLog() ? 1.0f : 0.0f,
             0.0f, 0.0f
         };
         static_assert(sizeof(params) == kUniformBufferSize);

@@ -160,7 +160,7 @@ private:
     void installResampleTransform();
 
     std::shared_ptr<QCPDataSource2D> mDataSource;
-    // Captured by value in the pipeline transform (re-baked by setGapThreshold / setDataScaleType)
+    // Captured by value in the pipeline transform (re-baked by setGapThreshold / setDataScale)
     // so background jobs never reference this object's memory.
     double mGapThreshold = 1.5;
     QCPColormapPipeline mPipeline;
@@ -231,9 +231,9 @@ public:
     {
         return this->apply([&](T& p) { p.setDataRange(range); });
     }
-    Ret setDataScaleType(QCPAxis::ScaleType type)
+    Ret setDataScale(const QCPScale& scale)
     {
-        return this->apply([&](T& p) { p.setDataScaleType(type); });
+        return this->apply([&](T& p) { p.setDataScale(scale); });
     }
 
     // The scale the map follows; an empty or dead handle detaches it.

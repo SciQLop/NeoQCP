@@ -951,7 +951,7 @@ void qcpEmit(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArg
 
 /*!
   Like qcpEmit, for a signal that reports a state: \a current is read when the signal is
-  delivered, not when it is queued. A setter that queues it after a nested call (setScaleType after
+  delivered, not when it is queued. A setter that queues it after a nested call (setScale after
   setRange) stays right when a slot of that nested call sets the state again: the last signal a
   listener gets carries the current state.
 */

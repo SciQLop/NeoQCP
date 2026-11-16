@@ -177,7 +177,7 @@ QCPRatioTransform QCPRatioTransform::fitted(const QRectF& rect)
 void qcp::transform::Snapshot::take(const QCPAxis* axis)
 {
     vertical = axis->orientation() == Qt::Vertical;
-    logarithmic = axis->scaleType() == QCPAxisBase::stLogarithmic;
+    logarithmic = axis->scale().isLog();
     reversed = axis->rangeReversed();
     lower = axis->range().lower;
     upper = axis->range().upper;
@@ -327,7 +327,7 @@ void qcp::transform::Polar::take(const QCPPolarAxisAngular& angular, const QCPPo
     const QCPRange radialRange = radial.range();
     lower = radialRange.lower;
     upper = radialRange.upper;
-    logarithmic = radial.scaleType() == QCPAxisBase::stLogarithmic;
+    logarithmic = radial.scale().isLog();
     reversed = radial.rangeReversed();
 }
 

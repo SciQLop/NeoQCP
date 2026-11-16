@@ -141,9 +141,9 @@ void TestRSpan::dirtyTrackingReplots()
 
 void TestRSpan::drawOnLogAxis()
 {
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(1, 1000);
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     mPlot->yAxis->setRange(1, 1000);
     auto span = mPlot->add<QCPItemRSpan>();
     span->setKeyRange(QCPRange(10, 100));
@@ -244,7 +244,7 @@ void TestRSpan::dataDragMovesByMouseDelta()
 
 void TestRSpan::logAxisDragFollowsTheMouseInPixels()
 {
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(1, 1000);
     mPlot->replot();
     auto span = mPlot->add<QCPItemRSpan>();

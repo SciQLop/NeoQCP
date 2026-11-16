@@ -725,7 +725,7 @@ void TestQCPAxisRect::logAxisMarginIsRightOnTheFirstFrame()
   QCustomPlot plot;
   plot.resize(400, 300);
   plot.setLocale(QLocale(QLocale::English, QLocale::UnitedStates));
-  plot.yAxis->setScaleType(QCPAxis::stLogarithmic);
+  plot.yAxis->setScale(QCPScale::log());
   plot.yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
   plot.yAxis->setNumberFormat("eb");
   plot.yAxis->setNumberPrecision(0);
@@ -1077,7 +1077,7 @@ void TestQCPAxisRect::aLinkedScaledAxisDragMovesItsSourceLinearly()
     QCPAxis* linked = mPlot->axisRect()->addAxis(QCPAxis::atTop);
     linked->linkTo(mPlot->xAxis); // identity: the linked axis shows the source's values
     mPlot->xAxis->setRange(1, 10);
-    linked->setScaleType(QCPAxis::stLogarithmic);
+    linked->setScale(QCPScale::log());
     mPlot->axisRect()->setRangeDragAxes(linked, nullptr);
     mPlot->replot();
 

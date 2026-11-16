@@ -123,8 +123,8 @@ void TestItemIndex::randomItemsMatchUnindexed()
         const bool reversed = round % 2 == 0;
         if (logarithmic)
         {
-            plot.xAxis->setScaleType(QCPAxis::stLogarithmic);
-            plot.yAxis->setScaleType(QCPAxis::stLogarithmic);
+            plot.xAxis->setScale(QCPScale::log());
+            plot.yAxis->setScale(QCPScale::log());
             plot.xAxis->setRange(0.5, 500);
             plot.yAxis->setRange(0.5, 500);
         }
@@ -170,14 +170,14 @@ void TestItemIndex::randomItemsMatchUnindexed()
         {
             if (step % 10 == 5)
             {
-                if (plot.xAxis->scaleType() == QCPAxis::stLinear)
+                if (plot.xAxis->scale().isLinear())
                 {
                     plot.xAxis->setRange(1, 100);
-                    plot.xAxis->setScaleType(QCPAxis::stLogarithmic);
+                    plot.xAxis->setScale(QCPScale::log());
                 }
                 else
                 {
-                    plot.xAxis->setScaleType(QCPAxis::stLinear);
+                    plot.xAxis->setScale(QCPScale::linear());
                 }
             }
             if (items.empty())
@@ -346,7 +346,7 @@ void TestItemIndex::scaleTypeChangeRebuildsTheIndex()
     const int builds = layer->mItemIndexBuilds;
     QVERIFY(builds >= 1);
 
-    plot.xAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot.xAxis->setScale(QCPScale::log());
     plot.xAxis->setRange(1, 100);
     plot.replot();
     QCoreApplication::processEvents();
@@ -359,7 +359,7 @@ void TestItemIndex::scaleTypeChangeRebuildsTheIndex()
     // And the frame must be the one a plot built on a log axis from the start draws.
     QCustomPlot fresh;
     fresh.resize(400, 300);
-    fresh.xAxis->setScaleType(QCPAxis::stLogarithmic);
+    fresh.xAxis->setScale(QCPScale::log());
     fresh.xAxis->setRange(1, 100);
     fresh.yAxis->setRange(0, 100);
     auto freshBracket = fresh.add<QCPItemBracket>();

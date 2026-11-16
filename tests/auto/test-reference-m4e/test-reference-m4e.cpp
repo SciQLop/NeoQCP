@@ -82,7 +82,7 @@ QImage errorBarsScene(bool verticalKey, bool logValue, bool selected, bool legen
                 bars->addToLegend();
             }
             if (logValue)
-                value->setScaleType(QCPAxis::stLogarithmic);
+                value->setScale(QCPScale::log());
         });
 }
 
@@ -127,7 +127,7 @@ QImage financialScene(bool ohlc, bool verticalKey, bool logValue, bool selected,
                 financial->addToLegend();
             }
             if (logValue)
-                value->setScaleType(QCPAxis::stLogarithmic);
+                value->setScale(QCPScale::log());
         });
 }
 
@@ -157,7 +157,7 @@ QImage statisticalBoxScene(bool verticalKey, bool selected, bool legend, bool lo
                 box->addToLegend();
             }
             if (logValue)
-                value->setScaleType(QCPAxis::stLogarithmic);
+                value->setScale(QCPScale::log());
         });
 }
 
@@ -476,7 +476,7 @@ QImage polarScene(const char* kind)
                 QCPPolarAxisRadial* radial = area->radialAxis();
                 angular->setRange(0, 360);
                 radial->setRange(1, 1000);
-                radial->setScaleType(QCPPolarAxisRadial::stLogarithmic);
+                radial->setScale(QCPScale::log());
                 auto ticker = QSharedPointer<QCPAxisTickerLog>::create();
                 ticker->setLogBase(10);
                 radial->setTicker(ticker);

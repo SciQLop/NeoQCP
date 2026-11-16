@@ -819,7 +819,7 @@ void QCPFinancial::recordSegment(QCPDrawContext& context, const QCPDataRange& se
         return;
     // 2.x centred a plot-coordinate body symmetrically in pixels. On a log key axis the two data
     // halves are not equal on screen, so such a body is recorded in pixels, as a pixel width is.
-    const bool logKey = keyAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool logKey = !keyAxis->scale().isLinear();
     const bool dataSpace = mWidthType == wtPlotCoords && !logKey;
     if (!dataSpace)
         (void)context.transform(); // a pixel width (or a log key axis): this geometry is this view's

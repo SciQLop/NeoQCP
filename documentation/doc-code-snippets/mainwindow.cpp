@@ -215,14 +215,14 @@ void MainWindow::snippetQCPFinancial()
 void MainWindow::snippetQCPAxisTickers()
 {
   //! [qcpaxisticker-log-creation]
-  customPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+  customPlot->xAxis->setScale(QCPScale::log());
   customPlot->xAxis->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
   //! [qcpaxisticker-log-creation]
   
   QCPColorScale *colorScale = new QCPColorScale(customPlot);
   customPlot->plotLayout()->addElement(colorScale);
   //! [qcpaxisticker-log-colorscale]
-  colorScale->setDataScaleType(QCPAxis::stLogarithmic);
+  colorScale->setDataScale(QCPScale::log());
   colorScale->axis()->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
   //! [qcpaxisticker-log-colorscale]
 }

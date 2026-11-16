@@ -69,7 +69,7 @@ Tick marks and tick labels have their own switches:
 
 ![A power spectrum on log-log axes](images/axes-log.png)
 
-`setScaleType(QCPAxis::stLogarithmic)` makes the axis logarithmic.
+`setScale(QCPScale::log())` makes the axis logarithmic.
 A log axis cannot reach or cross zero. When asked for a range that does, the axis keeps the wider side of zero and replaces zero with a small value.
 
 The scale type only changes the mapping. It does not change where ticks go.
@@ -78,6 +78,19 @@ So give a log axis a `QCPAxisTickerLog`, as above.
 The log ticker puts ticks on whole powers of ten.
 On a range shorter than about 1.6 decades there are too few of those. It then uses round mantissas instead: 1, 2 and 5 × 10ⁿ, then denser sets if needed.
 On a very long range it skips powers to keep the labels apart.
+
+## The scale is a value
+
+`scale()` returns the axis' scale and `setScale()` takes one: an axis takes `QCPScale::linear()` or
+`QCPScale::log()`, and a colour scale takes the same value as its data scale with
+`setDataScale()`. Setting the scale an axis already has does nothing and emits nothing.
+
+```cpp
+plot.xAxis->setScale(QCPScale::log());          // the same as the log example above
+colorScale->setDataScale(QCPScale::log());      // a logarithmic colour mapping
+```
+
+`scaleChanged` reports the new scale.
 
 ## Tickers
 
@@ -222,7 +235,8 @@ Connect one to the other, and the second axis follows the first.
 
 `rangeChanged` passes the old range too, so a slot can take either `(newRange, oldRange)` or just
 `newRange`.
-The axis also emits `scaleTypeChanged` when the scale type changes.
+The axis also emits `scaleChanged` when its scale changes. A scale is a value: `QCPScale::linear()`,
+`QCPScale::log()` or `QCPScale::symlog()`, passed to `setScale()` (see below).
 
 ### A second axis in other units
 

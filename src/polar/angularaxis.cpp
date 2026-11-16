@@ -1140,11 +1140,11 @@ void QCPPolarAxisAngular::rangeDidChange(const QCPRange& oldRange)
 /*! \internal
 
   The ring places every angle by its fraction of the angular range, whatever the scale: a
-  logarithmic one would change the ticks and nothing else, so it is refused.
+  non-linear one would change the ticks and nothing else, so it is refused.
 */
-bool QCPPolarAxisAngular::scaleTypeWillChange(ScaleType type)
+bool QCPPolarAxisAngular::scaleWillChange(const QCPScale& scale)
 {
-    QCP_CHECK_OR_RETURN(type == stLinear, "a polar angular axis has no logarithmic scale", false);
+    QCP_CHECK_OR_RETURN(scale.isLinear(), "a polar angular axis has no non-linear scale", false);
     return true;
 }
 

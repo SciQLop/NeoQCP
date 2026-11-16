@@ -113,7 +113,7 @@ The X fill range uses the same bounded-fill strategy as Y: each source column fi
 
 The loop is driven by output columns: for each output column, it visits the source columns whose fill can reach it. That makes the work splittable. Once a job has at least a million visible source cells, the output columns are cut into contiguous chunks processed in parallel, each writing only its own slice of the accumulation buffers, so no locking is needed. The accumulation buffers are kept in the pipeline cache and reused by the next job of the same size.
 
-With a logarithmic colour scale (`setDataScaleType(QCPAxis::stLogarithmic)`), `log10(z)` is accumulated instead of `z`, and `z <= 0` samples are left out; the bin only remembers that it saw one.
+With a logarithmic colour scale (`setDataScale(QCPScale::log())`), `log10(z)` is accumulated instead of `z`, and `z <= 0` samples are left out; the bin only remembers that it saw one.
 
 ### Step 5: Divide
 
@@ -197,9 +197,9 @@ QCPColorMap2 uses `QCPColormapPipeline` (an alias for `QCPAsyncPipeline<QCPDataS
 
 The transform is viewport-dependent. Resampling is triggered by:
 - **New data** → `setDataSource()` / `dataChanged()` → `onDataChanged()` on the pipeline (Heavy priority)
-- **Settings that change the result** → `setGapThreshold()`, `setDataScaleType()` → the transform is re-installed with the new values captured, then `onDataChanged()`
+- **Settings that change the result** → `setGapThreshold()`, `setDataScale()` → the transform is re-installed with the new values captured, then `onDataChanged()`
 - **Pan/zoom** → key or value axis `rangeChanged` signal → `onViewportChanged()` (Fast priority)
-- **Scale type change** → value axis `scaleTypeChanged` signal → `onViewportChanged()`
+- **Scale change** → value axis `scaleChanged` signal → `onViewportChanged()`
 - **Resize** → a draw that finds the last resample made for another plot size requests a new one
 
 Each request increments the generation counter and submits a job. The pipeline coalesces rapid requests (e.g., during a drag-pan) so only the latest viewport is resampled.

@@ -229,9 +229,9 @@ public:
         return this->apply([&](T& p) { p.setDataRange(range); });
     }
 
-    Ret setDataScaleType(QCPAxis::ScaleType type)
+    Ret setDataScale(const QCPScale& scale)
     {
-        return this->apply([&](T& p) { p.setDataScaleType(type); });
+        return this->apply([&](T& p) { p.setDataScale(scale); });
     }
 
     // The scale the map follows; an empty or dead handle detaches it.

@@ -2025,9 +2025,9 @@ QCPItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>& positio
     bool valueBounded = valuePositions == std::size_t(positions.size());
     // A logarithmic axis has no pixel for a coordinate at or below zero, yet draw() still runs: such
     // an item is left unindexed instead of being culled by a box the axis cannot map.
-    if (keyBounded && keyAxis->scaleType() == QCPAxis::stLogarithmic && !(box.keyLower > 0))
+    if (keyBounded && keyAxis->scale().isLog() && !(box.keyLower > 0))
         keyBounded = false;
-    if (valueBounded && valueAxis->scaleType() == QCPAxis::stLogarithmic && !(box.valueLower > 0))
+    if (valueBounded && valueAxis->scale().isLog() && !(box.valueLower > 0))
         valueBounded = false;
     if (!keyBounded && !valueBounded)
         return std::nullopt;

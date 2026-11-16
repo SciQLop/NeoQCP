@@ -1156,7 +1156,7 @@ void TestUserSystem::aLogImpulseRunsToTheBoundNearerZero()
 {
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
-    rect->axis(QCPAxis::atLeft)->setScaleType(QCPAxis::stLogarithmic);
+    rect->axis(QCPAxis::atLeft)->setScale(QCPScale::log());
     rect->axis(QCPAxis::atLeft)->setRange(1, 10);
     InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setLineStyle(QCPGraph::lsImpulse);
@@ -2156,7 +2156,7 @@ void TestUserSystem::aMultiGraphFillOnALogAxisStopsAtTheBoundNearerZero()
         QCustomPlot plot;
         SkewRect* rect = skewRect(plot);
         QCPAxis* value = rect->axis(QCPAxis::atLeft);
-        value->setScaleType(QCPAxis::stLogarithmic);
+        value->setScale(QCPScale::log());
         value->setRange(negative ? QCPRange(-10, -1) : QCPRange(1, 10));
         InspectableMultiGraph* graph = multiGraphOn(rect);
         graph->setData(QVector<double> { 2, 4 },
@@ -2336,7 +2336,7 @@ void TestUserSystem::aStepCentreOnALogKeyUserSystemTurnsInLogSpace()
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
     QCPAxis* key = rect->axis(QCPAxis::atBottom);
-    key->setScaleType(QCPAxis::stLogarithmic);
+    key->setScale(QCPScale::log());
     key->setRange(1, 100);
     rect->axis(QCPAxis::atLeft)->setRange(-1, 3);
     auto* graph = multiGraphOn(rect);

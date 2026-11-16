@@ -106,14 +106,14 @@ void QCPHistogram::followKeyAxis()
 {
     disconnect(mKeyScaleLink);
     if (keyAxisRaw())
-        mKeyScaleLink = connect(keyAxisRaw(), &QCPAxis::scaleTypeChanged, this, &QCPHistogram::resetEdges);
+        mKeyScaleLink = connect(keyAxisRaw(), &QCPAxis::scaleChanged, this, &QCPHistogram::resetEdges);
 }
 
 QCPHistogram::~QCPHistogram() = default;
 
 bool QCPHistogram::keyLog() const
 {
-    return keyAxisRaw() && keyAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
+    return keyAxisRaw() && keyAxisRaw()->scale().isLog();
 }
 
 // The transform's scale alone is not enough: rememberEdges() reinstalls it for the current axis
@@ -403,7 +403,7 @@ void QCPHistogram::recordRects(QCPDrawContext& context, int column, const QPen& 
                                const QBrush& brush) const
 {
     const auto& heights = mResult->heights[std::size_t(column)];
-    const bool log = valueAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
+    const bool log = valueAxisRaw()->scale().isLog();
     const double base = baseValue(context);
     for (std::size_t b = 0; b < heights.size(); ++b)
     {
@@ -428,7 +428,7 @@ void QCPHistogram::recordStep(QCPDrawContext& context, int column, const ColumnL
     if (look.fill.alpha() > 0)
         recordRects(context, column, QPen(Qt::NoPen), look.fill);
     const auto& heights = mResult->heights[std::size_t(column)];
-    const bool log = valueAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
+    const bool log = valueAxisRaw()->scale().isLog();
     const double base = baseValue(context);
     const QPointF breakPoint(qQNaN(), qQNaN());
     std::vector<QPointF> points;
@@ -465,7 +465,7 @@ void QCPHistogram::recordStep(QCPDrawContext& context, int column, const ColumnL
 // A log axis has no zero: the bars start at its lower bound, so the recording follows that bound.
 double QCPHistogram::baseValue(QCPDrawContext& context) const
 {
-    if (valueAxisRaw()->scaleType() == QCPAxis::stLinear)
+    if (valueAxisRaw()->scale().isLinear())
         return 0.0;
     (void)context.transform();
     return valueAxisRaw()->range().lower;

@@ -441,7 +441,7 @@ inline int l2BinCount(const ViewportParams& vp)
 template <typename Source>
 inline bool fewEnoughToDrawRaw(const Source& raw, const ViewportParams& vp)
 {
-    const QCPRange scan = lineCacheKeyRange(vp.keyRange, vp.keyLogScale);
+    const QCPRange scan = lineCacheKeyRange(vp.keyRange, vp.keyScale.isLog());
     return raw.findEnd(scan.upper) - raw.findBegin(scan.lower) <= l2BinCount(vp);
 }
 

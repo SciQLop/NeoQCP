@@ -132,7 +132,7 @@ Scene errorBarsScene(bool verticalKey, bool logValue, bool selected,
     if (tweak)
         tweak(*graph, *bars);
     if (logValue)
-        value->setScaleType(QCPAxis::stLogarithmic);
+        value->setScale(QCPScale::log());
     plot.replot();
     return { imageOf(plot), bars->recordedCommands() };
 }

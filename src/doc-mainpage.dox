@@ -46,8 +46,8 @@
 
   Their range is handled by the simple \ref QCPRange class which basically holds the lower and
   upper axis coordinate. You can set the range with the \ref QCPAxis::setRange function. To change
-  the axis scale type from a linear scale to a logarithmic scale, set \ref QCPAxis::setScaleType to
-  \ref QCPAxis::stLogarithmic. In that case you will also want logarithmically spaced ticks and
+  the axis scale from a linear scale to a logarithmic one, pass \ref QCPScale::log() to \ref
+  QCPAxis::setScale. In that case you will also want logarithmically spaced ticks and
   tick labels, so set the axis ticker with \ref QCPAxis::setTicker to a \ref QCPAxisTickerLog
   instance.
 

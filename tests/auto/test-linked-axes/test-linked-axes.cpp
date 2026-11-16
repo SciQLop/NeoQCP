@@ -131,13 +131,13 @@ void TestLinkedAxes::linkedPixelsMatchTheSourceOnOneRect()
                  "pixelToCoord undoes coordToPixel");
     }
 
-    plot.xAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot.xAxis->setScale(QCPScale::log());
     plot.xAxis->setRange(1, 100);
     for (const double v : {1.0, 3.3, 10.0})
         QVERIFY2(near(plot.xAxis2->coordToPixel(2 * v), plot.xAxis->coordToPixel(v)),
                  "a link on a log source maps where its source maps");
 
-    plot.xAxis->setScaleType(QCPAxis::stLinear);
+    plot.xAxis->setScale(QCPScale::linear());
     plot.xAxis->setRange(1, 10);
     plot.xAxis->setRangeReversed(true);
     QVERIFY2(plot.xAxis2->rangeReversed(), "the link follows the source's reversal");
@@ -364,7 +364,7 @@ void TestLinkedAxes::scaleTypeOnALinkedAxisLeavesTheSourceAlone()
     plot.xAxis2->linkTo(plot.xAxis);
     QCOMPARE(plot.xAxis2->range(), QCPRange(-5, 5));
 
-    plot.xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    plot.xAxis2->setScale(QCPScale::log());
     QCOMPARE(gMisuses, 0);
     QCOMPARE(plot.xAxis->range(), QCPRange(-5, 5));
     // The linked axis sanitizes its own copy: a log range never spans zero.
@@ -372,7 +372,7 @@ void TestLinkedAxes::scaleTypeOnALinkedAxisLeavesTheSourceAlone()
              qPrintable(QStringLiteral("(%1, %2)")
                             .arg(plot.xAxis2->range().lower)
                             .arg(plot.xAxis2->range().upper)));
-    QCOMPARE(plot.xAxis2->scaleType(), QCPAxis::stLogarithmic);
+    QCOMPARE(plot.xAxis2->scale(), QCPScale::log());
 
     plot.xAxis->setRange(1, 10);
     QCOMPARE(plot.xAxis2->range(), QCPRange(1, 10));
@@ -642,7 +642,7 @@ void TestLinkedAxes::aVerticalLinkFollowsALogReversedSource()
 {
     QCustomPlot plot;
     plot.setGeometry(0, 0, 400, 300);
-    plot.yAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot.yAxis->setScale(QCPScale::log());
     plot.yAxis->setRange(0.1, 1000);
     plot.yAxis->setRangeReversed(true);
     QCPAxisRect* second = new QCPAxisRect(&plot);

@@ -32,8 +32,8 @@ public:
     [[nodiscard]] const QCPColorGradient& gradient() const { return mGradient; }
     void setRange(const QCPRange& range) { mRange = range; ++mGeneration; }
     [[nodiscard]] QCPRange range() const { return mRange; }
-    void setScaleType(QCPAxis::ScaleType type) { mScaleType = type; ++mGeneration; }
-    [[nodiscard]] QCPAxis::ScaleType scaleType() const { return mScaleType; }
+    void setScale(const QCPScale& scale) { mScale = scale; ++mGeneration; }
+    [[nodiscard]] const QCPScale& scale() const { return mScale; }
     [[nodiscard]] const std::shared_ptr<const std::vector<double>>& values() const
     {
         return mValues;
@@ -47,7 +47,7 @@ public:
         const double v = (*mValues)[dataIndex];
         if (!std::isfinite(v))
             return kGap;
-        const bool log = mScaleType == QCPAxis::stLogarithmic;
+        const bool log = mScale.isLog();
         if (log && v <= 0)
             return kGap;
         return toBucket(log ? logPosition(v) : linearPosition(v));
@@ -92,7 +92,7 @@ private:
     std::shared_ptr<const std::vector<double>> mValues;
     QCPColorGradient mGradient;
     QCPRange mRange {0, 1};
-    QCPAxis::ScaleType mScaleType = QCPAxis::stLinear;
+    QCPScale mScale;
     std::array<QRgb, 256> mLut {};
     quint64 mGeneration = 0;
 };

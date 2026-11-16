@@ -579,6 +579,26 @@ Behaviour changes for 2.1 polar users:
   - Clicking inside a polar graph's fill selects it, as for cartesian graphs.
   - setSystem() with a non-polar system is refused as misuse.
 
+Milestone 6f (scales). Breaking, in the 3.0 preview line: the scale an axis, a colour scale or a
+colour-mapped plottable shows its data with is a value, not an enum.
+  - QCPScale (axis/scale.h): QCPScale::linear(), QCPScale::log(base = 10) and
+        QCPScale::symlog(threshold = 2, base = 10, linearScale = 1), with kind(), isLinear(),
+        isLog(), isSymlog(), base(), threshold(), linearScale(), toScale(), fromScale() and
+        sanitized(). A parameter out of range is refused as misuse and gives the factory's default.
+  - QCPAxisBase::setScale(const QCPScale&), scale(), scaleChanged(const QCPScale&) and the `scale`
+        property replace setScaleType/scaleType/scaleTypeChanged and the ScaleType enum, which are
+        gone with no forwarder. setScale(log()) sanitizes the range as setScaleType(stLogarithmic)
+        did; an equal scale emits nothing. Only linear and log draw so far: QCPScale::symlog() is a
+        value whose mapping, interaction and colour arrive with the rest of this milestone.
+  - QCPColorScale, QCPColorMapped and the plottables that carry a data scale: setDataScale(),
+        dataScale(), dataScaleChanged() and the `dataScale` property replace the *DataScaleType
+        names. A data scale set before the plottable is added to a rect now wins over the rect
+        colour scale's, as a gradient chosen before it already did.
+  - QCPColorGradient::color() and colorize() take a QCPScale instead of a bool logarithmic.
+  - ViewportParams carries a QCPScale per axis instead of keyLogScale/valueLogScale, for the
+        pipeline code that builds one by hand.
+  - A polar angular axis still refuses a non-linear scale, as misuse.
+
 Milestone 6c (the drawing context): units and positions. Additive, except where noted.
   - QCP::PixelLength and the `_px` literal (namespace QCP::Literals, spelled like Qt::Literals):
         8_px is a QCP::PixelLength{8}, so a distance is a type of its own and a bare number cannot

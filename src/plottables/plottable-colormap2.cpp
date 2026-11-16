@@ -81,8 +81,8 @@ void QCPColorMap2::followAxes()
             continue;
         mAxisLinks << connect(axis, &QCPAxis::rangeChanged,
                               this, &QCPColorMap2::onViewportChanged);
-        mAxisLinks << connect(axis, &QCPAxis::scaleTypeChanged,
-                              this, &QCPColorMap2::onViewportChanged);
+        mAxisLinks << connect(axis, &QCPAxis::scaleChanged, this,
+                              &QCPColorMap2::onViewportChanged);
     }
     onViewportChanged(); // the resample was made for the old axes
 }
@@ -94,7 +94,7 @@ void QCPColorMap2::installResampleTransform()
 {
     mPipeline.setTransform(TransformKind::ViewportDependent,
         [gapThreshold = mGapThreshold,
-         zLog = mRenderer.dataScaleType() == QCPAxis::stLogarithmic](
+         zLog = mRenderer.dataScale().isLog()](
             const QCPDataSource2D& src,
             const ViewportParams& vp,
             std::any& cache) -> std::shared_ptr<QCPColorMapData> {
@@ -132,10 +132,10 @@ void QCPColorMap2::installResampleTransform()
             double vpKeySz = vp.keyRange.size();
             double xFrac = vpKeySz > 0 ? xOut.size() / vpKeySz : 1.0;
             // NOTE: the key (X) axis is always sampled linearly here, even
-            // when vp.keyLogScale is set -- a log key axis is unsupported by
-            // this layer (image and contours alike, not just contours).
+            // when the key scale is non-linear -- a log key axis is unsupported
+            // by this layer (image and contours alike, not just contours).
             double vpValSz = vp.valueRange.size();
-            double yFrac = vp.valueLogScale ? logFrac(yOut, vp.valueRange)
+            double yFrac = vp.valueScale.isLog() ? logFrac(yOut, vp.valueRange)
                                             : (vpValSz > 0 ? yOut.size() / vpValSz : 1.0);
             int pixW = std::clamp(static_cast<int>(vp.plotWidthPx * xFrac), 1, 32768);
             int pixH = std::clamp(static_cast<int>(vp.plotHeightPx * yFrac), 1, 32768);
@@ -149,7 +149,7 @@ void QCPColorMap2::installResampleTransform()
                 cache = qcp::algo2d::ResampleCache{};
             auto& rc = std::any_cast<qcp::algo2d::ResampleCache&>(cache);
             auto* raw = qcp::algo2d::resample(src, xBegin, xEnd,
-                xOut, yOut, w, h, vp.valueLogScale, zLog, gapThreshold, &rc);
+                xOut, yOut, w, h, vp.valueScale.isLog(), zLog, gapThreshold, &rc);
             return std::shared_ptr<QCPColorMapData>(raw);
         });
 }
@@ -224,11 +224,11 @@ QCPRange QCPColorMap2::colorDataBounds(bool& found, bool recalc) const
 
 void QCPColorMap2::colorMappingChanged()
 {
-    const bool scaleTypeChanged = mRenderer.dataScaleType() != dataScaleType();
-    mRenderer.setDataScaleType(dataScaleType());
+    const bool scaleChanged = mRenderer.dataScale() != dataScale();
+    mRenderer.setDataScale(dataScale());
     mRenderer.setDataRange(dataRange());
     mRenderer.setGradient(gradient());
-    if (scaleTypeChanged)
+    if (scaleChanged)
     {
         // The resample transform captured the old colour scale type; a job may delete this map.
         const QPointer<QCPColorMap2> alive(this);
@@ -341,7 +341,7 @@ void QCPColorMap2::draw(QCPDrawContext& context) const
     const QCP::Data rightBottom = keyIsVertical ? QCP::Data { keyRange.lower, valRange.upper }
                                                 : QCP::Data { keyRange.upper, valRange.lower };
     context.image(leftTop, rightBottom, image, {}, false);
-    self->mContours.update(resampledData, context, dataScaleType(), keyAxisRaw(), valueAxisRaw());
+    self->mContours.update(resampledData, context, dataScale(), keyAxisRaw(), valueAxisRaw());
 }
 
 void QCPColorMap2::drawLegendIcon(QCPDrawContext& icon) const

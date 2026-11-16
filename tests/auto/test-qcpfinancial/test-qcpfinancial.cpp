@@ -232,7 +232,7 @@ Scene financialScene(bool ohlc, bool verticalKey, bool logValue, bool selected)
     financial->setSelection(QCPDataSelection(QCPDataRange(2, 5)));
   }
   if (logValue)
-    value->setScaleType(QCPAxis::stLogarithmic);
+    value->setScale(QCPScale::log());
   plot.replot();
   return { imageOf(plot), financial->recordedCommands() };
 }
@@ -335,7 +335,7 @@ void TestQCPFinancial::aLogKeyAxisCentresTheBodyInPixels()
 {
   QCustomPlot plot;
   plot.resize(400, 300);
-  plot.xAxis->setScaleType(QCPAxis::stLogarithmic);
+  plot.xAxis->setScale(QCPScale::log());
   plot.xAxis->setRange(1, 100);
   plot.yAxis->setRange(0, 10);
   auto* chart = plot.add<RecordingFinancial>().get();

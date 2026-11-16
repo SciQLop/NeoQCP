@@ -15,6 +15,7 @@ line numbers will drift).
 |---|---|---|
 | `QCPItemHSpan` / `QCPItemVSpan` deleted (4e) | `plot.add<QCPItemSpan>(Qt::Horizontal / Qt::Vertical)`; same `range()`, `setRange()`, `lowerEdge`, `upperEdge`, `rangeChanged` | `src/SciQLopMultiPlotPanel.cpp` ~823-908 (preview spans, `qobject_cast<QCPItemVSpan*>`), `include/SciQLopPlots/MultiPlots/SciQLopMultiPlotPanel.hpp` ~45, 70, `src/SpanTargets.cpp` ~52-54 (`SpanItem<QCPItemVSpan>`, `SpanItem<QCPItemHSpan>`): 16 references in all |
 | Line colour API renamed (4c): `setColorGradient`, `setColorRange`, `setColorScaleType` | `setGradient`, `setDataRange`, `setDataScaleType` | `src/SciQLopLineGraph.cpp` ~229-237 |
+| A scale is a value (6f): `setScaleType(bool ? QCPAxis::stLogarithmic : QCPAxis::stLinear)`, `scaleTypeChanged`, `dataScaleType()` and `setDataScaleType()` | `setScale(log ? QCPScale::log() : QCPScale::linear())`, `scaleChanged`, `dataScale()`, `setDataScale(...)` | `src/SciQLopPlotAxis.cpp` ~138, ~676-737, `src/SciQLopTimeColoredCurve.cpp` ~102-123, `src/SciQLopLineGraph.cpp` ~205-231, `src/SciQLopHistogram.cpp` ~409, `src/SciQLopHistogram2D.cpp` |
 | `QCPHistogram2D::Normalization` (`nNone`, `nColumn`) removed (4c) | `setColumnNormalized(bool)` / `columnNormalized()` | `src/SciQLopHistogram2D.cpp` ~229-238 |
 | `QCPHistogram::edgesChanged()` removed (4c) | `histogramReady()` | `src/SciQLopHistogram.cpp` ~124 |
 | `setSelectable(bool)` on items, legend rows, text elements (4a) | `setSelectable(QCP::stWhole / QCP::stNone)` | `src/SciQLopCrosshair.cpp` ~99-115, `src/SpanTargets.cpp` ~43 |

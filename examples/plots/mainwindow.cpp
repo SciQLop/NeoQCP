@@ -696,8 +696,8 @@ void MainWindow::setupLogarithmicDemo(QCustomPlot *customPlot)
 
   customPlot->yAxis->grid()->setSubGridVisible(true);
   customPlot->xAxis->grid()->setSubGridVisible(true);
-  customPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
-  customPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+  customPlot->yAxis->setScale(QCPScale::log());
+  customPlot->yAxis2->setScale(QCPScale::log());
   QSharedPointer<QCPAxisTickerLog> logTicker(new QCPAxisTickerLog);
   customPlot->yAxis->setTicker(logTicker);
   customPlot->yAxis2->setTicker(logTicker);

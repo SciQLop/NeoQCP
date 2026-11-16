@@ -638,10 +638,10 @@ void TestQCPBars::groupedBarsOnALogAxis()
     referenceGroup->append(colouredBars(&reference, Qt::red));
     referenceGroup->append(colouredBars(&reference, Qt::green));
     changed.replot(); // first frame on a linear key axis
-    reference.xAxis->setScaleType(QCPAxis::stLogarithmic);
+    reference.xAxis->setScale(QCPScale::log());
     reference.replot();
 
-    changed.xAxis->setScaleType(QCPAxis::stLogarithmic); // the axis the reference always had
+    changed.xAxis->setScale(QCPScale::log()); // the axis the reference always had
     changed.replot();
     QCOMPARE(leftEdgeOf(frameOf(&changed), &changed, 0.5, QColor(Qt::red)),
              leftEdgeOf(frameOf(&reference), &reference, 0.5, QColor(Qt::red)));

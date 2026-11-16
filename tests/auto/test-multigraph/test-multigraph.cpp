@@ -1832,7 +1832,7 @@ void TestMultiGraph::logValueImpulsesFollowTheValueRange()
     auto* mg = mPlot->add<QCPGraph>().get();
     mg->setData(std::vector<double> { 0, 1, 2 }, std::vector<std::vector<double>> { { 10, 100, 10 } });
     mg->setLineStyle(QCPGraph::lsImpulse);
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(-0.5, 2.5);
     mPlot->yAxis->setRange(1, 1000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -1850,7 +1850,7 @@ void TestMultiGraph::logKeyCentreStepSitsHalfwayOnScreen()
     auto* mg = mPlot->add<QCPGraph>().get();
     mg->setData(std::vector<double> { 1, 10, 100 }, std::vector<std::vector<double>> { { 0, 1, 0 } });
     mg->setLineStyle(QCPGraph::lsStepCenter);
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(1, 100);
     mPlot->yAxis->setRange(-1, 2);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -1870,7 +1870,7 @@ void TestMultiGraph::logKeyCentreStepFillSitsHalfwayOnScreen()
     mg->setData(std::vector<double> { 1, 10, 100 }, std::vector<std::vector<double>> { { 1, 2, 1 } });
     mg->setLineStyle(QCPGraph::lsStepCenter);
     mg->setComponentFill(0, 0.0, QBrush(Qt::red));
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(1, 100);
     mPlot->yAxis->setRange(-1, 3);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -2244,7 +2244,7 @@ void TestMultiGraph::fillOnALogAxisClampsAZeroBaseline()
     auto* mg = mPlot->add<QCPGraph>().get();
     mg->setData(std::vector<double>{1, 2, 3}, std::vector<std::vector<double>>{{10, 10, 10}});
     mg->setComponentFill(0, 0.0, QBrush(Qt::red));
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(1, 3);
     mPlot->yAxis->setRange(0.1, 100);
     const QImage img = renderOf(mPlot);
@@ -2260,7 +2260,7 @@ static QCPGraph* bandDownToZeroOnALogAxis(QCustomPlot* plot)
     mg->setData(std::vector<double>{1, 2, 3, 4},
                 std::vector<std::vector<double>>{{0, 0, nan, 0}, {10, 10, 10, 10}});
     mg->setComponentFillBetween(1, 0, QBrush(Qt::red));
-    plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->yAxis->setScale(QCPScale::log());
     plot->xAxis->setRange(1, 4);
     plot->yAxis->setRange(0.1, 100);
     return mg;
@@ -2513,7 +2513,7 @@ void TestMultiGraph::errorBoundsBelowZeroOnALogAxisReachTheEdge()
     auto* mg = errorBarGraph(mPlot, 3, 1.0);
     std::vector<double> x{0, 1, 2}, y{1, 1, 1}, lo{-1, -1, -1}, hi{2, 2, 2};
     mg->setData(std::move(x), std::vector<std::vector<double>>{std::move(y), std::move(lo), std::move(hi)});
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(-0.5, 2.5);
     mPlot->yAxis->setRange(0.1, 10);
     mPlot->xAxis->setTicks(false); // the tick at x = 1 would cover the bottom rows
@@ -2540,7 +2540,7 @@ void TestMultiGraph::errorBandBoundsBelowZeroOnALogAxisAreClampedLikeABaseline()
     auto* mg = errorBarGraph(mPlot, 3, 1.0);
     std::vector<double> x{0, 1, 2}, y{1, 1, 1}, lo{-1, 0, 0.5}, hi{2, 2, 2};
     mg->setData(std::move(x), std::vector<std::vector<double>>{std::move(y), std::move(lo), std::move(hi)});
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(-0.5, 2.5);
     mPlot->yAxis->setRange(0.1, 10);
     renderOf(mPlot); // lays the axis rect out
@@ -3085,7 +3085,7 @@ void TestMultiGraph::lineCacheWindowFollowsTheKeyScale()
     mg->setData(std::vector<double>(keys),
                 std::vector<std::vector<double>> { std::vector<double>(keys.size(), 1.0) });
     mg->setComponentPens({ QPen(Qt::red, 2) });
-    mPlot->xAxis->setScaleType(logKeyAxis ? QCPAxis::stLogarithmic : QCPAxis::stLinear);
+    mPlot->xAxis->setScale(logKeyAxis ? QCPScale::log() : QCPScale::linear());
     mPlot->xAxis->setRange(viewLower, viewUpper);
     mPlot->yAxis->setRange(0, 2);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -3128,7 +3128,7 @@ void TestMultiGraph::lineCacheFollowsTheScaleOfANewKeyAxis()
     auto* mg = decadesOnTheSecondAxes(mPlot, true);
     mg->setComponentPens({ QPen(Qt::red, 2) });
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis2->setScale(QCPScale::log());
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     const QPoint vertex(qRound(mPlot->xAxis2->coordToPixel(10)),
                         qRound(mPlot->yAxis->coordToPixel(10)));
@@ -3141,7 +3141,7 @@ void TestMultiGraph::lineCacheFollowsTheScaleOfANewValueAxis()
     auto* mg = decadesOnTheSecondAxes(mPlot, false);
     mg->setComponentPens({ QPen(Qt::red, 2) });
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis2->setScale(QCPScale::log());
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     const QPoint vertex(qRound(mPlot->xAxis->coordToPixel(10)),
                         qRound(mPlot->yAxis2->coordToPixel(10)));
@@ -3154,7 +3154,7 @@ static QCPGraph* decadesThenMovedToALogAxis(QCustomPlot* plot, bool keyAxis)
 {
     for (QCPAxis* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
         axis->setRange(1, 100);
-    (keyAxis ? plot->xAxis2 : plot->yAxis2)->setScaleType(QCPAxis::stLogarithmic);
+    (keyAxis ? plot->xAxis2 : plot->yAxis2)->setScale(QCPScale::log());
     auto* mg = plot->add<QCPGraph>().get();
     const std::vector<double> decades{1, 10, 100};
     mg->setData(std::vector<double>(decades), std::vector<std::vector<double>>{decades});
@@ -3194,7 +3194,7 @@ void TestMultiGraph::theKeyAxisItLeftIsNoLongerListenedTo()
 {
     auto* mg = decadesThenMovedToALogAxis(mPlot, true);
     const int recordings = mg->mCore.recordingCount();
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     QVERIFY(mg->hasRenderedRange());
     QCOMPARE(mg->mCore.recordingCount(), recordings);
 }
@@ -3216,7 +3216,7 @@ void TestMultiGraph::errorBoundOfZeroOnALogAxisStopsAtTheEdge()
 {
     auto* mg = errorBarGraph(mPlot, 3, 1.0);
     mg->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{1, 1, 1}, {0, 0, 0}, {2, 2, 2}});
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     mPlot->yAxis->setRange(0.1, 10);
     renderOf(mPlot); // lays the axis rect out
     const auto bars = mg->errorBarRows(*mg->componentErrorBars(0), *mg->dataSource(), 0, 3);
@@ -3228,7 +3228,7 @@ void TestMultiGraph::errorBoundsInsideALogAxisAreNotClamped()
     auto* mg = errorBarGraph(mPlot, 3, 1.0);
     mg->setData(std::vector<double>{0, 1, 2},
                 std::vector<std::vector<double>>{{0.5, 0.5, 0.5}, {0.25, 0.25, 0.25}, {2, 2, 2}});
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     mPlot->yAxis->setRange(0.1, 10);
     renderOf(mPlot);
     const auto bars = mg->errorBarRows(*mg->componentErrorBars(0), *mg->dataSource(), 0, 3);
@@ -3713,7 +3713,7 @@ void TestMultiGraph::logKeyAxisLinesMatchTheData()
     auto* mg = mPlot->add<QCPGraph>().get();
     mg->setData(std::move(keys), std::vector<std::vector<double>> { std::move(values) });
     mg->setComponentPens({ QPen(Qt::red, 2) });
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(1.0, std::pow(10.0, 9.99));
     mPlot->yAxis->setRange(0.0, 9.99);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -3817,7 +3817,7 @@ void TestMultiGraph::logKeyAxisBigGraphIsThinned()
     }
     mg->setData(std::move(keys), std::vector<std::vector<double>> { std::move(values) });
     mg->setComponentPens({ QPen(Qt::red, 2) });
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(1.0, 1e10);
     mPlot->yAxis->setRange(-1.5, 1.5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -4730,7 +4730,7 @@ void TestMultiGraph::aNegativeLogRangeFillsToTheUpperBound()
     auto* mg = mPlot->add<QCPGraph>().get();
     mg->setData(std::vector<double> { 0, 1, 2 }, std::vector<double> { -10, -10, -10 });
     mg->setBrush(QBrush(QColor(255, 0, 0, 120)));
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(-0.5, 2.5);
     mPlot->yAxis->setRange(-100, -1);
     renderOf(mPlot);
@@ -4752,7 +4752,7 @@ void TestMultiGraph::aNegativeLogRangeImpulsesStartAtTheUpperBound()
     mg->setData(std::vector<double> { 0, 1, 2 }, std::vector<double> { -10, -10, -10 });
     mg->setComponentPens({ QPen(Qt::red, 5) });
     mg->setLineStyle(QCPGraph::lsImpulse);
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(-0.5, 2.5);
     mPlot->yAxis->setRange(-100, -1);
 

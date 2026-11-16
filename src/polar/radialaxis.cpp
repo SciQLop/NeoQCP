@@ -91,9 +91,9 @@
   \a oldRange.
 */
 
-/*! \fn void QCPPolarAxisRadial::scaleTypeChanged(QCPPolarAxisRadial::ScaleType scaleType);
+/*! \fn void QCPPolarAxisRadial::scaleChanged(const QCPScale &scale);
 
-  This signal is emitted when the scale type changes, by calls to \ref setScaleType
+  This signal is emitted when the scale changes, by calls to \ref setScale
 */
 
 /*! \fn void QCPPolarAxisRadial::selectionChanged()
@@ -1045,14 +1045,14 @@ QPointF QCPPolarAxisRadial::coordToPixel(double angleCoord, double radiusCoord) 
 
 double QCPPolarAxisRadial::coordToRadius(double coord) const
 {
-    if (mScaleType == stLinear)
+    if (mScaleKind == QCPScale::Kind::Linear)
     {
         if (!mRangeReversed)
             return (coord - mRange.lower) / mRange.size() * mRadius;
         else
             return (mRange.upper - coord) / mRange.size() * mRadius;
     }
-    else // mScaleType == stLogarithmic
+    else // a non-linear scale, log today
     {
         if (coord >= 0.0
             && mRange.upper
@@ -1073,14 +1073,14 @@ double QCPPolarAxisRadial::coordToRadius(double coord) const
 
 double QCPPolarAxisRadial::radiusToCoord(double radius) const
 {
-    if (mScaleType == stLinear)
+    if (mScaleKind == QCPScale::Kind::Linear)
     {
         if (!mRangeReversed)
             return (radius) / mRadius * mRange.size() + mRange.lower;
         else
             return -(radius) / mRadius * mRange.size() + mRange.upper;
     }
-    else // mScaleType == stLogarithmic
+    else // a non-linear scale, log today
     {
         if (!mRangeReversed)
             return qPow(mRange.upper / mRange.lower, (radius) / mRadius) * mRange.lower;

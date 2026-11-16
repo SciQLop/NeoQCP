@@ -74,8 +74,7 @@ class QCP_LIB_DECL QCPColorScale : public QCPLayoutElement
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QCPAxis::AxisType type READ type WRITE setType NOTIFY typeChanged)
     Q_PROPERTY(QCPRange dataRange READ dataRange WRITE setDataRange NOTIFY dataRangeChanged)
-    Q_PROPERTY(QCPAxis::ScaleType dataScaleType READ dataScaleType WRITE setDataScaleType NOTIFY
-                   dataScaleTypeChanged)
+    Q_PROPERTY(QCPScale dataScale READ dataScale WRITE setDataScale NOTIFY dataScaleChanged)
     Q_PROPERTY(QCPColorGradient gradient READ gradient WRITE setGradient NOTIFY gradientChanged)
     Q_PROPERTY(QString label READ label WRITE setLabel NOTIFY labelChanged)
     Q_PROPERTY(int barWidth READ barWidth WRITE setBarWidth NOTIFY barWidthChanged)
@@ -97,7 +96,7 @@ public:
 
     QCPRange dataRange() const { return mDataRange; }
 
-    QCPAxis::ScaleType dataScaleType() const { return mDataScaleType; }
+    const QCPScale& dataScale() const { return mDataScale; }
 
     QCPColorGradient gradient() const { return mGradient; }
 
@@ -111,7 +110,7 @@ public:
     // setters:
     void setType(QCPAxis::AxisType type);
     Q_SLOT void setDataRange(const QCPRange& dataRange);
-    Q_SLOT void setDataScaleType(QCPAxis::ScaleType scaleType);
+    Q_SLOT void setDataScale(const QCPScale& scale);
     Q_SLOT void setGradient(const QCPColorGradient& gradient);
     void setLabel(const QString& str);
     void setBarWidth(int width);
@@ -121,7 +120,7 @@ public:
     // non-property methods:
     QList<QCPHandle<QCPColorMap>> colorMaps() const;
 
-    //! Every plottable that takes its gradient, range and scale type from this scale.
+    //! Every plottable that takes its gradient, range and data scale from this scale.
     QList<QCPHandle<QCPColorMapped>> users() const;
 
     void rescaleDataRange(bool onlyVisibleMaps);
@@ -131,7 +130,7 @@ public:
 
 signals:
     void dataRangeChanged(const QCPRange& newRange);
-    void dataScaleTypeChanged(QCPAxis::ScaleType scaleType);
+    void dataScaleChanged(const QCPScale& scale);
     void gradientChanged(const QCPColorGradient& newGradient);
     void typeChanged(QCPAxis::AxisType type);
     void labelChanged(const QString& label);
@@ -143,7 +142,7 @@ protected:
     // property members:
     QCPAxis::AxisType mType;
     QCPRange mDataRange;
-    QCPAxis::ScaleType mDataScaleType;
+    QCPScale mDataScale;
     QCPColorGradient mGradient;
     int mBarWidth;
 
@@ -210,9 +209,9 @@ public:
         return this->apply([&](T& p) { p.setDataRange(range); });
     }
 
-    Ret setDataScaleType(QCPAxis::ScaleType type)
+    Ret setDataScale(const QCPScale& scale)
     {
-        return this->apply([&](T& p) { p.setDataScaleType(type); });
+        return this->apply([&](T& p) { p.setDataScale(scale); });
     }
 };
 

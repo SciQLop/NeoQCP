@@ -43,7 +43,7 @@ DOC_SNIPPET(axes_log, 600, 360)
 
     for (QCPAxis* axis : { customPlot->xAxis, customPlot->yAxis })
     {
-        axis->setScaleType(QCPAxis::stLogarithmic);
+        axis->setScale(QCPScale::log());
         axis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
         axis->setNumberFormat("eb");      // 10^n instead of 1e+03
         axis->setNumberPrecision(0);
@@ -117,7 +117,7 @@ DOC_SNIPPET(axes_tickers, 600, 640)
     addRow(QSharedPointer<QCPAxisTickerTime>::create(), "QCPAxisTickerTime", 0, 3 * 3600);
 
     QCPAxis* logAxis = addRow(QSharedPointer<QCPAxisTickerLog>::create(), "QCPAxisTickerLog", 1e-2, 1e4);
-    logAxis->setScaleType(QCPAxis::stLogarithmic);
+    logAxis->setScale(QCPScale::log());
     logAxis->setNumberFormat("eb");
     logAxis->setNumberPrecision(0);
 

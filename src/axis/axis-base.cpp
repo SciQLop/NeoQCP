@@ -43,7 +43,6 @@ QCPAxisBase::QCPAxisBase(QCPArea* area, Qt::Orientation orientation)
         , mArea(area)
         , mRange(0, 0)
         , mRangeReversed(false)
-        , mScaleType(stLinear)
         , mOrientation(orientation)
         , mSelectableParts(spAxis | spTickLabels | spAxisLabel)
         , mSelectedParts(spNone)
@@ -90,42 +89,43 @@ void QCPAxisBase::detachLinks()
 }
 
 /*!
-  Sets the scale type of this axis to \a type. A logarithmic scale has no pixel for a non-positive
-  coordinate, so the range is sanitized: only the part on one side of zero survives.
+  Sets the scale this axis shows its range with to \a scale. A logarithmic scale has no pixel for a
+  non-positive coordinate, so the range is sanitized: only the part on one side of zero survives.
 
-  A linked axis takes its range from its source: a scale type change only picks its ticks, it never
-  writes a sanitized range back into the source.
+  A linked axis takes its range from its source: a scale change only picks its ticks, it never
+  writes a sanitized range back into the source. A scale equal to the current one changes nothing
+  and emits nothing.
 
-  \see setRange
+  \see QCPScale, setRange
 */
-void QCPAxisBase::setScaleType(QCPAxisBase::ScaleType type)
+void QCPAxisBase::setScale(const QCPScale& scale)
 {
-    if (mScaleType == type)
+    if (mScale == scale)
         return;
     std::optional<QCPEmissionScope> scope;
     if (defersEmissions())
         scope.emplace(mParentPlot);
-    if (!scaleTypeWillChange(type))
+    if (!scaleWillChange(scale))
         return;
-    mScaleType = type;
-    if (mScaleType == stLogarithmic)
+    mScale = scale;
+    mScaleKind = scale.kind();
+    if (scale.isLog())
     {
         if (mLink)
             refreshFromLink();
         else
             setRange(mRange.sanitizedForLogScale());
     }
-    scaleTypeDidChange();
-    qcpEmitCurrent(this, mParentPlot, &QCPAxisBase::scaleTypeChanged,
-                   [this] { return mScaleType; });
+    scaleDidChange();
+    qcpEmitCurrent(this, mParentPlot, &QCPAxisBase::scaleChanged, [this] { return mScale; });
 }
 
 /*! \internal
 
-  A scale type change moves what the subclass draws and what it caches: the cartesian axis drops its
+  A scale change moves what the subclass draws and what it caches: the cartesian axis drops its
   margin and its item trees. The base only knows the axis itself.
 */
-void QCPAxisBase::scaleTypeDidChange()
+void QCPAxisBase::scaleDidChange()
 {
     notifyMappingChanged();
     markAppearanceDirty();
@@ -334,12 +334,12 @@ void QCPAxisBase::setSelectedParts(const QCPAxisBase::SelectableParts& selectedP
 void QCPAxisBase::moveRange(double diff)
 {
     QCPRange moved = mRange;
-    if (mScaleType == stLinear)
+    if (mScaleKind == QCPScale::Kind::Linear)
     {
         moved.lower += diff;
         moved.upper += diff;
     }
-    else // mScaleType == stLogarithmic
+    else // a non-linear scale, log today: an offset in scale space once symlog draws
     {
         moved.lower *= diff;
         moved.upper *= diff;
@@ -364,12 +364,12 @@ void QCPAxisBase::scaleRange(double factor, double center)
 {
     PROFILE_HERE_N("QCPAxisBase::scaleRange");
     QCPRange scaled = mRange;
-    if (mScaleType == stLinear)
+    if (mScaleKind == QCPScale::Kind::Linear)
     {
         scaled.lower = (mRange.lower - center) * factor + center;
         scaled.upper = (mRange.upper - center) * factor + center;
     }
-    else // mScaleType == stLogarithmic
+    else // a non-linear scale, log today: a factor in scale space once symlog draws
     {
         if ((mRange.upper < 0 && center < 0)
             || (mRange.upper > 0 && center > 0)) // make sure center has same sign as range
@@ -432,8 +432,7 @@ void QCPAxisBase::rescale(bool onlyVisiblePlottables)
     QCPRange newRange;
     bool haveRange = false;
     const QCP::SignDomain signDomain =
-        mScaleType == stLogarithmic ? (mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive)
-                                    : QCP::sdBoth;
+        mScale.isLog() ? (mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive) : QCP::sdBoth;
     // Through the virtual list: a user axis that drops a plottable must be honoured (M1).
     for (const QCPHandle<QCPPlottable>& plottable : plottables())
     {
@@ -477,12 +476,12 @@ void QCPAxisBase::rescaleTo(const QCPRange& range, bool haveRange)
         double center = (newRange.lower + newRange.upper)
             * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
                    // validRange returned false for other reason
-        if (mScaleType == stLinear)
+        if (mScaleKind == QCPScale::Kind::Linear)
         {
             newRange.lower = center - mRange.size() / 2.0;
             newRange.upper = center + mRange.size() / 2.0;
         }
-        else // mScaleType == stLogarithmic
+        else // a non-linear scale, log today: the linear rule once symlog draws
         {
             newRange.lower = center / qSqrt(mRange.upper / mRange.lower);
             newRange.upper = center * qSqrt(mRange.upper / mRange.lower);
@@ -562,8 +561,8 @@ void QCPAxisBase::refreshFromLink()
     fresh.normalize();
     if (!QCPRange::validRange(fresh))
         return;
-    // Compared once sanitized: a scale type change that only sanitizes must still take effect.
-    fresh = mScaleType == stLogarithmic ? fresh.sanitizedForLogScale() : fresh.sanitizedForLinScale();
+    // Compared once sanitized: a scale change that only sanitizes must still take effect.
+    fresh = mScale.sanitized(fresh);
     const bool reversed = source->mRangeReversed != mLink->decreasing;
     if (fresh.lower == mRange.lower && fresh.upper == mRange.upper && reversed == mRangeReversed)
         return;
@@ -640,8 +639,7 @@ void QCPAxisBase::applyRange(const QCPRange& range)
         || !QCPRange::validRange(range))
         return;
     const QCPRange oldRange = mRange;
-    mRange
-        = mScaleType == stLogarithmic ? range.sanitizedForLogScale() : range.sanitizedForLinScale();
+    mRange = mScale.sanitized(range);
     rangeDidChange(oldRange);
 }
 
@@ -658,8 +656,7 @@ void QCPAxisBase::commitRange(const QCPRange& range)
     }
     if (!mLink->inverse || !QCPRange::validRange(range))
         return;
-    const QCPRange clean
-        = mScaleType == stLogarithmic ? range.sanitizedForLogScale() : range.sanitizedForLinScale();
+    const QCPRange clean = mScale.sanitized(range);
     if (clean.lower == mRange.lower && clean.upper == mRange.upper)
         return;
     const double lower = mLink->inverse(clean.lower);

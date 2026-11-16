@@ -61,9 +61,9 @@ void QCPHistogram2D::followAxisScales()
     disconnect(mKeyScaleLink);
     disconnect(mValueScaleLink);
     if (keyAxisRaw())
-        mKeyScaleLink = connect(keyAxisRaw(), &QCPAxis::scaleTypeChanged, this, &QCPHistogram2D::refreshBinning);
+        mKeyScaleLink = connect(keyAxisRaw(), &QCPAxis::scaleChanged, this, &QCPHistogram2D::refreshBinning);
     if (valueAxisRaw())
-        mValueScaleLink = connect(valueAxisRaw(), &QCPAxis::scaleTypeChanged, this, &QCPHistogram2D::refreshBinning);
+        mValueScaleLink = connect(valueAxisRaw(), &QCPAxis::scaleChanged, this, &QCPHistogram2D::refreshBinning);
 }
 
 void QCPHistogram2D::refreshBinning()
@@ -76,8 +76,8 @@ void QCPHistogram2D::installTransform()
 {
     int capturedKeyBins = mKeyBins;
     int capturedValueBins = mValueBins;
-    const bool keyLog = keyAxisRaw() && keyAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
-    const bool valueLog = valueAxisRaw() && valueAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
+    const bool keyLog = keyAxisRaw() && keyAxisRaw()->scale().isLog();
+    const bool valueLog = valueAxisRaw() && valueAxisRaw()->scale().isLog();
     mBinnedKeyLog = keyLog;
     mBinnedValueLog = valueLog;
 
@@ -172,7 +172,7 @@ void QCPHistogram2D::setColumnNormalized(bool normalized)
 
 void QCPHistogram2D::colorMappingChanged()
 {
-    mRenderer.setDataScaleType(dataScaleType());
+    mRenderer.setDataScale(dataScale());
     mRenderer.setDataRange(dataRange());
     mRenderer.setGradient(gradient());
     update();
@@ -281,8 +281,8 @@ bool QCPHistogram2D::canProduceContent() const
 
 bool QCPHistogram2D::binnedForTheAxisScales() const
 {
-    const bool keyLog = keyAxisRaw() && keyAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
-    const bool valueLog = valueAxisRaw() && valueAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
+    const bool keyLog = keyAxisRaw() && keyAxisRaw()->scale().isLog();
+    const bool valueLog = valueAxisRaw() && valueAxisRaw()->scale().isLog();
     return keyLog == mBinnedKeyLog && valueLog == mBinnedValueLog;
 }
 
@@ -349,7 +349,7 @@ void QCPHistogram2D::draw(QCPDrawContext& context) const
     const QCP::Data rightBottom = keyIsVertical ? QCP::Data { keyRange.lower, valueRange.upper }
                                                 : QCP::Data { keyRange.upper, valueRange.lower };
     context.image(leftTop, rightBottom, image, {}, false);
-    self->mContours.update(cells, context, dataScaleType(), keyAxisRaw(), valueAxisRaw());
+    self->mContours.update(cells, context, dataScale(), keyAxisRaw(), valueAxisRaw());
 }
 
 void QCPHistogram2D::drawLegendIcon(QCPDrawContext& icon) const

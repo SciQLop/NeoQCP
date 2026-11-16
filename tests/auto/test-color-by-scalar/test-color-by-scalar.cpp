@@ -370,13 +370,13 @@ void TestColorByScalar::mapperBucketsLinearLogNaNAndGaps()
     QCOMPARE(m.bucket(-1), qcp::ColorScalarMapper::kGap);  // gap marker
     QCOMPARE(m.bucket(99), qcp::ColorScalarMapper::kGap);  // out of range index
 
-    m.setScaleType(QCPAxis::stLogarithmic);
+    m.setScale(QCPScale::log());
     m.setRange(QCPRange(1, 100));
     QCOMPARE(m.bucket(6), 128);                        // 10 is half way on log [1, 100]
     QCOMPARE(m.bucket(4), qcp::ColorScalarMapper::kGap);   // non-positive on log
     QCOMPARE(m.bucket(0), qcp::ColorScalarMapper::kGap);
 
-    m.setScaleType(QCPAxis::stLinear);
+    m.setScale(QCPScale::linear());
     m.setRange(QCPRange(3, 3));                        // degenerate: every finite value -> 0
     QCOMPARE(m.bucket(1), 0);
 
@@ -399,7 +399,7 @@ void TestColorByScalar::mapperGenerationBumpsOnEverySetter()
     QVERIFY(m.generation() > g); g = m.generation();
     m.setRange(QCPRange(0, 2));
     QVERIFY(m.generation() > g); g = m.generation();
-    m.setScaleType(QCPAxis::stLogarithmic);
+    m.setScale(QCPScale::log());
     QVERIFY(m.generation() > g); g = m.generation();
     m.clearValues();
     QVERIFY(m.generation() > g);
@@ -467,7 +467,7 @@ void TestColorByScalar::firstColoringRebuildsL1OnceWithOrigin()
     const auto colouredL1 = mg->mL1Cache;
     mg->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
     mg->setDataRange(QCPRange(0, 10));
-    mg->setDataScaleType(QCPAxis::stLogarithmic);
+    mg->setDataScale(QCPScale::log());
     std::vector<double> other(n, 1.0);
     mg->setColorValues(other);                        // same length: no rebuild either
     QTest::qWait(200);

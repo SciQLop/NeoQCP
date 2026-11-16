@@ -150,7 +150,7 @@ void TestGridRhi::replotWithZeroLineDoesNotCrash()
 
 void TestGridRhi::replotWithLogAxisDoesNotCrash()
 {
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(0.01, 1000);
     mPlot->xAxis->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
     mPlot->replot();

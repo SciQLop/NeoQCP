@@ -715,7 +715,7 @@ void TestOwnership::deleteColorScaleOfMap()
     QVERIFY(map->colorScale() == nullptr);
     map->setDataRange(QCPRange(0, 3));
     map->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
-    map->setDataScaleType(QCPAxis::stLogarithmic);
+    map->setDataScale(QCPScale::log());
     draw();
 }
 
@@ -1184,7 +1184,7 @@ void TestOwnership::newColorScaleDuringTeardown()
     connect(graph, &QObject::destroyed, [plot] {
         auto* scale = new QCPColorScale(plot);
         scale->setDataRange(QCPRange(1, 2));
-        scale->setDataScaleType(QCPAxis::stLogarithmic);
+        scale->setDataScale(QCPScale::log());
         scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
         scale->setLabel("late");
         scale->setType(QCPAxis::atBottom);

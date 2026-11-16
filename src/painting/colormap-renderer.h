@@ -21,9 +21,9 @@ public:
 
     QCPRange dataRange() const { return mDataRange; }
 
-    void setDataScaleType(QCPAxis::ScaleType type);
+    void setDataScale(const QCPScale& scale);
 
-    QCPAxis::ScaleType dataScaleType() const { return mDataScaleType; }
+    const QCPScale& dataScale() const { return mDataScale; }
 
     // Rendering
     //! Colourises \a data key-major, or transposed (key down the rows) for a vertical key axis.
@@ -48,7 +48,7 @@ private:
     QCPPlottable* mOwner;
     QCPColorGradient mGradient;
     QCPRange mDataRange;
-    QCPAxis::ScaleType mDataScaleType = QCPAxis::stLinear;
+    QCPScale mDataScale;
     QImage mMapImage;
     bool mMapImageInvalidated = true;
     bool mKeyIsVertical = false;

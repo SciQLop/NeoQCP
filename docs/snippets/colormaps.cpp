@@ -80,12 +80,12 @@ DOC_SNIPPET(colormaps_log, 600, 360)
             flux.push_back(1e6 * std::exp(-std::pow(std::log10(e) - peak, 2) / 0.1) + 1e2);
     }
 
-    customPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    customPlot->yAxis->setScale(QCPScale::log());
     customPlot->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
 
     auto* scale = new QCPColorScale(customPlot);
     customPlot->plotLayout()->addElement(0, 1, scale);
-    scale->setDataScaleType(QCPAxis::stLogarithmic);
+    scale->setDataScale(QCPScale::log());
     scale->axis()->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
     scale->axis()->setNumberFormat("eb");   // 10^n labels
     scale->axis()->setNumberPrecision(0);

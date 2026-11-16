@@ -677,9 +677,9 @@ public:
         return this->apply([&](T& o) { o.setDataRange(range); });
     }
 
-    Ret setDataScaleType(QCPAxis::ScaleType type)
+    Ret setDataScale(const QCPScale& scale)
     {
-        return this->apply([&](T& o) { o.setDataScaleType(type); });
+        return this->apply([&](T& o) { o.setDataScale(scale); });
     }
 
     Ret setScatterSkip(int skip)

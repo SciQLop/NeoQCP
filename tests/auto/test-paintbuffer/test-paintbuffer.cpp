@@ -470,7 +470,7 @@ void TestPaintBuffer::colormap2_panDirtiesLayerBufferLogY()
     // log-Y spectrogram).
     auto* cm = mPlot->add<QCPColorMap2>().get();
     mPlot->xAxis->setRange(0, 10);
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     mPlot->yAxis->setRange(1, 1000);
     std::vector<double> x{0, 5, 10}, y{1, 10, 100, 1000};
     std::vector<double> z(x.size() * y.size(), 1.0);
@@ -520,7 +520,7 @@ void TestPaintBuffer::colormap2_stallOffsetOnLogYPan()
     // log-Y energy spectrogram): the zoom check is scale-aware.
     auto* cm = mPlot->add<QCPColorMap2>().get();
     mPlot->xAxis->setRange(0, 10);
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     mPlot->yAxis->setRange(1, 1000);
     std::vector<double> x{0, 5, 10}, y{1, 10, 100, 1000};
     std::vector<double> z(x.size() * y.size(), 1.0);

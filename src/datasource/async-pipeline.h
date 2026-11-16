@@ -5,6 +5,7 @@
 #include <QMetaObject>
 #include <QThread>
 #include <axis/range.h>
+#include <axis/scale.h>
 #include <functional>
 #include <memory>
 #include <algorithm>
@@ -22,8 +23,8 @@ struct ViewportParams {
     QCPRange valueRange;
     int plotWidthPx = 0;
     int plotHeightPx = 0;
-    bool keyLogScale = false;
-    bool valueLogScale = false;
+    QCPScale keyScale;
+    QCPScale valueScale;
 
     bool operator==(const ViewportParams&) const = default;
     static ViewportParams fromAxes(const QCPAxis* keyAxis, const QCPAxis* valueAxis);

@@ -226,7 +226,7 @@ QList<QCPLayoutElement*> colourScaleLayout(QCustomPlot& plot, Grouping grouping)
     plot.yAxis->setTickLabels(false);
     auto* vertical = new QCPColorScale(&plot);
     plot.plotLayout()->addElement(0, 1, vertical);
-    vertical->setDataScaleType(QCPAxis::stLogarithmic);
+    vertical->setDataScale(QCPScale::log());
     vertical->setDataRange(QCPRange(1, 1000));
     vertical->axis()->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
     vertical->axis()->setNumberFormat("eb");

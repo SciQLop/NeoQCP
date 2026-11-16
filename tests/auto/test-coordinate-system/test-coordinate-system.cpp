@@ -324,7 +324,7 @@ void TestCoordinateSystem::revisionBumpsOnAnyMappingChange()
     QCOMPARE(system->revision(), start + 1);
     QCOMPARE(changed.count(), 1);
 
-    key->setScaleType(QCPAxis::stLogarithmic);
+    key->setScale(QCPScale::log());
     QCOMPARE(system->revision(), start + 2);
     QCOMPARE(changed.count(), 2);
 

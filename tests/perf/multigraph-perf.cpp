@@ -170,7 +170,7 @@ static void scenarioL2Resampling(int iters)
     ViewportParams vp;
     vp.keyRange = QCPRange(mid - halfSpan, mid + halfSpan);
     vp.plotWidthPx = 1920;
-    vp.valueLogScale = false;
+    vp.valueScale = QCPScale::linear();
 
     fprintf(stderr, "l2_resampling: L1=%d bins, viewport 50%%, %d px, %d iters\n",
             qcp::algo::kLevel1TargetBins, vp.plotWidthPx, iters);

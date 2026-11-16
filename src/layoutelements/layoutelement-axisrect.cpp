@@ -672,7 +672,7 @@ void forEachAxis(const QPointer<QCPAxisRect>& rect, const QList<QPointer<QCPAxis
 // Moves the axis from its range at the drag start by the pointer's travel.
 void dragAxis(QCPAxis* axis, const QCPRange& start, double fromPixel, double toPixel)
 {
-    if (axis->scaleType() == QCPAxis::stLinear)
+    if (axis->scale().isLinear())
     {
         const double diff = axis->pixelToCoord(fromPixel) - axis->pixelToCoord(toPixel);
         axis->setRange(start.lower + diff, start.upper + diff);
@@ -739,7 +739,7 @@ void QCPAxisRect::zoom(const QRectF& pixelRect, const QList<QCPAxis*>& affectedA
 
   \li range (\ref QCPAxis::setRange)
   \li range reversed (\ref QCPAxis::setRangeReversed)
-  \li scale type (\ref QCPAxis::setScaleType)
+  \li scale (\ref QCPAxis::setScale)
   \li tick visibility (\ref QCPAxis::setTicks)
   \li number format (\ref QCPAxis::setNumberFormat)
   \li number precision (\ref QCPAxis::setNumberPrecision)
@@ -791,7 +791,7 @@ void QCPAxisRect::setupFullAxesBox(bool connectRanges)
 
     xAxis2->setRange(xAxis->range());
     xAxis2->setRangeReversed(xAxis->rangeReversed());
-    xAxis2->setScaleType(xAxis->scaleType());
+    xAxis2->setScale(xAxis->scale());
     xAxis2->setTicks(xAxis->ticks());
     xAxis2->setNumberFormat(xAxis->numberFormat());
     xAxis2->setNumberPrecision(xAxis->numberPrecision());
@@ -800,7 +800,7 @@ void QCPAxisRect::setupFullAxesBox(bool connectRanges)
 
     yAxis2->setRange(yAxis->range());
     yAxis2->setRangeReversed(yAxis->rangeReversed());
-    yAxis2->setScaleType(yAxis->scaleType());
+    yAxis2->setScale(yAxis->scale());
     yAxis2->setTicks(yAxis->ticks());
     yAxis2->setNumberFormat(yAxis->numberFormat());
     yAxis2->setNumberPrecision(yAxis->numberPrecision());
@@ -1621,7 +1621,7 @@ void followPointer(QCPAxis* axis, double pixels)
     const QCPRange range = target->range();
     const double from = axis->pixelOnMoveTarget(0.0);
     const double to = axis->pixelOnMoveTarget(pixels);
-    if (target->scaleType() == QCPAxis::stLogarithmic)
+    if (target->scale().isLog())
     {
         const double ratio = target->pixelToCoord(from) / target->pixelToCoord(to);
         target->setRange(range.lower * ratio, range.upper * ratio);

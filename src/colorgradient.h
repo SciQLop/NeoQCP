@@ -27,6 +27,7 @@
 #define QCP_COLORGRADIENT_H
 
 #include "axis/range.h"
+#include "axis/scale.h"
 #include "global.h"
 
 class QCP_LIB_DECL QCPColorGradient
@@ -167,10 +168,12 @@ public:
     // The colour stops as a QLinearGradient from \a start to \a finalStop, e.g. for a legend icon.
     [[nodiscard]] QLinearGradient toLinearGradient(const QPointF& start, const QPointF& finalStop) const;
     void colorize(const double* data, const QCPRange& range, QRgb* scanLine, int n,
-                  int dataIndexFactor = 1, bool logarithmic = false);
+                  int dataIndexFactor = 1, const QCPScale& scale = QCPScale::linear());
     void colorize(const double* data, const unsigned char* alpha, const QCPRange& range,
-                  QRgb* scanLine, int n, int dataIndexFactor = 1, bool logarithmic = false);
-    [[nodiscard]] QRgb color(double position, const QCPRange& range, bool logarithmic = false);
+                  QRgb* scanLine, int n, int dataIndexFactor = 1,
+                  const QCPScale& scale = QCPScale::linear());
+    [[nodiscard]] QRgb color(double position, const QCPRange& range,
+                            const QCPScale& scale = QCPScale::linear());
     void loadPreset(GradientPreset preset);
     void clearColorStops();
     [[nodiscard]] QCPColorGradient inverted() const;

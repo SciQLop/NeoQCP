@@ -44,7 +44,7 @@ void TestPipeline::viewportOffsetLinearVertical()
 
 void TestPipeline::viewportOffsetLogScale()
 {
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     QCPRange oldKey(1, 1000);
     QCPRange newKey(10, 10000);
     mPlot->xAxis->setRange(newKey);

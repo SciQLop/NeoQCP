@@ -373,7 +373,7 @@ static QWidget* createColorMapLogTab()
     cm->setGapThreshold(3.0);
 
     // Log-Y axis
-    plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->yAxis->setScale(QCPScale::log());
     plot->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
     plot->yAxis->setLabel("Energy (eV)");
     plot->xAxis->setLabel("Time (s)");
@@ -381,7 +381,7 @@ static QWidget* createColorMapLogTab()
     // Color scale with log-Z
     auto* scale = new QCPColorScale(plot);
     plot->plotLayout()->addElement(0, 1, scale);
-    scale->setDataScaleType(QCPAxis::stLogarithmic);
+    scale->setDataScale(QCPScale::log());
     scale->axis()->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
     cm->setColorScale(scale);
 
@@ -433,7 +433,7 @@ static QWidget* createColorMapVariableYTab()
     auto* cm = plot->add<QCPColorMap2>().get();
     cm->setData(std::move(x), std::move(y), std::move(z));
 
-    plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->yAxis->setScale(QCPScale::log());
     plot->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
     plot->yAxis->setLabel("Energy (eV) — drifting channels");
     plot->xAxis->setLabel("Time (s)");
@@ -1116,7 +1116,7 @@ static QWidget* createHistogram2DLogTab()
     hist->setBins(60, 60);
     hist->setColumnNormalized(true);
 
-    plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->yAxis->setScale(QCPScale::log());
     plot->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
 
     auto* scale = new QCPColorScale(plot);
@@ -1289,7 +1289,7 @@ static QWidget* createDualYAxisTab()
 
     // --- ColorMap2 on right Y axis (log scale) ---
     plot->yAxis2->setVisible(true);
-    plot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+    plot->yAxis2->setScale(QCPScale::log());
     plot->yAxis2->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
     plot->yAxis2->setLabel("Energy (eV)");
 
@@ -1316,7 +1316,7 @@ static QWidget* createDualYAxisTab()
 
     auto* scale = new QCPColorScale(plot);
     plot->plotLayout()->addElement(0, 1, scale);
-    scale->setDataScaleType(QCPAxis::stLogarithmic);
+    scale->setDataScale(QCPScale::log());
     scale->axis()->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
     cm->setColorScale(scale);
 

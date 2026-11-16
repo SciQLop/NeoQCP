@@ -1184,7 +1184,7 @@ void QCPPlottable::rescaleKeyAxis(bool onlyEnlarge) const
         return;
 
     QCP::SignDomain signDomain = QCP::sdBoth;
-    if (keyAxis->scaleType() == QCPAxis::stLogarithmic)
+    if (keyAxis->scale().isLog())
         signDomain = (keyAxis->range().upper < 0 ? QCP::sdNegative : QCP::sdPositive);
 
     bool foundRange;
@@ -1200,12 +1200,12 @@ void QCPPlottable::rescaleKeyAxis(bool onlyEnlarge) const
             double center = (newRange.lower + newRange.upper)
                 * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
                        // validRange returned false for other reason
-            if (keyAxis->scaleType() == QCPAxis::stLinear)
+            if (keyAxis->scale().isLinear())
             {
                 newRange.lower = center - keyAxis->range().size() / 2.0;
                 newRange.upper = center + keyAxis->range().size() / 2.0;
             }
-            else // scaleType() == stLogarithmic
+            else // a non-linear scale, log today
             {
                 newRange.lower = center / qSqrt(keyAxis->range().upper / keyAxis->range().lower);
                 newRange.upper = center * qSqrt(keyAxis->range().upper / keyAxis->range().lower);
@@ -1235,7 +1235,7 @@ void QCPPlottable::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) const
         return;
 
     QCP::SignDomain signDomain = QCP::sdBoth;
-    if (valueAxis->scaleType() == QCPAxis::stLogarithmic)
+    if (valueAxis->scale().isLog())
         signDomain = (valueAxis->range().upper < 0 ? QCP::sdNegative : QCP::sdPositive);
 
     bool foundRange;
@@ -1253,12 +1253,12 @@ void QCPPlottable::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) const
             double center = (newRange.lower + newRange.upper)
                 * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
                        // validRange returned false for other reason
-            if (valueAxis->scaleType() == QCPAxis::stLinear)
+            if (valueAxis->scale().isLinear())
             {
                 newRange.lower = center - valueAxis->range().size() / 2.0;
                 newRange.upper = center + valueAxis->range().size() / 2.0;
             }
-            else // scaleType() == stLogarithmic
+            else // a non-linear scale, log today
             {
                 newRange.lower
                     = center / qSqrt(valueAxis->range().upper / valueAxis->range().lower);

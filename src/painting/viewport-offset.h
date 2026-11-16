@@ -17,7 +17,7 @@ inline double axisRangeSizeRatio(const QCPAxis* axis, const QCPRange& renderedRa
     if (!axis)
         return 1.0;
     const QCPRange cur = axis->range();
-    if (axis->scaleType() == QCPAxis::stLogarithmic
+    if (axis->scale().isLog()
         && cur.lower > 0 && cur.upper > 0
         && renderedRange.lower > 0 && renderedRange.upper > 0)
     {

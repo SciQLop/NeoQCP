@@ -38,9 +38,13 @@ public:
     //! A scale that maps a value to itself.
     static QCPScale linear();
     //! log_base(|v|). A base not finite or not greater than 1 is refused.
-    static QCPScale log(double base = 10.0);
-    //! matplotlib's SymmetricalLogTransform. See the class documentation for the formula.
-    static QCPScale symlog(double threshold = 2.0, double base = 10.0, double linearScale = 1.0);
+    static QCPScale log(double base = kDefaultBase);
+    /*!
+      matplotlib's SymmetricalLogTransform. See the class documentation for the formula. Any
+      parameter that is refused gives symlog() with all its defaults, not just the refused one.
+    */
+    static QCPScale symlog(double threshold = kDefaultThreshold, double base = kDefaultBase,
+                           double linearScale = kDefaultLinearScale);
 
     Kind kind() const { return mKind; }
 
@@ -66,12 +70,17 @@ public:
     bool operator==(const QCPScale& other) const = default;
 
 private:
+    //! What log() and symlog() default to, and what a refused parameter gives back.
+    static constexpr double kDefaultBase = 10.0;
+    static constexpr double kDefaultThreshold = 2.0;
+    static constexpr double kDefaultLinearScale = 1.0;
+
     QCPScale(Kind kind, double base, double threshold, double linearScale);
 
     Kind mKind = Kind::Linear;
-    double mBase = 10.0;
-    double mThreshold = 2.0;
-    double mLinearScale = 1.0;
+    double mBase = kDefaultBase;
+    double mThreshold = kDefaultThreshold;
+    double mLinearScale = kDefaultLinearScale;
 };
 
 //! Hash key for QHash and dependency revisions.

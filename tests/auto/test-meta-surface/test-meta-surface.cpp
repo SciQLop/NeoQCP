@@ -258,10 +258,10 @@ const QVector<SpikeCase>& spikeCases()
               return std::pair<QObject*, QObject*>(barsOn(plot), barsOn(plot));
           },
           removePlottable, QVariant(QPen(Qt::blue, 3)), bindableOf<QPen>, bindGuarded<QPen> },
-        { "axis scale type", "scaleType",
+        { "axis scale", "scale",
           [](QCustomPlot& plot) { return std::pair<QObject*, QObject*>(plot.xAxis, plot.yAxis); },
-          removeAxis, QVariant::fromValue(QCPAxisBase::stLogarithmic),
-          bindableOf<QCPAxisBase::ScaleType>, bindGuarded<QCPAxisBase::ScaleType> },
+          removeAxis, QVariant::fromValue(QCPScale::log()),
+          bindableOf<QCPScale>, bindGuarded<QCPScale> },
     };
     return cases;
 }
@@ -521,21 +521,21 @@ void TestMetaSurface::bindingToARefusedScaleTypeKeepsTheValue()
     auto* area = new QCPPolarArea(plot.get());
     plot->plotLayout()->addElement(0, 1, area);
     QCPPolarAxisAngular* angular = area->angularAxis();
-    QBindable<QCPAxisBase::ScaleType> scaleType(angular, "scaleType");
-    QProperty<QCPAxisBase::ScaleType> wanted(QCPAxisBase::stLinear);
-    scaleType.setBinding([&wanted] { return wanted.value(); });
-    QSignalSpy spy(angular, &QCPAxisBase::scaleTypeChanged);
+    QBindable<QCPScale> scale(angular, "scale");
+    QProperty<QCPScale> wanted(QCPScale::linear());
+    scale.setBinding([&wanted] { return wanted.value(); });
+    QSignalSpy spy(angular, &QCPAxisBase::scaleChanged);
 
-    wanted = QCPAxisBase::stLogarithmic;
+    wanted = QCPScale::log();
 
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear(); // the refusal is the point of this test
-    QCOMPARE(angular->scaleType(), QCPAxisBase::stLinear);
-    QCOMPARE(scaleType.value(), QCPAxisBase::stLinear);
+    QCOMPARE(angular->scale(), QCPScale::linear());
+    QCOMPARE(scale.value(), QCPScale::linear());
     QCOMPARE(spy.count(), 0);
-    QVERIFY(scaleType.hasBinding());
+    QVERIFY(scale.hasBinding());
 
-    wanted = QCPAxisBase::stLinear;
+    wanted = QCPScale::linear();
     QCOMPARE(spy.count(), 0);
     QVERIFY(test_misuse::calls.empty());
 }
@@ -804,6 +804,8 @@ const QVector<std::pair<QMetaType, Different>>& differentValues()
                                            ? QCPScatterStyle::ssDisc
                                            : QCPScatterStyle::ssCircle);
             }),
+        differentFor<QCPScale>(
+            [](const QCPScale& v, QObject*) { return v.isLinear() ? QCPScale::log() : QCPScale::linear(); }),
         differentFor<QCPColorGradient>(
             [](const QCPColorGradient& v, QObject*)
             {
@@ -1058,9 +1060,9 @@ const QVector<Exception>& exceptions()
               return QVariant::fromValue(plot->axisRect()->system(plot->xAxis, plot->yAxis).get());
           },
           "draws in a polar system only (polargraph.cpp)", true },
-        { &QCPPolarAxisAngular::staticMetaObject, "scaleType", Rule::Refuses, nullptr,
-          [](QObject*) { return QVariant::fromValue(QCPAxisBase::stLogarithmic); },
-          "the ring has no logarithmic scale (angularaxis.cpp:938)", true },
+        { &QCPPolarAxisAngular::staticMetaObject, "scale", Rule::Refuses, nullptr,
+          [](QObject*) { return QVariant::fromValue(QCPScale::log()); },
+          "the ring has no non-linear scale (angularaxis.cpp)", true },
     };
     return list;
 }
@@ -2969,7 +2971,7 @@ struct TypeRow
 const QVector<TypeRow>& metatypeRows()
 {
     static const QVector<TypeRow> list {
-        TYPE_ROW(QCPAxisBase::ScaleType), TYPE_ROW(QCPAxisBase::SelectablePart),
+        TYPE_ROW(QCPScale), TYPE_ROW(QCPAxisBase::SelectablePart),
         TYPE_ROW(QCPAxis::AxisType), TYPE_ROW(QCPAxis::LabelSide),
         TYPE_ROW(QCPAxisTicker::TickStepStrategy), TYPE_ROW(QCPAxisTickerFixed::ScaleStrategy),
         TYPE_ROW(QCPAxisTickerPi::FractionStyle), TYPE_ROW(QCPAxisTickerTime::TimeUnit),

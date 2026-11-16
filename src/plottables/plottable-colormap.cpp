@@ -735,11 +735,11 @@ bool QCPColorMapData::createAlpha(bool initializeOpaque)
   \see setDataRange
 */
 
-/*! \fn void QCPColorMap::dataScaleTypeChanged(QCPAxis::ScaleType scaleType);
+/*! \fn void QCPColorMap::dataScaleChanged(const QCPScale &scale);
 
   This signal is emitted when the data scale type changes.
 
-  \see setDataScaleType
+  \see setDataScale
 */
 
 /*! \fn void QCPColorMap::gradientChanged(const QCPColorGradient &newGradient);
@@ -764,7 +764,7 @@ QCPRange rangeWithHalfACell(QCPAxis* axis, const QCPRange& range, int size)
 {
     if (size <= 1)
         return range;
-    if (axis->scaleType() == QCPAxis::stLogarithmic && range.lower * range.upper > 0)
+    if (axis->scale().isLog() && range.lower * range.upper > 0)
     {
         // A log axis spaces cells geometrically: half a cell is a ratio, not a distance.
         const double growth
@@ -1114,10 +1114,10 @@ void QCPColorMap::updateMapImage()
                 if (rawAlpha)
                     mGradient.colorize(rawData + line * rowCount, rawAlpha + line * rowCount,
                                        mDataRange, pixels, rowCount, 1,
-                                       mDataScaleType == QCPAxis::stLogarithmic);
+                                       mDataScale);
                 else
                     mGradient.colorize(rawData + line * rowCount, mDataRange, pixels, rowCount, 1,
-                                       mDataScaleType == QCPAxis::stLogarithmic);
+                                       mDataScale);
             }
         }
         else // keyAxis->orientation() == Qt::Vertical
@@ -1133,10 +1133,10 @@ void QCPColorMap::updateMapImage()
                 if (rawAlpha)
                     mGradient.colorize(rawData + line, rawAlpha + line, mDataRange, pixels,
                                        rowCount, lineCount,
-                                       mDataScaleType == QCPAxis::stLogarithmic);
+                                       mDataScale);
                 else
                     mGradient.colorize(rawData + line, mDataRange, pixels, rowCount, lineCount,
-                                       mDataScaleType == QCPAxis::stLogarithmic);
+                                       mDataScale);
             }
         }
 

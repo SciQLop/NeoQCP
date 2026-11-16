@@ -435,9 +435,9 @@ void QCPGrid::drawSubGridLines(QCPPainter* painter) const
   \a oldRange.
 */
 
-/*! \fn void QCPAxis::scaleTypeChanged(QCPAxis::ScaleType scaleType);
+/*! \fn void QCPAxis::scaleChanged(const QCPScale &scale);
 
-  This signal is emitted when the scale type changes, by calls to \ref setScaleType
+  This signal is emitted when the scale changes, by calls to \ref setScale
 */
 
 /*! \fn void QCPAxis::selectionChanged()
@@ -1660,7 +1660,7 @@ void QCPAxis::rescale(bool onlyVisiblePlottables)
         QCPRange plottableRange;
         bool currentFoundRange;
         QCP::SignDomain signDomain = QCP::sdBoth;
-        if (mScaleType == stLogarithmic)
+        if (mScale.isLog())
             signDomain = (mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive);
         if (plottable->keyAxisBase().get() == this)
             plottableRange = plottable->getKeyRange(currentFoundRange, signDomain);
@@ -1692,7 +1692,7 @@ double QCPAxis::pixelToCoord(double value) const
     {
         const int left = area.left();
         const int width = area.width();
-        if (mScaleType == stLinear)
+        if (mScaleKind == QCPScale::Kind::Linear)
         {
             if (!mRangeReversed)
                 return (value - left) / width * mRange.size()
@@ -1701,7 +1701,7 @@ double QCPAxis::pixelToCoord(double value) const
                 return -(value - left) / width * mRange.size()
                     + mRange.upper;
         }
-        else // mScaleType == stLogarithmic
+        else // a non-linear scale, log today
         {
             if (!mRangeReversed)
                 return qPow(mRange.upper / mRange.lower,
@@ -1717,7 +1717,7 @@ double QCPAxis::pixelToCoord(double value) const
     {
         const int bottom = area.bottom();
         const int height = area.height();
-        if (mScaleType == stLinear)
+        if (mScaleKind == QCPScale::Kind::Linear)
         {
             if (!mRangeReversed)
                 return (bottom - value) / height * mRange.size()
@@ -1726,7 +1726,7 @@ double QCPAxis::pixelToCoord(double value) const
                 return -(bottom - value) / height * mRange.size()
                     + mRange.upper;
         }
-        else // mScaleType == stLogarithmic
+        else // a non-linear scale, log today
         {
             if (!mRangeReversed)
                 return qPow(mRange.upper / mRange.lower,
@@ -1754,7 +1754,7 @@ double QCPAxis::coordToPixel(double value) const
     {
         const int left = area.left();
         const int width = area.width();
-        if (mScaleType == stLinear)
+        if (mScaleKind == QCPScale::Kind::Linear)
         {
             if (!mRangeReversed)
                 return (value - mRange.lower) / mRange.size() * width
@@ -1763,7 +1763,7 @@ double QCPAxis::coordToPixel(double value) const
                 return (mRange.upper - value) / mRange.size() * width
                     + left;
         }
-        else // mScaleType == stLogarithmic
+        else // a non-linear scale, log today
         {
             if (value >= 0.0 && mRange.upper < 0.0) // invalid value for logarithmic scale, just
                                                     // draw it outside visible range
@@ -1788,7 +1788,7 @@ double QCPAxis::coordToPixel(double value) const
     {
         const int bottom = area.bottom();
         const int height = area.height();
-        if (mScaleType == stLinear)
+        if (mScaleKind == QCPScale::Kind::Linear)
         {
             if (!mRangeReversed)
                 return bottom
@@ -1797,7 +1797,7 @@ double QCPAxis::coordToPixel(double value) const
                 return bottom
                     - (mRange.upper - value) / mRange.size() * height;
         }
-        else // mScaleType == stLogarithmic
+        else // a non-linear scale, log today
         {
             if (value >= 0.0 && mRange.upper < 0.0) // invalid value for logarithmic scale, just
                                                     // draw it outside visible range
@@ -2006,12 +2006,12 @@ void QCPAxis::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
         const QPointer<QCPAxis> targetAlive(target);
         const double from = pixelOnMoveTarget(startPixel);
         const double to = pixelOnMoveTarget(currentPixel);
-        if (target->mScaleType == QCPAxis::stLinear)
+        if (target->mScaleKind == QCPScale::Kind::Linear)
         {
             const double diff = target->pixelToCoord(from) - target->pixelToCoord(to);
             target->setRange(mDragStartRange.lower + diff, mDragStartRange.upper + diff);
         }
-        else if (target->mScaleType == QCPAxis::stLogarithmic)
+        else if (target->mScaleKind == QCPScale::Kind::Log)
         {
             const double ratio = target->pixelToCoord(from) / target->pixelToCoord(to);
             target->setRange(mDragStartRange.lower * ratio, mDragStartRange.upper * ratio);
@@ -2336,7 +2336,7 @@ int QCPAxis::calculateMargin()
 void QCPAxis::applyTickLabelFormat()
 {
     mAxisPainter->substituteExponent = mNumberBeautifulPowers;
-    mAxisPainter->abbreviateDecimalPowers = mScaleType == stLogarithmic;
+    mAxisPainter->abbreviateDecimalPowers = mScale.isLog();
 }
 
 /* inherits documentation from base class */
@@ -3307,10 +3307,10 @@ QCPAxisRect* QCPAxis::axisRectRaw() const
 
 /*! \internal
 
-  A scale type change stales the cached margin and every item tree: an item's extent depends on the
-  scale type, as a non-positive coordinate has no pixel on a log axis.
+  A scale change stales the cached margin and every item tree: an item's extent depends on the
+  scale, as a non-positive coordinate has no pixel on a log axis.
 */
-bool QCPAxis::scaleTypeWillChange([[maybe_unused]] ScaleType type)
+bool QCPAxis::scaleWillChange([[maybe_unused]] const QCPScale& scale)
 {
     mCachedMarginValid = false;
     if (mParentPlot)

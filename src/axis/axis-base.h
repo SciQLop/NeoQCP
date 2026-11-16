@@ -30,6 +30,7 @@
 #include "../layer.h"
 #include "axisticker.h"
 #include "range.h"
+#include "scale.h"
 #include <QList>
 #include <QPointer>
 #include <QSharedPointer>
@@ -59,7 +60,7 @@ class QCP_LIB_DECL QCPAxisBase : public QCPLayerable
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(ScaleType scaleType READ scaleType WRITE setScaleType NOTIFY scaleTypeChanged)
+    Q_PROPERTY(QCPScale scale READ scale WRITE setScale NOTIFY scaleChanged)
     Q_PROPERTY(QCPRange range READ range WRITE setRange NOTIFY rangeChanged)
     Q_PROPERTY(
         bool rangeReversed READ rangeReversed WRITE setRangeReversed NOTIFY rangeReversedChanged)
@@ -76,17 +77,6 @@ class QCP_LIB_DECL QCPAxisBase : public QCPLayerable
     /// \endcond
 
 public:
-    /*!
-      Defines the scale types an axis can show its range with.
-    */
-    enum ScaleType
-    {
-        stLinear ///< Linear scale
-        ,
-        stLogarithmic ///< Logarithmic scale
-    };
-    Q_ENUM(ScaleType)
-
     /*!
       Defines the selectable parts of an axis.
       \see setSelectableParts, setSelectedParts
@@ -111,7 +101,7 @@ public:
     virtual ~QCPAxisBase() override;
 
     // getters:
-    ScaleType scaleType() const { return mScaleType; }
+    const QCPScale& scale() const { return mScale; }
 
     const QCPRange range() const { return mRange; }
 
@@ -143,7 +133,7 @@ public:
     }
 
     // setters:
-    Q_SLOT void setScaleType(QCPAxisBase::ScaleType type);
+    Q_SLOT void setScale(const QCPScale& scale);
     Q_SLOT void setRange(const QCPRange& range);
     void setRange(double lower, double upper);
     void setRange(double position, double size, Qt::AlignmentFlag alignment);
@@ -192,7 +182,7 @@ public:
 
 signals:
     void rangeChanged(const QCPRange& newRange, const QCPRange& oldRange);
-    void scaleTypeChanged(QCPAxisBase::ScaleType scaleType);
+    void scaleChanged(const QCPScale& scale);
     void selectionChanged();
     void selectableChanged();
     void rangeReversedChanged(bool rangeReversed);
@@ -202,10 +192,10 @@ signals:
 
 protected:
     // The hot members sit together, first among this class's: a coordToPixel call reads where the
-    // axis draws, its range and direction, the link flag and the scale type. For a cartesian axis
+    // axis draws, its range and direction, the link flag and the scale kind. For a cartesian axis
     // the area is its rect, whose geometry turns the fraction into a pixel, so both live here
     // rather than in QCPAxis; the polar area answers for the polar axes. GCC 16 puts mArea at
-    // +0x40, mRange at +0x48, mRangeReversed at +0x58, mLinked at +0x59, mScaleType at +0x5c and
+    // +0x40, mRange at +0x48, mRangeReversed at +0x58, mLinked at +0x59, mScaleKind at +0x5c and
     // mOrientation at +0x60: 36 bytes, one cache line of the four a call used to touch.
     QCPArea* mArea;
     QCPRange mRange;
@@ -215,8 +205,14 @@ protected:
     bool mLinked = false;
     bool mRangeDraggable = true;
     bool mRangeZoomable = true;
-    ScaleType mScaleType;
+    // The one byte a mapping needs: setScale is the only writer of it and of mScale, so the two
+    // never disagree. The parameters themselves sit outside this block, where nothing hot reads
+    // them.
+    QCPScale::Kind mScaleKind = QCPScale::Kind::Linear;
     Qt::Orientation mOrientation;
+
+    // The scale in full, parameters included.
+    QCPScale mScale;
 
     // property members:
     SelectableParts mSelectableParts, mSelectedParts;
@@ -241,13 +237,13 @@ protected:
     // emits rangeChanged.
     virtual void rangeDidChange(const QCPRange& oldRange);
 
-    // The hooks around the scale type change: a cartesian axis drops its cached margin and item
-    // trees before, and redraws itself and the axes it drives after.
-    //! Asked before the scale type changes: false refuses it, for a subclass whose geometry only
-    //! knows one scale.
-    virtual bool scaleTypeWillChange([[maybe_unused]] ScaleType type) { return true; }
+    // The hooks around the scale change: a cartesian axis drops its cached margin and item trees
+    // before, and redraws itself and the axes it drives after.
+    //! Asked before the scale changes: false refuses it, for a subclass whose geometry only knows
+    //! one scale.
+    virtual bool scaleWillChange([[maybe_unused]] const QCPScale& scale) { return true; }
 
-    virtual void scaleTypeDidChange();
+    virtual void scaleDidChange();
     // Dirties what a look change moves. The default dirties the axis alone; a cartesian axis also
     // dirties the rect's layers.
     virtual void markAppearanceDirty();

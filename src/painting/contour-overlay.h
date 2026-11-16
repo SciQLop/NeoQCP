@@ -56,8 +56,8 @@ public:
     void dataChanged() { ++mGeneration; }
 
     //! Records the lines of \a grid and, labels on, their labels into \a context.
-    void update(const QCPColorMapData* grid, QCPDrawContext& context,
-                QCPAxis::ScaleType dataScaleType, const QCPAxis* keyAxis, const QCPAxis* valueAxis);
+    void update(const QCPColorMapData* grid, QCPDrawContext& context, const QCPScale& dataScale,
+                const QCPAxis* keyAxis, const QCPAxis* valueAxis);
 
     // Exposed for tests: the levels of the last recording and the labels it placed.
     [[nodiscard]] QVector<double> lastLevels() const { return mLastLevels; }
@@ -80,7 +80,7 @@ private:
     };
 
     [[nodiscard]] QVector<double> resolveLevels(const QCPColorMapData* grid,
-                                                QCPAxis::ScaleType dataScaleType) const;
+                                                const QCPScale& dataScale) const;
     const Lines& linesFor(const QCPColorMapData* grid, const Key& key, bool exporting);
     void recordLines(QCPDrawContext& context, const QCPColorMapData* grid, const Lines& lines,
                      bool keyLog, bool valueLog) const;

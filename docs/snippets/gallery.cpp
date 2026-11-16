@@ -47,7 +47,7 @@ DOC_SNIPPET(gallery_space_weather, 800, 560)
     auto* spectraRect = new QCPAxisRect(customPlot);
     customPlot->plotLayout()->addElement(1, 0, spectraRect);
     QCPAxis* energyAxis = spectraRect->axis(QCPAxis::atLeft);
-    energyAxis->setScaleType(QCPAxis::stLogarithmic);
+    energyAxis->setScale(QCPScale::log());
     energyAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
     const int channels = 40;
     std::vector<double> minutes, energy(channels), flux;
@@ -68,7 +68,7 @@ DOC_SNIPPET(gallery_space_weather, 800, 560)
     }
     auto* scale = new QCPColorScale(customPlot);
     customPlot->plotLayout()->addElement(1, 1, scale);
-    scale->setDataScaleType(QCPAxis::stLogarithmic);
+    scale->setDataScale(QCPScale::log());
     scale->axis()->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
     scale->axis()->setNumberFormat("eb");
     scale->axis()->setNumberPrecision(0);

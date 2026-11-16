@@ -456,7 +456,7 @@ void TestPipeline::pipelineViewportDependentRuns()
     pipeline.setSource(source);
     QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 1000);
 
-    pipeline.onViewportChanged(ViewportParams{{0, 10}, {0, 10}, 400, 300, false, false});
+    pipeline.onViewportChanged(ViewportParams{{0, 10}, {0, 10}, 400, 300});
     QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 2, 1000);
 
     QVERIFY(runCount.load() >= 2);
@@ -745,7 +745,7 @@ void TestPipeline::colormap2DescendingYAxisLogScaleResamplesNonEmpty()
     if (!showAndHasRhi(mPlot)) QSKIP("No QRhi available — pipeline needs viewport from draw()");
 
     auto* cm = mPlot->add<QCPColorMap2>().get();
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     mPlot->xAxis->setRange(0.0, 5.0);
     mPlot->yAxis->setRange(1.0, 5.0);
     QCoreApplication::processEvents();
@@ -767,7 +767,7 @@ void TestPipeline::colormap2DescendingYAxisLogScaleResamplesNonEmpty()
             if (!std::isnan(result->cell(i, j)))
                 ++finite;
 
-    mPlot->yAxis->setScaleType(QCPAxis::stLinear);
+    mPlot->yAxis->setScale(QCPScale::linear());
 
     QVERIFY2(finite > 0,
              "descending-y source on a log value axis must still accumulate cells");
@@ -805,7 +805,7 @@ void TestPipeline::colormap2DataFromExternalThread()
     auto* cm = mPlot->add<QCPColorMap2>().get();
     mPlot->xAxis->setRange(0, 2);
     mPlot->yAxis->setRange(0, 1);
-    cm->pipeline().onViewportChanged(ViewportParams{{0, 2}, {0, 1}, 400, 300, false, false});
+    cm->pipeline().onViewportChanged(ViewportParams{{0, 2}, {0, 1}, 400, 300});
 
     QSignalSpy spy(&cm->pipeline(), &QCPColormapPipeline::finished);
 
@@ -852,7 +852,7 @@ void TestPipeline::colormap2ResamplesAgainAfterResize()
     };
     auto* cm = colormapOn(mPlot);
     QVERIFY(cm->pipeline().runSynchronously(
-        ViewportParams{{0, nx - 1.0}, {0, ny - 1.0}, 2, 2, false, false}));
+        ViewportParams{{0, nx - 1.0}, {0, ny - 1.0}, 2, 2}));
     QVERIFY(cm->pipeline().result()->keySize() < nx);
     QCustomPlot fresh;
     fresh.resize(mPlot->size());
@@ -880,8 +880,8 @@ void TestPipeline::colormap2ResamplesForTheLogScaleOfItsKeyAxis()
 {
     auto* cm = gridOnTheSecondAxes(mPlot);
     mPlot->xAxis->setRange(1, 100); // a log toggle that leaves the range alone emits no rangeChanged
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
-    QVERIFY(cm->pipeline().lastViewport().keyLogScale);
+    mPlot->xAxis->setScale(QCPScale::log());
+    QVERIFY(cm->pipeline().lastViewport().keyScale.isLog());
 }
 
 void TestPipeline::colormap2ResamplesForTheScaleOfANewKeyAxis()
@@ -889,8 +889,8 @@ void TestPipeline::colormap2ResamplesForTheScaleOfANewKeyAxis()
     auto* cm = gridOnTheSecondAxes(mPlot);
     cm->setKeyAxis(mPlot->xAxis2);
     mPlot->xAxis2->setRange(1, 100);
-    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
-    QVERIFY(cm->pipeline().lastViewport().keyLogScale);
+    mPlot->xAxis2->setScale(QCPScale::log());
+    QVERIFY(cm->pipeline().lastViewport().keyScale.isLog());
 }
 
 void TestPipeline::colormap2ResamplesForTheScaleOfANewValueAxis()
@@ -898,8 +898,8 @@ void TestPipeline::colormap2ResamplesForTheScaleOfANewValueAxis()
     auto* cm = gridOnTheSecondAxes(mPlot);
     cm->setValueAxis(mPlot->yAxis2);
     mPlot->yAxis2->setRange(1, 100);
-    mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
-    QVERIFY(cm->pipeline().lastViewport().valueLogScale);
+    mPlot->yAxis2->setScale(QCPScale::log());
+    QVERIFY(cm->pipeline().lastViewport().valueScale.isLog());
 }
 
 void TestPipeline::colormap2ResamplesForTheRangeOfANewKeyAxis()
@@ -923,18 +923,18 @@ void TestPipeline::colormap2ResamplesWhenMovedToALogKeyAxis()
 {
     auto* cm = gridOnTheSecondAxes(mPlot);
     mPlot->xAxis2->setRange(1, 100);
-    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis2->setScale(QCPScale::log());
     cm->setKeyAxis(mPlot->xAxis2);
-    QVERIFY(cm->pipeline().lastViewport().keyLogScale);
+    QVERIFY(cm->pipeline().lastViewport().keyScale.isLog());
 }
 
 void TestPipeline::colormap2ResamplesWhenMovedToALogValueAxis()
 {
     auto* cm = gridOnTheSecondAxes(mPlot);
     mPlot->yAxis2->setRange(1, 100);
-    mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis2->setScale(QCPScale::log());
     cm->setValueAxis(mPlot->yAxis2);
-    QVERIFY(cm->pipeline().lastViewport().valueLogScale);
+    QVERIFY(cm->pipeline().lastViewport().valueScale.isLog());
 }
 
 // One axis in both roles must not connect twice: a range change would resample twice.
@@ -1936,7 +1936,7 @@ void TestPipeline::histogram2dBinsFollowALogKeyAxis()
 {
     auto* hist = mPlot->add<QCPHistogram2D>().get();
     hist->setBins(3, 1);
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
 
     std::vector<double> keys = {1.0, 10.0, 100.0, 1000.0};
     std::vector<double> vals = {5.0, 5.0, 5.0, 5.0};
@@ -2015,7 +2015,7 @@ void TestPipeline::histogram2dAxisScaleTogglesRebinning()
 
     // Toggle the key axis to log -> the histogram must re-bin in log space.
     QSignalSpy spy2(&hist->pipeline(), &QCPHistogramPipeline::finished);
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     QVERIFY(spy2.wait(2000));
     auto* log = hist->pipeline().result();
     QVERIFY(log);
@@ -2048,14 +2048,14 @@ bool spreadOverDecades(const QCPColorMapData* data, bool alongKeys)
 }
 } // namespace
 
-// Moving onto an axis that is already log sends no scaleTypeChanged: draw() notices the scale.
+// Moving onto an axis that is already log sends no scaleChanged: draw() notices the scale.
 void TestPipeline::histogram2dRebinsForTheScaleOfANewKeyAxis()
 {
     auto* hist = decadeHistogram(mPlot, true);
     QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(spy.wait(2000));
     QVERIFY(!spreadOverDecades(hist->pipeline().result(), true));
-    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis2->setScale(QCPScale::log());
     hist->setKeyAxis(mPlot->xAxis2);
     mPlot->replot();
     QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), true), 2000);
@@ -2067,7 +2067,7 @@ void TestPipeline::histogram2dRebinsForTheScaleOfANewValueAxis()
     QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(spy.wait(2000));
     QVERIFY(!spreadOverDecades(hist->pipeline().result(), false));
-    mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis2->setScale(QCPScale::log());
     hist->setValueAxis(mPlot->yAxis2);
     mPlot->replot();
     QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), false), 2000);
@@ -2083,7 +2083,7 @@ void TestPipeline::histogram2dRebinsForANewKeyAxisScaleWithoutADraw()
     mPlot->xAxis2->setRange(1, 1000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QTest::qWait(50);
-    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis2->setScale(QCPScale::log());
     QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), true), 2000);
 }
 
@@ -2096,7 +2096,7 @@ void TestPipeline::histogram2dRebinsForANewValueAxisScaleWithoutADraw()
     mPlot->yAxis2->setRange(1, 1000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QTest::qWait(50);
-    mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis2->setScale(QCPScale::log());
     QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), false), 2000);
 }
 
@@ -2108,7 +2108,7 @@ void TestPipeline::histogram2dIgnoresTheScaleOfTheKeyAxisItLeft()
     QVERIFY(finished.wait(2000));
     hist->setKeyAxis(mPlot->xAxis2);
     QSignalSpy busy(&hist->pipeline(), &QCPHistogramPipeline::busyChanged);
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     QCOMPARE(busy.count(), 0);
 }
 
@@ -2119,7 +2119,7 @@ void TestPipeline::histogram2dIgnoresTheScaleOfTheValueAxisItLeft()
     QVERIFY(finished.wait(2000));
     hist->setValueAxis(mPlot->yAxis2);
     QSignalSpy busy(&hist->pipeline(), &QCPHistogramPipeline::busyChanged);
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     QCOMPARE(busy.count(), 0);
 }
 
@@ -2143,7 +2143,7 @@ void TestPipeline::histogram2dRebinForANewScaleEmitsNothingDuringPaint()
     QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(finished.wait(2000));
     hist->setKeyAxis(mPlot->xAxis2);
-    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis2->setScale(QCPScale::log());
     QSignalSpy busy(&hist->pipeline(), &QCPHistogramPipeline::busyChanged);
     mPlot->replot();
     QCOMPARE(busy.count(), 0);
@@ -2156,7 +2156,7 @@ void TestPipeline::histogram2dExportRightAfterAScaleChangeShowsTheNewBins()
     auto* hist = decadeHistogram(mPlot, true);
     QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(finished.wait(2000));
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
     QVERIFY(spreadOverDecades(hist->pipeline().result(), true));
 }
@@ -2167,7 +2167,7 @@ void TestPipeline::histogram2dExportRightAfterANewAxisShowsItsScale()
     QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(finished.wait(2000));
     hist->setKeyAxis(mPlot->xAxis2);
-    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis2->setScale(QCPScale::log());
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
     QVERIFY(spreadOverDecades(hist->pipeline().result(), true));
 }
@@ -2181,7 +2181,7 @@ void TestPipeline::histogram2dQueuedRebinIsDroppedAfterAnExportRebinned()
     hist->setKeyAxis(mPlot->xAxis2);
     {
         const QSignalBlocker noSignal(mPlot->xAxis2); // only the paint notices the new scale
-        mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+        mPlot->xAxis2->setScale(QCPScale::log());
     }
     mPlot->replot(); // queues the re-bin
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
@@ -2230,7 +2230,7 @@ void TestPipeline::histogram2dExportResultIsNotReplacedByAnOlderJob()
     auto open = std::make_shared<std::atomic<bool>>(false);
     QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
     hist->setDataSource(std::make_shared<GatedDecadeSource>(open));
-    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic); // already log: no re-bin is queued
+    mPlot->xAxis2->setScale(QCPScale::log()); // already log: no re-bin is queued
     hist->setKeyAxis(mPlot->xAxis2);
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
     QVERIFY(spreadOverDecades(hist->pipeline().result(), true));
@@ -2281,7 +2281,7 @@ void TestPipeline::histogram2dDataWithNothingFiniteClearsTheOldCells()
 // is fresh, not stale, so draw() must not ask for a re-bin again and again.
 void TestPipeline::histogram2dLogValueAxisFromTheStartIsNotStale()
 {
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setScale(QCPScale::log());
     auto* hist = decadeHistogram(mPlot, false);
     QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(finished.wait(2000));
@@ -2301,7 +2301,7 @@ void TestPipeline::histogram2dStaleScaleIsReboundAgainAfterAQueuedRebin()
     auto* hist = decadeHistogram(mPlot, true);
     QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(finished.wait(2000));
-    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis2->setScale(QCPScale::log());
     hist->setKeyAxis(mPlot->xAxis2);
     mPlot->replot();
     QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), true), 2000);
@@ -2324,7 +2324,7 @@ QImage exportedLogKeyDecades(QCustomPlot* plot, bool drawnLinearFirst)
     plot->yAxis->setRange(0, 5);
     if (drawnLinearFirst)
         plot->replot(QCustomPlot::rpImmediateRefresh);
-    plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->xAxis->setScale(QCPScale::log());
     plot->xAxis->setRange(1, 1000);
     return plot->toPixmap(400, 300).toImage();
 }
@@ -2439,7 +2439,7 @@ void TestPipeline::histogram2dContoursMapALogKeyGeometrically()
 {
     auto* hist = mPlot->add<QCPHistogram2D>().get();
     hist->setBins(10, 2);
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
 
     // Column i holds i + 1 samples in each value row, so level 5.5 separates column 4 from
     // column 5: u = 0.5 of the grid.
@@ -2500,7 +2500,7 @@ void TestPipeline::histogram2dChangingTheDataRangeRequestsARepaint()
 void TestPipeline::histogram2dChangingTheDataScaleTypeRequestsARepaint()
 {
     auto* hist = decadeHistogram(mPlot, true);
-    QVERIFY(repaintFollows(hist, [&] { hist->setDataScaleType(QCPAxis::stLogarithmic); }));
+    QVERIFY(repaintFollows(hist, [&] { hist->setDataScale(QCPScale::log()); }));
 }
 
 void TestPipeline::histogram2dChangingTheNormalizationRequestsARepaint()
@@ -2919,7 +2919,7 @@ void TestPipeline::multiGraphExportSynchronousFallback()
 
 void TestPipeline::multiGraphLogScaleFallback()
 {
-    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScale(QCPScale::log());
     auto* mg = mPlot->add<QCPGraph>().get();
 
     // 10M+1 points: above threshold, pipeline is installed
@@ -3583,9 +3583,9 @@ QCPGraph* drawnPositiveGraph(QCustomPlot* plot, bool logKeys, bool logValues)
     }
     graph->setData(std::move(keys), std::move(values));
     if (logKeys)
-        plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+        plot->xAxis->setScale(QCPScale::log());
     if (logValues)
-        plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+        plot->yAxis->setScale(QCPScale::log());
     plot->xAxis->setRange(10, 100);
     plot->yAxis->setRange(0.5, 5);
     plot->replot(QCustomPlot::rpImmediateRefresh);
@@ -3788,7 +3788,7 @@ void TestPipeline::histogram2dContourLabelsFollowAColourScaleToggle()
     QVERIFY(spy.wait(2000));
     mPlot->toPixmap();
     const QVector<double> linear = hist->lastContourLevels();
-    hist->setDataScaleType(QCPAxis::stLogarithmic);
+    hist->setDataScale(QCPScale::log());
     mPlot->toPixmap();
     const QVector<double> levels = hist->lastContourLevels();
     QVERIFY2(levels != linear, "sanity: log auto levels differ from linear ones");

@@ -442,11 +442,11 @@ void TestBuilder::addEveryPlottable_data()
                          .setColorValues(std::vector<double>{1, 2, 3})
                          .setGradient(QCPColorGradient(QCPColorGradient::gpJet))
                          .setDataRange(QCPRange(1, 3))
-                         .setDataScaleType(QCPAxis::stLogarithmic)
+                         .setDataScale(QCPScale::log())
                          .setScatterSkip(3)
                          .setLineStyle(QCPGraph::lsLine);
             return m->dataSource() && m->hasColorValues() && m->scatterSkip() == 3
-                && m->dataScaleType() == QCPAxis::stLogarithmic && m->dataRange() == QCPRange(1, 3)
+                && m->dataScale() == QCPScale::log() && m->dataRange() == QCPRange(1, 3)
                 && m->gradient() == QCPColorGradient(QCPColorGradient::gpJet);
         });
     row("waterfall",

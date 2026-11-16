@@ -548,7 +548,7 @@ QCPKeyWindow QCPDrawContext::keyWindow() const
     }
     if (!mKeyAxis)
         return { };
-    const bool logarithmic = mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool logarithmic = !mKeyAxis->scale().isLinear();
     const QCPKeyWindow window { qcp::algo::lineCacheKeyRange(mKeyAxis->range(), logarithmic),
                                 qcpKeyPixelsPerUnit(mKeyAxis) };
     if (logarithmic)

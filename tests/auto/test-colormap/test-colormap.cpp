@@ -527,7 +527,7 @@ void TestColorMap::QCPColorMap2_contourExportFollowsALogValueAxis()
 {
   mPlot->resize(400, 300);
   mPlot->xAxis->setRange(0, 4);
-  mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+  mPlot->yAxis->setScale(QCPScale::log());
   mPlot->yAxis->setRange(1, 1000);
   const int ny = 31;
   std::vector<double> x = {0, 1, 2, 3, 4}, y(ny), z(5 * ny);
@@ -615,7 +615,7 @@ void TestColorMap::QCPColorMap2_contourLabelsFollowAColourScaleToggle()
   cm->setAutoContourLevels(3);
   cm->setContourLabelEnabled(true);
   mPlot->toPixmap();
-  cm->setDataScaleType(QCPAxis::stLogarithmic);
+  cm->setDataScale(QCPScale::log());
   settleColorMap(mPlot, cm);
   mPlot->toPixmap();
 
@@ -680,7 +680,7 @@ void TestColorMap::QCPColorMap2_autoContourLevelsGeometricInLogScale()
   auto* cm = mPlot->add<QCPColorMap2>().get();
   cm->setData(x, y, z);
   settleColorMap(mPlot, cm);
-  cm->setDataScaleType(QCPAxis::stLogarithmic);
+  cm->setDataScale(QCPScale::log());
   cm->setAutoContourLevels(3);
   mPlot->replot();
   QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
@@ -889,16 +889,16 @@ void colourSettersSurviveADeletingSlot(QCustomPlot* plot)
     QCOMPARE(plot->plottableCount(), 0);
   };
   // The log scale sanitises the range, so dataRangeChanged comes first.
-  check(&Map::dataRangeChanged, [](Map* m) { m->setDataScaleType(QCPAxis::stLogarithmic); });
-  check(&Map::dataScaleTypeChanged, [](Map* m) { m->setDataScaleType(QCPAxis::stLogarithmic); });
+  check(&Map::dataRangeChanged, [](Map* m) { m->setDataScale(QCPScale::log()); });
+  check(&Map::dataScaleChanged, [](Map* m) { m->setDataScale(QCPScale::log()); });
   check(&Map::dataRangeChanged, [](Map* m) { m->setDataRange(QCPRange(2, 3)); });
   check(&Map::gradientChanged,
         [](Map* m) { m->setGradient(QCPColorGradient(QCPColorGradient::gpHot)); });
   auto* scale = new QCPColorScale(plot);
   scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
-  scale->setDataScaleType(QCPAxis::stLogarithmic);
+  scale->setDataScale(QCPScale::log());
   check(&Map::gradientChanged, [scale](Map* m) { m->setColorScale(scale); });
-  check(&Map::dataScaleTypeChanged, [scale](Map* m) { m->setColorScale(scale); });
+  check(&Map::dataScaleChanged, [scale](Map* m) { m->setColorScale(scale); });
   delete scale;
 }
 } // namespace
@@ -919,8 +919,8 @@ void TestColorMap::QCPHistogram2D_colourSlotDeletingTheMapIsSafe()
 void TestColorMap::QCPColorMap_scaleTypeSlotDeletingTheMapIsSafe()
 {
   mColorMap->setDataRange(QCPRange(-1, 10));
-  removeOn(mColorMap, &QCPColorMap::dataScaleTypeChanged);
-  mColorMap->setDataScaleType(QCPAxis::stLogarithmic);
+  removeOn(mColorMap, &QCPColorMap::dataScaleChanged);
+  mColorMap->setDataScale(QCPScale::log());
   QCOMPARE(mPlot->plottableCount(), 0);
 }
 
@@ -931,10 +931,10 @@ void TestColorMap::QCPColorScale_rangeSlotDeletingTheScaleIsSafe()
   scale->setDataRange(QCPRange(-1, 10));
   const QPointer<QCPColorScale> alive(scale);
   int scaleTypeSignals = 0;
-  connect(scale, &QCPColorScale::dataScaleTypeChanged, mPlot, [&] { ++scaleTypeSignals; });
+  connect(scale, &QCPColorScale::dataScaleChanged, mPlot, [&] { ++scaleTypeSignals; });
   connect(scale, &QCPColorScale::dataRangeChanged, mPlot, [scale] { delete scale; },
           Qt::SingleShotConnection);
-  scale->setDataScaleType(QCPAxis::stLogarithmic);
+  scale->setDataScale(QCPScale::log());
   QVERIFY(!alive);
   QCOMPARE(scaleTypeSignals, 0);
 }
@@ -1226,11 +1226,11 @@ void TestColorMap::QCPColorMap_colorScaleSlotDeletingTheMapIsSafe()
 {
   auto* scale = new QCPColorScale(mPlot);
   scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
-  scale->setDataScaleType(QCPAxis::stLogarithmic);
+  scale->setDataScale(QCPScale::log());
   removeOn(mColorMap, &QCPColorMap::gradientChanged);
   mColorMap->setColorScale(scale);
   QCOMPARE(mPlot->plottableCount(), 0);
-  QCOMPARE(scale->dataScaleType(), QCPAxis::stLogarithmic);
+  QCOMPARE(scale->dataScale(), QCPScale::log());
 }
 
 // One scale, three kinds of user: rescaling must see the bounds of each of them.
@@ -1283,9 +1283,9 @@ void TestColorMap::QCPColorScale_aSetterOnOneUserReachesTheOthers()
     QCOMPARE(map->dataRange(), QCPRange(1, 2));
     QCOMPARE(scale->dataRange(), QCPRange(1, 2));
 
-    map2->setDataScaleType(QCPAxis::stLogarithmic);
-    QCOMPARE(map->dataScaleType(), QCPAxis::stLogarithmic);
-    QCOMPARE(scale->dataScaleType(), QCPAxis::stLogarithmic);
+    map2->setDataScale(QCPScale::log());
+    QCOMPARE(map->dataScale(), QCPScale::log());
+    QCOMPARE(scale->dataScale(), QCPScale::log());
 }
 
 // Attaching takes the scale's gradient, range and scale type.
@@ -1295,12 +1295,12 @@ void TestColorMap::QCPColorScale_attachingTakesTheScaleValues()
     const QCPColorGradient hot(QCPColorGradient::gpHot);
     scale->setGradient(hot);
     scale->setDataRange(QCPRange(2, 4));
-    scale->setDataScaleType(QCPAxis::stLogarithmic);
+    scale->setDataScale(QCPScale::log());
 
     mColorMap->setColorScale(scale);
     QCOMPARE(mColorMap->gradient(), hot);
     QCOMPARE(mColorMap->dataRange(), scale->dataRange());
-    QCOMPARE(mColorMap->dataScaleType(), scale->dataScaleType());
+    QCOMPARE(mColorMap->dataScale(), scale->dataScale());
 }
 
 // Deleting the scale forgets it on every user, keeps their values, and tells each of them once.

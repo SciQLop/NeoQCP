@@ -264,7 +264,7 @@ void TestSpan::drawOnLogAxis()
 {
     QFETCH(bool, vertical);
     QCPAxis* axis = rangeAxis(mPlot, vertical);
-    axis->setScaleType(QCPAxis::stLogarithmic);
+    axis->setScale(QCPScale::log());
     axis->setRange(1, 1000);
     auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));
     span->setRange(QCPRange(10, 100));
@@ -465,7 +465,7 @@ void TestSpan::logAxisDragFollowsTheMouseInPixels()
 {
     QFETCH(bool, vertical);
     QCPAxis* axis = rangeAxis(mPlot, vertical);
-    axis->setScaleType(QCPAxis::stLogarithmic);
+    axis->setScale(QCPScale::log());
     axis->setRange(1, 1000);
     mPlot->replot();
     auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));

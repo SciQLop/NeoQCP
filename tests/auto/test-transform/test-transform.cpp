@@ -121,7 +121,7 @@ void TestTransform::polarMappingMatchesTheAxes()
     angular->setRangeReversed(angularReversed);
     angular->setAngle(startAngle);
     const QCPRange radialRange = radialLog ? QCPRange(0.5, 8.0) : QCPRange(0.0, 5.0);
-    radial->setScaleType(radialLog ? QCPAxisBase::stLogarithmic : QCPAxisBase::stLinear);
+    radial->setScale(radialLog ? QCPScale::log() : QCPScale::linear());
     radial->setRange(radialRange.lower, radialRange.upper);
     radial->setRangeReversed(radialReversed);
     plot.replot();
@@ -158,7 +158,7 @@ void TestTransform::polarInverseRoundTrips()
     QCPPolarAxisRadial* radial = area->radialAxis();
     angular->setAngle(20.0);
     radial->setRange(0.5, 5.0);
-    radial->setScaleType(QCPAxisBase::stLogarithmic);
+    radial->setScale(QCPScale::log());
     plot.replot();
 
     const QCPTransform transform = QCPTransform::polar(*angular, *radial);
@@ -194,7 +194,7 @@ void TestTransform::polarClampsTheRadius()
     QCPPolarAxisAngular* angular = area->angularAxis();
     QCPPolarAxisRadial* radial = area->radialAxis();
     const QCPRange range = radialLog ? QCPRange(0.5, 8.0) : QCPRange(0.0, 5.0);
-    radial->setScaleType(radialLog ? QCPAxisBase::stLogarithmic : QCPAxisBase::stLinear);
+    radial->setScale(radialLog ? QCPScale::log() : QCPScale::linear());
     radial->setRange(range.lower, range.upper);
     plot.replot();
 
@@ -298,7 +298,7 @@ void TestTransform::cartesianInverseMatchesPixelToCoord()
     keyAxis->setRange(0, 10);
     if (logValue)
     {
-        valueAxis->setScaleType(QCPAxisBase::stLogarithmic);
+        valueAxis->setScale(QCPScale::log());
         valueAxis->setRange(1.0, 100.0);
     }
     else

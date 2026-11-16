@@ -65,7 +65,7 @@ For radians, replace it with a `QCPAxisTickerPi`.
 The radial axis behaves like a normal axis along a spoke.
 
 - `setRange()`, `setRangeReversed()` and `rescale()` work as on a `QCPAxis`. The default range is 0 to 5.
-- `setScaleType(QCPPolarAxisRadial::stLogarithmic)` makes it logarithmic. Give it a `QCPAxisTickerLog` too.
+- `setScale(QCPScale::log())` makes it logarithmic. Give it a `QCPAxisTickerLog` too.
 - `setAngle(degrees)` turns the spoke. With the default `setAngleReference(QCPPolarAxisRadial::arAngularAxis)`, the angle is measured from the angular axis' start, clockwise. The default is 45.
 - `setTickLabelMode()` keeps the tick labels upright (`QCPPolarAxisRadial::lmUpright`, the default) or turns them with the spoke (`lmRotated`).
 - Labels, fonts, pens, ticks and number formats have the same setters as on a `QCPAxis`.

@@ -4,15 +4,14 @@
 #include <colorgradient.h>
 #include <layoutelements/layoutelement-colorscale.h>
 
-//! The colour mapping a plottable shares with a QCPColorScale: gradient, data range, scale type.
+//! The colour mapping a plottable shares with a QCPColorScale: gradient, data range, data scale.
 class QCP_LIB_DECL QCPColorMapped : public QCPPlottable
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(QCPColorMapped)
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QCPRange dataRange READ dataRange WRITE setDataRange NOTIFY dataRangeChanged)
-    Q_PROPERTY(QCPAxis::ScaleType dataScaleType READ dataScaleType WRITE setDataScaleType NOTIFY
-                   dataScaleTypeChanged)
+    Q_PROPERTY(QCPScale dataScale READ dataScale WRITE setDataScale NOTIFY dataScaleChanged)
     Q_PROPERTY(QCPColorGradient gradient READ gradient WRITE setGradient NOTIFY gradientChanged)
     Q_PROPERTY(
         QCPColorScale* colorScale READ colorScale WRITE setColorScale NOTIFY colorScaleChanged)
@@ -27,7 +26,7 @@ public:
     // getters:
     [[nodiscard]] QCPRange dataRange() const { return mDataRange; }
 
-    [[nodiscard]] QCPAxis::ScaleType dataScaleType() const { return mDataScaleType; }
+    [[nodiscard]] const QCPScale& dataScale() const { return mDataScale; }
 
     [[nodiscard]] QCPColorGradient gradient() const { return mGradient; }
 
@@ -39,7 +38,7 @@ public:
 
     // setters:
     Q_SLOT void setDataRange(const QCPRange& dataRange);
-    Q_SLOT void setDataScaleType(QCPAxis::ScaleType scaleType);
+    Q_SLOT void setDataScale(const QCPScale& scale);
     Q_SLOT void setGradient(const QCPColorGradient& gradient);
     //! Joins \a colorScale, or none with null. The choice sticks: a plottable given null never
     //! joins its rect's scale on its own, and one given a scale keeps it through moves and new
@@ -65,12 +64,12 @@ public:
 
 signals:
     void dataRangeChanged(const QCPRange& newRange);
-    void dataScaleTypeChanged(QCPAxis::ScaleType scaleType);
+    void dataScaleChanged(const QCPScale& scale);
     void gradientChanged(const QCPColorGradient& newGradient);
     void colorScaleChanged();
 
 protected:
-    //! Called after the gradient, range or scale type changed: repaint, or hand it to a renderer.
+    //! Called after the gradient, range or data scale changed: repaint, or hand it to a renderer.
     virtual void colorMappingChanged() { update(); }
 
     //! Takes the key axis rect's scale, if it has one, and hands its values to the renderer.
@@ -85,11 +84,12 @@ protected:
 
     // property members:
     QCPRange mDataRange;
-    QCPAxis::ScaleType mDataScaleType;
+    QCPScale mDataScale;
     QCPColorGradient mGradient;
     //! Whether the caller set each one, and so whether a scale may still fill it when it is joined.
     bool mGradientChosen = false;
     bool mDataRangeChosen = false;
+    bool mDataScaleChosen = false;
 
 private:
     //! Which scale this plottable uses: its rect's (the default), the one setColorScale() picked,
@@ -115,7 +115,7 @@ private:
     //! setColorScale(), which names a scale the caller picked, takes that scale's values whole.
     void attachColorScale(QCPColorScale* colorScale, bool keepsChosenValues = false);
     void applyDataRange(const QCPRange& dataRange);
-    void applyDataScaleType(QCPAxis::ScaleType scaleType);
+    void applyDataScale(const QCPScale& scale);
     void applyGradient(const QCPColorGradient& gradient);
     void detachColorScale();
 

@@ -89,7 +89,7 @@ public:
     bool columnNormalized() const { return mColumnNormalized; }
 
     // Re-read the key/value axis scale type and re-bin. Wired to the axes'
-    // scaleTypeChanged, but also callable directly for callers that change the
+    // scaleChanged, but also callable directly for callers that change the
     // scale with that signal blocked (e.g. SciQLop's axis wrapper).
     Q_SLOT void refreshBinning();
 
@@ -180,7 +180,7 @@ private:
         bool stale = true;
     };
     mutable Shown mShown;
-    //! The axis scales the binning was made for: a new axis or a blocked scaleTypeChanged
+    //! The axis scales the binning was made for: a new axis or a blocked scaleChanged
     //! leaves them behind, and draw() catches up.
     bool mBinnedKeyLog = false;
     bool mBinnedValueLog = false;
@@ -276,9 +276,9 @@ public:
     {
         return this->apply([&](T& p) { p.setDataRange(range); });
     }
-    Ret setDataScaleType(QCPAxis::ScaleType type)
+    Ret setDataScale(const QCPScale& scale)
     {
-        return this->apply([&](T& p) { p.setDataScaleType(type); });
+        return this->apply([&](T& p) { p.setDataScale(scale); });
     }
 
     // The scale the map follows; an empty or dead handle detaches it.

@@ -5,7 +5,6 @@
 
 QCPColorMapped::QCPColorMapped(bool transparentNan, QCP::Capabilities required)
         : QCPPlottable(required)
-        , mDataScaleType(QCPAxis::stLinear)
         , mGradient(QCPColorGradient::gpCold)
 {
     if (transparentNan)
@@ -39,17 +38,18 @@ void QCPColorMapped::setDataRange(const QCPRange& dataRange)
         mColorScale->setDataRange(mDataRange);
 }
 
-void QCPColorMapped::setDataScaleType(QCPAxis::ScaleType scaleType)
+void QCPColorMapped::setDataScale(const QCPScale& scale)
 {
+    mDataScaleChosen = true;
     if (!mColorScale)
     {
-        applyDataScaleType(scaleType);
+        applyDataScale(scale);
         return;
     }
     const QPointer<QCPColorMapped> alive(this);
-    applyDataScaleType(scaleType);
+    applyDataScale(scale);
     if (alive && mColorScale)
-        mColorScale->setDataScaleType(mDataScaleType);
+        mColorScale->setDataScale(mDataScale);
 }
 
 void QCPColorMapped::setGradient(const QCPColorGradient& gradient)
@@ -110,8 +110,8 @@ void QCPColorMapped::attachColorScale(QCPColorScale* colorScale, bool keepsChose
         applyGradient(colorScale->gradient());
     if (alive && live && (!keepsChosenValues || !mDataRangeChosen))
         applyDataRange(colorScale->dataRange());
-    if (alive && live)
-        applyDataScaleType(colorScale->dataScaleType());
+    if (alive && live && (!keepsChosenValues || !mDataScaleChosen))
+        applyDataScale(colorScale->dataScale());
     if (!alive || !live)
         return;
     qcpEmit(this, mParentPlot, &QCPColorMapped::colorScaleChanged);
@@ -127,9 +127,7 @@ void QCPColorMapped::rescaleDataRange(bool)
 
 void QCPColorMapped::applyDataRange(const QCPRange& dataRange)
 {
-    const QCPRange range = (mDataScaleType == QCPAxis::stLogarithmic)
-        ? dataRange.sanitizedForLogScale()
-        : dataRange.sanitizedForLinScale();
+    const QCPRange range = mDataScale.sanitized(dataRange);
     if (mDataRange.lower == range.lower && mDataRange.upper == range.upper)
         return;
     mDataRange = range;
@@ -137,20 +135,20 @@ void QCPColorMapped::applyDataRange(const QCPRange& dataRange)
     qcpEmit(this, mParentPlot, &QCPColorMapped::dataRangeChanged, mDataRange);
 }
 
-void QCPColorMapped::applyDataScaleType(QCPAxis::ScaleType scaleType)
+void QCPColorMapped::applyDataScale(const QCPScale& scale)
 {
-    if (mDataScaleType == scaleType)
+    if (mDataScale == scale)
         return;
-    mDataScaleType = scaleType;
-    // Handing the type to a renderer may start a pipeline job whose slot deletes this plottable.
+    mDataScale = scale;
+    // Handing the scale to a renderer may start a pipeline job whose slot deletes this plottable.
     const QPointer<QCPColorMapped> alive(this);
     colorMappingChanged();
     if (!alive)
         return;
     const QCPEmissionScope scope(mParentPlot);
-    qcpEmit(this, mParentPlot, &QCPColorMapped::dataScaleTypeChanged, mDataScaleType);
-    if (mDataScaleType == QCPAxis::stLogarithmic)
-        applyDataRange(mDataRange.sanitizedForLogScale());
+    qcpEmit(this, mParentPlot, &QCPColorMapped::dataScaleChanged, mDataScale);
+    if (mDataScale.isLog())
+        applyDataRange(mDataRange);
 }
 
 void QCPColorMapped::applyGradient(const QCPColorGradient& gradient)
