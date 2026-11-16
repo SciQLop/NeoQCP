@@ -602,12 +602,12 @@ void QCPColorScale::rescaleDataRange(bool onlyVisibleMaps)
             double center = (newRange.lower + newRange.upper)
                 * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
                        // validRange returned false for other reason
-            if (mDataScale.isLinear())
+            if (!mDataScale.isLog())
             {
                 newRange.lower = center - mDataRange.size() / 2.0;
                 newRange.upper = center + mDataRange.size() / 2.0;
             }
-            else // a non-linear scale, log today
+            else // a logarithmic scale: a range is a ratio
             {
                 newRange.lower = center / qSqrt(mDataRange.upper / mDataRange.lower);
                 newRange.upper = center * qSqrt(mDataRange.upper / mDataRange.lower);

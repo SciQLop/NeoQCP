@@ -74,20 +74,27 @@ struct QCP_LIB_DECL QCPDrawFrame
 /*!
   \brief The key range a recording stays valid for, and the scale it was recorded at.
 
-  \a keys is the view's key range widened by one view width on each side, the window the resampler
-  already keeps its line cache for. A recording that declared this window is reused while the view's
-  key range stays inside it and \a pixelsPerKey, the key axis' pixels per data unit, is unchanged:
-  a pan inside the window only translates the kept geometry. \a pixelsPerKey is a magnitude, so a
-  reversed or vertical key axis reads the same.
+  \a keys is the view's key range widened by one view span on each side, in the key axis' own
+  scale space where a width is a span on every scale, the window the resampler already keeps its
+  line cache for. A recording that declared this window is reused while the view's key range stays
+  inside it, \a scale is the scale it was recorded at, and the key axis' pixels per data unit
+  (\a pixelsPerKey) and per unit of scale space (\a pixelsPerScale) are unchanged: a pan inside the
+  window only translates the kept geometry. Both magnitudes read the same on a reversed or vertical
+  key axis, and on a linear one the two of them are equal.
 */
 struct QCP_LIB_DECL QCPKeyWindow
 {
     QCPRange keys;
     double pixelsPerKey = 0.0;
+    QCPScale scale;
+    double pixelsPerScale = 0.0;
 };
 
 //! The key axis' pixels per data unit, as a magnitude; 0 when the range has no extent.
 [[nodiscard]] QCP_LIB_DECL double qcpKeyPixelsPerUnit(const QCPAxis* keyAxis);
+
+//! The key axis' pixels per unit of its scale's scale space, as a magnitude; 0 without a span.
+[[nodiscard]] QCP_LIB_DECL double qcpKeyPixelsPerScaleUnit(const QCPAxis* keyAxis);
 
 /*!
   \brief The frame of one axis pair and one clip rect, built without recording anything.
@@ -169,8 +176,8 @@ public:
       computes it from the key axis. An empty window means unbounded, never the range [0, 0]: a
       caller that culls by it draws everything.
 
-      A logarithmic key axis has no constant pixels per key, so there the recording is marked
-      transform-dependent instead and a pan remakes it.
+      A non-linear key axis has no constant pixels per data unit, so the window also carries its
+      scale and the pixels per unit of that scale's scale space: a pan there stays a translation.
     */
     [[nodiscard]] QCPKeyWindow keyWindow() const;
 

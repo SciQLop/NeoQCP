@@ -149,6 +149,10 @@ private slots:
     void QCPPlottables_Pan200();
     void QCPPlottables_Zoom200();
 
+    // M6f: a scale's forward and inverse, with their constants cached in the value.
+    void QCPScale_ToScale1M();
+    void QCPScale_SymlogRoundTrip1M();
+
 private:
     QCustomPlot* mPlot;
     QWidget mContainerWidget;
@@ -3038,4 +3042,39 @@ void Benchmark::QCPPlottables_Zoom200()
         factor = 1.0 / factor;
         mPlot->replot(QCustomPlot::rpImmediateRefresh);
     }
+}
+
+// A scale maps and unmaps per point: 1/log(base) and the symlog slope are cached in the value, so
+// this row measures the two multiplications and the logarithm, not a recomputed constant.
+void Benchmark::QCPScale_ToScale1M()
+{
+    const QCPScale log = QCPScale::log();
+    const QCPScale symlog = QCPScale::symlog(2);
+    constexpr int n = 1000000;
+    std::vector<double> values(n);
+    for (int i = 0; i < n; ++i)
+        values[i] = 0.01 * (i + 1) * (i % 2 == 0 ? 1.0 : -1.0);
+    double sink = 0.0;
+    QBENCHMARK
+    {
+        for (int i = 0; i < n; ++i)
+            sink += log.toScale(values[i]) + symlog.toScale(values[i]);
+    }
+    QVERIFY(!qIsNaN(sink));
+}
+
+void Benchmark::QCPScale_SymlogRoundTrip1M()
+{
+    const QCPScale symlog = QCPScale::symlog(2);
+    constexpr int n = 1000000;
+    std::vector<double> scales(n);
+    for (int i = 0; i < n; ++i)
+        scales[i] = -6.0 + 12.0 * double(i) / n;
+    double sink = 0.0;
+    QBENCHMARK
+    {
+        for (int i = 0; i < n; ++i)
+            sink += symlog.fromScale(scales[i]);
+    }
+    QVERIFY(!qIsNaN(sink));
 }

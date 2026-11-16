@@ -177,7 +177,7 @@ QCPRatioTransform QCPRatioTransform::fitted(const QRectF& rect)
 void qcp::transform::Snapshot::take(const QCPAxis* axis)
 {
     vertical = axis->orientation() == Qt::Vertical;
-    logarithmic = axis->scale().isLog();
+    scale = axis->scale();
     reversed = axis->rangeReversed();
     lower = axis->range().lower;
     upper = axis->range().upper;
@@ -199,26 +199,34 @@ void qcp::transform::Snapshot::prepare()
         return;
     const double direction = reversed ? -1.0 : 1.0;
     const double axisSign = vertical ? -1.0 : 1.0; // a vertical axis grows upwards on screen
-    if (!logarithmic)
+    if (scale.isLog())
     {
-        slope = axisSign * direction * length / size;
-        intercept = origin - slope * (direction > 0.0 ? lower : upper);
-        usable = true;
+        const double ratio = upper / lower;
+        if (!(ratio > 0.0) || qFuzzyCompare(ratio, 1.0))
+            return;
+        positive = lower > 0.0 ? 1.0 : -1.0;
+        const double base = direction > 0.0 ? lower : upper;
+        logSlope = axisSign * direction * length / std::log(ratio);
+        logIntercept = origin - logSlope * std::log(std::abs(base));
+        usable = !qIsNaN(logSlope) && !qIsInf(logSlope);
         return;
     }
-    const double ratio = upper / lower;
-    if (!(ratio > 0.0) || qFuzzyCompare(ratio, 1.0))
+    // A linear and a symlog scale both draw as a straight line in their own scale space.
+    const double scaleLower = scale.toScale(lower);
+    const double scaleUpper = scale.toScale(upper);
+    const double span = scaleUpper - scaleLower;
+    if (!(span > 0.0))
         return;
-    positive = lower > 0.0 ? 1.0 : -1.0;
-    const double base = direction > 0.0 ? lower : upper;
-    logSlope = axisSign * direction * length / std::log(ratio);
-    logIntercept = origin - logSlope * std::log(std::abs(base));
-    usable = !qIsNaN(logSlope) && !qIsInf(logSlope);
+    slope = axisSign * direction * length / span;
+    intercept = origin - slope * (direction > 0.0 ? scaleLower : scaleUpper);
+    usable = !qIsNaN(slope) && !qIsInf(slope);
 }
 
 double qcp::transform::Snapshot::toPixel(double value) const
 {
-    if (!logarithmic)
+    if (scale.isSymlog())
+        return slope * scale.toScale(value) + intercept;
+    if (!scale.isLog())
         return slope * value + intercept;
     // QCPAxis::coordToPixel puts a value of the range's opposite sign 200 pixels outside the rect;
     // a replay must draw it where the axis would.
@@ -241,9 +249,10 @@ double qcp::transform::Snapshot::toValue(double pixel) const
 {
     if (!usable)
         return qQNaN();
-    if (!logarithmic)
-        return (pixel - intercept) / slope;
-    return positive * std::exp((pixel - logIntercept) / logSlope);
+    if (scale.isLog())
+        return positive * std::exp((pixel - logIntercept) / logSlope);
+    const double scaleValue = (pixel - intercept) / slope;
+    return scale.isSymlog() ? scale.fromScale(scaleValue) : scaleValue;
 }
 
 double qcp::transform::Snapshot::fractionOf(double pixel) const
@@ -327,7 +336,7 @@ void qcp::transform::Polar::take(const QCPPolarAxisAngular& angular, const QCPPo
     const QCPRange radialRange = radial.range();
     lower = radialRange.lower;
     upper = radialRange.upper;
-    logarithmic = radial.scale().isLog();
+    scale = radial.scale();
     reversed = radial.rangeReversed();
 }
 
@@ -335,17 +344,25 @@ bool qcp::transform::Polar::usable() const
 {
     if (!(radius >= 1.0) || !(angleUpper > angleLower) || !(upper > lower))
         return false;
-    return !logarithmic || lower > 0.0 || upper < 0.0;
+    return !scale.isLog() || lower > 0.0 || upper < 0.0;
 }
 
 double qcp::transform::Polar::rawFraction(double value) const
 {
-    if (!logarithmic)
+    if (scale.isLog())
+    {
+        if (value == 0.0 || (value > 0.0) != (lower > 0.0))
+            return qQNaN(); // the range's opposite sign has no log position
+        const double ratio = upper / lower;
+        return reversed ? qLn(upper / value) / qLn(ratio) : qLn(value / lower) / qLn(ratio);
+    }
+    if (scale.isLinear())
         return (reversed ? upper - value : value - lower) / (upper - lower);
-    if (value == 0.0 || (value > 0.0) != (lower > 0.0))
-        return qQNaN(); // the range's opposite sign has no log position
-    const double ratio = upper / lower;
-    return reversed ? qLn(upper / value) / qLn(ratio) : qLn(value / lower) / qLn(ratio);
+    const double lowerScale = scale.toScale(lower);
+    const double upperScale = scale.toScale(upper);
+    const double valueScale = scale.toScale(value);
+    return reversed ? (upperScale - valueScale) / (upperScale - lowerScale)
+                    : (valueScale - lowerScale) / (upperScale - lowerScale);
 }
 
 double qcp::transform::Polar::fraction(double value) const
@@ -355,10 +372,17 @@ double qcp::transform::Polar::fraction(double value) const
 
 double qcp::transform::Polar::valueAt(double fraction) const
 {
-    if (!logarithmic)
+    if (scale.isLog())
+    {
+        const double ratio = upper / lower;
+        return reversed ? upper / qPow(ratio, fraction) : lower * qPow(ratio, fraction);
+    }
+    if (scale.isLinear())
         return reversed ? upper - fraction * (upper - lower) : lower + fraction * (upper - lower);
-    const double ratio = upper / lower;
-    return reversed ? upper / qPow(ratio, fraction) : lower * qPow(ratio, fraction);
+    const double lowerScale = scale.toScale(lower);
+    const double upperScale = scale.toScale(upper);
+    return scale.fromScale(reversed ? upperScale - fraction * (upperScale - lowerScale)
+                                    : lowerScale + fraction * (upperScale - lowerScale));
 }
 
 double QCPTransform::polarFraction(double value) const
@@ -392,14 +416,22 @@ QCP::Data qcp::transform::Polar::toData(QPointF pixel) const
                 * (angleUpper - angleLower)
                                                 : angleLower;
     double value;
-    if (!logarithmic)
-        value = reversed ? upper - radiusPixel / radius * (upper - lower)
-                         : lower + radiusPixel / radius * (upper - lower);
-    else
+    if (scale.isLog())
     {
         const double ratio = upper / lower;
         value = reversed ? qPow(ratio, -radiusPixel / radius) * upper
                          : qPow(ratio, radiusPixel / radius) * lower;
+    }
+    else if (scale.isLinear())
+        value = reversed ? upper - radiusPixel / radius * (upper - lower)
+                         : lower + radiusPixel / radius * (upper - lower);
+    else
+    {
+        const double lowerScale = scale.toScale(lower);
+        const double upperScale = scale.toScale(upper);
+        const double fraction = radiusPixel / radius;
+        value = scale.fromScale(reversed ? upperScale - fraction * (upperScale - lowerScale)
+                                         : lowerScale + fraction * (upperScale - lowerScale));
     }
     return QCP::Data { angleCoord, value };
 }
@@ -438,10 +470,12 @@ QCP::Data QCPTransform::inverse(QPointF pixel) const
     return std::get<Custom>(mFrame).mapping->inverse(pixel);
 }
 
-template <bool KeyLog, bool ValueLog, typename KeyAt, typename ValueAt>
+template <qcp::transform::ScaleMode KeyMode, qcp::transform::ScaleMode ValueMode,
+          typename KeyAt, typename ValueAt>
 void QCPTransform::mapRange(const Cartesian& frame, std::size_t count, KeyAt keyAt, ValueAt valueAt,
                             std::span<QPointF> out) const
 {
+    using qcp::transform::ScaleMode;
     const Snapshot& keyAxis = frame.key.self;
     const Snapshot& valueAxis = frame.value.self;
     const double keySlope = keyAxis.slope;
@@ -462,16 +496,20 @@ void QCPTransform::mapRange(const Cartesian& frame, std::size_t count, KeyAt key
         const double value = valueAt(i);
         double keyPixel;
         double valuePixel;
-        if constexpr (KeyLog)
+        if constexpr (KeyMode == ScaleMode::Log)
             keyPixel = (key > 0.0) == keyPositive
                 ? keyLogSlope * std::log(std::abs(key)) + keyLogIntercept
                 : keyAxis.toPixel(key); // the sign QCPAxis draws 200 px outside the rect
+        else if constexpr (KeyMode == ScaleMode::Symlog)
+            keyPixel = keySlope * keyAxis.scale.toScale(key) + keyIntercept;
         else
             keyPixel = keySlope * key + keyIntercept;
-        if constexpr (ValueLog)
+        if constexpr (ValueMode == ScaleMode::Log)
             valuePixel = (value > 0.0) == valuePositive
                 ? valueLogSlope * std::log(std::abs(value)) + valueLogIntercept
                 : valueAxis.toPixel(value);
+        else if constexpr (ValueMode == ScaleMode::Symlog)
+            valuePixel = valueSlope * valueAxis.scale.toScale(value) + valueIntercept;
         else
             valuePixel = valueSlope * value + valueIntercept;
         o[i] = keyIsX ? QPointF(keyPixel, valuePixel) : QPointF(valuePixel, keyPixel);
@@ -496,19 +534,51 @@ void QCPTransform::mapAny(const Cartesian& frame, std::size_t count, KeyAt keyAt
         }
         return;
     }
-    if (frame.key.self.logarithmic)
+    using enum qcp::transform::ScaleMode;
+    switch (qcp::transform::scaleModeOf(frame.key.self.scale))
     {
-        if (frame.value.self.logarithmic)
-            mapRange<true, true>(frame, count, keyAt, valueAt, out);
-        else
-            mapRange<true, false>(frame, count, keyAt, valueAt, out);
-    }
-    else
-    {
-        if (frame.value.self.logarithmic)
-            mapRange<false, true>(frame, count, keyAt, valueAt, out);
-        else
-            mapRange<false, false>(frame, count, keyAt, valueAt, out);
+    case Linear:
+        switch (qcp::transform::scaleModeOf(frame.value.self.scale))
+        {
+        case Linear:
+            mapRange<Linear, Linear>(frame, count, keyAt, valueAt, out);
+            return;
+        case Log:
+            mapRange<Linear, Log>(frame, count, keyAt, valueAt, out);
+            return;
+        case Symlog:
+            mapRange<Linear, Symlog>(frame, count, keyAt, valueAt, out);
+            return;
+        }
+        return;
+    case Log:
+        switch (qcp::transform::scaleModeOf(frame.value.self.scale))
+        {
+        case Linear:
+            mapRange<Log, Linear>(frame, count, keyAt, valueAt, out);
+            return;
+        case Log:
+            mapRange<Log, Log>(frame, count, keyAt, valueAt, out);
+            return;
+        case Symlog:
+            mapRange<Log, Symlog>(frame, count, keyAt, valueAt, out);
+            return;
+        }
+        return;
+    case Symlog:
+        switch (qcp::transform::scaleModeOf(frame.value.self.scale))
+        {
+        case Linear:
+            mapRange<Symlog, Linear>(frame, count, keyAt, valueAt, out);
+            return;
+        case Log:
+            mapRange<Symlog, Log>(frame, count, keyAt, valueAt, out);
+            return;
+        case Symlog:
+            mapRange<Symlog, Symlog>(frame, count, keyAt, valueAt, out);
+            return;
+        }
+        return;
     }
 }
 
@@ -612,18 +682,19 @@ bool QCPTransform::isTranslationOf(const QCPTransform& other, QPointF* delta) co
     // it by a constant. Never replay it as a translation.
     if (here->key.link || here->value.link || there->key.link || there->value.link)
         return false;
-    // Only a linear mapping turns a range shift into a pixel shift: a log axis's shift is
-    // multiplicative and is reported as "not a translation", which costs a repaint and can never
-    // draw a wrong frame.
-    if (here->key.self.logarithmic || here->value.self.logarithmic || there->key.self.logarithmic
-        || there->value.self.logarithmic)
-        return false;
     // The two mappings are translations only when they have the same scale. A drag adds the same
     // diff to both range ends, but the addition rounds, so the two spans can differ by an ulp:
     // allow the scale to move by less than a thousandth of a pixel across the visible span
-    // (|delta slope| times the span is exactly that drift).
+    // (|delta slope| times the span is exactly that drift). A log or symlog slope is per unit of
+    // its own scale space, so the span it is measured over is a scale-space span, and a different
+    // scale altogether is a different mapping, not a translation.
     const auto sameScale = [](const Snapshot& a, const Snapshot& b)
-    { return std::abs(a.slope - b.slope) * std::abs(a.upper - a.lower) < 1e-3; };
+    {
+        if (!(a.scale == b.scale))
+            return false;
+        const double span = a.scale.toScale(a.upper) - a.scale.toScale(a.lower);
+        return std::abs(a.slope - b.slope) * std::abs(span) < 1e-3;
+    };
     if (!sameScale(here->key.self, there->key.self)
         || !sameScale(here->value.self, there->value.self))
         return false; // a zoom: the data-to-pixel scale changed

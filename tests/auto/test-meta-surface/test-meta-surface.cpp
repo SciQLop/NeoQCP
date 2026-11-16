@@ -2966,12 +2966,13 @@ struct TypeRow
 
 #define TYPE_ROW(T) { #T, QMetaType::fromType<T>(), #T }
 
-// E-13: the 32 enums whose Q_DECLARE_METATYPE line is gone, and the 5 lines kept. Each registers under
-// the name it is written with: a deleted line that renamed its type, or an alias line removed, fails.
+// E-13: the 31 enums whose Q_DECLARE_METATYPE line is gone, the 5 lines kept, and QCPScale, a
+// Q_GADGET value rather than an enum, whose line is kept too. Each registers under the name it is
+// written with: a deleted line that renamed its type, or an alias line removed, fails.
 const QVector<TypeRow>& metatypeRows()
 {
     static const QVector<TypeRow> list {
-        TYPE_ROW(QCPScale), TYPE_ROW(QCPAxisBase::SelectablePart),
+        TYPE_ROW(QCPAxisBase::SelectablePart),
         TYPE_ROW(QCPAxis::AxisType), TYPE_ROW(QCPAxis::LabelSide),
         TYPE_ROW(QCPAxisTicker::TickStepStrategy), TYPE_ROW(QCPAxisTickerFixed::ScaleStrategy),
         TYPE_ROW(QCPAxisTickerPi::FractionStyle), TYPE_ROW(QCPAxisTickerTime::TimeUnit),
@@ -2990,7 +2991,7 @@ const QVector<TypeRow>& metatypeRows()
         { "QCPCurve::LineStyle", QMetaType::fromType<QCPCurve::LineStyle>(), "QCPLine::LineStyle" },
          TYPE_ROW(QCPDataSelection),
         TYPE_ROW(QSharedPointer<QCPAxisTicker>), TYPE_ROW(QCPSelectionDecorator*),
-        TYPE_ROW(QCPIntervalEdit),
+        TYPE_ROW(QCPIntervalEdit), TYPE_ROW(QCPScale),
     };
     return list;
 }

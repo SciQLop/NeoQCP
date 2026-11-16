@@ -94,6 +94,22 @@ void TestScale::roundTrips()
     const QCPScale log = QCPScale::log();
     for (const double value : { 0.5, 2.0, 20.0, 1000.0, 1e6 })
         QVERIFY(sameValue(log.fromScale(log.toScale(value)), value));
+
+    // A pan is an offset in scale space and a zoom is a scaling there, on every scale.
+    for (const QCPScale& scale : { QCPScale::linear(), QCPScale::log(), QCPScale::symlog(2) })
+    {
+        const QCPRange range = scale.isLog() ? QCPRange(0.5, 20.0) : QCPRange(-4.0, 8.0);
+        const double span = scale.toScale(range.upper) - scale.toScale(range.lower);
+        const QCPRange moved = scale.shifted(range, 0.5 * span);
+        QVERIFY(sameValue(scale.toScale(moved.lower), scale.toScale(range.lower) + 0.5 * span));
+        QVERIFY(sameValue(scale.toScale(moved.upper) - scale.toScale(moved.lower), span));
+
+        const double center = 0.5 * (range.lower + range.upper);
+        const QCPRange zoomed = scale.scaled(range, 2.0, center);
+        QVERIFY(sameValue(scale.toScale(zoomed.upper) - scale.toScale(zoomed.lower), 2.0 * span));
+        QVERIFY(sameValue(scale.toScale(zoomed.lower) - scale.toScale(center),
+                          -2.0 * (scale.toScale(center) - scale.toScale(range.lower))));
+    }
 }
 
 void TestScale::badParametersAreRefused()
@@ -138,6 +154,19 @@ void settle(QCustomPlot& plot)
     plot.replot();
     for (int i = 0; i < 10 && plot.isRepaintQueued(); ++i)
         QCoreApplication::processEvents();
+}
+
+void sendMouse(QCustomPlot* plot, QEvent::Type type, QPoint pos, Qt::MouseButtons buttons)
+{
+    QMouseEvent e(type, pos, plot->mapToGlobal(pos), Qt::LeftButton, buttons, Qt::NoModifier);
+    QCoreApplication::sendEvent(plot, &e);
+}
+
+void dragFromTo(QCustomPlot* plot, QPoint from, QPoint to)
+{
+    sendMouse(plot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(plot, QEvent::MouseMove, to, Qt::LeftButton);
+    sendMouse(plot, QEvent::MouseButtonRelease, to, Qt::NoButton);
 }
 } // namespace
 
@@ -211,6 +240,119 @@ void TestScale::aLogAxisMapsAsBefore()
                  qPrintable(QStringLiteral("value %1").arg(values[i], 0, 'g', 17)));
 }
 
+// A symlog axis spreads the band and the log side on one pixel scale: zero is the middle, the
+// threshold sits where the scale space puts it, and the two signs mirror.
+void TestScale::symlogMapsBothSides()
+{
+    QCustomPlot plot;
+    plot.xAxis->setScale(QCPScale::symlog(2));
+    plot.xAxis->setRange(-100, 100);
+    settle(plot);
+
+    const double left = plot.xAxis->coordToPixel(-100);
+    const double right = plot.xAxis->coordToPixel(100);
+    const double width = right - left;
+    QVERIFY(width > 0.0);
+    QVERIFY(samePixel(plot.xAxis->coordToPixel(0), left + 0.5 * width));
+    // A linear fallback puts x = 2 at 0.51 of the width: the band makes it 0.6977.
+    QVERIFY2(close((plot.xAxis->coordToPixel(2) - left) / width, 0.6977),
+             qPrintable(QStringLiteral("x = 2 at %1").arg((plot.xAxis->coordToPixel(2) - left) / width)));
+    for (const double x : { 1.0, 2.0, 10.0, 100.0 })
+        QVERIFY2(samePixel(plot.xAxis->coordToPixel(-x) - left, right - plot.xAxis->coordToPixel(x)),
+                 qPrintable(QStringLiteral("x = %1").arg(x)));
+    // The inverse mapping agrees with the forward one on both sides of the band.
+    for (const double x : { -100.0, -10.0, -1.0, 0.0, 1.0, 2.0, 50.0, 100.0 })
+        QVERIFY2(samePixel(plot.xAxis->pixelToCoord(plot.xAxis->coordToPixel(x)), x),
+                 qPrintable(QStringLiteral("x = %1").arg(x)));
+}
+
+// A drag moves a symlog range by a scale-space offset, a wheel zoom about zero keeps zero where it
+// is, and neither leaves a NaN behind, even for a range that straddles the band.
+void TestScale::dragAndZoomWorkInScaleSpace()
+{
+    QCustomPlot plot;
+    plot.setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
+    plot.xAxis->setScale(QCPScale::symlog(2));
+    plot.xAxis->setRange(-100, 100);
+    settle(plot);
+
+    const QCPScale scale = plot.xAxis->scale();
+    const QCPRange before = plot.xAxis->range();
+    const double spanBefore = scale.toScale(before.upper) - scale.toScale(before.lower);
+    const QPoint from(qRound(plot.xAxis->coordToPixel(0)), 150);
+    dragFromTo(&plot, from, from + QPoint(60, 0));
+    settle(plot);
+
+    const QCPRange afterDrag = plot.xAxis->range();
+    QVERIFY(std::isfinite(afterDrag.lower) && std::isfinite(afterDrag.upper));
+    QVERIFY(afterDrag.lower != before.lower);
+    QVERIFY2(samePixel(scale.toScale(afterDrag.upper) - scale.toScale(afterDrag.lower), spanBefore),
+             "a symlog drag must keep the scale-space span");
+
+    // A wheel zoom about zero: zero stays on its pixel, and the range shrinks on both sides.
+    plot.xAxis->setRange(-100, 100);
+    settle(plot);
+    const double centrePixel = plot.xAxis->coordToPixel(0.0);
+    const QPointF centre(centrePixel, 150);
+    QWheelEvent wheel(centre, plot.mapToGlobal(centre.toPoint()), QPoint(), QPoint(0, 120),
+                      Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(&plot, &wheel);
+    settle(plot);
+    const QCPRange afterZoom = plot.xAxis->range();
+    QVERIFY(afterZoom.size() < before.size());
+    QVERIFY(std::isfinite(afterZoom.lower) && std::isfinite(afterZoom.upper));
+    QVERIFY2(samePixel(plot.xAxis->coordToPixel(0.0), centrePixel),
+             "the zoom centre must keep its pixel");
+
+    // A drag of a range that straddles the band: finite bounds, a finite mapping every way.
+    plot.xAxis->setRange(-5, 3);
+    settle(plot);
+    const QPoint straddle(qRound(plot.xAxis->coordToPixel(-1)), 150);
+    dragFromTo(&plot, straddle, straddle + QPoint(40, 0));
+    settle(plot);
+    const QCPRange straddled = plot.xAxis->range();
+    for (const auto& edge : { straddled.lower, straddled.upper })
+        QVERIFY2(std::isfinite(edge), "a drag across the band gave a non-finite bound");
+    for (const double pixel : { plot.xAxis->coordToPixel(straddled.lower),
+                                plot.xAxis->coordToPixel(straddled.upper),
+                                plot.xAxis->pixelToCoord(plot.xAxis->coordToPixel(straddled.lower)),
+                                plot.xAxis->pixelToCoord(plot.xAxis->coordToPixel(straddled.upper)) })
+        QVERIFY2(std::isfinite(pixel), "a drag across the band gave a non-finite mapping");
+}
+
+// The radial axis takes a symlog scale through the same scale-space mapping, so r = +2 and r = -2
+// sit symmetrically on the ring and no point of the graph maps to a NaN.
+void TestScale::aRadialAxisTakesSymlog()
+{
+    QCustomPlot plot;
+    plot.plotLayout()->clear();
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(0, 0, area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setScale(QCPScale::symlog(2));
+    area->radialAxis()->setRange(-10, 10);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180, 270 },
+                                          QVector<double> { -2, 2, -2, 2 });
+    QVERIFY(graph);
+    settle(plot);
+
+    QCPPolarAxisRadial* radial = area->radialAxis();
+    QCOMPARE(radial->scale(), QCPScale::symlog(2));
+
+    const QPointF centre = radial->coordToPixel(0.0, 0.0);
+    const QPointF positive = radial->coordToPixel(0.0, 2.0);
+    const QPointF negative = radial->coordToPixel(0.0, -2.0);
+    for (const QPointF& point : { centre, positive, negative })
+        QVERIFY2(std::isfinite(point.x()) && std::isfinite(point.y()),
+                 "a symlog radial mapping gave a NaN");
+    const auto distance = [](const QPointF& a, const QPointF& b)
+    { return std::hypot(a.x() - b.x(), a.y() - b.y()); };
+    QVERIFY2(samePixel(distance(positive, centre), distance(negative, centre)),
+             "r = 2 and r = -2 must sit the same distance from the centre");
+    QVERIFY(radial->coordToRadius(2.0) > radial->coordToRadius(0.0));
+    QVERIFY(radial->coordToRadius(0.0) > radial->coordToRadius(-2.0));
+}
+
 // A log colour scale gives the same colours as the gradient's logarithmic flag did.
 void TestScale::aLogColourScaleMapsAsBefore()
 {
@@ -227,6 +369,33 @@ void TestScale::aLogColourScaleMapsAsBefore()
     }
     // The linear default is unchanged: no scale argument still means linear.
     QCOMPARE(gradient.color(range.lower, range), gradient.color(range.lower, range, QCPScale::linear()));
+}
+
+// Both bulk colorize() overloads read the data scale the single-value color() reads: on a log
+// scale they map the same values to the same literals.
+void TestScale::colorizeOverloadsAgreeOnALogScale()
+{
+    QCPColorGradient gradient(QCPColorGradient::gpCold);
+    const QCPRange range(0.1, 1e4);
+    const QCPScale scale = QCPScale::log();
+    std::array<double, 10> values {};
+    std::array<QRgb, 10> opaque {};
+    std::array<QRgb, 10> withAlpha {};
+    std::array<unsigned char, 10> alpha {};
+    for (size_t i = 0; i < values.size(); ++i)
+    {
+        values[i] = 0.1 * std::pow(1e5, double(i) / 9.0);
+        alpha[i] = 255;
+    }
+    gradient.colorize(values.data(), range, opaque.data(), int(values.size()), 1, scale);
+    gradient.colorize(values.data(), alpha.data(), range, withAlpha.data(), int(values.size()), 1,
+                      scale);
+    for (size_t i = 0; i < values.size(); ++i)
+    {
+        const QRgb expected = gradient.color(values[i], range, scale);
+        QCOMPARE(opaque[i], expected);
+        QCOMPARE(withAlpha[i], expected);
+    }
 }
 
 // A data scale chosen before the add is not the joined colour scale's to overwrite.

@@ -1200,12 +1200,12 @@ void QCPPlottable::rescaleKeyAxis(bool onlyEnlarge) const
             double center = (newRange.lower + newRange.upper)
                 * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
                        // validRange returned false for other reason
-            if (keyAxis->scale().isLinear())
+            if (!keyAxis->scale().isLog())
             {
                 newRange.lower = center - keyAxis->range().size() / 2.0;
                 newRange.upper = center + keyAxis->range().size() / 2.0;
             }
-            else // a non-linear scale, log today
+            else // a logarithmic scale: a range is a ratio
             {
                 newRange.lower = center / qSqrt(keyAxis->range().upper / keyAxis->range().lower);
                 newRange.upper = center * qSqrt(keyAxis->range().upper / keyAxis->range().lower);
@@ -1253,12 +1253,12 @@ void QCPPlottable::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) const
             double center = (newRange.lower + newRange.upper)
                 * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
                        // validRange returned false for other reason
-            if (valueAxis->scale().isLinear())
+            if (!valueAxis->scale().isLog())
             {
                 newRange.lower = center - valueAxis->range().size() / 2.0;
                 newRange.upper = center + valueAxis->range().size() / 2.0;
             }
-            else // a non-linear scale, log today
+            else // a logarithmic scale: a range is a ratio
             {
                 newRange.lower
                     = center / qSqrt(valueAxis->range().upper / valueAxis->range().lower);

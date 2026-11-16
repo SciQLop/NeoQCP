@@ -102,6 +102,9 @@ private slots:
     void dashedLineMatchesExportDashes();
     void solidLinesKeepTheirVertexFormat();
     void panDoesNotMarkTheLayerDirty();
+    void aPanReusesGeometryAndMatchesAFreshReplot_data();
+    void aPanReusesGeometryAndMatchesAFreshReplot();
+    void aLineCrossingZeroIsContinuous();
     void gpuRectFillsBeforeStroking();
     void mergeStopsAtAnUnlikeNeighbour();
     void dashesMergeOnlyWithEqualPhase();

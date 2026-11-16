@@ -1052,7 +1052,7 @@ double QCPPolarAxisRadial::coordToRadius(double coord) const
         else
             return (mRange.upper - coord) / mRange.size() * mRadius;
     }
-    else // a non-linear scale, log today
+    else if (mScaleKind == QCPScale::Kind::Log)
     {
         if (coord >= 0.0
             && mRange.upper
@@ -1069,6 +1069,15 @@ double QCPPolarAxisRadial::coordToRadius(double coord) const
                 return qLn(mRange.upper / coord) / qLn(mRange.upper / mRange.lower) * mRadius;
         }
     }
+    else // symlog: every value has a radius, the band included
+    {
+        const double lower = mScale.toScale(mRange.lower);
+        const double upper = mScale.toScale(mRange.upper);
+        if (!mRangeReversed)
+            return (mScale.toScale(coord) - lower) / (upper - lower) * mRadius;
+        else
+            return (upper - mScale.toScale(coord)) / (upper - lower) * mRadius;
+    }
 }
 
 double QCPPolarAxisRadial::radiusToCoord(double radius) const
@@ -1080,12 +1089,21 @@ double QCPPolarAxisRadial::radiusToCoord(double radius) const
         else
             return -(radius) / mRadius * mRange.size() + mRange.upper;
     }
-    else // a non-linear scale, log today
+    else if (mScaleKind == QCPScale::Kind::Log)
     {
         if (!mRangeReversed)
             return qPow(mRange.upper / mRange.lower, (radius) / mRadius) * mRange.lower;
         else
             return qPow(mRange.upper / mRange.lower, (-radius) / mRadius) * mRange.upper;
+    }
+    else // symlog: the radius is a fraction of the range's span in scale space
+    {
+        const double lower = mScale.toScale(mRange.lower);
+        const double upper = mScale.toScale(mRange.upper);
+        if (!mRangeReversed)
+            return mScale.fromScale(lower + radius / mRadius * (upper - lower));
+        else
+            return mScale.fromScale(upper - radius / mRadius * (upper - lower));
     }
 }
 

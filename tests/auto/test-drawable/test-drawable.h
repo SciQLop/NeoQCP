@@ -79,7 +79,7 @@ private slots:
     void aPanPastTheKeyWindowRecords();
     void aZoomRecords();
     void aValueZoomKeepsTheRecording();
-    void aLogKeyAxisRecordsEveryTransform();
+    void aLogKeyAxisReusesItsWindowLikeALinearOne();
     void switchingTheKeyAxisToLogRecords();
     void keyWindowCoversOneViewWidthEachSide();
     void aResizeRecords();

@@ -588,8 +588,10 @@ colour-mapped plottable shows its data with is a value, not an enum.
   - QCPAxisBase::setScale(const QCPScale&), scale(), scaleChanged(const QCPScale&) and the `scale`
         property replace setScaleType/scaleType/scaleTypeChanged and the ScaleType enum, which are
         gone with no forwarder. setScale(log()) sanitizes the range as setScaleType(stLogarithmic)
-        did; an equal scale emits nothing. Only linear and log draw so far: QCPScale::symlog() is a
-        value whose mapping, interaction and colour arrive with the rest of this milestone.
+        did; an equal scale emits nothing. Linear, log and symlog all draw: a symlog axis maps as a
+        straight line in its own scale space (a linear band around zero, logarithmic outside it), and
+        panning, zooming, drags, the grid, the kept line geometry and a polar radial axis all follow
+        that space. A symlog colour mapping still takes the linear colour path for now.
   - QCPColorScale, QCPColorMapped and the plottables that carry a data scale: setDataScale(),
         dataScale(), dataScaleChanged() and the `dataScale` property replace the *DataScaleType
         names. A data scale set before the plottable is added to a rect now wins over the rect

@@ -672,15 +672,22 @@ void forEachAxis(const QPointer<QCPAxisRect>& rect, const QList<QPointer<QCPAxis
 // Moves the axis from its range at the drag start by the pointer's travel.
 void dragAxis(QCPAxis* axis, const QCPRange& start, double fromPixel, double toPixel)
 {
-    if (axis->scale().isLinear())
+    const QCPScale& scale = axis->scale();
+    if (scale.isLinear())
     {
         const double diff = axis->pixelToCoord(fromPixel) - axis->pixelToCoord(toPixel);
         axis->setRange(start.lower + diff, start.upper + diff);
     }
-    else
+    else if (scale.isLog())
     {
         const double ratio = axis->pixelToCoord(fromPixel) / axis->pixelToCoord(toPixel);
         axis->setRange(start.lower * ratio, start.upper * ratio);
+    }
+    else // symlog: the pointer's travel is an offset in scale space
+    {
+        const double travelled = scale.toScale(axis->pixelToCoord(fromPixel))
+            - scale.toScale(axis->pixelToCoord(toPixel));
+        axis->setRange(scale.shifted(start, travelled));
     }
 }
 
@@ -1621,15 +1628,22 @@ void followPointer(QCPAxis* axis, double pixels)
     const QCPRange range = target->range();
     const double from = axis->pixelOnMoveTarget(0.0);
     const double to = axis->pixelOnMoveTarget(pixels);
-    if (target->scale().isLog())
+    const QCPScale& scale = target->scale();
+    if (scale.isLog())
     {
         const double ratio = target->pixelToCoord(from) / target->pixelToCoord(to);
         target->setRange(range.lower * ratio, range.upper * ratio);
     }
-    else
+    else if (scale.isLinear())
     {
         const double diff = target->pixelToCoord(from) - target->pixelToCoord(to);
         target->setRange(range.lower + diff, range.upper + diff);
+    }
+    else // symlog: the pointer's travel is an offset in scale space
+    {
+        const double travelled
+            = scale.toScale(target->pixelToCoord(from)) - scale.toScale(target->pixelToCoord(to));
+        target->setRange(scale.shifted(range, travelled));
     }
 }
 

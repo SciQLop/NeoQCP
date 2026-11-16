@@ -33,6 +33,11 @@ public:
     };
     Q_ENUM(Kind)
 
+    //! What log() and symlog() default to, and what a refused parameter gives back.
+    static constexpr double kDefaultBase = 10.0;
+    static constexpr double kDefaultThreshold = 2.0;
+    static constexpr double kDefaultLinearScale = 1.0;
+
     QCPScale() = default;
 
     //! A scale that maps a value to itself.
@@ -66,21 +71,23 @@ public:
     double fromScale(double s) const;
     //! The range as this scale can show it: the log rule on a log scale, else the linear rule.
     [[nodiscard]] QCPRange sanitized(const QCPRange& range) const;
+    //! \a range moved by \a scaleDelta in scale space: a pan of any scale.
+    [[nodiscard]] QCPRange shifted(const QCPRange& range, double scaleDelta) const;
+    //! \a range scaled by \a factor in scale space, about \a center of the data space.
+    [[nodiscard]] QCPRange scaled(const QCPRange& range, double factor, double center) const;
 
     bool operator==(const QCPScale& other) const = default;
 
 private:
-    //! What log() and symlog() default to, and what a refused parameter gives back.
-    static constexpr double kDefaultBase = 10.0;
-    static constexpr double kDefaultThreshold = 2.0;
-    static constexpr double kDefaultLinearScale = 1.0;
-
     QCPScale(Kind kind, double base, double threshold, double linearScale);
 
     Kind mKind = Kind::Linear;
     double mBase = kDefaultBase;
     double mThreshold = kDefaultThreshold;
     double mLinearScale = kDefaultLinearScale;
+    //! 1/ln(base) and symlog's slope, so a mapping does not recompute them per value.
+    double mInvLogBase = 1.0 / 2.302585092994046;
+    double mSymlogSlope = kDefaultLinearScale / (1.0 - 1.0 / kDefaultBase);
 };
 
 //! Hash key for QHash and dependency revisions.

@@ -251,8 +251,8 @@ QCPKeyWindow QCPCartesianSystem::keyWindow() const
     const QCPAxis* key = static_cast<QCPAxis*>(mKeyAxis);
     if (!key)
         return { };
-    return { qcp::algo::lineCacheKeyRange(key->range(), !key->scale().isLinear()),
-             qcpKeyPixelsPerUnit(key) };
+    return { qcp::algo::lineCacheKeyRange(key->range(), key->scale()), qcpKeyPixelsPerUnit(key),
+             key->scale(), qcpKeyPixelsPerScaleUnit(key) };
 }
 
 QCP::Capabilities QCPCartesianSystem::capabilities() const

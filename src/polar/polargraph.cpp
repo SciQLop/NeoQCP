@@ -249,7 +249,7 @@ void QCPPolarGraph::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) const
         if (!QCPRange::validRange(newRange))
         {
             const double center = (newRange.lower + newRange.upper) * 0.5;
-            if (valueAxis->scale().isLinear())
+            if (!valueAxis->scale().isLog())
             {
                 newRange.lower = center - valueAxis->range().size() / 2.0;
                 newRange.upper = center + valueAxis->range().size() / 2.0;

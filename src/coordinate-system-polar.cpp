@@ -94,8 +94,10 @@ QCPKeyWindow QCPPolarSystem::keyWindow() const
         return { };
     // The angular range covers one turn, so one unit of angle is 2*pi/span radians: a key covers
     // that much of the circle at the outer radius.
-    return { qcp::algo::lineCacheKeyRange(angular->range(), false),
-             area->radius() * 2.0 * M_PI / span };
+    // An angular axis is linear, so its pixels per data unit and per scale unit are the same.
+    const double pixelsPerKey = area->radius() * 2.0 * M_PI / span;
+    return { qcp::algo::lineCacheKeyRange(angular->range(), false), pixelsPerKey,
+             angular->scale(), pixelsPerKey };
 }
 
 QCP::Capabilities QCPPolarSystem::capabilities() const

@@ -1701,7 +1701,7 @@ double QCPAxis::pixelToCoord(double value) const
                 return -(value - left) / width * mRange.size()
                     + mRange.upper;
         }
-        else // a non-linear scale, log today
+        else if (mScaleKind == QCPScale::Kind::Log)
         {
             if (!mRangeReversed)
                 return qPow(mRange.upper / mRange.lower,
@@ -1711,6 +1711,15 @@ double QCPAxis::pixelToCoord(double value) const
                 return qPow(mRange.upper / mRange.lower,
                             (left - value) / width)
                     * mRange.upper;
+        }
+        else // symlog: the band and both log halves are one straight line in scale space
+        {
+            const double lower = mScale.toScale(mRange.lower);
+            const double upper = mScale.toScale(mRange.upper);
+            if (!mRangeReversed)
+                return mScale.fromScale(lower + (value - left) / width * (upper - lower));
+            else
+                return mScale.fromScale(upper - (value - left) / width * (upper - lower));
         }
     }
     else // orientation() == Qt::Vertical
@@ -1726,7 +1735,7 @@ double QCPAxis::pixelToCoord(double value) const
                 return -(bottom - value) / height * mRange.size()
                     + mRange.upper;
         }
-        else // a non-linear scale, log today
+        else if (mScaleKind == QCPScale::Kind::Log)
         {
             if (!mRangeReversed)
                 return qPow(mRange.upper / mRange.lower,
@@ -1736,6 +1745,15 @@ double QCPAxis::pixelToCoord(double value) const
                 return qPow(mRange.upper / mRange.lower,
                             (value - bottom) / height)
                     * mRange.upper;
+        }
+        else // symlog: the band and both log halves are one straight line in scale space
+        {
+            const double lower = mScale.toScale(mRange.lower);
+            const double upper = mScale.toScale(mRange.upper);
+            if (!mRangeReversed)
+                return mScale.fromScale(lower + (bottom - value) / height * (upper - lower));
+            else
+                return mScale.fromScale(upper - (bottom - value) / height * (upper - lower));
         }
     }
 }
@@ -1763,7 +1781,7 @@ double QCPAxis::coordToPixel(double value) const
                 return (mRange.upper - value) / mRange.size() * width
                     + left;
         }
-        else // a non-linear scale, log today
+        else if (mScaleKind == QCPScale::Kind::Log)
         {
             if (value >= 0.0 && mRange.upper < 0.0) // invalid value for logarithmic scale, just
                                                     // draw it outside visible range
@@ -1783,6 +1801,15 @@ double QCPAxis::coordToPixel(double value) const
                         + left;
             }
         }
+        else // symlog: every value has a place, the band included
+        {
+            const double lower = mScale.toScale(mRange.lower);
+            const double upper = mScale.toScale(mRange.upper);
+            if (!mRangeReversed)
+                return left + (mScale.toScale(value) - lower) / (upper - lower) * width;
+            else
+                return left + (upper - mScale.toScale(value)) / (upper - lower) * width;
+        }
     }
     else // orientation() == Qt::Vertical
     {
@@ -1797,7 +1824,7 @@ double QCPAxis::coordToPixel(double value) const
                 return bottom
                     - (mRange.upper - value) / mRange.size() * height;
         }
-        else // a non-linear scale, log today
+        else if (mScaleKind == QCPScale::Kind::Log)
         {
             if (value >= 0.0 && mRange.upper < 0.0) // invalid value for logarithmic scale, just
                                                     // draw it outside visible range
@@ -1816,6 +1843,15 @@ double QCPAxis::coordToPixel(double value) const
                         - qLn(mRange.upper / value) / qLn(mRange.upper / mRange.lower)
                         * height;
             }
+        }
+        else // symlog: every value has a place, the band included
+        {
+            const double lower = mScale.toScale(mRange.lower);
+            const double upper = mScale.toScale(mRange.upper);
+            if (!mRangeReversed)
+                return bottom - (mScale.toScale(value) - lower) / (upper - lower) * height;
+            else
+                return bottom - (upper - mScale.toScale(value)) / (upper - lower) * height;
         }
     }
 }
@@ -2015,6 +2051,13 @@ void QCPAxis::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
         {
             const double ratio = target->pixelToCoord(from) / target->pixelToCoord(to);
             target->setRange(mDragStartRange.lower * ratio, mDragStartRange.upper * ratio);
+        }
+        else // symlog: the pointer's travel is an offset in scale space
+        {
+            const QCPScale& scale = target->mScale;
+            const double travelled = scale.toScale(target->pixelToCoord(from))
+                - scale.toScale(target->pixelToCoord(to));
+            target->setRange(scale.shifted(mDragStartRange, travelled));
         }
         if (!alive || !targetAlive)
             return;

@@ -626,12 +626,12 @@ bool QCPDrawnCore::recordingIsStale(const QCPDrawable& object, const QCPDrawnVie
         // A key window only promises its key range and scale: a pan inside it is a translation, a
         // value zoom re-resolves the commands, and anything that changes the key scale remakes it.
         const QCPKeyWindow& window = *mState->recording.keyWindow;
-        if (!view.keyAxis || !view.keyAxis->scale().isLinear())
-            return true; // a window is only recorded on a linear key axis
-        const double pixelsPerKey = qcpKeyPixelsPerUnit(view.keyAxis);
-        if (!(pixelsPerKey > 0.0) || !(window.pixelsPerKey > 0.0))
+        if (!view.keyAxis || !(view.keyAxis->scale() == window.scale))
             return true;
-        if (qAbs(pixelsPerKey / window.pixelsPerKey - 1.0) > 1e-9)
+        const double pixelsPerScale = qcpKeyPixelsPerScaleUnit(view.keyAxis);
+        if (!(pixelsPerScale > 0.0) || !(window.pixelsPerScale > 0.0))
+            return true;
+        if (qAbs(pixelsPerScale / window.pixelsPerScale - 1.0) > 1e-9)
             return true;
         const QCPRange keys = view.keyAxis->range();
         return keys.lower < window.keys.lower || keys.upper > window.keys.upper;

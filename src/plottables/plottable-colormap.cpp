@@ -737,7 +737,7 @@ bool QCPColorMapData::createAlpha(bool initializeOpaque)
 
 /*! \fn void QCPColorMap::dataScaleChanged(const QCPScale &scale);
 
-  This signal is emitted when the data scale type changes.
+  This signal is emitted when the data scale changes.
 
   \see setDataScale
 */

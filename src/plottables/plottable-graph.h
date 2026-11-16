@@ -356,6 +356,7 @@ protected:
     friend class TestPipeline;
     friend class TestDataSwap;
     friend class TestColorByScalar;
+    friend class TestRepaint;
 
 protected:
     std::shared_ptr<QCPMultiDataSource> mDataSource;

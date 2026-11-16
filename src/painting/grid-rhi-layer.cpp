@@ -12,6 +12,16 @@
 
 using namespace qcp::rhi::span_grid;
 
+namespace
+{
+// The coordinate the grid shader works in: a linear axis uploads its values; a log axis uploads
+// them with the shader's log flag; a symlog axis uploads its own scale space, where it is linear.
+double gridCoordinate(const QCPScale& scale, double value)
+{
+    return scale.isSymlog() ? scale.toScale(value) : value;
+}
+} // namespace
+
 QCPGridRhiLayer::QCPGridRhiLayer(QRhi* rhi)
     : mRhi(rhi)
 {
@@ -213,7 +223,8 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
             const float pixRight = float(ar->left() + ar->width());
             const float pixTop = float(ar->top());
             const float pixBot = float(ar->top() + ar->height());
-            const double origin = axisOrigin(axis);
+            const QCPScale& scale = axis->scale();
+            const double origin = gridCoordinate(scale, axisOrigin(axis));
 
             auto emitGridLine = [&](double tickValue, const QPen& pen) {
                 auto color = qcp::rhi::premultipliedColor(pen.color());
@@ -224,7 +235,7 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
                 // Subtract the origin in double before narrowing to float32, so a
                 // huge absolute coordinate (e.g. a Unix timestamp) doesn't quantize
                 // away the sub-range precision the shader needs (see axisOrigin()).
-                float tv = float(tickValue - origin);
+                float tv = float(gridCoordinate(scale, tickValue) - origin);
                 if (isHorizontal)
                     appendDashedBorder(mStagingVertices, tv, pixTop, tv, pixBot, color, 1, 0,
                                        halfW, 0, 1, pen);
@@ -562,21 +573,24 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
         const double hOrigin = cachedOrigin(hAxis);
         const double vOrigin = cachedOrigin(vAxis);
 
+        // The shader maps this coordinate's range to the axis pixel span, on all three scales.
+        const QCPScale& hScale = hAxis->scale();
+        const QCPScale& vScale = vAxis->scale();
         UboParams params = {
             float(outputSize.width()),
             float(outputSize.height()),
             isYUpInNDC ? -1.0f : 1.0f,
             dpr,
-            float(hAxis->range().lower - hOrigin),
-            float(hAxis->range().upper - hOrigin),
+            float(gridCoordinate(hScale, hAxis->range().lower) - gridCoordinate(hScale, hOrigin)),
+            float(gridCoordinate(hScale, hAxis->range().upper) - gridCoordinate(hScale, hOrigin)),
             keyOffset,
             keyLength,
-            hAxis->scale().isLog() ? 1.0f : 0.0f,
-            float(vAxis->range().lower - vOrigin),
-            float(vAxis->range().upper - vOrigin),
+            hScale.isLog() ? 1.0f : 0.0f,
+            float(gridCoordinate(vScale, vAxis->range().lower) - gridCoordinate(vScale, vOrigin)),
+            float(gridCoordinate(vScale, vAxis->range().upper) - gridCoordinate(vScale, vOrigin)),
             valOffset,
             valLength,
-            vAxis->scale().isLog() ? 1.0f : 0.0f,
+            vScale.isLog() ? 1.0f : 0.0f,
             0.0f, 0.0f
         };
         static_assert(sizeof(params) == kUniformBufferSize);

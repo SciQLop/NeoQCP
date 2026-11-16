@@ -14,6 +14,7 @@
 
 #include "global.h"
 
+#include "axis/scale.h"
 #include "spatial-index.h"
 
 #include <QPointF>
@@ -169,13 +170,29 @@ namespace Literals
 // enclosing class (GCC PR 96645).
 namespace qcp::transform
 {
+//! The three branches a mapping takes: a straight line, a line in log space, or a symlog one.
+enum class ScaleMode
+{
+    Linear,
+    Log,
+    Symlog
+};
+
+//! How \a scale maps a range: the branch its mapping takes.
+[[nodiscard]] inline ScaleMode scaleModeOf(const QCPScale& scale)
+{
+    if (scale.isLinear())
+        return ScaleMode::Linear;
+    return scale.isLog() ? ScaleMode::Log : ScaleMode::Symlog;
+}
+
 //! One axis on its own: the mapping QCPAxis would draw, copied so a replay never reads it.
 struct Snapshot
 {
     bool vertical = false;
-    bool logarithmic = false;
     bool reversed = false;
     bool usable = false;
+    QCPScale scale; //!< how the range maps: linear and symlog are affine in its scale space
     double origin = 0; //!< the pixel the axis grows from: the rect's left, or its bottom
     double length = 0; //!< the pixels it spans
     double lower = 0;
@@ -184,7 +201,7 @@ struct Snapshot
     double top = 0;
     double right = 0;
     double bottom = 0;
-    double slope = 0; //!< pixels = slope * value + intercept
+    double slope = 0; //!< pixels = slope * toScale(value) + intercept (linear: value)
     double intercept = 0;
     double logSlope = 0; //!< pixels = logSlope * ln(|value|) + logIntercept
     double logIntercept = 0;
@@ -243,7 +260,7 @@ struct Polar
     double lower = 0; //!< the radial range
     double upper = 0;
     bool startReversed = false; //!< the angular axis' direction
-    bool logarithmic = false;
+    QCPScale scale; //!< the radial mapping: linear and symlog are affine in its scale space
     bool reversed = false;
 
     bool operator==(const Polar&) const = default;
@@ -361,7 +378,8 @@ private:
 
     [[nodiscard]] const Cartesian* cartesian() const { return std::get_if<Cartesian>(&mFrame); }
 
-    template <bool KeyLog, bool ValueLog, typename KeyAt, typename ValueAt>
+    template <qcp::transform::ScaleMode KeyMode, qcp::transform::ScaleMode ValueMode,
+              typename KeyAt, typename ValueAt>
     void mapRange(const Cartesian& frame, std::size_t count, KeyAt keyAt, ValueAt valueAt,
                   std::span<QPointF> out) const;
     template <typename KeyAt, typename ValueAt>

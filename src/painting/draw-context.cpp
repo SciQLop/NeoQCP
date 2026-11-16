@@ -475,6 +475,20 @@ QCPDrawFrame qcpMakeFittedFrame(const QCPDataBox& box, const QRectF& rect)
     return QCPDrawFrame { QCPTransform::fitted(box, rect), QCPRatioTransform::fitted(rect), rect };
 }
 
+double qcpKeyPixelsPerScaleUnit(const QCPAxis* keyAxis)
+{
+    if (!keyAxis)
+        return 0.0;
+    if (keyAxis->scale().isLinear())
+        return qcpKeyPixelsPerUnit(keyAxis); // a linear axis' scale unit is its data unit
+    const QCPRange range = keyAxis->range();
+    const QCPScale& scale = keyAxis->scale();
+    const double span = scale.toScale(range.upper) - scale.toScale(range.lower);
+    if (!(span > 0.0))
+        return 0.0;
+    return std::abs(keyAxis->coordToPixel(range.upper) - keyAxis->coordToPixel(range.lower)) / span;
+}
+
 double qcpKeyPixelsPerUnit(const QCPAxis* keyAxis)
 {
     if (!keyAxis)
@@ -548,17 +562,10 @@ QCPKeyWindow QCPDrawContext::keyWindow() const
     }
     if (!mKeyAxis)
         return { };
-    const bool logarithmic = !mKeyAxis->scale().isLinear();
-    const QCPKeyWindow window { qcp::algo::lineCacheKeyRange(mKeyAxis->range(), logarithmic),
-                                qcpKeyPixelsPerUnit(mKeyAxis) };
-    if (logarithmic)
-    {
-        // simplify: pixels per key are not constant on a log axis, so no window in data units can
-        // promise them; the recording is remade on every transform change, a log-key pan included.
-        // Upgrade: a window in log units with the scale checked in those.
-        mList->transformDependent = true;
-        return window;
-    }
+    const QCPScale& scale = mKeyAxis->scale();
+    const QCPKeyWindow window { qcp::algo::lineCacheKeyRange(mKeyAxis->range(), scale),
+                                qcpKeyPixelsPerUnit(mKeyAxis), scale,
+                                qcpKeyPixelsPerScaleUnit(mKeyAxis) };
     mList->keyWindow = window;
     return window;
 }

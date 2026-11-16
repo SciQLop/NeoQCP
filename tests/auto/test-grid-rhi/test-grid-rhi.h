@@ -16,6 +16,7 @@ private slots:
     void dashedGridPenIsDashedOnScreen();
     void zeroLineIsNotOverdrawnOnScreen();
     void colorScaleTicksAreDrawnOnScreen();
+    void aGpuGridOnSymlogMatchesThePainterGrid();
     void thinLinesAreOneLogicalPixelOnScreen();
     void replotDoesNotCrash();
     void replotWithSubGridDoesNotCrash();

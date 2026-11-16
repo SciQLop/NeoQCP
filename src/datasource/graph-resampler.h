@@ -430,6 +430,17 @@ inline QCPRange lineCacheKeyRange(const QCPRange& view, bool logScale)
     return {view.lower - view.size(), view.upper + view.size()};
 }
 
+// The same window, written in the key axis' scale space: a span in scale units is a width on a
+// linear axis, a ratio on a log one, and the band plus both log halves on a symlog one.
+inline QCPRange lineCacheKeyRange(const QCPRange& view, const QCPScale& scale)
+{
+    if (!scale.isSymlog())
+        return lineCacheKeyRange(view, scale.isLog());
+    const double lower = scale.toScale(view.lower);
+    const double span = scale.toScale(view.upper) - lower;
+    return {scale.fromScale(lower - span), scale.fromScale(scale.toScale(view.upper) + span)};
+}
+
 inline int l2BinCount(const ViewportParams& vp)
 {
     const int bins = vp.plotWidthPx * kLevel2PixelMultiplier;
@@ -441,7 +452,7 @@ inline int l2BinCount(const ViewportParams& vp)
 template <typename Source>
 inline bool fewEnoughToDrawRaw(const Source& raw, const ViewportParams& vp)
 {
-    const QCPRange scan = lineCacheKeyRange(vp.keyRange, vp.keyScale.isLog());
+    const QCPRange scan = lineCacheKeyRange(vp.keyRange, vp.keyScale);
     return raw.findEnd(scan.upper) - raw.findBegin(scan.lower) <= l2BinCount(vp);
 }
 

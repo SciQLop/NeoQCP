@@ -21,6 +21,10 @@ private slots:
 
     void anAxisTakesAScale();
     void aLogAxisMapsAsBefore();
+    void symlogMapsBothSides();
+    void dragAndZoomWorkInScaleSpace();
+    void aRadialAxisTakesSymlog();
     void aLogColourScaleMapsAsBefore();
     void aDataScaleSetBeforeTheAddWins();
+    void colorizeOverloadsAgreeOnALogScale();
 };

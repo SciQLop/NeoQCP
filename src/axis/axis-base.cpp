@@ -328,8 +328,8 @@ void QCPAxisBase::setSelectedParts(const QCPAxisBase::SelectableParts& selectedP
 }
 
 /*!
-  Moves the range by \a diff, on a linear scale in coordinates and on a logarithmic scale as a
-  factor.
+  Moves the range by \a diff: an offset in coordinates on a linear or symlog scale, and a factor on
+  a logarithmic scale.
 */
 void QCPAxisBase::moveRange(double diff)
 {
@@ -339,11 +339,13 @@ void QCPAxisBase::moveRange(double diff)
         moved.lower += diff;
         moved.upper += diff;
     }
-    else // a non-linear scale, log today: an offset in scale space once symlog draws
+    else if (mScaleKind == QCPScale::Kind::Log)
     {
         moved.lower *= diff;
         moved.upper *= diff;
     }
+    else // symlog: the offset is in scale space
+        moved = mScale.shifted(mRange, diff);
     commitRange(moved);
 }
 
@@ -358,7 +360,7 @@ void QCPAxisBase::scaleRange(double factor)
 /*! \overload
 
   Scales the range by \a factor around the coordinate \a center. On a logarithmic scale the center
-  must lie in the same sign domain as the range.
+  must lie in the same sign domain as the range; a symlog scale takes any center.
 */
 void QCPAxisBase::scaleRange(double factor, double center)
 {
@@ -369,7 +371,7 @@ void QCPAxisBase::scaleRange(double factor, double center)
         scaled.lower = (mRange.lower - center) * factor + center;
         scaled.upper = (mRange.upper - center) * factor + center;
     }
-    else // a non-linear scale, log today: a factor in scale space once symlog draws
+    else if (mScaleKind == QCPScale::Kind::Log)
     {
         if ((mRange.upper < 0 && center < 0)
             || (mRange.upper > 0 && center > 0)) // make sure center has same sign as range
@@ -386,6 +388,8 @@ void QCPAxisBase::scaleRange(double factor, double center)
             return;
         }
     }
+    else // symlog: a scale-space scaling about the center, on either side of the band
+        scaled = mScale.scaled(mRange, factor, center);
     commitRange(scaled);
 }
 
@@ -476,12 +480,12 @@ void QCPAxisBase::rescaleTo(const QCPRange& range, bool haveRange)
         double center = (newRange.lower + newRange.upper)
             * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
                    // validRange returned false for other reason
-        if (mScaleKind == QCPScale::Kind::Linear)
+        if (mScaleKind != QCPScale::Kind::Log)
         {
             newRange.lower = center - mRange.size() / 2.0;
             newRange.upper = center + mRange.size() / 2.0;
         }
-        else // a non-linear scale, log today: the linear rule once symlog draws
+        else // log: the same ratio on both sides of the centre
         {
             newRange.lower = center / qSqrt(mRange.upper / mRange.lower);
             newRange.upper = center * qSqrt(mRange.upper / mRange.lower);

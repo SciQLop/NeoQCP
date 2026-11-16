@@ -27,7 +27,8 @@ double symlogSlope(double base, double linearScale)
 } // namespace
 
 QCPScale::QCPScale(Kind kind, double base, double threshold, double linearScale)
-        : mKind(kind), mBase(base), mThreshold(threshold), mLinearScale(linearScale)
+        : mKind(kind), mBase(base), mThreshold(threshold), mLinearScale(linearScale),
+          mInvLogBase(1.0 / std::log(base)), mSymlogSlope(symlogSlope(base, linearScale))
 {
 }
 
@@ -67,15 +68,14 @@ double QCPScale::toScale(double value) const
         case Kind::Linear:
             return value;
         case Kind::Log:
-            return std::log(std::abs(value)) / std::log(mBase);
+            return std::log(std::abs(value)) * mInvLogBase;
         case Kind::Symlog:
         {
-            const double slope = symlogSlope(mBase, mLinearScale);
             const double magnitude = std::abs(value);
             if (magnitude <= mThreshold)
-                return value * slope;
-            const double above = std::log(magnitude / mThreshold) / std::log(mBase);
-            return std::copysign(mThreshold * (slope + above), value);
+                return value * mSymlogSlope;
+            const double above = std::log(magnitude / mThreshold) * mInvLogBase;
+            return std::copysign(mThreshold * (mSymlogSlope + above), value);
         }
     }
     return value;
@@ -91,11 +91,11 @@ double QCPScale::fromScale(double s) const
             return std::pow(mBase, s);
         case Kind::Symlog:
         {
-            const double slope = symlogSlope(mBase, mLinearScale);
             const double magnitude = std::abs(s);
-            if (magnitude <= mThreshold * slope)
-                return s / slope;
-            return std::copysign(mThreshold * std::pow(mBase, magnitude / mThreshold - slope), s);
+            if (magnitude <= mThreshold * mSymlogSlope)
+                return s / mSymlogSlope;
+            const double power = magnitude / mThreshold - mSymlogSlope;
+            return std::copysign(mThreshold * std::pow(mBase, power), s);
         }
     }
     return s;
@@ -104,6 +104,27 @@ double QCPScale::fromScale(double s) const
 QCPRange QCPScale::sanitized(const QCPRange& range) const
 {
     return isLog() ? range.sanitizedForLogScale() : range.sanitizedForLinScale();
+}
+
+QCPRange QCPScale::shifted(const QCPRange& range, double scaleDelta) const
+{
+    if (isLinear())
+        return QCPRange(range.lower + scaleDelta, range.upper + scaleDelta);
+    return QCPRange(fromScale(toScale(range.lower) + scaleDelta),
+                    fromScale(toScale(range.upper) + scaleDelta));
+}
+
+QCPRange QCPScale::scaled(const QCPRange& range, double factor, double center) const
+{
+    if (isLinear())
+    {
+        const double newCenter = center + (range.center() - center) * factor;
+        const double half = 0.5 * range.size() * std::abs(factor);
+        return QCPRange(newCenter - half, newCenter + half);
+    }
+    const double at = toScale(center);
+    return QCPRange(fromScale(at + (toScale(range.lower) - at) * factor),
+                    fromScale(at + (toScale(range.upper) - at) * factor));
 }
 
 size_t qHash(const QCPScale& scale, size_t seed)

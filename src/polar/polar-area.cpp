@@ -464,6 +464,13 @@ void QCPPolarArea::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
                     axis->setRange(start.lower * diff, start.upper * diff);
                 }
             }
+            else // symlog: the pointer's travel is an offset in scale space
+            {
+                const QCPScale& scale = axis->scale();
+                const double travelled
+                    = scale.toScale(radiusCoordStart) - scale.toScale(radiusCoord);
+                axis->setRange(scale.shifted(start, travelled));
+            }
         }
         if (alive && doReplot)
         {

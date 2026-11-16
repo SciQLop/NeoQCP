@@ -85,6 +85,67 @@ void TestGridRhi::colorScaleTicksAreDrawnOnScreen()
     QCOMPARE(onScreen, inExport);
 }
 
+// A symlog axis maps its ticks on the CPU and uploads them linear: each GPU grid line lands where
+// coordToPixel puts its tick, like the painter's grid in an export, and a wider band moves the
+// lines.
+void TestGridRhi::aGpuGridOnSymlogMatchesThePainterGrid()
+{
+    if (!showAndHasRhiGrid(mPlot))
+        QSKIP("No QRhi available — the GPU grid needs a real backend");
+    mPlot->xAxis->setScale(QCPScale::symlog(2));
+    mPlot->xAxis->setRange(-100, 100);
+    mPlot->yAxis->grid()->setVisible(false);
+    mPlot->xAxis->grid()->setSubGridVisible(false);
+    // A crisp black grid: the default light grey sits at the lightness threshold itself.
+    mPlot->xAxis->grid()->setPen(QPen(Qt::black, 1));
+    auto ticker = QSharedPointer<QCPAxisTickerText>::create();
+    // Interior ticks: a tick on the rect's own edge lands under the frame, not on a grid pixel.
+    const QVector<double> ticks { -50, -10, 2, 10, 50 };
+    for (const double tick : ticks)
+        ticker->addTick(tick, QString::number(tick));
+    mPlot->xAxis->setTicker(ticker);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+
+    const QImage frame = mPlot->grabFramebuffer();
+    const double dpr = frame.devicePixelRatio();
+    const QImage exported = mPlot->toPixmap(mPlot->width(), mPlot->height(), dpr).toImage();
+    const QRect rect = mPlot->axisRect()->rect();
+    const int row = qRound((rect.top() + rect.height() * 0.4) * dpr);
+
+    const auto columnOf = [&](double value)
+    { return qRound(mPlot->xAxis->coordToPixel(value) * dpr); };
+    const auto inked = [&](const QImage& image, int column)
+    {
+        for (int dx = -1; dx <= 1; ++dx)
+            if (image.pixelColor(qBound(0, column + dx, image.width() - 1), row).lightness() < 128)
+                return true;
+        return false;
+    };
+
+    for (const double tick : ticks)
+    {
+        QVERIFY2(inked(frame, columnOf(tick)),
+                 qPrintable(QStringLiteral("no grid line on screen at tick %1").arg(tick)));
+        QVERIFY2(inked(exported, columnOf(tick)),
+                 qPrintable(QStringLiteral("no grid line in the export at tick %1").arg(tick)));
+    }
+    QVERIFY2(!inked(frame, columnOf(5.0)), "a grid line at a value that is no tick");
+    QVERIFY2(!inked(exported, columnOf(5.0)), "a grid line at a value that is no tick (export)");
+
+    // The grid cache keys on the whole scale: a wider band moves x = 2 and the line follows.
+    const int oldColumn = columnOf(2.0);
+    mPlot->xAxis->setScale(QCPScale::symlog(3));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+    const QImage moved = mPlot->grabFramebuffer();
+    QVERIFY2(columnOf(2.0) != oldColumn, "symlog(3) must map x = 2 to another pixel");
+    QVERIFY2(inked(moved, columnOf(2.0)),
+             "the grid did not follow symlog(2) -> symlog(3)");
+    QVERIFY2(!inked(moved, oldColumn),
+             "the grid kept its old line after symlog(2) -> symlog(3)");
+}
+
 // A width-0 pen is one device pixel on a painted screen buffer: half a logical pixel on a 2x
 // screen, while the GPU layers and a 2x export draw it one logical pixel wide. The painted lines
 // must match the export at the screen's ratio; at ratio 1 both are one pixel.

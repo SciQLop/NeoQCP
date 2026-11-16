@@ -3035,6 +3035,205 @@ void TestRepaint::panDoesNotMarkTheLayerDirty()
     QVERIFY(!layer->isDirty());
 }
 
+namespace
+{
+//! Whether \a actual is \a expected to the reference pictures' rule: at most \a tolerance.pixels
+//! differ, by more than \a tolerance.channel in any channel.
+bool framesMatch(const QImage& actual, const QImage& expected, qcp::test::Tolerance tolerance)
+{
+    if (actual.size() != expected.size())
+        return false;
+    int bad = 0;
+    for (int y = 0; y < actual.height(); ++y)
+        for (int x = 0; x < actual.width(); ++x)
+        {
+            const QRgb a = actual.pixel(x, y), b = expected.pixel(x, y);
+            if (qAbs(qRed(a) - qRed(b)) > tolerance.channel
+                || qAbs(qGreen(a) - qGreen(b)) > tolerance.channel
+                || qAbs(qBlue(a) - qBlue(b)) > tolerance.channel
+                || qAbs(qAlpha(a) - qAlpha(b)) > tolerance.channel)
+                if (++bad > tolerance.pixels)
+                    return false;
+        }
+    return true;
+}
+
+void sendMouse(QCustomPlot* plot, QEvent::Type type, QPoint pos, Qt::MouseButtons buttons)
+{
+    QMouseEvent e(type, pos, plot->mapToGlobal(pos), Qt::LeftButton, buttons, Qt::NoModifier);
+    QCoreApplication::sendEvent(plot, &e);
+}
+
+void dragFromTo(QCustomPlot* plot, QPoint from, QPoint to)
+{
+    sendMouse(plot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(plot, QEvent::MouseMove, to, Qt::LeftButton);
+    sendMouse(plot, QEvent::MouseButtonRelease, to, Qt::NoButton);
+}
+
+//! The keys of \a count samples across the view, half on each side of zero when the range does.
+QVector<double> sampledKeys(const QCPScale& scale, const QCPRange& range, int count)
+{
+    QVector<double> keys;
+    const double lower = scale.toScale(range.lower), upper = scale.toScale(range.upper);
+    for (int i = 0; i <= count; ++i)
+        keys << scale.fromScale(lower + (upper - lower) * double(i) / count);
+    return keys;
+}
+} // namespace
+
+// A pan of a GPU line on a non-linear key axis keeps the recorded geometry and the frame it draws
+// is the frame a fresh plot at the same range draws.
+void TestRepaint::aPanReusesGeometryAndMatchesAFreshReplot_data()
+{
+    QTest::addColumn<QString>("kind");
+    QTest::newRow("symlog") << QStringLiteral("symlog");
+    QTest::newRow("log") << QStringLiteral("log");
+}
+
+void TestRepaint::aPanReusesGeometryAndMatchesAFreshReplot()
+{
+    QFETCH(QString, kind);
+    const QCPScale scale = kind == QLatin1String("symlog") ? QCPScale::symlog(2) : QCPScale::log();
+    const QCPRange range = scale.isSymlog() ? QCPRange(-100, 100) : QCPRange(0.1, 100);
+    const QVector<double> keys = sampledKeys(scale, range, 400);
+    QVector<double> values;
+    values.reserve(keys.size());
+    for (qsizetype i = 0; i < keys.size(); ++i)
+        values << qSin(6.0 * double(i) / (keys.size() - 1));
+
+    const auto build = [&](QWidget& host, const QCPRange& keyRange)
+    {
+        QCustomPlot* plot = shownGpuPlot(host);
+        if (!plot)
+            return static_cast<QCustomPlot*>(nullptr);
+        plot->xAxis->setScale(scale);
+        plot->xAxis->setRange(keyRange);
+        plot->yAxis->setRange(-1.5, 1.5);
+        QCPGraph* graph = plot->addGraph();
+        graph->setData(keys, values);
+        graph->setPen(QPen(Qt::black, 3));
+        plot->replot();
+        return plot;
+    };
+
+    QWidget host;
+    QCustomPlot* plot = build(host, range);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    waitUntilSettled(*plot);
+    QCPGraph* graph = plot->graph(0);
+    auto* layer = plot->plottableRhiLayer(graph->layer());
+    QVERIFY(layer);
+    QTRY_VERIFY_WITH_TIMEOUT(layer->solidVertexUploads() > 0, 5000);
+
+    const int recordings = graph->mCore.recordingCount();
+    QVERIFY(recordings > 0);
+
+    // A drag of seven pixels of the key axis, in scale space.
+    plot->setInteractions(QCP::iRangeDrag);
+    const QPoint from(qRound(plot->xAxis->coordToPixel(scale.fromScale(0.0))),
+                      plot->axisRect()->rect().center().y());
+    dragFromTo(plot, from, from + QPoint(7, 0));
+    waitUntilSettled(*plot);
+
+    QVERIFY2(plot->xAxis->range() != range, "the drag did not move the key axis");
+    QCOMPARE(graph->mCore.recordingCount(), recordings);
+
+    QWidget freshHost;
+    QCustomPlot* fresh = build(freshHost, plot->xAxis->range());
+    QVERIFY(fresh);
+    waitUntilSettled(*fresh);
+
+    const QImage panned = screenOf(plot);
+    const QImage replotted = screenOf(fresh);
+    if (!framesMatch(panned, replotted, qcp::test::Tolerance {}))
+    {
+        keepImagesForCi(QStringLiteral("aPanReusesGeometryAndMatchesAFreshReplot-") + kind, panned,
+                        replotted);
+        QFAIL(qPrintable(QStringLiteral("the kept geometry no longer draws what a fresh plot "
+                                        "draws (%1)")
+                             .arg(kind)));
+    }
+}
+
+// Data that crosses zero on a symlog axis is one continuous line, on screen and in an export: every
+// column of its extent is inked, and x = 2 sits where coordToPixel says (a linear fallback would
+// put it elsewhere).
+void TestRepaint::aLineCrossingZeroIsContinuous()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    plot->xAxis->setScale(QCPScale::symlog(2));
+    plot->xAxis->setRange(-50, 50);
+    plot->yAxis->setRange(-1.5, 1.5);
+    plot->xAxis->grid()->setVisible(false);
+    plot->yAxis->grid()->setVisible(false);
+
+    QVector<double> keys, values;
+    for (int i = 0; i <= 1000; ++i)
+    {
+        const double key = -50.0 + 0.1 * i;
+        keys << key;
+        values << qSin(key / 10.0);
+    }
+    plot->addGraph()->setData(keys, values);
+    plot->graph(0)->setPen(QPen(Qt::black, 4));
+
+    // One marker beside the line at x = 2: its column is the pixel the mapping gives for 2.
+    QCPGraph* marker = plot->addGraph();
+    marker->setData(QVector<double> { 2.0 }, QVector<double> { 1.2 });
+    marker->setLineStyle(QCPGraph::lsNone);
+    marker->setScatterStyle(
+        QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(200, 0, 0), QColor(200, 0, 0), 11));
+
+    plot->replot();
+    waitUntilSettled(*plot);
+
+    const auto check = [plot](const QImage& image, const QString& surface)
+    {
+        // The picture's pixel size over the widget's logical width: the buffer ratio on screen, the
+        // requested raster ratio for an export.
+        const double dpr = double(image.width()) / double(plot->width());
+        const int first = qRound(plot->xAxis->coordToPixel(-50) * dpr) + 2;
+        const int last = qRound(plot->xAxis->coordToPixel(50) * dpr) - 2;
+        const int top = qRound(plot->yAxis->coordToPixel(1.45) * dpr);
+        const int bottom = qRound(plot->yAxis->coordToPixel(-1.45) * dpr);
+        QVERIFY2(last > first, qPrintable(surface + QStringLiteral(": the line has no extent")));
+        int missing = 0;
+        for (int x = first; x <= last; ++x)
+        {
+            bool inked = false;
+            for (int y = qMax(0, top); y <= qMin(image.height() - 1, bottom) && !inked; ++y)
+                inked = qGray(image.pixel(x, y)) < 110;
+            missing += !inked;
+        }
+        QVERIFY2(missing == 0, qPrintable(QStringLiteral("%1: %2 columns of the line are blank")
+                                              .arg(surface)
+                                              .arg(missing)));
+
+        // The marker's disc: its column is the pixel of x = 2.
+        const int column = qRound(plot->xAxis->coordToPixel(2.0) * dpr);
+        const int row = qRound(plot->yAxis->coordToPixel(1.2) * dpr);
+        bool found = false;
+        for (int dx = -2; dx <= 2 && !found; ++dx)
+        {
+            const QColor colour = image.pixelColor(column + dx, row);
+            found = colour.red() > 150 && colour.green() < 90 && colour.blue() < 90;
+        }
+        QVERIFY2(found, qPrintable(QStringLiteral("%1: x = 2 is not at its coordToPixel column")
+                                       .arg(surface)));
+    };
+
+    check(screenOf(plot), QStringLiteral("the screen"));
+    // The painter export, the path a PDF export takes, at two raster sizes.
+    check(plot->toPixmap(400, 300, plot->bufferDevicePixelRatio()).toImage(),
+          QStringLiteral("the export"));
+    check(plot->toPixmap(400, 300, 3).toImage(), QStringLiteral("the print-sized raster"));
+}
+
 void TestRepaint::gpuRectFillsBeforeStroking()
 {
     QWidget host;

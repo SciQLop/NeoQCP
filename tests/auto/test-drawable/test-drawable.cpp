@@ -2177,10 +2177,11 @@ void TestDrawable::aValueZoomKeepsTheRecording()
     }
 }
 
-void TestDrawable::aLogKeyAxisRecordsEveryTransform()
+void TestDrawable::aLogKeyAxisReusesItsWindowLikeALinearOne()
 {
-    // Pixels per key are not constant on a log axis, so no window can describe them: the recording
-    // is marked transform-dependent and remade on every pan.
+    // A non-linear key axis keeps a pan's geometry like a linear one: the window is widened in the
+    // axis' scale space and the pixels per unit of that space stay put. A pan that leaves the window
+    // records again, and so does a zoom.
     Fixture f;
     auto shape = f.plot->add<TestShape>();
     shape->readsKeyWindow = true;
@@ -2189,11 +2190,15 @@ void TestDrawable::aLogKeyAxisRecordsEveryTransform()
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
 
-    f.plot->xAxis->setRange(2, 20);
+    f.plot->xAxis->setRange(2, 20); // inside the window [0.1, 100], same scale
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+
+    f.plot->xAxis->setRange(0.01, 0.1); // leaves the window: another recording
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 2);
 
-    f.plot->xAxis->setRange(4, 40);
+    f.plot->xAxis->setRange(0.02, 0.1); // a zoom: the pixels per scale unit changed
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 3);
 }
