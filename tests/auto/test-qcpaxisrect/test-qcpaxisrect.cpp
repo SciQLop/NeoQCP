@@ -44,6 +44,13 @@ QPointF rectCentre(const QCustomPlot* plot)
     return QRectF(plot->axisRect()->rect()).center();
 }
 
+//! The text box an item measures: its corners are the topLeft and bottomRight anchors, in pixels.
+QSize textBoxSize(const QCPItemText& item)
+{
+    const QPointF size = item.bottomRight->pixelPosition() - item.topLeft->pixelPosition();
+    return QSize(qRound(size.x()), qRound(size.y()));
+}
+
 // A drag as the user makes it: press, two moves, release.
 void dragOn(QCustomPlot* plot, const QPoint& from, const QPoint& to)
 {
@@ -180,6 +187,83 @@ void TestQCPAxisRect::textAppliesEveryStyleField()
   QCOMPARE(label->positionAlignment(), Qt::Alignment(Qt::AlignLeft | Qt::AlignTop));
   QCOMPARE(label->textAlignment(), Qt::Alignment(Qt::AlignRight | Qt::AlignVCenter));
   QCOMPARE(label->color(), QColor(Qt::black)); // no theme on this plot, so black is its foreground
+}
+
+void TestQCPAxisRect::textItemMathTextIsOnByDefault()
+{
+  const QCPHandle<QCPItemText> label = mPlot->add<QCPItemText>();
+  QVERIFY(label);
+  // Today's look: the item has always been measured and drawn through the label renderer.
+  QCOMPARE(label->mathText(), true);
+}
+
+void TestQCPAxisRect::textCopiesTheStyleMathText()
+{
+  QCPAxisRect *ar = mPlot->axisRect();
+  // A default QCPTextStyle is a drawing context's, whose mathText is off: the item follows it, so
+  // a caller opts in per label.
+  const QCPHandle<QCPItemText> plain = ar->text(QCP::Pixels { 20, 20 }, QStringLiteral("x"));
+  QVERIFY(plain);
+  QCOMPARE(plain->mathText(), false);
+
+  const QCPHandle<QCPItemText> math = ar->text(
+      QCP::Pixels { 20, 20 }, QStringLiteral("$x$"), { .mathText = true });
+  QVERIFY(math);
+  QCOMPARE(math->mathText(), true);
+}
+
+void TestQCPAxisRect::aPlainTextItemMeasuresWithFontMetrics()
+{
+  const QFont font(QStringLiteral("Serif"), 14);
+  const QString text = QStringLiteral("MMMM a text item");
+  const QCPHandle<QCPItemText> label = mPlot->add<QCPItemText>();
+  label->setFont(font);
+  label->setText(text);
+  label->setMathText(false);
+  label->setPositionAlignment(Qt::AlignLeft | Qt::AlignTop);
+
+  const int flags = int(Qt::TextDontClip | label->textAlignment());
+  QCOMPARE(textBoxSize(*label),
+           QCP::paintedMetrics(font).boundingRect(0, 0, 0, 0, flags, text).size());
+}
+
+void TestQCPAxisRect::aMathTextItemMeasuresThroughTheRenderer()
+{
+  const QFont font(QStringLiteral("Serif"), 14);
+  const QString text = QStringLiteral("MMMM a text item");
+  const QCPHandle<QCPItemText> label = mPlot->add<QCPItemText>();
+  label->setFont(font);
+  label->setText(text);
+  label->setPositionAlignment(Qt::AlignLeft | Qt::AlignTop);
+  QVERIFY(label->mathText());
+
+  const int flags = int(Qt::TextDontClip | label->textAlignment());
+  QCOMPARE(textBoxSize(*label),
+           QCPLabelRenderer::measureRectWith(QCPLabelRenderer::defaultRenderer(), font, text, flags)
+               .size());
+}
+
+void TestQCPAxisRect::aMathTextItemTypesetsLatex()
+{
+#if NEOQCP_WITH_LATEX
+  const QFont font(QStringLiteral("Serif"), 14);
+  const QString math = QStringLiteral("$\\alpha^2$");
+  const QCPHandle<QCPItemText> label = mPlot->add<QCPItemText>();
+  label->setFont(font);
+  label->setText(math);
+  label->setTextAlignment(Qt::AlignLeft);
+  label->setPositionAlignment(Qt::AlignLeft | Qt::AlignTop);
+
+  const int flags = int(Qt::TextDontClip | Qt::AlignLeft);
+  QCOMPARE(textBoxSize(*label),
+           QCPLabelRenderer::measureRectWith(QCPLatexLabelRenderer::instance(), font, math, flags)
+               .size());
+  // The typeset span is not the literal source a font would measure.
+  QVERIFY(textBoxSize(*label).width()
+          != QCP::paintedMetrics(font).boundingRect(0, 0, 0, 0, flags, math).width());
+#else
+  QSKIP("built without LaTeX");
+#endif
 }
 
 void TestQCPAxisRect::ellipseTakesTwoCornersInTheirOwnSpaces()

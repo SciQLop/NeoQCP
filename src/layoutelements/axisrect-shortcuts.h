@@ -38,8 +38,9 @@ QCPHandle<QCPGraph> QCPAxisRect::line(const K& keys, const V& values, const QCPL
   ratio of this rect, ...), and \a style is the same QCPTextStyle the drawing context takes.
 
   Every style field is applied, whatever its value: the defaults of QCPTextStyle are a drawing
-  context's, not an item's. A style colour that is not valid leaves the item's own, which is the
-  colour the plot's theme gives a plain annotation.
+  context's, not an item's, so a default style gives an item whose \a mathText is off, while an
+  item built on its own measures and draws through the label renderer. A style colour that is not
+  valid leaves the item's own, which is the colour the plot's theme gives a plain annotation.
 */
 inline QCPHandle<QCPItemText> QCPAxisRect::text(QCP::Position at, const QString& text,
                                                 const QCPTextStyle& style)
@@ -59,6 +60,7 @@ inline QCPHandle<QCPItemText> QCPAxisRect::text(QCP::Position at, const QString&
     item->setTextAlignment(static_cast<Qt::Alignment>(style.textFlags));
     item->setRotation(style.rotationDegrees);
     item->setPadding(style.padding.toMargins());
+    item->setMathText(style.mathText);
     return item;
 }
 

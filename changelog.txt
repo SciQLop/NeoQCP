@@ -612,6 +612,10 @@ Milestone 6c (the drawing context): units and positions. Additive, except where 
         of the output submitted over that GPU content, so the screen stacks as an export does. A
         layer takes at most 8 slices a frame; past that, the content goes under the GPU content with
         one warning. A layer holding a slice is never translated on a pan: it is painted again.
+  - QCPItemText::mathText, on by default: the item measures and draws through the label renderer, as
+        it always did, and mathText(false) measures with the font's own metrics. ax->text() copies
+        the style's field, whose default is off, so a label made with a default QCPTextStyle is now
+        plain: pass {.mathText = true} for a label that typesets $...$ spans.
 
 Milestone 6b (plot-free construction). Breaking, in the 3.0 preview line.
   - The three annotations an axis rect can make in one call: ax->line(keys, values, options), with

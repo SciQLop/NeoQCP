@@ -60,6 +60,7 @@ class QCP_LIB_DECL QCPItemText : public QCPItem
                    textAlignmentChanged)
     Q_PROPERTY(double rotation READ rotation WRITE setRotation NOTIFY rotationChanged)
     Q_PROPERTY(QMargins padding READ padding WRITE setPadding NOTIFY paddingChanged)
+    Q_PROPERTY(bool mathText READ mathText WRITE setMathText NOTIFY mathTextChanged)
     /// \endcond
 
 public:
@@ -96,6 +97,8 @@ public:
 
     QMargins padding() const { return mPadding; }
 
+    bool mathText() const { return mMathText; }
+
     //! Fills the colours a caller never set: the plot's theme, applied when the item is placed.
     void applyThemeColors(const QColor& color, const QColor& selectedColor);
 
@@ -113,6 +116,7 @@ public:
     void setTextAlignment(Qt::Alignment alignment);
     void setRotation(double degrees);
     void setPadding(const QMargins& padding);
+    void setMathText(bool mathText);
 
     //! Places the item, the way QCPItemPosition::set does: a QCP::Data position follows a pan.
     void setPosition(const QCP::Position& position);
@@ -141,6 +145,7 @@ signals:
     void textAlignmentChanged(Qt::Alignment textAlignment);
     void rotationChanged(double rotation);
     void paddingChanged(const QMargins& padding);
+    void mathTextChanged(bool mathText);
 
 protected:
     enum AnchorIndex
@@ -168,6 +173,8 @@ protected:
     Qt::Alignment mTextAlignment;
     double mRotation;
     QMargins mPadding;
+    //! Measured and drawn through the label renderer; off, the font's own metrics measure it.
+    bool mMathText = true;
     //! The measurement the box queries reuse; text and font are the only inputs it depends on.
     mutable QSize mGlyphSize;
     mutable QString mGlyphText;
@@ -268,6 +275,11 @@ public:
     Ret setPadding(const QMargins& padding)
     {
         return this->apply([&](T& i) { i.setPadding(padding); });
+    }
+
+    Ret setMathText(bool mathText)
+    {
+        return this->apply([&](T& o) { o.setMathText(mathText); });
     }
 
 };

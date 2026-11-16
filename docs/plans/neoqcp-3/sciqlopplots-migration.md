@@ -539,3 +539,6 @@ that no section above lists, and the behaviour changes of 5f.
 - Call order is screen order (C-4/C-5): a text, a painter callback or a plain layerable recorded after GPU content
   now covers it on screen as in an export, through a painter slice of its layer; a layer holding a slice is
   painted again on a pan instead of being translated, and markers stay over everything else on their layer.
+- `QCPItemText::mathText` is on by default and `ax->text()` copies `QCPTextStyle::mathText`, which defaults to
+  off: a label SciQLopPlots builds with a default style is plain from now on, so a label that wants `$...$`
+  typeset passes `.mathText = true`.

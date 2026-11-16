@@ -363,6 +363,21 @@ void QCPItemText::setPadding(const QMargins& padding)
     qcpEmit(this, mParentPlot, &QCPItemText::paddingChanged, this->padding());
 }
 
+/*!
+  Sets whether the text is measured and drawn through the label renderer (\ref
+  QCPTextStyle::mathText), which typesets $...$ spans when the library is built with LaTeX. It is
+  on by default, which is how this item has always measured and drawn its text; off, the glyphs
+  are measured with the font's own metrics, one pixel narrower and shorter.
+*/
+void QCPItemText::setMathText(bool mathText)
+{
+    if (mathText == mMathText)
+        return;
+    update();
+    mMathText = mathText;
+    qcpEmit(this, mParentPlot, &QCPItemText::mathTextChanged, mathText);
+}
+
 /* inherits documentation from base class */
 /* inherits documentation from base class */
 void QCPItemText::setPosition(const QCP::Position& position)
@@ -386,7 +401,9 @@ QCPTextStyle QCPItemText::textStyle() const
     style.textFlags = int(Qt::TextDontClip | mTextAlignment);
     style.rotationDegrees = mRotation;
     style.padding = QMarginsF(mPadding);
-    style.mathText = true; // measured and drawn through the label renderer, as it always was
+    // The item has always been measured and drawn through the label renderer; mathText(false) is
+    // the plain-font path, one pixel narrower and shorter.
+    style.mathText = mMathText;
     return style;
 }
 

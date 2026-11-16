@@ -16,6 +16,11 @@ private slots:
   void lineWithNoPenDrawsMarkersOnly();
   void textTakesAPositionAndAStyle();
   void textAppliesEveryStyleField();
+  void textItemMathTextIsOnByDefault();
+  void textCopiesTheStyleMathText();
+  void aPlainTextItemMeasuresWithFontMetrics();
+  void aMathTextItemMeasuresThroughTheRenderer();
+  void aMathTextItemTypesetsLatex();
   void ellipseTakesTwoCornersInTheirOwnSpaces();
   void axisRemovalConsequencesToPlottables();
   void axisRemovalConsequencesToItems();
