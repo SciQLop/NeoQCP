@@ -14,6 +14,10 @@ There is no single `qcustomplot.h` / `qcustomplot.cpp` pair to drop into your pr
 - Keep including one header: `#include <qcustomplot.h>`. It pulls in everything.
 - The C++ standard is C++23 (GCC 14, Clang 18 or Apple Clang 16, MSVC 17.10). Your project needs the same
   to include the headers; Meson 1.3 or newer builds it.
+- `QCPGraph::setData(std::vector<double>, std::vector<double>)` takes its two vectors by value and moves
+  them into the graph: a call with lvalues copies once, as before, and one with rvalues hands its
+  storage over. Only code that names that overload's type (a member pointer, a subclass hiding it)
+  changes.
 
 A CMake or qmake project can build NeoQCP with Meson first, then link `libNeoQCP.a`. Its include paths are `src/` and the build directory, which holds the generated `neoqcp_config.h`.
 

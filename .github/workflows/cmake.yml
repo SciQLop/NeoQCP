@@ -77,7 +77,7 @@ jobs:
             echo "QT_QPA_FONTDIR=C:\Windows\Fonts" >> "$GITHUB_ENV"
           fi
           if [ "$RUNNER_OS" = "Linux" ]; then
-            # C++23: the image's default c++ is GCC 13, which has no <ranges> to<> (GCC 14 does).
+            # C++23: GCC 14 is the floor the project sets; the image's default is GCC 13.
             echo "CC=gcc-14" >> "$GITHUB_ENV"
             echo "CXX=g++-14" >> "$GITHUB_ENV"
           fi

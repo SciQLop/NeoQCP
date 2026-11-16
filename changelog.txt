@@ -642,6 +642,9 @@ Milestone 6b (plot-free construction). Breaking, in the 3.0 preview line.
   - An item keeps the clipToAxisRect choice it was given: a new item is clipped to the area it lands
         in, and one built or taken with setClipToAxisRect(false) stays unclipped.
   - QCPNumberRange (a std::ranges input range of numbers) names the number ranges the data forms take.
+  - QCPNumbersOnly (a QCPNumberRange that is not QCPColumns) names their one-column value forms: a type
+        with only a qcp_columns hook is refused there instead of being flattened row-major, and
+        QCPGraph::setData(keys, values) takes any QCPNumberRange, a std::span or a view say.
   - Plottables are built without axes: a constructor takes the plottable's own arguments, and the
         plottable joins a plot when it is placed. QCustomPlot::add<T>(args...), QCPAxisRect::add<T>(args...),
         QCPAxisRect::add<T>(key, value, args...) and QCPPolarArea::add<T>(args...) build T(args...), join it

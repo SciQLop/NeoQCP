@@ -542,3 +542,22 @@ that no section above lists, and the behaviour changes of 5f.
 - `QCPItemText::mathText` is on by default and `ax->text()` copies `QCPTextStyle::mathText`, which defaults to
   off: a label SciQLopPlots builds with a default style is plain from now on, so a label that wants `$...$`
   typeset passes `.mathText = true`.
+
+## From n11 (range data calls, C++23)
+
+### Compile breaks
+
+- `QCPGraph::setData(std::vector<double>, std::vector<double>)` takes its two vectors by value and moves them into
+  the growable source. A call with lvalues copies once, as before, and one with rvalues hands its storage over; only
+  code that names that overload's type (a member pointer, a subclass hiding it) changes.
+- The build is C++23 (GCC 14, Clang 18 or Apple Clang 16, MSVC 17.10). The headers still compile as C++20 today,
+  but the CI floor is C++23 and libc++ builds need it: build SciQLopPlots with `cpp_std=c++23`.
+
+### Behaviour changes
+
+- A type with a `qcp_columns` hook is columns only: a number form (a plottable's constructor, `ax->line`, the
+  one-column `QCPGraph::setData`) refuses it instead of flattening it row-major. `QCPGraph` and
+  `QCPWaterfallGraph` take it through their columns form.
+- The range-taking calls are the plottables' data constructors, `ax->line(keys, values)` and
+  `QCPGraph::setData(keys, values)` (also through the graph's handle); the other plottables' `setData()` and
+  `addData()` keep taking `QVector<double>` and `std::vector<double>`.

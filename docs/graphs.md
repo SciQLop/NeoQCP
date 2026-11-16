@@ -145,9 +145,13 @@ This matters because resampling runs on a worker thread and can still read the d
 
 ### Your own data types
 
-The data calls take any range whose elements convert to `double`, and read it once from begin to end,
-straight into the graph's own storage: `std::vector`, `QVector`, `std::array`, `std::span`,
-`std::views::iota`, a `std::ranges` view.
+The range-taking data calls take any range whose elements convert to `double`, and read it once from
+begin to end, straight into the graph's own storage: `std::vector`, `QVector`, `std::array`,
+`std::span`, `std::views::iota`, a `std::ranges` view.
+Those calls are the plottables' data constructors (`add<QCPGraph>(keys, values)`,
+`add<QCPBars>(keys, values)`, ...), `QCPAxisRect::line(keys, values)` and `QCPGraph::setData(keys,
+values)`; the `setData()` and `addData()` of the other plottables keep their `QVector` and
+`std::vector` parameters.
 A view is read where it is and a container passed as a plain variable is read as it is, and either way
 the numbers end up copied once, with no buffer of yours in between; only `viewData` keeps your storage.
 An `Eigen::VectorXd` and a 1D `xt::xtensor` already pass this way.
@@ -161,6 +165,18 @@ Both are plain free functions, found by argument-dependent lookup: write them in
 
 Returning a reference or a view avoids a copy of the hook's result, which is read where it is;
 returning a value moves it into the call, which reads it there.
+
+A hook that returns a view over its argument must not be reachable through a conversion.
+The argument lives only for the call, so a view of it dangles as soon as the hook returns, and the
+call then reads freed memory; the library cannot detect that.
+A hook taking a concrete type, `auto qcp_columns(const Eigen::MatrixXd& m)` say, is reached by
+conversion: `QCPGraph(keys, m * 2.0)` builds a temporary `MatrixXd` for the parameter, which dies at
+the end of the hook call, and the columns the hook returned point into it.
+Make such a hook a template on the exact type or one of its bases (`Eigen::MatrixBase<Derived>`,
+`std::derived_from<Base>`), so that the parameter binds to the caller's own object, or return by
+value.
+That is why the `qcp_columns` example below is a template, and the same rule holds for a
+`qcp_numbers` hook that returns a `std::span` over its argument.
 
 ```cpp
 // A struct of arrays, read as the numbers of the curve it feeds.
