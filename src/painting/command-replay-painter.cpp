@@ -187,8 +187,15 @@ void replayBoxedText(const qcp::BoxedTextCmd& cmd, QCPPainter& painter, const QC
         payload.wrapped = qcpWrappedText(style, payload.text, innerWidth);
         payload.laidOutWidth = innerWidth;
     }
+    // The box bounds its text. Lines that do not fit, a glyph overhanging its advance, or ink the
+    // painter would not clip on its own stay inside the box, on screen, in a raster fallback and in
+    // an export alike: the rect the words are laid out in is the box's rounded inner rect, which is
+    // close to the box but not the box.
+    painter.save();
+    painter.setClipRect(box, Qt::IntersectClip);
     QCPLabelRenderer::drawWith(textRenderer(style), &painter, inner.toRect(), style.font, color,
                                payload.wrapped, style.textFlags);
+    painter.restore();
 }
 } // namespace
 

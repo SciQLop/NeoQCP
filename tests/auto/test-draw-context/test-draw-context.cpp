@@ -697,6 +697,45 @@ void TestDrawContext::boxedTextSmallerThanItsPaddingHasNoNegativeBox()
     QCOMPARE(outside, 0);
 }
 
+void TestDrawContext::boxedTextTallerThanItsBoxIsClipped()
+{
+    // The box bounds its text, whatever the font does with it: the wrapped lines cannot all fit
+    // (the box is a few pixels tall, one line is taller), the box sits on fractional pixels so the
+    // rect the text is laid out in rounds outward to whole pixels, and the style asks the painter
+    // not to clip at all. None of that puts ink outside the box.
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    QCPTextStyle style;
+    style.font = QFont(QStringLiteral("Sans"), 9);
+    style.color = QColor(10, 60, 90);
+    style.textFlags = Qt::AlignLeft | Qt::TextDontClip;
+    const QString text = QStringLiteral("Wrapping words cannot all fit this box");
+    context.text(QCP::Data { 22.4, 68.6 }, QCP::Data { 182.4, 48.6 }, text, style);
+
+    const QImage replay = replayOf(context);
+    const QRectF box = QRectF(pixelOf(context.transform(), 22.4, 68.6),
+                              pixelOf(context.transform(), 182.4, 48.6))
+                           .normalized();
+    QCOMPARE(box.topLeft(), QPointF(22.4, 80.4));
+    QCOMPARE(box.size(), QSizeF(160, 20));
+    // The test is about ink that cannot fit: the words wrap, and two lines are taller than the box.
+    const auto* boxed = std::get_if<qcp::BoxedTextCmd>(&context.drawList().commands.front());
+    QVERIFY(boxed);
+    QVERIFY(boxed->box->wrapped.contains(QLatin1Char('\n')));
+    QVERIFY(QCP::paintedMetrics(style.font)
+                .boundingRect(QRect(), Qt::AlignLeft, boxed->box->wrapped)
+                .height()
+            > box.height());
+
+    int outside = 0;
+    for (int y = 0; y < kHeight; ++y)
+        for (int x = 0; x < kWidth; ++x)
+            if (!box.contains(x, y) && replay.pixelColor(x, y) != QColor(Qt::white))
+                ++outside;
+    QCOMPARE(outside, 0);
+}
+
 void TestDrawContext::emptyBoxedTextDrawsOnlyTheBox()
 {
     Fixture fixture;

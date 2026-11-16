@@ -25,6 +25,7 @@ private slots:
     void boxedTextWrapsInsideItsBox();
     void boxedTextWrapsForTheRectItDrawsIn();
     void boxedTextSmallerThanItsPaddingHasNoNegativeBox();
+    void boxedTextTallerThanItsBoxIsClipped();
     void emptyBoxedTextDrawsOnlyTheBox();
     void circleOfAPixelLengthPicksThePixelCircle();
     void dataOffsetCentreCircleKeepsItsOffset();
