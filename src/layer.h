@@ -148,7 +148,8 @@ protected:
     std::unique_ptr<QCPPainter> mSlicePainter; //!< the painter of the slice that is open, if any
     int mSliceCount = 0; //!< the slices this pass opened: the next free image index
     int mOpenSlice = -1; //!< the index of the open slice, or -1
-    //! What an export paints at the end of this layer's pass, in the order it was recorded.
+    //! What an export paints at the end of this layer's pass, in the order it was recorded. Each
+    //! entry owns the marker commands it paints: their object may be deleted before they land.
     std::vector<std::function<void(QCPPainter&)>> mDeferredMarkers;
     //! Whether this pass paints the layer's own buffer. An export paints every layerable into its
     //! painter: it opens no slice, and never reads or writes the screen's GPU state.

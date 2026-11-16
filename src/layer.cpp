@@ -445,16 +445,23 @@ void QCPLayer::restoreSlicePainter()
 void QCPLayer::deferMarkers(const QCPDrawList& list, const QCPDrawFrame& frame,
                             const QCPPainter& from)
 {
+    // The recording belongs to its object, and that object may delete itself, or another one, while
+    // the layer draws on: the markers are copied out, so the pass owns what it paints late.
+    std::vector<qcp::QCPDrawCommand> markers;
+    for (const qcp::QCPDrawCommand& command : list.commands)
+        if (std::holds_alternative<qcp::MarkersCmd>(command))
+            markers.push_back(command);
+    if (markers.empty())
+        return;
     const PainterState state = PainterState::of(from);
     mDeferredMarkers.emplace_back(
-        [&list, frame, state](QCPPainter& painter)
+        [markers = std::move(markers), frame, state](QCPPainter& painter)
         {
             // The markers paint where their child would have painted them, only later: its clip,
             // fade, antialiasing and transform, for the length of the replay.
             painter.save();
             state.applyTo(painter);
-            qcpReplayWithPainter(list, painter, frame, QCPReplayKinds::MarkersOnly, nullptr, true,
-                                 false, QCPReplayState::AlreadySaved);
+            qcpReplayMarkers(markers, painter, frame);
             painter.restore();
         });
 }

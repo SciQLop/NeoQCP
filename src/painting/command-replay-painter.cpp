@@ -498,3 +498,15 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
     if (owned)
         painter.restore();
 }
+
+void qcpReplayMarkers(const std::vector<qcp::QCPDrawCommand>& commands, QCPPainter& painter,
+                      const QCPDrawFrame& frame)
+{
+    // The commands are a copy: a recording can die while the pass that deferred its markers draws
+    // its other children, and nothing here may read it. A list holds them so the replay rules of a
+    // markers-only pass stay the ones above.
+    QCPDrawList list;
+    list.commands = commands;
+    qcpReplayWithPainter(list, painter, frame, QCPReplayKinds::MarkersOnly, nullptr, true, false,
+                         QCPReplayState::AlreadySaved);
+}

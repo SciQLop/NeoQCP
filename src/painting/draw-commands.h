@@ -1066,3 +1066,8 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
                           bool dashedAvailable = true, bool antialiasStrokes = false,
                           QCPReplayState state = QCPReplayState::Save, int firstCommand = 0,
                           int lastCommand = -1);
+
+//! Paints the marker  commands of a recording, copied out of it: an export defers a layer's
+//! markers to the end of its pass, and the object that recorded them may be gone by then.
+void qcpReplayMarkers(const std::vector<qcp::QCPDrawCommand>& commands, QCPPainter& painter,
+                      const QCPDrawFrame& frame);
