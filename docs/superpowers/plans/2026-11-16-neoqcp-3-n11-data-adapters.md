@@ -42,6 +42,37 @@ xtensor (+ xtl), a reference `mdspan` (Kokkos), from meson wraps.
 5. A hook found for a base class (user type derived from an adapted type): ADL finds it, no ambiguity with the
    fallback.
 
+## Pre-flight rulings (2026-11-16, review in the plan workspace `preflight.md`; they override the task text)
+
+- P-1 (B1): the detail-namespace fallback is a C variadic, `NoHook qcp_numbers(...)` (same for `qcp_columns`), used
+  only in unevaluated operands. An ellipsis is the worst match, so any user hook (base-class, CRTP, forwarding
+  template) wins; a deleted best match still makes the call ill-formed (the opt-out).
+- P-2 (B2, C6): `cpp_std=c++23,c++latest`, `meson_version >= 1.3.0`; GCC 14 on every Linux CI job.
+- P-3 (B3): Task 3 tests pass keys as `std::vector<double>{0, 1, 2}`.
+- P-4 (C1): the concepts check the const object (`requires(const R& r) { qcp::numbers(r); }`), matching the
+  `const K&` consumers. Ranges that are not const-iterable (generators, `views::istream`, `filter_view`) are out,
+  said in the docs; Review Focus 4 becomes "a non-common range (`take(iota(0.0), n)`) is read once".
+- P-5 (C2): every `QCPNumberRange` consumer reads through `qcp::numbers` / `qcp::toDoubles`, including
+  `QCPPlottable1D(keys, values)` (no `std::ranges::distance` pre-pass on a non-sized range). `toDoubles` takes
+  non-common ranges.
+- P-6 (C3): for an rvalue that is not a borrowed range (including a hook returning a container by value), rule 3
+  returns `std::views::all(std::move(x))` (an `owning_view`), never a span. Test: a hook returning
+  `std::vector<double>` by value, through `QCPGraph`, under ASan.
+- P-7 (C4): the numbers forms are constrained `&& !QCPColumns<V>`, so a type with a columns hook is 2D. Same in the
+  6f `colorMap` pair.
+- P-8 (C5): no `std::views::stride` anywhere (libc++ age); strided columns are `iota | transform`. Floor stays GCC 14,
+  Clang 18 / Apple Clang 16, MSVC 17.10.
+- P-9 (C7): wraps from wrapdb where they exist, else `[wrap-git]` pinned to a release with `method = cmake` or a
+  `packagefiles` overlay; xtensor and xtl pinned as a matching pair; third-party includes `include_type: 'system'`.
+- P-10 (C8): drop `anIntVectorConverts` and the deref-count form of `eachElementIsReadOnce`. Instead:
+  `aNonCommonRangeIsRead` (`std::views::iota(0.0) | std::views::take(5)` as keys), `aHookedTypeReachesEveryPlotType`
+  (a hooked type through graph, curve, bars, error bars, financial, statistical box, polar graph, waterfall,
+  `QCPPlottable1D`), and `copiesOnce` checked by storage identity or an allocation count.
+- P-11 (C9): CI green on all five platforms after Task 1 is a gate before Task 2 (the push is the maintainer's).
+- P-12 (C10): an invalid hook result makes the CPO's constraint false (the concept is false, the error is the usual
+  "constraints not satisfied"); `static_assert` with a readable message only inside consumer bodies.
+- Minors M1-M7: the implementer reads them in `preflight.md` and applies them where they touch its task.
+
 ---
 
 ### Task 1: C++23
