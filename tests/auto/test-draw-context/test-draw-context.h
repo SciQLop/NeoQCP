@@ -23,6 +23,7 @@ private slots:
     void initializerListPolygonKeepsItsPositions();
     void roundedRectMatchesHandPainting();
     void boxedTextWrapsInsideItsBox();
+    void boxedTextWrapsForTheRectItDrawsIn();
     void boxedTextSmallerThanItsPaddingHasNoNegativeBox();
     void emptyBoxedTextDrawsOnlyTheBox();
     void circleOfAPixelLengthPicksThePixelCircle();

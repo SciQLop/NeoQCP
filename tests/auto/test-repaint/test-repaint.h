@@ -29,9 +29,12 @@ private slots:
     void aRecordingWithoutPainterCommandsTakesNoImageSlot();
     void aScreenDrawsAPlainLayerableOverGpuContent();
     void aPanKeepsTheSliceOverItsContent();
-    void aPainterSliceCapWarnsOnce();
+    void anInterleavedRecordingPastTheCapIsNotSplit();
+    void aSpentSliceCapPaintsTheWholeRecordingIntoTheBuffer();
+    void aPassReleasesTheSlicesItNoLongerNeeds();
     void aMarkerStaysOverTheSliceOfItsLayer();
     void anExportKeepsAPlainLayerableOfAShownPlot();
+    void anExportKeepsTheMarkersOverThePainterContent();
     void aSliceTakesTheStateOfEachChild();
     void aSliceClipsEachChildToItsOwnRect();
     void aSliceFadesOnlyItsOwnChild();

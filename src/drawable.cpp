@@ -1047,6 +1047,41 @@ bool paintsIntoTheSlice(const qcp::QCPDrawCommand& command)
     return !qcp::isGpuCommand(command);
 }
 
+//! How many painter slices \a list opens when it replays as runs: one per painter run that lands
+//! over GPU content, the slice already open counted once. The same walk as the replay below, so the
+//! two never disagree on where a run starts.
+int slicesNeeded(const QCPDrawList& list, bool gpuBefore, bool sliceOpen)
+{
+    int needed = 0;
+    bool gpuSeen = gpuBefore;
+    bool painterRun = false;
+    for (const qcp::QCPDrawCommand& command : list.commands)
+    {
+        if (paintsIntoTheSlice(command))
+        {
+            if (gpuSeen && !painterRun)
+                ++needed;
+            painterRun = true;
+            continue;
+        }
+        painterRun = false;
+        if (submitsToTheGpu(command))
+            gpuSeen = true;
+    }
+    return sliceOpen && needed > 0 ? needed - 1 : needed;
+}
+
+//! An export, or a screen without a backend, paints a recording without its markers and then its
+//! markers: on screen the scatter layer draws after the painter content of the layer, so a marker
+//! stays over a text recorded after it, and both paths have to agree on that.
+void replayWithMarkersLast(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame)
+{
+    qcpReplayWithPainter(list, painter, frame, QCPReplayKinds::WithoutMarkers, nullptr, true, false,
+                         QCPReplayState::AlreadySaved);
+    qcpReplayWithPainter(list, painter, frame, QCPReplayKinds::MarkersOnly, nullptr, true, false,
+                         QCPReplayState::AlreadySaved);
+}
+
 } // namespace
 
 //! Replays \a list as runs of painter-only and of GPU commands, each in the order it was recorded:
@@ -1065,6 +1100,27 @@ void QCPDrawnCore::paintInCallOrder(const QCPDrawList& list, QCPPlottableRhiLaye
     // before it built, and rasterise them again on every frame.
     resolve.beginReplay();
     fallback.beginReplay();
+    // More slices than the layer has left: splitting the recording would put one object on both
+    // sides of a stacking level and lose the order inside it. Its GPU content goes up once, its
+    // painter content once over it, so the object stays whole and on top; with no slice left at all
+    // the pixels land in the buffer, as a recording the raster budget refuses does.
+    if (slicesNeeded(list, gpuBefore, view.layer->hasOpenPainterSlice())
+        > view.layer->painterSlicesLeft())
+    {
+        if (list.hasGpuContent)
+            view.layer->closePainterSlice(painter);
+        qcpReplayWithRhi(list, plottables, scatter, frame, resolve, fallback,
+                         view.plot->bufferDevicePixelRatio(), view.plot->rhiOutputSize(), generation,
+                         nullptr, static_cast<float>(painter.opacity()));
+        if (list.hasGpuContent)
+            view.layer->noteGpuContent();
+        QCPPainter* slice = view.layer->painterSlice(painter);
+        qcpReplayWithPainter(list, slice ? *slice : painter, frame, QCPReplayKinds::PainterOnly,
+                             &fallback, dashed, false, QCPReplayState::AlreadySaved);
+        if (slice)
+            view.layer->restoreSlicePainter();
+        return;
+    }
     for (int first = 0; first < count;)
     {
         const bool painterRun = paintsIntoTheSlice(list.commands[std::size_t(first)]);
@@ -1128,16 +1184,22 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
             // A screen without a backend: the painter draws it all, and never touches the caches a
             // screen frame resolves into.
             // The layer brackets this draw with save()/restore(): the replay need not repeat it.
-            qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::All, nullptr,
-                                 true, false, QCPReplayState::AlreadySaved);
+            replayWithMarkersLast(mState->recording, painter, frame);
             notePainted(view);
             return;
         }
         // Spec 5: an export stacks like the screen, so the recording replays in call order here
-        // too. The layer brackets this draw with save()/restore() and carries this object's clip,
-        // antialiasing hint and busy fade, so the inline replay inherits them.
-        qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::All, nullptr, true,
-                             false, QCPReplayState::AlreadySaved);
+        // too. Its markers are the exception: the screen draws them in a scatter pass above the
+        // whole layer, so the layer paints them after its last child. The layer brackets this draw
+        // with save()/restore() and carries this object's clip, antialiasing hint and busy fade, so
+        // the inline replay inherits them.
+        qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::WithoutMarkers,
+                             nullptr, true, false, QCPReplayState::AlreadySaved);
+        if (view.layer)
+            view.layer->deferMarkers(mState->recording, frame, painter);
+        else
+            qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::MarkersOnly,
+                                 nullptr, true, false, QCPReplayState::AlreadySaved);
         return;
     }
     // The painter pass completes what the layer refused, so it makes the same dashed decision.

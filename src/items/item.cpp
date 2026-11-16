@@ -26,6 +26,7 @@
 #include "item.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <vector>
 
@@ -2040,6 +2041,12 @@ QCPItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>& positio
         box.valueLower = -infinity;
         box.valueUpper = infinity;
     }
+    // A pixel offset rides on its data point: the item is drawn that far from where the point maps,
+    // so the pad has to reach it, or the index drops an item that is still on screen and loses its
+    // clicks with it.
+    for (const QCPItemPosition* position : positions)
+        pixelPad = std::max(pixelPad, std::max(std::abs(position->mPixelOffset.dx),
+                                               std::abs(position->mPixelOffset.dy)));
     return QCPItemExtent { keyAxis, valueAxis, box, pixelPad, system };
 }
 

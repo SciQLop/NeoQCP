@@ -179,7 +179,9 @@ void replayBoxedText(const qcp::BoxedTextCmd& cmd, QCPPainter& painter, const QC
     // simplify: the wrap is cached in the recording and written by every replay, with no lock.
     // Every replay runs on the GUI thread (a screen repaint, a raster fallback, an export), so one
     // writer at a time; a second thread replaying would need its own copy.
-    const int innerWidth = inner.size().toSize().width();
+    // The drawn rect's width, not the rounded size's: toRect() rounds the two edges apart, and
+    // the text is laid out for the rect it is drawn in.
+    const int innerWidth = inner.toRect().width();
     if (payload.laidOutWidth != innerWidth)
     {
         payload.wrapped = qcpWrappedText(style, payload.text, innerWidth);
@@ -470,7 +472,12 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
     {
         const qcp::QCPDrawCommand& command = list.commands[std::size_t(i)];
         const bool gpu = qcp::isGpuCommand(command);
+        const bool markers = std::holds_alternative<qcp::MarkersCmd>(command);
         if (kinds == QCPReplayKinds::GpuOnly && !gpu)
+            continue;
+        if (kinds == QCPReplayKinds::MarkersOnly && !markers)
+            continue;
+        if (kinds == QCPReplayKinds::WithoutMarkers && markers)
             continue;
         if (kinds == QCPReplayKinds::PainterOnly && gpu && !painterDrawsAll)
         {

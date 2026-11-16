@@ -19,6 +19,7 @@ private slots:
   void textItemMathTextIsOnByDefault();
   void textCopiesTheStyleMathText();
   void aPlainTextItemMeasuresWithFontMetrics();
+  void flippingMathTextChangesTheMeasuredBox();
   void aMathTextItemMeasuresThroughTheRenderer();
   void aMathTextItemTypesetsLatex();
   void ellipseTakesTwoCornersInTheirOwnSpaces();

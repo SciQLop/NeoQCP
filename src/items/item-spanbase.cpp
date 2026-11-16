@@ -1,6 +1,7 @@
 #include "item-spanbase.h"
 
 #include "../core.h"
+#include "../misuse.h"
 
 /*! \fn void QCPSpanItem::brushChanged(const QBrush& brush)
 
@@ -30,6 +31,21 @@
 */
 
 QCPSpanItem::~QCPSpanItem() = default;
+
+bool QCPSpanItem::refusesAPixelOffset(const QCPItemPosition* edge) const
+{
+    [[maybe_unused]] bool snapshot = false;
+    if (!std::holds_alternative<QCP::DataOffset>(edge->asPosition(&snapshot)))
+        return false;
+    if (!mRefusedAPixelOffset)
+    {
+        mRefusedAPixelOffset = true;
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "a span edge cannot carry a pixel offset: the band spans the axis rect, "
+                          "so the offset would move the edge across it; the span is not drawn");
+    }
+    return true;
+}
 
 void QCPSpanItem::setBrush(const QBrush& brush)
 {

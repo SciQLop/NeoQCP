@@ -56,6 +56,8 @@ class QCPDrawnCore;
 class QCPTheme;
 class QCPContourOverlay;
 class QCPColormapRenderer;
+struct QCPDrawFrame;
+struct QCPDrawList;
 struct QCPDrawnView;
 
 class QCP_LIB_DECL QCPLayer : public QObject
@@ -146,6 +148,8 @@ protected:
     std::unique_ptr<QCPPainter> mSlicePainter; //!< the painter of the slice that is open, if any
     int mSliceCount = 0; //!< the slices this pass opened: the next free image index
     int mOpenSlice = -1; //!< the index of the open slice, or -1
+    //! What an export paints at the end of this layer's pass, in the order it was recorded.
+    std::vector<std::function<void(QCPPainter&)>> mDeferredMarkers;
     //! Whether this pass paints the layer's own buffer. An export paints every layerable into its
     //! painter: it opens no slice, and never reads or writes the screen's GPU state.
     bool mScreenPass = false;
@@ -157,6 +161,11 @@ protected:
 
     //! Whether painter-only content is currently going into a slice of this layer.
     [[nodiscard]] bool hasOpenPainterSlice() const { return mOpenSlice >= 0; }
+
+    //! How many painter slices this pass can still open on this layer: zero when it can take none
+    //! (no screen pass, no backend, or the cap spent), so a caller knows before it splits a
+    //! recording across them.
+    [[nodiscard]] int painterSlicesLeft();
 
     //! Whether GPU content is on this layer as it draws: its own, that of an earlier child of this
     //! pass, or that of the layers below it which share its paint buffer.
@@ -178,6 +187,11 @@ protected:
     [[nodiscard]] bool dirtiedAfterDraw() const { return mDirtyGeneration > mDrawnGeneration; }
 
     void draw(QCPPainter* painter);
+
+    //! Defers \a list's markers to the end of this layer's pass: the screen draws a layer's markers
+    //! in a scatter pass above the rest of it, and an export has to agree. They paint in \a from's
+    //! state, the one their child would have painted them in.
+    void deferMarkers(const QCPDrawList& list, const QCPDrawFrame& frame, const QCPPainter& from);
     void drawToPaintBuffer();
     void addChild(QCPLayerable* layerable, bool prepend);
     void removeChild(QCPLayerable* layerable);

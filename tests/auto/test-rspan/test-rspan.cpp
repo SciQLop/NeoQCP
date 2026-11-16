@@ -1,5 +1,6 @@
 #include "test-rspan.h"
 #include "../../../src/qcp.h"
+#include "../misuse-recorder.h"
 
 void TestRSpan::init()
 {
@@ -277,4 +278,23 @@ void TestRSpan::mixedEdgesEachMoveInTheirOwnUnit()
     sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(40, 0), Qt::NoButton);
     QCOMPARE(span->leftEdge->coords().x(), 140.0);
     QCOMPARE(span->rightEdge->coords().x(), x->pixelToCoord(x->coordToPixel(7) + 40));
+}
+
+void TestRSpan::anEdgeWithAPixelOffsetIsRefused()
+{
+    // One rule for both spans: an edge is a range on one axis and the whole axis rect on the other,
+    // which no pixel nudge can shift. Refused, once, and the edge keeps what it was given.
+    auto span = mPlot->add<QCPItemRSpan>();
+    span->setKeyRange(QCPRange(2, 8));
+    span->setValueRange(QCPRange(2, 8));
+    span->leftEdge->set(QCP::Data { 3, 3 } + QCP::PixelOffset { 12, 0 });
+
+    test_misuse::calls.clear();
+    qcp::setMisuseHandler(test_misuse::record);
+    mPlot->replot();
+    qcp::setMisuseHandler(nullptr);
+
+    QCOMPARE(test_misuse::calls.size(), size_t(1));
+    QVERIFY2(std::holds_alternative<QCP::DataOffset>(span->leftEdge->asPosition()),
+             "the edge keeps the position it was given");
 }

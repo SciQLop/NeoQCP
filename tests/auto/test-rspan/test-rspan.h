@@ -22,6 +22,7 @@ private slots:
     void dataDragMovesByMouseDelta();
     void logAxisDragFollowsTheMouseInPixels();
     void mixedEdgesEachMoveInTheirOwnUnit();
+    void anEdgeWithAPixelOffsetIsRefused();
 
 private:
     QCustomPlot* mPlot = nullptr;

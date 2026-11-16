@@ -121,7 +121,12 @@ See {doc}`performance`.
 - **Zooming a million-point graph costs about 0.7 ms**, a little over the target.
 - **A layer takes at most 8 painter slices per frame.**
   A slice is opened where painter-only content follows GPU content, and each one is an image of the output.
-  Past the cap, that content goes under the GPU content again, and one warning per layer says so.
+  A recording that would need more than the layer has left is not split: its GPU content goes up once and its
+  painter content in one slice over it, so the order inside it is lost. With no slice left at all, that content
+  goes under the GPU content, and one warning per layer says so.
+- **A GPU shape is not antialiased at a 2x device pixel ratio.**
+  The screen rasterises with one sample per device pixel there, so the edge of a pixel-radius `circle` steps by
+  one device pixel instead of fading. A normal screen uses four samples.
 - **Each painter slice is uploaded again on every frame it is submitted.**
   It is an image of the output at the buffer's device resolution, so a slice on a 4K viewport uploads 4K pixels
   per repaint. A layer that holds a slice is also painted again on a pan instead of being shifted.

@@ -5,6 +5,12 @@
 #if NEOQCP_WITH_LATEX
 #include "axis/latexlabelrenderer.h"
 #endif
+// The build must say whether it has LaTeX: both build configurations define the macro as 0 or 1.
+// An undefined one is a build that forgot to pass it, not a build without LaTeX.
+#ifndef NEOQCP_WITH_LATEX
+#error "NEOQCP_WITH_LATEX must be defined by the build configuration (0 or 1)"
+#endif
+
 #include <array>
 #include <ranges>
 #include <vector>
@@ -210,6 +216,44 @@ void TestQCPAxisRect::textCopiesTheStyleMathText()
       QCP::Pixels { 20, 20 }, QStringLiteral("$x$"), { .mathText = true });
   QVERIFY(math);
   QCOMPARE(math->mathText(), true);
+
+  // The flag the shortcut copies is the one the item measures with, not a field kept beside it.
+  mPlot->replot();
+  const int plainFlags = int(Qt::TextDontClip | plain->textAlignment());
+  QCOMPARE(textBoxSize(*plain),
+           QCP::paintedMetrics(plain->font())
+               .boundingRect(0, 0, 0, 0, plainFlags, QStringLiteral("x"))
+               .size());
+  const int mathFlags = int(Qt::TextDontClip | math->textAlignment());
+  QCOMPARE(textBoxSize(*math),
+           QCPLabelRenderer::measureRectWith(QCPLabelRenderer::defaultRenderer(), math->font(),
+                                             QStringLiteral("$x$"), mathFlags)
+               .size());
+}
+
+void TestQCPAxisRect::flippingMathTextChangesTheMeasuredBox()
+{
+  const QFont font(QStringLiteral("Serif"), 14);
+  const QString text = QStringLiteral("MMMM a text item");
+  const QCPHandle<QCPItemText> label = mPlot->add<QCPItemText>();
+  label->setFont(font);
+  label->setText(text);
+  label->setPositionAlignment(Qt::AlignLeft | Qt::AlignTop);
+  mPlot->replot();
+  QVERIFY(label->mathText());
+  const QSize measured = textBoxSize(*label);
+
+  // The renderer measures a plain string a pixel wider and taller than the font's own metrics on
+  // some platform fonts, the same on others: a flip after a measurement must land on the plain
+  // measurement, and move the box wherever the two differ, never keep the first one.
+  label->setMathText(false);
+  mPlot->replot();
+  const QSize plainBox = textBoxSize(*label);
+  const int flags = int(Qt::TextDontClip | label->textAlignment());
+  const QSize plainMetrics
+      = QCP::paintedMetrics(font).boundingRect(0, 0, 0, 0, flags, text).size();
+  QCOMPARE(plainBox, plainMetrics);
+  QCOMPARE(plainBox == measured, measured == plainMetrics);
 }
 
 void TestQCPAxisRect::aPlainTextItemMeasuresWithFontMetrics()

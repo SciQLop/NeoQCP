@@ -12,6 +12,7 @@ private slots:
     void emptyClickVisitsOnlySelectedItems();
     void aRetargetedItemFollowsItsNewArea();
     void aDataExtentDoesNotBuildATransform();
+    void anItemWithAPixelOffsetEndIsNotCulled();
     void itemsOfTwoSystemsOfOneRectAreIndexedApart();
     void anItemOnAPolarSystemIsAlwaysACandidate();
     void aDeletedAxisDropsItsGroup();

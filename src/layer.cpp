@@ -35,6 +35,8 @@
 #include "layout.h"
 #include "layoutelements/area.h"
 #include "layoutelements/layoutelement-axisrect.h"
+#include "layoutelements/layoutelement-legend.h"
+#include "painting/draw-commands.h"
 #include "painting/painter.h"
 #include "painting/plottable-rhi-layer.h"
 #include "painting/rhi-utils.h"
@@ -234,6 +236,8 @@ void QCPLayer::setMode(QCPLayer::LayerMode mode)
 void QCPLayer::draw(QCPPainter* painter)
 {
     PROFILE_HERE_N("QCPLayer::draw");
+    // Markers a child defers are painted at the end of this pass, and never carried into the next.
+    const auto clearDeferredMarkers = qScopeGuard([this] { mDeferredMarkers.clear(); });
     // One tree lookup per axis pair for the whole frame; the answer says which indexed children
     // can be on screen at all. Items outside it are skipped before the painter is touched.
     const bool useIndex = mParentPlot && mParentPlot->itemIndexing() && !mChildren.isEmpty();
@@ -261,7 +265,14 @@ void QCPLayer::draw(QCPPainter* painter)
             // slice instead, carrying the clip, the fade and the antialiasing above. The slice is
             // opened after the clip, so the reuse of an open one still takes this child's own.
             QCPPainter* target = painter;
-            if (mGpuContentSeen && !dynamic_cast<QCPDrawable*>(child))
+            // A pure layout container paints nothing itself, so it opens no slice: the legend is a
+            // grid too, and one that paints.
+            // simplify: the slice is opened for a child that may paint nothing at all; opening it
+            // on the first painter call would need the painter to report one.
+            const bool paintsLayerable
+                = !dynamic_cast<QCPDrawable*>(child)
+                  && !(qobject_cast<QCPLayout*>(child) && !qobject_cast<QCPLegend*>(child));
+            if (mGpuContentSeen && paintsLayerable)
                 if (QCPPainter* slice = painterSlice(*painter))
                     target = slice;
             // Apply busy fade for plottables (suppress during vector export)
@@ -282,6 +293,10 @@ void QCPLayer::draw(QCPPainter* painter)
                 restoreSlicePainter();
         }
     }
+    // The screen draws the markers of a layer in a scatter pass above the rest of it, so an export
+    // paints what its children deferred here, after the last child and in recorded order.
+    for (const auto& markers : mDeferredMarkers)
+        markers(*painter);
     // Consecutive painter-only layerables shared the slice that is open; the next GPU content, or
     // the end of the layer, is what closes it.
     closePainterSlice(*painter);
@@ -320,6 +335,10 @@ void QCPLayer::drawToPaintBuffer()
                         mHiDpiScreenPass = false;
                         mOpenSlice = -1;
                         mSlicePainter.reset();
+                        // The images of the slices this pass did not use would hold the pixels of a
+                        // frame long gone: the next pass opens as many as it needs again.
+                        if (mSliceImages.size() > std::size_t(mSliceCount))
+                            mSliceImages.resize(std::size_t(mSliceCount));
                     });
                 draw(painter);
             }
@@ -350,6 +369,58 @@ void QCPLayer::drawToPaintBuffer()
   a painter that is not this layer's own pass): the caller then keeps painting into the buffer,
   under the GPU content.
 */
+namespace
+{
+//! The state a painter paints with, kept whole so a pass that paints later can reproduce it: the
+//! clip (or no clip at all), the fade, the antialiasing and the transform.
+struct PainterState
+{
+    static PainterState of(const QCPPainter& painter)
+    {
+        return { painter.opacity(),
+                 painter.antialiasing(),
+                 painter.modes().testFlag(QCPPainter::pmNonCosmetic),
+                 painter.hasClipping(),
+                 painter.worldTransform(),
+                 painter.clipRegion(),
+                 painter.clipPath() };
+    }
+
+    void applyTo(QCPPainter& painter) const
+    {
+        painter.setOpacity(opacity);
+        // Antialiasing before the transform: QCPPainter's antialiasing is a half pixel translation
+        // of its own, and the caller's transform, copied whole afterwards, already carries it.
+        painter.setAntialiasing(antialiasing);
+        painter.setMode(QCPPainter::pmNonCosmetic, nonCosmetic);
+        painter.setWorldTransform(transform);
+        // The clip last: QPainter reads one in the coordinates of the transform in force, and
+        // clipRegion() / clipPath() answer in the caller's. Copied before the transform, the clip
+        // of an antialiased drawable landed a pixel up and left of the buffer's.
+        if (!clipped)
+        {
+            painter.setClipping(false);
+            return;
+        }
+        if (!clipPath.isEmpty())
+        {
+            painter.setClipRegion(clipRegion);
+            painter.setClipPath(clipPath, Qt::IntersectClip);
+            return;
+        }
+        painter.setClipRegion(clipRegion);
+    }
+
+    double opacity;
+    bool antialiasing;
+    bool nonCosmetic;
+    bool clipped;
+    QTransform transform;
+    QRegion clipRegion;
+    QPainterPath clipPath;
+};
+} // namespace
+
 QCPPainter* QCPLayer::painterSlice(const QCPPainter& from)
 {
     if (!mScreenPass)
@@ -361,27 +432,7 @@ QCPPainter* QCPLayer::painterSlice(const QCPPainter& from)
     // clip at all), its fade, its antialiasing and its transform. The save keeps them from leaking
     // into the child that shares the slice after it.
     painter->save();
-    painter->setOpacity(from.opacity());
-    // Antialiasing before the transform: QCPPainter's antialiasing is a half pixel translation of
-    // its own, and the caller's transform, copied whole afterwards, already carries it.
-    painter->setAntialiasing(from.antialiasing());
-    painter->setMode(QCPPainter::pmNonCosmetic, from.modes().testFlag(QCPPainter::pmNonCosmetic));
-    painter->setWorldTransform(from.worldTransform());
-    // The clip last: QPainter reads one in the coordinates of the transform in force, and
-    // clipRegion() / clipPath() answer in the caller's. Copied before the transform, the clip of an
-    // antialiased drawable landed a pixel up and left of the buffer's.
-    if (from.hasClipping())
-    {
-        if (!from.clipPath().isEmpty())
-        {
-            painter->setClipRegion(from.clipRegion());
-            painter->setClipPath(from.clipPath(), Qt::IntersectClip);
-        }
-        else
-            painter->setClipRegion(from.clipRegion());
-    }
-    else
-        painter->setClipping(false);
+    PainterState::of(from).applyTo(*painter);
     return painter;
 }
 
@@ -389,6 +440,33 @@ void QCPLayer::restoreSlicePainter()
 {
     if (mSlicePainter)
         mSlicePainter->restore();
+}
+
+void QCPLayer::deferMarkers(const QCPDrawList& list, const QCPDrawFrame& frame,
+                            const QCPPainter& from)
+{
+    const PainterState state = PainterState::of(from);
+    mDeferredMarkers.emplace_back(
+        [&list, frame, state](QCPPainter& painter)
+        {
+            // The markers paint where their child would have painted them, only later: its clip,
+            // fade, antialiasing and transform, for the length of the replay.
+            painter.save();
+            state.applyTo(painter);
+            qcpReplayWithPainter(list, painter, frame, QCPReplayKinds::MarkersOnly, nullptr, true,
+                                 false, QCPReplayState::AlreadySaved);
+            painter.restore();
+        });
+}
+
+int QCPLayer::painterSlicesLeft()
+{
+    if (!mScreenPass || !mParentPlot)
+        return 0;
+    const QCPPlottableRhiLayer* plottables = mParentPlot->plottableRhiLayer(this);
+    if (!plottables || !plottables->canAddSlice())
+        return 0;
+    return QCPPlottableRhiLayer::kMaxSlices - plottables->sliceImageCount();
 }
 
 bool QCPLayer::openSlice()

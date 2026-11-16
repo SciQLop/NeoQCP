@@ -631,11 +631,15 @@ inline quint64 qcpCommandIndex(const QCPDrawList& list, const qcp::QCPDrawComman
 //! What a replay is for: All paints everything (no GPU pass), PainterOnly is the other half of a
 //! screen frame and leaves the GPU kinds to the RHI replay, GpuOnly is the export's second pass:
 //! the QPainter form of the GPU kinds, which an export draws over the layer's painter content.
+//! WithoutMarkers and MarkersOnly are the two halves of All, split where the screen splits them:
+//! markers have a layer of their own, above the content of the layer they name.
 enum class QCPReplayKinds
 {
     All,
     PainterOnly,
-    GpuOnly
+    GpuOnly,
+    WithoutMarkers,
+    MarkersOnly
 };
 
 //! The four corners of each error bar in data space: above, below, left and right of the centre.

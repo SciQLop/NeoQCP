@@ -2204,3 +2204,39 @@ void TestDrawContext::dataOffsetRectKeepsItsOffsetOnAPan()
                  != qcpResolvePosition(context.frame(), QCP::Data { 40, 60 }).x(),
              "the zoom must move where the data point lands");
 }
+
+void TestDrawContext::boxedTextWrapsForTheRectItDrawsIn()
+{
+    Fixture fixture;
+    QCPTextStyle style;
+    style.font = QFont(QStringLiteral("Sans"), 9);
+    style.color = QColor(10, 60, 90);
+    style.padding = QMarginsF(4.4, 2.0, 3.4, 2.0);
+    const QString text = QStringLiteral("the quick brown fox jumps over the lazy dog");
+    // The wrap and the draw must agree on one width: the drawn inner rect's, whose edges are
+    // rounded one by one, and not the rounded width of the inner rect.
+    bool sawGap = false;
+    for (int step = 0; step < 8; ++step)
+    {
+        QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                               nullptr);
+        const QCP::Data lower { 20.3, 120 };
+        const QCP::Data upper { 100.7 + step, 60 };
+        context.text(lower, upper, text, style);
+        const auto* boxed = std::get_if<qcp::BoxedTextCmd>(&context.drawList().commands.front());
+        QVERIFY(boxed);
+        const QImage replay = replayOf(context);
+        Q_UNUSED(replay);
+        const QRectF box
+            = QRectF(pixelOf(context.transform(), lower.x, lower.y),
+                     pixelOf(context.transform(), upper.x, upper.y))
+                  .normalized();
+        const QRectF inner(box.left() + style.padding.left(), box.top() + style.padding.top(),
+                           box.width() - style.padding.left() - style.padding.right(),
+                           box.height() - style.padding.top() - style.padding.bottom());
+        const int drawnWidth = inner.toRect().width();
+        sawGap = sawGap || drawnWidth != qRound(inner.width());
+        QCOMPARE(boxed->box->laidOutWidth, drawnWidth);
+    }
+    QVERIFY2(sawGap, "no box in the loop rounds its two edges apart");
+}

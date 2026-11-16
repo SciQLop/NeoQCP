@@ -622,3 +622,37 @@ void TestItemIndex::aDataExtentDoesNotBuildATransform()
     item->dataExtent();
     QCOMPARE(system.mCalls, 0);
 }
+
+void TestItemIndex::anItemWithAPixelOffsetEndIsNotCulled()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 10);
+
+    // A callout whose data point is panned past the right edge: only the offset end of the line is
+    // still in the viewport, and the index must not cull what the frame draws.
+    auto line = plot.add<QCPItemLine>();
+    line->setPen(QPen(Qt::black, 4));
+    const double offScreenKey = 12.0;
+    line->start->setCoords(offScreenKey, 5.0);
+    line->end->setCoords(offScreenKey, 5.0);
+    // The axes map a coordinate to a pixel only once the layout has placed their rect.
+    plot.replot(QCustomPlot::rpImmediateRefresh);
+    const double offset = plot.xAxis->coordToPixel(2.0) - plot.xAxis->coordToPixel(offScreenKey);
+    line->end->set(QCP::Data { offScreenKey, 5.0 } + QCP::PixelOffset { offset, 0.0 });
+    plot.replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+
+    const QPointF drawnAt(plot.xAxis->coordToPixel(5.0), plot.yAxis->coordToPixel(5.0));
+    const QColor pixel = plot.toPixmap(400, 300).toImage().pixelColor(drawnAt.toPoint());
+    QVERIFY2(pixel.lightness() < 120,
+             qPrintable(QStringLiteral("the line is not drawn where its offset end is: %1,%2,%3")
+                            .arg(pixel.red())
+                            .arg(pixel.green())
+                            .arg(pixel.blue())));
+
+    // The same box filters clicks: the visible part of the line answers a click on it.
+    const QList<QCPLayerable*> hits = plot.layerableListAt(drawnAt, true);
+    QVERIFY2(hits.contains(line), "a click on the visible part of the line missed it");
+}

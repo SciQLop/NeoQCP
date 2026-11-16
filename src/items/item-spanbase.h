@@ -57,6 +57,13 @@ protected:
     bool mMovable = true;
     // True while the span moves its own edges: the writer signals the range once, when it is done.
     bool mEdgesQuiet = false;
+    //! The pixel-offset misuse was reported for this item: the handler hears it once, not per frame.
+    mutable bool mRefusedAPixelOffset = false;
+
+    //! Whether \a edge is a data point carrying a pixel offset, which a span cannot draw: the band
+    //! spans the axis rect, so the offset would move the edge across it while the range the item
+    //! reports and drags (rangePixel) moved the other way. The span draws nothing then.
+    bool refusesAPixelOffset(const QCPItemPosition* edge) const;
 
     QBrush mainBrush() const { return mSelected ? mSelectedBrush : mBrush; }
 

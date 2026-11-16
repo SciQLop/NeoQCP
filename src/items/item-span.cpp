@@ -3,7 +3,6 @@
 #include <array>
 
 #include "../core.h"
-#include "../misuse.h"
 #include "../painting/draw-context.h"
 
 namespace
@@ -29,25 +28,6 @@ QCP::Position pinnedToRatio(const QCPItemPosition* edge, Qt::Orientation orienta
             return QCP::RatioXDataY { ratio, data->y };
     }
     return at;
-}
-
-//! Whether \a edge is a data point carrying a pixel offset, which a span cannot draw: the band
-//! spans the axis rect, so the offset would move the edge across it while the range the item
-//! reports and drags (rangePixel) moved the other way. Refused once, and the span draws nothing.
-bool refusesAPixelOffset(const QCPItemPosition* edge)
-{
-    [[maybe_unused]] bool snapshot = false;
-    if (!std::holds_alternative<QCP::DataOffset>(edge->asPosition(&snapshot)))
-        return false;
-    static const bool once = []
-    {
-        qcp::reportMisuse(Q_FUNC_INFO,
-                          "a span edge cannot carry a pixel offset: the band spans the axis rect, "
-                          "so the offset would move the edge across it; the span is not drawn");
-        return true;
-    }();
-    Q_UNUSED(once);
-    return true;
 }
 
 //! Whether the position is resolved against the axis rect ratio, so a pan re-resolves it.

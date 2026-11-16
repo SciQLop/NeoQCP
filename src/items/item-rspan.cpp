@@ -156,6 +156,9 @@ std::optional<double> QCPItemRSpan::hitTest(QCP::Pixels at, QVariant* details) c
 
 void QCPItemRSpan::draw(QCPDrawContext& context) const
 {
+    if (refusesAPixelOffset(leftEdge) || refusesAPixelOffset(rightEdge)
+        || refusesAPixelOffset(topEdge) || refusesAPixelOffset(bottomEdge))
+        return;
     // A corner is data only when both of its edges are: an edge in pixels or on an anchor is
     // placed against the axis rect, which moves, so the recording cannot outlive the frame.
     const auto dataOf = [](const QCPItemPosition* edge) -> std::optional<QCP::Data>

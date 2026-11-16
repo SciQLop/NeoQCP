@@ -4208,6 +4208,7 @@ enum class CallOrderParts
     Text,
     LineThenPainter,
     NineAlternations,
+    TextWithABrushedBoxInTheMiddle,
     Fill,
     RectThenFill
 };
@@ -4233,6 +4234,18 @@ void recordCallOrderFill(QCPDrawContext& context)
     context.painter(
         [](QCPPainter& painter, const QCPTransform&)
         { painter.fillRect(QRectF(-100, -100, 1000, 1000), QColor(20, 160, 40)); });
+}
+
+//! A brushed text box centred on its anchor: a painter-only command that hides what lies under it,
+//! where the glyphs alone would leave a sample point between two of them.
+void recordCallOrderTextBox(QCPDrawContext& context)
+{
+    QCPTextStyle style;
+    style.font = qcp::test::referenceFont(20);
+    style.color = QColor(20, 20, 20);
+    style.alignment = Qt::AlignCenter;
+    style.brush = QBrush(QColor(20, 160, 40));
+    context.text(QCP::Data { 5.0, 0.5 }, QStringLiteral("MMMM"), style);
 }
 
 //! Records what \a parts names: the rect and the text in one or the other order, alone, or pairs
@@ -4267,6 +4280,9 @@ void recordCallOrder(QCPDrawContext& context, CallOrderParts parts)
                 recordCallOrderRect(context);
                 recordCallOrderText(context);
             }
+            break;
+        case CallOrderParts::TextWithABrushedBoxInTheMiddle:
+            recordCallOrderTextBox(context);
             break;
         case CallOrderParts::Fill:
             recordCallOrderFill(context);
@@ -4602,9 +4618,10 @@ void TestRepaint::aPanKeepsTheSliceOverItsContent()
              "the pan left a copy of the previous frame behind");
 }
 
-// Past the slice cap the painter-only content falls back into the buffer, with one warning: what is
-// past the cap is not lost, it goes under the GPU content like everything before C-4 did.
-void TestRepaint::aPainterSliceCapWarnsOnce()
+// A recording that interleaves more painter runs than a layer has slices left is not split across
+// stacking levels: it goes whole, one submission then all its painter content in one slice, so its
+// last label still shows over its own rect.
+void TestRepaint::anInterleavedRecordingPastTheCapIsNotSplit()
 {
     QWidget host;
     QCustomPlot* plot = shownGpuPlot(host);
@@ -4624,10 +4641,74 @@ void TestRepaint::aPainterSliceCapWarnsOnce()
     plot->replot();
     plot->replot();
     qInstallMessageHandler(previous);
-    QCOMPARE(warnings, 1);
+    // One slice holds all nine labels, so the cap is not reached at all.
+    QCOMPARE(warnings, 0);
+    const QImage frame = screenOf(plot);
+    QVERIFY2(textInkInsideTheRect(*plot, frame) > 20,
+             "the labels past the cap went under the rects of their own recording");
     const QPointF centre(plot->xAxis->coordToPixel(5.0), plot->yAxis->coordToPixel(0.5));
-    const QColor drawn = screenOf(plot).pixelColor(centre.toPoint());
-    QVERIFY2(drawn.red() > 120, "the rects are lost past the slice cap");
+    QVERIFY2(frame.pixelColor(centre.toPoint()).red() > 120, "the rects are lost past the cap");
+}
+
+// The cap spent by other drawables first: a recording that finds no slice left at all is painted
+// whole into the buffer, under the GPU content, with one warning per layer.
+void TestRepaint::aSpentSliceCapPaintsTheWholeRecordingIntoTheBuffer()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    for (int earlier = 0; earlier < QCPPlottableRhiLayer::kMaxSlices; ++earlier)
+    {
+        auto item = plot->add<CallOrderItem>();
+        item->parts = CallOrderParts::RectThenText;
+    }
+    auto item = plot->add<CallOrderItem>();
+    item->parts = CallOrderParts::NineAlternations;
+    static int warnings = 0;
+    warnings = 0;
+    const QtMessageHandler previous = qInstallMessageHandler(
+        +[](QtMsgType type, const QMessageLogContext&, const QString& message)
+        {
+            if (type == QtDebugMsg && message.contains(QStringLiteral("painter slices in one layer")))
+                ++warnings;
+        });
+    plot->replot();
+    plot->replot();
+    qInstallMessageHandler(previous);
+    QCOMPARE(warnings, 1);
+    // Everything is still drawn: the rects of the recording are on the frame.
+    const QImage frame = screenOf(plot);
+    const QPointF centre(plot->xAxis->coordToPixel(5.0), plot->yAxis->coordToPixel(0.5));
+    QVERIFY2(frame.pixelColor(centre.toPoint()).red() > 120,
+             "the rects are lost when the layer has no slice left");
+}
+
+// A pass that needs fewer slices gives back the images of the ones it no longer opens: a layer keeps
+// what its last frame used, not the high-water mark of every frame before it.
+void TestRepaint::aPassReleasesTheSlicesItNoLongerNeeds()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto first = plot->add<CallOrderItem>();
+    first->parts = CallOrderParts::RectThenText;
+    auto second = plot->add<CallOrderItem>();
+    second->parts = CallOrderParts::RectThenText;
+    plot->replot();
+    QCPLayer* layer = first->layer();
+    QVERIFY(layer);
+    QCOMPARE(int(layer->mSliceImages.size()), 2);
+    first->parts = CallOrderParts::Rect;
+    second->parts = CallOrderParts::Rect;
+    // A recording is what the library keeps: the member it reads changed behind its back.
+    first->update();
+    second->update();
+    plot->replot();
+    QCOMPARE(int(layer->mSliceImages.size()), 0);
 }
 
 // P-5: markers live on the scatter layer, one pass above their plottable's layer, so they stay over
@@ -4654,6 +4735,35 @@ void TestRepaint::aMarkerStaysOverTheSliceOfItsLayer()
                             .arg(drawn.red())
                             .arg(drawn.green())
                             .arg(drawn.blue())));
+}
+
+// M1: an export keeps a layer's markers above its painter content, as the screen does: one pass
+// over the layer's content without them, then the markers on top.
+void TestRepaint::anExportKeepsTheMarkersOverThePainterContent()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    QCPGraph* graph = plot->addGraph();
+    graph->setLineStyle(QCPGraph::lsNone);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(20, 40, 160), 20));
+    graph->setData(QVector<double> { 5.0 }, QVector<double> { 0.5 });
+    auto text = plot->add<CallOrderItem>();
+    text->parts = CallOrderParts::TextWithABrushedBoxInTheMiddle;
+    text->setLayer(graph->layer()); // recorded after the marker, on the same layer
+    plot->replot();
+    const QPointF centre(plot->xAxis->coordToPixel(5.0), plot->yAxis->coordToPixel(0.5));
+    const QColor onScreen = screenOf(plot).pixelColor(centre.toPoint());
+    QVERIFY2(onScreen.blue() > 120 && onScreen.red() < 100,
+             "the marker is not over the text on the screen");
+    const QColor exported = plot->toPixmap(400, 300).toImage().pixelColor(centre.toPoint());
+    QVERIFY2(exported.blue() > 120 && exported.red() < 100,
+             qPrintable(QStringLiteral("the export puts the text over the marker: %1,%2,%3")
+                            .arg(exported.red())
+                            .arg(exported.green())
+                            .arg(exported.blue())));
 }
 
 // C1: an export of a shown plot stacks like the screen. On screen a plain layerable is pixels of a
