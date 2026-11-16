@@ -538,6 +538,9 @@ struct QCP_LIB_DECL QCPDrawList
         everyFrame = other.everyFrame;
         keyWindow = other.keyWindow;
         rasterCommands = other.rasterCommands;
+        painterOverGpu = other.painterOverGpu;
+        hasPainterOnly = other.hasPainterOnly;
+        hasGpuContent = other.hasGpuContent;
         id = qcpNextDrawListId();
         return *this;
     }
@@ -568,6 +571,15 @@ struct QCP_LIB_DECL QCPDrawList
     //! How many commands the replay has to rasterise (see needsRaster): a raster image is a
     //! scarce resource, and counting here keeps the query off every frame's replay.
     int rasterCommands = 0;
+    //! Whether painter-only content was recorded after GPU content of this recording: it then
+    //! replays as runs to stack in call order (see QCPDrawnCore::paintInCallOrder). Kept as it is
+    //! recorded, so a paint reads one bit instead of walking the commands.
+    bool painterOverGpu = false;
+    //! Whether the recording paints into the painter at all: without one, no slice can be needed.
+    bool hasPainterOnly = false;
+    //! Whether a command of this recording submits to a layer's GPU pipelines (a marker does not:
+    //! it lives one layer above). Painter-only content after one has to land over it.
+    bool hasGpuContent = false;
     quint64 id = qcpNextDrawListId(); //!< unique: with a command's index it is a cache key
 };
 

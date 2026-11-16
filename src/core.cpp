@@ -1555,16 +1555,25 @@ QCPScatterRhiLayer* QCustomPlot::scatterRhiLayer(QCPLayer* layer)
 // content already lies under its buffer and does not count.
 bool QCustomPlot::gpuContentBefore(const QCPLayer* layer) const
 {
+    const auto hasGpu = [this](const QCPLayer* candidate)
+    {
+        const QCPPlottableRhiLayer* plottables
+            = mPlottableRhiLayers.value(const_cast<QCPLayer*>(candidate));
+        return plottables && plottables->hasGeometry();
+    };
+    // The layer's own content answers in one lookup, and a layer over another one's GPU content
+    // usually draws some of its own: the walk below is the rare case.
+    if (hasGpu(layer))
+        return true;
     const QCPAbstractPaintBuffer* buffer = layer->mPaintBuffer.toStrongRef().data();
     for (const auto& candidate : mLayers)
     {
-        if (candidate != layer && candidate->mPaintBuffer.toStrongRef().data() != buffer)
-            continue;
-        const QCPPlottableRhiLayer* plottables = mPlottableRhiLayers.value(candidate);
-        if (plottables && plottables->hasGeometry())
-            return true;
         if (candidate == layer)
             break;
+        if (candidate->mPaintBuffer.toStrongRef().data() != buffer)
+            continue;
+        if (hasGpu(candidate))
+            return true;
     }
     return false;
 }

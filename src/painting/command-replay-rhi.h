@@ -196,7 +196,9 @@ private:
 
   Only the commands \a firstCommand to \a lastCommand (exclusive, -1: the end) are replayed. A range
   owns no kept geometry and is never painted whole: it is one run of a recording the caller walks in
-  call order, so a slice submitted after it lands over it.
+  call order, so a slice submitted after it lands over it. Such a caller opens the replay of the
+  recording with QCPResolveCache::beginReplay() and QCPRasterFallback::beginReplay() once, then calls
+  this per run: a sweep per run would drop the raster images of the runs before it.
 */
 void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                       QCPScatterRhiLayer& scatter, const QCPDrawFrame& frame,
@@ -204,6 +206,12 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                       const QSize& outputSize, quint64 generation = 0,
                       QCPRecordingCache* geometry = nullptr, float alpha = 1.0f,
                       int firstCommand = 0, int lastCommand = -1);
+
+//! Whether \a list needs more rasterised fills than \a plottables can hold: it then has to be
+//! painted whole, under the layer's GPU content, rather than split at the cap - one object may not
+//! have half of its content in the buffer and half on the GPU.
+[[nodiscard]] bool qcpRasterOverflowsTheLayer(const QCPDrawList& list,
+                                              QCPPlottableRhiLayer& plottables);
 
 //! Test hook: how many fill vertex sets the replay has built (a pan must not add one). Counts the
 //! fan and ribbon fills together, like QCPLineExtruder::extruderCallCount() counts strokes.

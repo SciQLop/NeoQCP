@@ -144,9 +144,13 @@ protected:
     //! slice cap once so that a QPainter holding one never outlives its storage.
     std::vector<QImage> mSliceImages;
     std::unique_ptr<QCPPainter> mSlicePainter; //!< the painter of the slice that is open, if any
-    QRect mSliceClip; //!< the clip the open slice was opened with
     int mSliceCount = 0; //!< the slices this pass opened: the next free image index
     int mOpenSlice = -1; //!< the index of the open slice, or -1
+    //! Whether this pass paints the layer's own buffer. An export paints every layerable into its
+    //! painter: it opens no slice, and never reads or writes the screen's GPU state.
+    bool mScreenPass = false;
+    //! Whether GPU content is on this layer in this pass (see gpuContentSeen).
+    bool mGpuContentSeen = false;
 
     // non-virtual methods:
     void noteDirtied();
@@ -154,11 +158,21 @@ protected:
     //! Whether painter-only content is currently going into a slice of this layer.
     [[nodiscard]] bool hasOpenPainterSlice() const { return mOpenSlice >= 0; }
 
-    // The slice a painter-only layerable draws into once GPU content is on its layer: a copy of
-    // \a from's state on a transparent image of the output, submitted over the GPU content when
-    // closed. Null when the layer cannot take one, and the caller then keeps painting into the
-    // buffer, under that GPU content.
-    QCPPainter* painterSlice(const QCPPainter& from, const QRect& clip);
+    //! Whether GPU content is on this layer as it draws: its own, that of an earlier child of this
+    //! pass, or that of the layers below it which share its paint buffer.
+    [[nodiscard]] bool gpuContentSeen() const { return mGpuContentSeen; }
+
+    //! Notes that a GPU run of this pass submitted content: painter-only content after it belongs
+    //! over that content.
+    void noteGpuContent() { mGpuContentSeen = true; }
+
+    // The slice painter-only content draws into once GPU content is on this layer: \a from's state
+    // on a transparent image of the output, submitted over the GPU content when the slice is
+    // closed. The caller paints through the returned painter, then calls restoreSlicePainter().
+    // Null when the layer cannot take one (the cap, a broken pipeline), and the caller then keeps
+    // painting into the buffer, under that GPU content.
+    QCPPainter* painterSlice(const QCPPainter& from);
+    void restoreSlicePainter();
     void closePainterSlice(QCPPainter& bufferPainter);
 
     [[nodiscard]] bool dirtiedAfterDraw() const { return mDirtyGeneration > mDrawnGeneration; }
@@ -170,6 +184,10 @@ protected:
     void removeChildren(const QSet<QCPLayerable*>& dying);
 
 private:
+    // The image of the next slice, and the painter that fills it: does not touch the state of the
+    // painter the caller paints with, which painterSlice() copies per use.
+    bool openSlice();
+
     // The per-child item index: one packed R-tree per (key axis, value axis) pair, in data
     // coordinates so that it survives range changes. Kinds are 0 unindexed, 1 indexed, 2 side
     // (extent changed since the build: tested one by one).

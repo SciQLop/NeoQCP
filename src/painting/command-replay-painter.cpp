@@ -452,9 +452,9 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
                           bool dashedAvailable, bool antialiasStrokes, QCPReplayState state,
                           int firstCommand, int lastCommand)
 {
-    // PainterOnly leaves the GPU kinds to another pass: on screen the RHI replay, in an export the
-    // layer's deferred GpuOnly pass. \a fallback, when there is one, draws the kinds the layer
-    // refused; GpuOnly draws exactly the GPU kinds, so it never needs one.
+    // PainterOnly leaves the GPU kinds to the RHI replay that runs before it, on screen and in an
+    // export alike. \a fallback, when there is one, draws the kinds the layer refused; GpuOnly
+    // draws exactly the GPU kinds, so it never needs one.
     const bool owned = state == QCPReplayState::Save;
     if (owned)
         painter.save();

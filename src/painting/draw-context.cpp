@@ -246,6 +246,18 @@ void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& data,
     mergeExtent(list.index, index);
     if (qcp::needsRaster(command))
         ++list.rasterCommands;
+    // The call-order facts a replay reads: a marker has a layer of its own, so it neither submits
+    // to this one's GPU nor paints into its painter.
+    const bool marker = std::holds_alternative<qcp::MarkersCmd>(command);
+    const bool gpu = qcp::isGpuCommand(command);
+    if (gpu && !marker)
+        list.hasGpuContent = true;
+    else if (!gpu)
+    {
+        list.hasPainterOnly = true;
+        if (list.hasGpuContent)
+            list.painterOverGpu = true;
+    }
     list.commands.push_back(std::move(command));
 }
 

@@ -238,6 +238,9 @@ void QCPLayer::draw(QCPPainter* painter)
     const bool useIndex = mParentPlot && mParentPlot->itemIndexing() && !mChildren.isEmpty();
     if (useIndex)
         itemCandidates(QRectF(mParentPlot->viewport()));
+    // What is already on the GPU where this layer's painter-only content lands, asked once for the
+    // whole pass: the children of the pass itself keep it up to date (noteGpuContent).
+    mGpuContentSeen = mScreenPass && mParentPlot && mParentPlot->gpuContentBefore(this);
     for (int childIndex = 0; childIndex < mChildren.size(); ++childIndex)
     {
         QCPLayerable* child = mChildren.at(childIndex);
@@ -249,17 +252,17 @@ void QCPLayer::draw(QCPPainter* painter)
             auto* plottable = qobject_cast<QCPPlottable*>(child);
             if (plottable && !plottable->drawableAxes())
                 continue;
-            // A drawable replays its own recording in call order, and opens a slice when its
+            painter->save();
+            painter->setClipRect(child->clipRect().translated(0, -1));
+            // A drawable replays its own recording in call order, and opens a slice itself when its
             // painter-only content lands over GPU content. Every other layerable paints straight
             // into the buffer, under that content: once GPU content is on the layer, it gets the
-            // slice instead, so its pixels stack where the call that drew it puts them.
+            // slice instead, carrying the clip, the fade and the antialiasing above. The slice is
+            // opened after the clip, so the reuse of an open one still takes this child's own.
             QCPPainter* target = painter;
-            if (!dynamic_cast<QCPDrawable*>(child)
-                && (hasOpenPainterSlice() || mParentPlot->gpuContentBefore(this)))
-                if (QCPPainter* slice = painterSlice(*painter, child->clipRect().translated(0, -1)))
+            if (mGpuContentSeen && !dynamic_cast<QCPDrawable*>(child))
+                if (QCPPainter* slice = painterSlice(*painter))
                     target = slice;
-            target->save();
-            target->setClipRect(child->clipRect().translated(0, -1));
             // Apply busy fade for plottables (suppress during vector export)
             if (plottable && plottable->visuallyBusy()
                 && !target->modes().testFlag(QCPPainter::pmVectorized))
@@ -273,7 +276,9 @@ void QCPLayer::draw(QCPPainter* painter)
                 target->setMode(QCPPainter::pmNonCosmetic,
                                 !plottable && !qobject_cast<QCPGrid*>(child));
             child->draw(target);
-            target->restore();
+            painter->restore();
+            if (target != painter)
+                restoreSlicePainter();
         }
     }
     // Consecutive painter-only layerables shared the slice that is open; the next GPU content, or
@@ -303,7 +308,10 @@ void QCPLayer::drawToPaintBuffer()
                 // Slices belong to one pass: the first painter-only content of this one opens
                 // slice 0 again, and its image is reused.
                 mSliceCount = 0;
+                mScreenPass = true;
                 draw(painter);
+                mScreenPass = false;
+                mGpuContentSeen = false;
                 mHiDpiScreenPass = false;
             }
             else
@@ -321,23 +329,60 @@ void QCPLayer::drawToPaintBuffer()
 /*! \internal
 
   Opens the slice the painter-only content of this layer draws into, once GPU content is on the
-  layer, or returns the slice already open.
+  layer, or takes the slice already open, and copies \a from's state onto it for the one use the
+  caller paints.
 
   A slice is an image of the whole output, painted after the layer's GPU content, so that a text or
   a painter callback drawn later in call order lands over a rect drawn earlier. Consecutive
-  painter-only layerables share one slice: one image upload, one ordered draw.
+  painter-only children share one slice: one image upload, one ordered draw, and one save/restore
+  per child, so that a neighbour's clip, fade or antialiasing never leaks into it.
 
-  Returns null when the layer cannot take one (no RHI, no plottable layer, the slice cap spent):
-  the caller then keeps painting into the buffer, under the GPU content.
+  Returns null when the layer cannot take one (no RHI, no plottable layer, the slice cap spent, or
+  a painter that is not this layer's own pass): the caller then keeps painting into the buffer,
+  under the GPU content.
 */
-QCPPainter* QCPLayer::painterSlice(const QCPPainter& from, const QRect& clip)
+QCPPainter* QCPLayer::painterSlice(const QCPPainter& from)
 {
-    if (mOpenSlice >= 0)
-        return mSlicePainter.get();
+    if (!mScreenPass)
+        return nullptr;
+    if (mOpenSlice < 0 && !openSlice())
+        return nullptr;
+    QCPPainter* painter = mSlicePainter.get();
+    // The state of the child painting now, not of the one that opened the slice: its clip (or no
+    // clip at all), its fade, its antialiasing and its transform. The save keeps them from leaking
+    // into the child that shares the slice after it.
+    painter->save();
+    if (from.hasClipping())
+    {
+        if (!from.clipPath().isEmpty())
+        {
+            painter->setClipRegion(from.clipRegion());
+            painter->setClipPath(from.clipPath(), Qt::IntersectClip);
+        }
+        else
+            painter->setClipRegion(from.clipRegion());
+    }
+    else
+        painter->setClipping(false);
+    painter->setOpacity(from.opacity());
+    painter->setAntialiasing(from.antialiasing());
+    painter->setMode(QCPPainter::pmNonCosmetic, from.modes().testFlag(QCPPainter::pmNonCosmetic));
+    painter->setWorldTransform(from.worldTransform());
+    return painter;
+}
+
+void QCPLayer::restoreSlicePainter()
+{
+    if (mSlicePainter)
+        mSlicePainter->restore();
+}
+
+bool QCPLayer::openSlice()
+{
     const QSharedPointer<QCPAbstractPaintBuffer> pb = mPaintBuffer.toStrongRef();
     QRhi* rhi = mParentPlot ? mParentPlot->rhi() : nullptr;
     if (!pb || !rhi)
-        return nullptr;
+        return false;
     QCPPlottableRhiLayer* plottables = mParentPlot->plottableRhiLayer(this);
     if (!plottables || !plottables->canAddSlice())
     {
@@ -345,7 +390,7 @@ QCPPainter* QCPLayer::painterSlice(const QCPPainter& from, const QRect& clip)
             qDebug() << "NeoQCP: more than" << QCPPlottableRhiLayer::kMaxSlices
                      << "painter slices in one layer, the painter-only content past the cap is "
                         "painted under this layer's GPU content";
-        return nullptr;
+        return false;
     }
 
     if (std::size_t(mSliceCount) >= mSliceImages.size())
@@ -355,29 +400,18 @@ QCPPainter* QCPLayer::painterSlice(const QCPPainter& from, const QRect& clip)
     // picture of the painter-only content alone.
     const QSize pixelSize = pb->size() * pb->devicePixelRatio();
     const QImage::Format format = qcp::rhi::imageFormatFor(qcp::rhi::preferredTextureFormat(rhi));
-    if (image.size() != pixelSize || image.format() != format)
+    // A device pixel ratio change at the same pixel size would keep the old scale: the ratio is
+    // part of what makes the image the right one.
+    if (image.size() != pixelSize || image.format() != format
+        || image.devicePixelRatio() != pb->devicePixelRatio())
     {
         image = QImage(pixelSize, format);
         image.setDevicePixelRatio(pb->devicePixelRatio());
     }
     image.fill(Qt::transparent);
-
-    mSliceClip = clip;
     mSlicePainter = std::make_unique<QCPPainter>(&image);
-    QCPPainter* painter = mSlicePainter.get();
-    painter->setAntialiasing(from.antialiasing());
-    painter->setOpacity(from.opacity());
-    painter->setMode(QCPPainter::pmNonCosmetic, from.modes().testFlag(QCPPainter::pmNonCosmetic));
-    // The system clip is a path (a polar disc on a rect, a rounded frame): it survives as a path.
-    if (!from.clipPath().isEmpty())
-    {
-        painter->setClipRegion(from.clipRegion());
-        painter->setClipPath(from.clipPath(), Qt::IntersectClip);
-    }
-    else
-        painter->setClipRegion(from.clipRegion());
     mOpenSlice = mSliceCount++;
-    return painter;
+    return true;
 }
 
 /*! \internal
@@ -396,15 +430,24 @@ void QCPLayer::closePainterSlice(QCPPainter& bufferPainter)
     mSlicePainter.reset();
     const QImage& image = mSliceImages[std::size_t(index)];
     QCPPlottableRhiLayer* plottables = mParentPlot ? mParentPlot->plottableRhiLayer(this) : nullptr;
+    // The painter clipped every child that shared this slice, so the quad takes the whole output: a
+    // scissor of one child's rect would cut the ones painted after it. The height is the render
+    // target's, as it is for every other entry, not the buffer's: fractional ratios round apart.
+    const int outputHeight = mParentPlot ? mParentPlot->rhiOutputSize().height() : image.height();
+    const QSizeF logical = QSizeF(image.size()) / image.devicePixelRatio();
     // A negative key never collides with a QImage cache key, and it is stable across frames: the
     // texture keeps the slice's number, not its pixels.
     if (plottables
-        && plottables->addSliceImage(image, -(1 + qint64(index)), mSliceClip,
-                                     image.devicePixelRatio(), image.height()))
+        && plottables->addSliceImage(image, -(1 + qint64(index)),
+                                     QRect(QPoint(0, 0), logical.toSize()),
+                                     image.devicePixelRatio(), outputHeight))
         return;
+    // The layer refused it: the pixels go into the buffer at their own pixels, under this layer's
+    // GPU content, without the half pixel the buffer's transform would shift them by.
     bufferPainter.save();
     bufferPainter.setClipping(false);
     bufferPainter.setOpacity(1);
+    bufferPainter.setWorldTransform(QTransform());
     bufferPainter.drawImage(QPointF(0, 0), image);
     bufferPainter.restore();
 }

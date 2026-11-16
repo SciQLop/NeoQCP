@@ -122,6 +122,9 @@ See {doc}`performance`.
 - **A layer takes at most 8 painter slices per frame.**
   A slice is opened where painter-only content follows GPU content, and each one is an image of the output.
   Past the cap, that content goes under the GPU content again, and one warning per layer says so.
+- **Each painter slice is uploaded again on every frame it is submitted.**
+  It is an image of the output at the buffer's device resolution, so a slice on a 4K viewport uploads 4K pixels
+  per repaint. A layer that holds a slice is also painted again on a pan instead of being shifted.
 - **A pan on a log key axis records the graph again on every frame.**
   On a linear axis a pan only moves the picture.
 - **A scatter-only graph of millions of points has no point cap.**

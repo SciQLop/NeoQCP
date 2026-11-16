@@ -4158,13 +4158,13 @@ void TestRepaint::fiveImagesOnOneLayerStayOnTheGpu()
         QVERIFY(!fallback.painterHandled(context.drawList().id, quint64(i)));
 }
 
-// The busy fade is a painter opacity the layer sets around a plottable's draw. The export's second
-// pass replays the GPU commands after the layer's restore(), so it must carry the fade too.
+// The busy fade is a painter opacity the layer sets around a plottable's draw: the export's inline
+// replay paints the GPU commands inside that save/restore, so it carries the fade too.
 void TestRepaint::busyFadeCoversTheGpuCommandsInAnExport()
 {
     QCustomPlot plot;
     plot.resize(400, 300);
-    // Bars record their rects: those are GPU commands, replayed by the export's deferred pass.
+    // Bars record their rects: those are GPU commands, replayed inline with the painter ones.
     auto* bars = plot.add<QCPBars>().get();
     bars->setData(QVector<double> { 1, 2, 3 }, QVector<double> { 0.5, 0.7, 0.4 });
     bars->setPen(QPen(Qt::black, 2));
@@ -4284,6 +4284,41 @@ public:
     bool hasPendingData() const override { return false; }
 
     void draw(QCPDrawContext& context) const override { recordCallOrder(context, parts); }
+};
+
+//! A plottable whose recording moves with the data, so its layer may translate it instead of
+//! painting it again on a pan.
+class DataRectPlottable : public PendingStub
+{
+public:
+    using PendingStub::PendingStub;
+
+    bool hasPendingData() const override { return false; }
+
+    void draw(QCPDrawContext& context) const override
+    {
+        context.rect(QCP::Data { 2.0, 0.2 }, QCP::Data { 8.0, 0.8 }, QPen(Qt::NoPen),
+                     QBrush(QColor(220, 30, 30)));
+    }
+};
+
+//! A plain layerable clipped to a rect of its own, as a layerable inside an axis rect is.
+class ClippedHook : public QCPLayerable
+{
+public:
+    using QCPLayerable::QCPLayerable;
+
+    QRect clip;
+
+protected:
+    QRect clipRect() const override { return clip; }
+
+    void applyDefaultAntialiasingHint(QCPPainter*) const override { }
+
+    void draw(QCPPainter* painter) override
+    {
+        painter->fillRect(QRectF(clip).adjusted(20, 20, -20, -20), QColor(20, 160, 40));
+    }
 };
 
 //! The pixels darker than any red on the whole frame: one count per copy of the text, wherever it is.
@@ -4430,9 +4465,6 @@ void TestRepaint::aScreenStacksTwoItemsInAddOrder()
              "the text item added last is not drawn over the rect item on the screen");
     (void)plot->removeItem(rect.get());
     plot->replot();
-    auto before = plot->add<CallOrderItem>();
-    before->parts = CallOrderParts::Text;
-    (void)plot->removeItem(before.get());
     auto over = plot->add<CallOrderItem>();
     over->parts = CallOrderParts::Rect;
     plot->replot();
@@ -4474,6 +4506,9 @@ void TestRepaint::aRecordingWithoutPainterCommandsTakesNoImageSlot()
     QCPPlottableRhiLayer* layer = qcp::gpuLayer(plot, item->layer(), false);
     QVERIFY(layer);
     const int plain = layer->imageDrawEntries().size();
+    // A rect alone is GPU geometry: no image, and no slice to hold one.
+    QCOMPARE(plain, 0);
+    QCOMPARE(layer->sliceImageCount(), 0);
     item->parts = CallOrderParts::RectThenText;
     // A recording is what the library keeps: the member it reads changed behind its back.
     item->update();
@@ -4587,4 +4622,147 @@ void TestRepaint::aMarkerStaysOverTheSliceOfItsLayer()
                             .arg(drawn.red())
                             .arg(drawn.green())
                             .arg(drawn.blue())));
+}
+
+// C1: an export of a shown plot stacks like the screen. On screen a plain layerable is pixels of a
+// slice; the export has to paint it into its own painter, and leave the screen's frame alone.
+void TestRepaint::anExportKeepsAPlainLayerableOfAShownPlot()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto rect = plot->add<CallOrderItem>();
+    rect->parts = CallOrderParts::Rect;
+    const QPointF centre(plot->xAxis->coordToPixel(5.0), plot->yAxis->coordToPixel(0.5));
+    const QColor green(20, 160, 40);
+    auto* hook = new DrawHook(plot, rect->layer()->name());
+    hook->onPaint = [centre, green](QCPPainter* painter)
+    { painter->fillRect(QRectF(centre - QPointF(20, 20), QSizeF(40, 40)), green); };
+    plot->replot();
+    const QColor onScreen = screenOf(plot).pixelColor(centre.toPoint());
+    QVERIFY2(onScreen.green() > 120 && onScreen.red() < 100,
+             "the plain layerable is not over the GPU rect on the screen");
+    QCPPlottableRhiLayer* layer = qcp::gpuLayer(plot, rect->layer(), false);
+    QVERIFY(layer);
+    const int slices = layer->sliceImageCount();
+    const QImage exported = plot->toPixmap(400, 300).toImage();
+    const QColor inExport = exported.pixelColor(centre.toPoint());
+    QVERIFY2(inExport.green() > 120 && inExport.red() < 100,
+             qPrintable(QStringLiteral("the export lost the plain layerable: %1,%2,%3")
+                            .arg(inExport.red())
+                            .arg(inExport.green())
+                            .arg(inExport.blue())));
+    QCOMPARE(layer->sliceImageCount(), slices);
+}
+
+// C2: a child that paints into a slice another child opened takes its own state, not the opener's:
+// the text recorded after the plain layerable is not clipped away by it.
+void TestRepaint::aSliceTakesTheStateOfEachChild()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto rect = plot->add<CallOrderItem>();
+    rect->parts = CallOrderParts::Rect;
+    auto* hook = new DrawHook(plot, rect->layer()->name());
+    hook->onPaint = [](QCPPainter* painter)
+    { painter->fillRect(QRectF(2, 2, 6, 6), QColor(20, 160, 40)); };
+    auto text = plot->add<CallOrderItem>();
+    text->parts = CallOrderParts::Text;
+    plot->replot();
+    QVERIFY2(textInkInsideTheRect(*plot, screenOf(plot)) > 20,
+             "the text after the plain layerable is clipped away in its slice");
+}
+
+// C2: consecutive plain layerables with a clip rect each: the second is not clipped to the first's.
+void TestRepaint::aSliceClipsEachChildToItsOwnRect()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto rect = plot->add<CallOrderItem>();
+    rect->parts = CallOrderParts::Rect;
+    const QRect viewport = plot->viewport();
+    const QRect top(viewport.left(), viewport.top(), viewport.width(), viewport.height() / 2);
+    const QRect bottom(viewport.left(), viewport.top() + viewport.height() / 2,
+                       viewport.width(), viewport.height() / 2);
+    auto* first = new ClippedHook(plot, rect->layer()->name());
+    first->clip = top;
+    auto* second = new ClippedHook(plot, rect->layer()->name());
+    second->clip = bottom;
+    plot->replot();
+    const QImage screen = screenOf(plot);
+    const QColor inTop = screen.pixelColor(top.center());
+    QVERIFY2(inTop.green() > 120 && inTop.red() < 100,
+             "the first plain layerable is not over the GPU rect in its half");
+    const QColor inBottom = screen.pixelColor(bottom.center());
+    QVERIFY2(inBottom.green() > 120 && inBottom.red() < 100,
+             "the second plain layerable is clipped to the first one's rect");
+}
+
+// C2: the busy fade of a plottable fades its own painter content in the slice, and stops at the
+// next child: a layerable after it paints at full strength.
+void TestRepaint::aSliceFadesOnlyItsOwnChild()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto busy = plot->add<CallOrderPlottable>();
+    busy->parts = CallOrderParts::RectThenText;
+    busy->setBusyShowDelayMs(0);
+    busy->setBusy(true);
+    QTest::qWait(5); // the busy state settles through the plottable's debounce timer
+    const QPointF spot(plot->xAxis->coordToPixel(5.0), plot->yAxis->coordToPixel(0.05));
+    const QColor ink(20, 20, 20);
+    auto* hook = new DrawHook(plot, busy->layer()->name());
+    hook->onPaint = [spot, ink](QCPPainter* painter)
+    { painter->fillRect(QRectF(spot - QPointF(4, 4), QSizeF(8, 8)), ink); };
+    plot->replot();
+    QVERIFY2(busy->visuallyBusy(), "the plottable is not in its busy state");
+    const int lightness = screenOf(plot).pixelColor(spot.toPoint()).lightness();
+    QVERIFY2(lightness < 60,
+             qPrintable(QStringLiteral("the next child inherits the busy fade: lightness %1")
+                            .arg(lightness)));
+}
+
+// B6: a slice is a picture of the viewport, so a layer holding one is painted again on a pan, not
+// translated - even when the content under it moves with the data.
+void TestRepaint::aSliceIsNotTranslatedOnAPan()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto data = plot->add<DataRectPlottable>();
+    const QColor green(20, 160, 40);
+    auto* hook = new DrawHook(plot, data->layer()->name());
+    // A layerable that paints where the data is: its pixels depend on the frame's transform.
+    hook->onPaint = [plot, green](QCPPainter* painter)
+    {
+        const QPointF at(plot->xAxis->coordToPixel(5.0), plot->yAxis->coordToPixel(0.5));
+        painter->fillRect(QRectF(at - QPointF(5, 5), QSizeF(10, 10)), green);
+    };
+    plot->replot();
+    waitUntilSettled(*plot);
+    const QPointF before(plot->xAxis->coordToPixel(5.0), plot->yAxis->coordToPixel(0.5));
+    QVERIFY2(screenOf(plot).pixelColor(before.toPoint()).green() > 120,
+             "the plain layerable is not over the data point on the screen");
+    plot->xAxis->setRange(1.0, 11.0);
+    plot->replot();
+    waitUntilSettled(*plot);
+    const QImage after = screenOf(plot);
+    const QPointF moved(plot->xAxis->coordToPixel(5.0), plot->yAxis->coordToPixel(0.5));
+    QVERIFY2(after.pixelColor(moved.toPoint()).green() > 120,
+             "the slice is no longer over its data point after the pan");
+    QVERIFY2(!(after.pixelColor(before.toPoint()).green() > 120),
+             "the pan left the slice where the old frame put it");
 }

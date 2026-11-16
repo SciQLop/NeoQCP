@@ -646,8 +646,12 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
         return;
     }
 
-    cache.beginReplay();
-    fallback.beginReplay();
+    // A range belongs to a recording whose caller began the replay once for all of its runs.
+    if (!partial)
+    {
+        cache.beginReplay();
+        fallback.beginReplay();
+    }
     // The cache the build keeps into: none on a frame whose vertices no later frame can re-emit,
     // nor on a range of one.
     const bool canKeep
@@ -856,6 +860,11 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
     }
     if (geometry)
         geometry->commit();
+}
+
+bool qcpRasterOverflowsTheLayer(const QCPDrawList& list, QCPPlottableRhiLayer& plottables)
+{
+    return rasterOverflows(list, plottables);
 }
 
 quint64 qcpFillBuildCount()

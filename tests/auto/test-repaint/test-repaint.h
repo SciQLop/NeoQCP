@@ -31,6 +31,11 @@ private slots:
     void aPanKeepsTheSliceOverItsContent();
     void aPainterSliceCapWarnsOnce();
     void aMarkerStaysOverTheSliceOfItsLayer();
+    void anExportKeepsAPlainLayerableOfAShownPlot();
+    void aSliceTakesTheStateOfEachChild();
+    void aSliceClipsEachChildToItsOwnRect();
+    void aSliceFadesOnlyItsOwnChild();
+    void aSliceIsNotTranslatedOnAPan();
     void exportShowsReadyStagedData();
     void legendShowsAddedGraphAndItsName();
     void setLayerRepaintsTheLayerLeft();

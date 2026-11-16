@@ -1040,26 +1040,11 @@ bool submitsToTheGpu(const qcp::QCPDrawCommand& command)
 }
 
 //! Whether a command paints into the current painter: the painter-only content that has to land
-//! over the GPU content drawn before it.
+//! over the GPU content drawn before it. The kind is asked the cheap way: painter-only and GPU are
+//! complements, and commandKind() walks the positions of a polygon.
 bool paintsIntoTheSlice(const qcp::QCPDrawCommand& command)
 {
-    return qcp::commandKind(command).painterOnly;
-}
-
-//! Whether the recording must replay as runs to stack in call order: some painter-only command of
-//! it lands over GPU content, its own or the layer's. False keeps the single GPU call and single
-//! painter call every recording took before, with no run split.
-bool needsCallOrder(const QCPDrawList& list, bool gpuBefore)
-{
-    bool gpuSeen = gpuBefore;
-    for (const qcp::QCPDrawCommand& command : list.commands)
-    {
-        if (submitsToTheGpu(command))
-            gpuSeen = true;
-        else if (paintsIntoTheSlice(command) && gpuSeen)
-            return true;
-    }
-    return false;
+    return !qcp::isGpuCommand(command);
 }
 
 } // namespace
@@ -1076,6 +1061,10 @@ void QCPDrawnCore::paintInCallOrder(const QCPDrawList& list, QCPPlottableRhiLaye
     const int count = int(list.commands.size());
     const bool dashed = plottables.dashedAvailable();
     bool gpuSeen = gpuBefore;
+    // Once for the whole recording: a sweep per run would throw away the raster images the runs
+    // before it built, and rasterise them again on every frame.
+    resolve.beginReplay();
+    fallback.beginReplay();
     for (int first = 0; first < count;)
     {
         const bool painterRun = paintsIntoTheSlice(list.commands[std::size_t(first)]);
@@ -1084,16 +1073,14 @@ void QCPDrawnCore::paintInCallOrder(const QCPDrawList& list, QCPPlottableRhiLaye
             ++last;
         if (painterRun)
         {
-            QCPPainter* target = &painter;
-            // Without a slice the pixels fall back into the buffer, under the GPU content.
-            if (gpuSeen)
-            {
-                QCPPainter* slice = view.layer->painterSlice(painter, frame.clip.toAlignedRect());
-                if (slice)
-                    target = slice;
-            }
-            qcpReplayWithPainter(list, *target, frame, QCPReplayKinds::PainterOnly, &fallback,
-                                 dashed, false, QCPReplayState::AlreadySaved, first, last);
+            // The slice takes this run's clip, fade and antialiasing for the length of the run;
+            // without one the pixels fall back into the buffer, under the GPU content.
+            QCPPainter* slice = gpuSeen ? view.layer->painterSlice(painter) : nullptr;
+            qcpReplayWithPainter(list, slice ? *slice : painter, frame,
+                                 QCPReplayKinds::PainterOnly, &fallback, dashed, false,
+                                 QCPReplayState::AlreadySaved, first, last);
+            if (slice)
+                view.layer->restoreSlicePainter();
         }
         else
         {
@@ -1108,7 +1095,11 @@ void QCPDrawnCore::paintInCallOrder(const QCPDrawList& list, QCPPlottableRhiLaye
             // What the layer refused of this run goes under it, in the buffer.
             qcpReplayWithPainter(list, painter, frame, QCPReplayKinds::PainterOnly, &fallback,
                                  dashed, false, QCPReplayState::AlreadySaved, first, last);
-            gpuSeen = gpuSeen || gpu;
+            if (gpu)
+            {
+                gpuSeen = true;
+                view.layer->noteGpuContent();
+            }
         }
         first = last;
     }
@@ -1152,14 +1143,19 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
     // The painter pass completes what the layer refused, so it makes the same dashed decision.
     if (!plottables->dashedAvailable() && mState->movesWithTheData)
         mState->movesWithTheData = qcpRecordingMovesWithTheData(mState->recording, false);
-    const bool gpuBefore = view.plot->gpuContentBefore(view.layer);
-    if (!needsCallOrder(mState->recording, gpuBefore))
+    // The layer keeps this flag for its whole pass, and the recording knows whether one of its own
+    // painter-only commands lands over GPU content: both are O(1).
+    const bool gpuBefore = view.layer->gpuContentSeen();
+    const bool callOrder = mState->recording.painterOverGpu
+        || (gpuBefore && mState->recording.hasPainterOnly);
+    // A recording the raster budget cannot hold paints whole, under the layer's GPU content: a run
+    // split would put one object on both sides of the buffer.
+    if (!callOrder || qcpRasterOverflowsTheLayer(mState->recording, *plottables))
     {
+        const bool gpu = mState->recording.hasGpuContent;
         // Anything GPU this recording submits comes after what its layer already shows: it closes
         // the slice an earlier layerable left open.
-        if (view.layer->hasOpenPainterSlice()
-            && std::any_of(mState->recording.commands.begin(), mState->recording.commands.end(),
-                           submitsToTheGpu))
+        if (gpu && view.layer->hasOpenPainterSlice())
             view.layer->closePainterSlice(painter);
         qcpReplayWithRhi(mState->recording, *plottables, *scatter, frame, mState->resolve,
                          mState->raster, view.plot->bufferDevicePixelRatio(),
@@ -1168,6 +1164,8 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
         qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly,
                              &mState->raster, plottables->dashedAvailable(), false,
                              QCPReplayState::AlreadySaved);
+        if (gpu)
+            view.layer->noteGpuContent();
         notePainted(view);
         return;
     }

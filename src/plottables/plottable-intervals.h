@@ -317,9 +317,9 @@ protected:
     std::vector<std::pair<QRectF, QString>> mRowNames;
     quint64 mSubRowGeneration = 0;
 
-    // The labels are painter text, the bars are recorded commands: on screen the bars reach the GPU
-    // after their layer's painter output, so text drawn on the plottable's own layer would end up
-    // underneath them. This layerable lives one layer above and draws the labels/lane names.
+    // The label layer draws what the plottable's recording does not: lane names, the selection and
+    // the preview, all above the bars by their own layer. Stacking alone would no longer need it
+    // (C-4 replays text recorded after a rect over it), so this is public API plus that content.
     class LabelLayer;
     //! The plot's layerable for this plottable's labels: it dies with the plot, so a move makes a
     //! fresh one.

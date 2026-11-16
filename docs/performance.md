@@ -35,6 +35,7 @@ A pan changes the axis range but not the shape of the data on screen. NeoQCP tak
 
 - `QCPGraph` and `QCPColorMap2` keep the geometry of their last draw. During a pan, the GPU moves it by the pan offset. Graphs recompute nothing. A colour map resamples the new range in the background and shows the shifted old image meanwhile.
 - A layer whose plottables all agree on that offset is not repainted at all. Its old texture is shifted by the compositor, and clipped to the axis rect.
+- A layer that holds a painter slice is the exception: the slice is pixels of the viewport, and a shift would leave it where the old frame put it, so the layer is painted again. Each slice is one output-sized image upload per frame it is submitted.
 - The cached lines cover one view width on each side of the visible range. A pan of up to one width never shows an empty edge.
 - The lines are rebuilt for the new range when the pan goes past one view width. A graph with 100 000 points or more also rebuilds them about 150 ms after the pan stops.
 

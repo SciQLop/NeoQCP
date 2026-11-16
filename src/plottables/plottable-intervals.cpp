@@ -12,9 +12,10 @@
 #include <cmath>
 #include <stdexcept>
 
-// Draws the owning QCPIntervals' bar labels and lane names. Lives one layer above
-// the plottable's own layer so its painter-drawn text composites after (i.e. on top
-// of) the GPU-rendered bars; see the comment on QCPIntervals::mLabelLayer.
+// Draws the owning QCPIntervals' bar labels, lane names, selection and preview. It has a layer of
+// its own (see QCPIntervals::labelLayer), which is public API and carries what the plottable's
+// recording does not; the stacking itself would no longer need one (call order) - see the comment
+// on QCPIntervals::mLabelLayer.
 class QCPIntervals::LabelLayer : public QCPLayerable
 {
 public:
