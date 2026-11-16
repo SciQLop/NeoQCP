@@ -36,6 +36,7 @@ private slots:
     void aSliceClipsEachChildToItsOwnRect();
     void aSliceFadesOnlyItsOwnChild();
     void aSliceIsNotTranslatedOnAPan();
+    void aSliceClipsADrawableLikeTheBuffer();
     void exportShowsReadyStagedData();
     void legendShowsAddedGraphAndItsName();
     void setLayerRepaintsTheLayerLeft();

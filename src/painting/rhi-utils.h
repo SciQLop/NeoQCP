@@ -3,6 +3,7 @@
 #include <QColor>
 #include <QDebug>
 #include <QImage>
+#include <QtMath>
 #include <algorithm>
 #include <array>
 #include <cstdlib>
@@ -172,6 +173,15 @@ inline QRect computeScissor(const QRect& clip, double dpr, int outputHeight)
     int sh = static_cast<int>(clip.height() * dpr);
     sy = outputHeight - sy - sh;
     return QRect(sx, sy, sw, sh);
+}
+
+// The clip, in logical units, that covers an output of \a pixelSize: a slice is an image of the
+// whole output, and rounding its logical size to the nearest unit drops the last device column or
+// row at a fractional ratio. A scissor that overhangs is clamped to the render target by QRhi.
+inline QRect outputClip(const QSize& pixelSize, double dpr)
+{
+    const QSize logical(qCeil(pixelSize.width() / dpr), qCeil(pixelSize.height() / dpr));
+    return QRect(QPoint(0, 0), logical);
 }
 
 } // namespace qcp::rhi

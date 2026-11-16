@@ -4207,7 +4207,9 @@ enum class CallOrderParts
     Rect,
     Text,
     LineThenPainter,
-    NineAlternations
+    NineAlternations,
+    Fill,
+    RectThenFill
 };
 
 void recordCallOrderRect(QCPDrawContext& context)
@@ -4222,6 +4224,15 @@ void recordCallOrderText(QCPDrawContext& context)
     style.font = qcp::test::referenceFont(20);
     style.color = QColor(20, 20, 20);
     context.text(QCP::Data { 3.0, 0.72 }, QStringLiteral("MMMM"), style);
+}
+
+//! A painter callback filling everything its clip allows: the pixels at the clip's own edges tell
+//! whether the slice clips it like the buffer does.
+void recordCallOrderFill(QCPDrawContext& context)
+{
+    context.painter(
+        [](QCPPainter& painter, const QCPTransform&)
+        { painter.fillRect(QRectF(-100, -100, 1000, 1000), QColor(20, 160, 40)); });
 }
 
 //! Records what \a parts names: the rect and the text in one or the other order, alone, or pairs
@@ -4256,6 +4267,13 @@ void recordCallOrder(QCPDrawContext& context, CallOrderParts parts)
                 recordCallOrderRect(context);
                 recordCallOrderText(context);
             }
+            break;
+        case CallOrderParts::Fill:
+            recordCallOrderFill(context);
+            break;
+        case CallOrderParts::RectThenFill:
+            recordCallOrderRect(context);
+            recordCallOrderFill(context);
             break;
     }
 }
@@ -4330,6 +4348,20 @@ int darkPixels(const QImage& image)
             if (image.pixelColor(x, y).lightness() < 120)
                 ++ink;
     return ink;
+}
+
+//! The bounding box of the pixels a green fill painted, whichever pass painted them.
+QRect greenExtent(const QImage& image)
+{
+    QRect extent;
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x)
+        {
+            const QColor pixel = image.pixelColor(x, y);
+            if (pixel.green() > 120 && pixel.red() < 100)
+                extent = extent.isNull() ? QRect(x, y, 1, 1) : extent.united(QRect(x, y, 1, 1));
+        }
+    return extent;
 }
 
 void prepareCallOrderPlot(QCustomPlot& plot)
@@ -4765,4 +4797,38 @@ void TestRepaint::aSliceIsNotTranslatedOnAPan()
              "the slice is no longer over its data point after the pan");
     QVERIFY2(!(after.pixelColor(before.toPoint()).green() > 120),
              "the pan left the slice where the old frame put it");
+}
+
+// I-N1: a drawable paints into a slice with the clip it has in the buffer. The slice takes the
+// caller's transform before its clip, or the clip lands a pixel up-left of the buffer's.
+void TestRepaint::aSliceClipsADrawableLikeTheBuffer()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    prepareCallOrderPlot(*plot);
+    auto item = plot->add<CallOrderItem>();
+    item->parts = CallOrderParts::Fill;
+    plot->replot();
+    // No GPU content before the callback: it paints into the buffer, under nothing.
+    const QRect inBuffer = greenExtent(screenOf(plot));
+    QVERIFY2(!inBuffer.isNull(), "the painter callback filled nothing on the screen");
+    item->parts = CallOrderParts::RectThenFill;
+    // A recording is what the library keeps: the member it reads changed behind its back.
+    item->update();
+    plot->replot();
+    // The rect is under the opaque fill: the two frames differ only in the clip of the slice.
+    const QRect inSlice = greenExtent(screenOf(plot));
+    QVERIFY2(inSlice == inBuffer,
+             qPrintable(QStringLiteral("the slice clips its drawable away from the buffer: %1,%2 "
+                                       "%3x%4 instead of %5,%6 %7x%8")
+                            .arg(inSlice.x())
+                            .arg(inSlice.y())
+                            .arg(inSlice.width())
+                            .arg(inSlice.height())
+                            .arg(inBuffer.x())
+                            .arg(inBuffer.y())
+                            .arg(inBuffer.width())
+                            .arg(inBuffer.height())));
 }

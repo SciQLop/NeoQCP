@@ -23,6 +23,7 @@ private slots:
     void replotOnFirstShow_tabWidget();
     void rhi_reallocatedTextureRequiresUpload();
     void rhi_imageBytesMatchTextureChannelOrder();
+    void outputClip_coversTheOutputAtFractionalRatios();
 
     void skipRepaint_multiGraphPanOnly();
     void skipRepaint_disabledWithItems();

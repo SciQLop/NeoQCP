@@ -23,6 +23,7 @@
 **          Version: 2.1.1                                                **
 ****************************************************************************/
 
+#include <QScopeGuard>
 #include <optional>
 #include "Profiling.hpp"
 
@@ -309,10 +310,18 @@ void QCPLayer::drawToPaintBuffer()
                 // slice 0 again, and its image is reused.
                 mSliceCount = 0;
                 mScreenPass = true;
+                // A child that throws out of draw() ends the pass half way: the next export must not
+                // inherit the flags of this one, and the open slice must not keep its saves.
+                const auto endPass = qScopeGuard(
+                    [this]
+                    {
+                        mScreenPass = false;
+                        mGpuContentSeen = false;
+                        mHiDpiScreenPass = false;
+                        mOpenSlice = -1;
+                        mSlicePainter.reset();
+                    });
                 draw(painter);
-                mScreenPass = false;
-                mGpuContentSeen = false;
-                mHiDpiScreenPass = false;
             }
             else
                 qDebug() << Q_FUNC_INFO << "paint buffer returned inactive painter";
@@ -352,6 +361,15 @@ QCPPainter* QCPLayer::painterSlice(const QCPPainter& from)
     // clip at all), its fade, its antialiasing and its transform. The save keeps them from leaking
     // into the child that shares the slice after it.
     painter->save();
+    painter->setOpacity(from.opacity());
+    // Antialiasing before the transform: QCPPainter's antialiasing is a half pixel translation of
+    // its own, and the caller's transform, copied whole afterwards, already carries it.
+    painter->setAntialiasing(from.antialiasing());
+    painter->setMode(QCPPainter::pmNonCosmetic, from.modes().testFlag(QCPPainter::pmNonCosmetic));
+    painter->setWorldTransform(from.worldTransform());
+    // The clip last: QPainter reads one in the coordinates of the transform in force, and
+    // clipRegion() / clipPath() answer in the caller's. Copied before the transform, the clip of an
+    // antialiased drawable landed a pixel up and left of the buffer's.
     if (from.hasClipping())
     {
         if (!from.clipPath().isEmpty())
@@ -364,10 +382,6 @@ QCPPainter* QCPLayer::painterSlice(const QCPPainter& from)
     }
     else
         painter->setClipping(false);
-    painter->setOpacity(from.opacity());
-    painter->setAntialiasing(from.antialiasing());
-    painter->setMode(QCPPainter::pmNonCosmetic, from.modes().testFlag(QCPPainter::pmNonCosmetic));
-    painter->setWorldTransform(from.worldTransform());
     return painter;
 }
 
@@ -434,12 +448,11 @@ void QCPLayer::closePainterSlice(QCPPainter& bufferPainter)
     // scissor of one child's rect would cut the ones painted after it. The height is the render
     // target's, as it is for every other entry, not the buffer's: fractional ratios round apart.
     const int outputHeight = mParentPlot ? mParentPlot->rhiOutputSize().height() : image.height();
-    const QSizeF logical = QSizeF(image.size()) / image.devicePixelRatio();
     // A negative key never collides with a QImage cache key, and it is stable across frames: the
     // texture keeps the slice's number, not its pixels.
     if (plottables
         && plottables->addSliceImage(image, -(1 + qint64(index)),
-                                     QRect(QPoint(0, 0), logical.toSize()),
+                                     qcp::rhi::outputClip(image.size(), image.devicePixelRatio()),
                                      image.devicePixelRatio(), outputHeight))
         return;
     // The layer refused it: the pixels go into the buffer at their own pixels, under this layer's

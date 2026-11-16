@@ -698,3 +698,24 @@ void TestPaintBuffer::alignedLinesFillTheSamePixelsAsTheStroker()
     }
   }
 }
+
+// N3: a slice covers the whole output. Its clip goes from device pixels to logical units and back,
+// which drops the last device column and row at a fractional ratio unless it rounds outward.
+void TestPaintBuffer::outputClip_coversTheOutputAtFractionalRatios()
+{
+  for (const double dpr : { 1.0, 1.25, 1.5, 2.0 })
+  {
+    for (const QSize pixels : { QSize(400, 300), QSize(602, 451), QSize(601, 401) })
+    {
+      const QRect scissor = qcp::rhi::computeScissor(qcp::rhi::outputClip(pixels, dpr), dpr,
+                                                     pixels.height());
+      QVERIFY2(scissor.width() >= pixels.width() && scissor.height() >= pixels.height(),
+               qPrintable(QStringLiteral("dpr %1, %2x%3 output: scissor %4x%5")
+                              .arg(dpr)
+                              .arg(pixels.width())
+                              .arg(pixels.height())
+                              .arg(scissor.width())
+                              .arg(scissor.height())));
+    }
+  }
+}
