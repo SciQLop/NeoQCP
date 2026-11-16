@@ -10,10 +10,15 @@
 #include <xtensor/xtensor.hpp>
 #include <xtensor/xview.hpp>
 
-#if defined(__cpp_lib_mdspan)
+#include <version>
+
+// GCC 14 ships no <mdspan>, so the reference implementation from the mdspan wrap is what CI builds.
+// Its 0.6.0 release exposes std::experimental::mdspan, and QCP_TEST_EXPERIMENTAL_MDSPAN forces that
+// branch on a standard library that has mdspan, which is how the branch stays compiled and run.
+#if defined(__cpp_lib_mdspan) && !defined(QCP_TEST_EXPERIMENTAL_MDSPAN)
 #include <mdspan>
 #else
-#include <mdspan/mdspan.hpp>
+#include <experimental/mdspan>
 #endif
 
 namespace
@@ -44,10 +49,10 @@ struct Grid
     M values;
 };
 
-#if defined(__cpp_lib_mdspan)
+#if defined(__cpp_lib_mdspan) && !defined(QCP_TEST_EXPERIMENTAL_MDSPAN)
 using Grid2D = std::mdspan<const double, std::dextents<std::size_t, 2>>;
 #else
-using Grid2D = Kokkos::mdspan<const double, Kokkos::dextents<std::size_t, 2>>;
+using Grid2D = std::experimental::mdspan<const double, std::experimental::dextents<std::size_t, 2>>;
 #endif
 
 //! Every component of \a graph against the values the caller expects, row by row.

@@ -9,7 +9,9 @@ if 'address' in get_option('b_sanitize')
 endif
 
 subdir('auto')
-subdir('third-party')
+if get_option('with_third_party_tests')
+    subdir('third-party')
+endif
 subdir('benchmark')
 subdir('manual')
 subdir('big_data_for_tracy')

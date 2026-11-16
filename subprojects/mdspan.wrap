@@ -1,6 +1,7 @@
 [wrap-git]
 url = https://github.com/kokkos/mdspan.git
-revision = mdspan-0.6.0
+# tag mdspan-0.6.0
+revision = 9ceface91483775a6c74d06ebf717bbb2768452f
 depth = 1
 method = cmake
 

@@ -145,9 +145,11 @@ This matters because resampling runs on a worker thread and can still read the d
 
 ### Your own data types
 
-The data calls take any range whose elements convert to `double`, read once from begin to end:
-`std::vector`, `QVector`, `std::array`, `std::span`, `std::views::iota`, a `std::ranges` view.
-A view is read where it is, a container passed as a plain variable is copied once.
+The data calls take any range whose elements convert to `double`, and read it once from begin to end,
+straight into the graph's own storage: `std::vector`, `QVector`, `std::array`, `std::span`,
+`std::views::iota`, a `std::ranges` view.
+A view is read where it is and a container passed as a plain variable is read as it is, and either way
+the numbers end up copied once, with no buffer of yours in between; only `viewData` keeps your storage.
 An `Eigen::VectorXd` and a 1D `xt::xtensor` already pass this way.
 A C-order 2D buffer does not even need a type: `viewRowMajorData(keys, values, columns, stride)` views it in place.
 
@@ -157,7 +159,8 @@ Both are plain free functions, found by argument-dependent lookup: write them in
 - `qcp_numbers(const T&)` gives the numbers of `T` where one run of numbers is expected: a range, or a `std::span` over your storage.
 - `qcp_columns(const T&)` gives the columns of `T` where value columns are expected: a range of ranges, one per component.
 
-Returning a reference or a view copies nothing; returning a value gives the call its own copy.
+Returning a reference or a view avoids a copy of the hook's result, which is read where it is;
+returning a value moves it into the call, which reads it there.
 
 ```cpp
 // A struct of arrays, read as the numbers of the curve it feeds.

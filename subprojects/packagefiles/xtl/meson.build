@@ -6,5 +6,3 @@ project('xtl', 'cpp', version: '0.7.7', license: 'BSD-3-Clause',
 xtl_dep = declare_dependency(
     include_directories: include_directories('include', is_system: true),
     version: meson.project_version())
-
-install_subdir('include/xtl', install_dir: get_option('includedir'))

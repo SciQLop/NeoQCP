@@ -198,6 +198,33 @@ public:
     std::array<std::array<double, 2>, 2> mRows { { { 1.0, 2.0 }, { 3.0, 4.0 } } };
 };
 
+//! A range a hook hands out by value that cannot be moved: the adaptor owns what it reads, so the
+//! call refuses it instead of failing where the view over it is built.
+struct ImmovableColumns : std::vector<std::vector<double>>
+{
+    ImmovableColumns() = default;
+    ImmovableColumns(const ImmovableColumns&) = delete;
+    ImmovableColumns(ImmovableColumns&&) = delete;
+    ImmovableColumns& operator=(const ImmovableColumns&) = delete;
+    ImmovableColumns& operator=(ImmovableColumns&&) = delete;
+};
+
+struct ImmovableNumbers : std::vector<double>
+{
+    ImmovableNumbers() = default;
+    ImmovableNumbers(const ImmovableNumbers&) = delete;
+    ImmovableNumbers(ImmovableNumbers&&) = delete;
+    ImmovableNumbers& operator=(const ImmovableNumbers&) = delete;
+    ImmovableNumbers& operator=(ImmovableNumbers&&) = delete;
+};
+
+struct BuriedData
+{
+};
+
+ImmovableNumbers qcp_numbers(const BuriedData&) { return {}; }
+ImmovableColumns qcp_columns(const BuriedData&) { return {}; }
+
 //! The user type of the last test: a plottable that inherits QCPPlottable1D's data constructor.
 class HookedGraph : public QCPPlottable1D<QCPGraphData>
 {
@@ -259,11 +286,12 @@ static_assert(QCPColumns<DoublesWithColumns>);
 static_assert(!QCPColumns<std::vector<double>>);
 static_assert(!QCPColumns<Samples>);
 static_assert(QCPNumberRange<DoublesWithColumns>);
-static_assert(QCPColumns<std::vector<std::vector<double>>>);
 static_assert(QCPColumns<SharedColumns>);
 static_assert(!QCPColumns<WrappedColumns>);
 static_assert(QCPNumberRange<std::ranges::range_value_t<ProxiedColumns>>);
 static_assert(!QCPColumns<ProxiedColumns>);
+static_assert(!QCPColumns<BuriedData>);
+static_assert(!QCPNumberRange<BuriedData>);
 } // namespace
 
 void TestDataAdapters::aVectorIsReadInPlace()
@@ -472,11 +500,6 @@ void TestDataAdapters::aNumbersHookDoesNotMakeColumns()
 void TestDataAdapters::aColumnsTypeIsNotFlattened()
 {
     static_assert(QCPNumberRange<DoublesWithColumns>);
-static_assert(QCPColumns<std::vector<std::vector<double>>>);
-static_assert(QCPColumns<SharedColumns>);
-static_assert(!QCPColumns<WrappedColumns>);
-static_assert(QCPNumberRange<std::ranges::range_value_t<ProxiedColumns>>);
-static_assert(!QCPColumns<ProxiedColumns>);
     static_assert(QCPColumns<DoublesWithColumns>);
 
     const DoublesWithColumns both { 1.0, 2.0, 3.0 };

@@ -37,6 +37,11 @@ template <typename T>
 concept contiguousDoubles = std::ranges::contiguous_range<T>
     && std::same_as<std::remove_cv_t<std::ranges::range_value_t<T>>, double>;
 
+//! A range the adaptor has to own is moved into it, which is what the owning view over it requires;
+//! a reference is the caller's storage and is read where it is, so it need not be movable.
+template <typename T>
+concept movableIfOwned = std::is_reference_v<T> || std::movable<std::remove_cvref_t<T>>;
+
 template <typename T>
 constexpr auto adaptNumbers(T&& numbers)
 {
@@ -51,10 +56,12 @@ template <typename T>
 using hookResult = decltype(qcp_numbers(std::declval<T>()));
 
 template <typename T>
-concept numbersHookAdaptable = numbersHook<T> && numberSource<std::remove_cvref_t<hookResult<T>>>;
+concept numbersHookAdaptable = numbersHook<T> && movableIfOwned<hookResult<T>>
+    && numberSource<std::remove_cvref_t<hookResult<T>>>;
 
 template <typename T>
-concept numbersPlainAdaptable = numbersCall<T> && !numbersHook<T> && numberSource<T>;
+concept numbersPlainAdaptable
+    = numbersCall<T> && !numbersHook<T> && movableIfOwned<T> && numberSource<T>;
 
 struct Numbers
 {
@@ -134,17 +141,18 @@ template <typename T>
 using columnsHookResult = decltype(qcp_columns(std::declval<T>()));
 
 //! The columns as the adaptor reads them: a hook's reference is read where it is (its const
-//! included), a hook's own object is decayed and read as an lvalue, a plain operand as given.
+//! included), a hook's own object is moved into the adaptor and read there, a plain operand as
+//! given.
 template <typename T>
 using columnsAsRead = std::conditional_t<std::is_reference_v<T>, T, std::remove_cvref_t<T>&>;
 
 template <typename T>
-concept columnsHookAdaptable
-    = columnsHook<T> && columnSource<columnsAsRead<columnsHookResult<T>>>;
+concept columnsHookAdaptable = columnsHook<T> && movableIfOwned<columnsHookResult<T>>
+    && columnSource<columnsAsRead<columnsHookResult<T>>>;
 
 template <typename T>
-concept columnsPlainAdaptable
-    = columnsCall<T> && !columnsHook<T> && columnSource<columnsAsRead<T>>;
+concept columnsPlainAdaptable = columnsCall<T> && !columnsHook<T> && movableIfOwned<T>
+    && columnSource<columnsAsRead<T>>;
 
 struct Columns
 {

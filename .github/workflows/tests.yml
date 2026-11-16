@@ -115,9 +115,10 @@ jobs:
           # the Intel runner above (virtualized, unreliable). The default cocoa platform
           # uses that session.
 
+      # Linux only: the adapter tests fetch Eigen, xtensor and mdspan through meson wraps.
       - name: Build
         run: |
-          meson setup --buildtype debugoptimized build
+          meson setup --buildtype debugoptimized build ${{ runner.os == 'Linux' && '-Dwith_third_party_tests=true' || '' }}
           meson compile -C build
       - name: Test
         shell: bash
