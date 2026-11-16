@@ -143,6 +143,56 @@ The constructor of <a href="api/classQCPSoAMultiDataSource.html">QCPSoAMultiData
 The source holds it as long as it lives, so whatever the guard owns stays alive too.
 This matters because resampling runs on a worker thread and can still read the data after you replace it.
 
+### Your own data types
+
+The data calls take any range whose elements convert to `double`, read once from begin to end:
+`std::vector`, `QVector`, `std::array`, `std::span`, `std::views::iota`, a `std::ranges` view.
+A view is read where it is, a container passed as a plain variable is copied once.
+An `Eigen::VectorXd` and a 1D `xt::xtensor` already pass this way.
+A C-order 2D buffer does not even need a type: `viewRowMajorData(keys, values, columns, stride)` views it in place.
+
+Two hooks adapt a type that is not a range, or that must not be read as one.
+Both are plain free functions, found by argument-dependent lookup: write them in the namespace of the type you adapt, never as members, so a third-party type can be adapted without touching it.
+
+- `qcp_numbers(const T&)` gives the numbers of `T` where one run of numbers is expected: a range, or a `std::span` over your storage.
+- `qcp_columns(const T&)` gives the columns of `T` where value columns are expected: a range of ranges, one per component.
+
+Returning a reference or a view copies nothing; returning a value gives the call its own copy.
+
+```cpp
+// A struct of arrays, read as the numbers of the curve it feeds.
+std::span<const double> qcp_numbers(const Samples& samples)
+{
+    return { samples.values, samples.size };
+}
+```
+
+A matrix in Eigen is columns, not one long run of numbers, so it takes a `qcp_columns` hook: `setData(keys, matrix)` then draws one line per column.
+A grid without iteration of its own, an `std::mdspan` say, gives one column per index the same way, each a `std::span` over the rows it covers.
+
+```cpp
+namespace Eigen
+{
+// A 2D array gives its columns. A vector stays one run of numbers, and the constraint is what keeps
+// it out: an unconstrained overload would also take a VectorXf through its conversion to a matrix.
+template <typename Derived>
+    requires(Derived::ColsAtCompileTime != 1)
+auto qcp_columns(const MatrixBase<Derived>& matrix)
+{
+    return std::views::iota(Eigen::Index(0), matrix.cols())
+        | std::views::transform([&matrix](Eigen::Index column)
+                                { return std::views::iota(Eigen::Index(0), matrix.rows())
+                                    | std::views::transform([&matrix, column](Eigen::Index row)
+                                                            { return matrix(row, column); }); });
+}
+} // namespace Eigen
+```
+
+- `void qcp_numbers(const T&) = delete;` refuses a type where numbers are expected: `QCPNumberRange` is false for it, and a `qcp_columns` hook still applies. A 2D type takes it so it cannot be flattened into one curve by mistake.
+- The calls read a `const` range once, from begin to end: your type needs a `const` `begin()` and `end()`, and no random access.
+- Constrain a hook on the shape of what it accepts. A tensor converts to a tensor of another rank and a `MatrixXf` to a `MatrixXd`, so an unconstrained overload is taken for types it was not written for.
+- `QCPNumberRange<T>` and `QCPColumns<T>` are the concepts the calls are constrained by: `static_assert` one of them to see what your type gives.
+
 ### Share one source between graphs
 
 `setDataSource()` takes a `std::shared_ptr` to a source.

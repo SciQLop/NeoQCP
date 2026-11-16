@@ -124,20 +124,27 @@ template <typename T>
 concept columnsHook
     = columnsCall<T> && !std::same_as<decltype(qcp_columns(std::declval<T>())), NoHook>;
 
-//! A range of columns: every element is itself a QCPNumberRange.
+//! A range of columns: every element, as the reading loop takes it, is itself a QCPNumberRange.
+//! The loop hands the element to a const reference, so a column is judged through one.
 template <typename T>
-concept columnSource
-    = std::ranges::input_range<T> && QCPNumberRange<std::ranges::range_value_t<T>>;
+concept columnSource = std::ranges::input_range<T>
+    && QCPNumberRange<std::remove_cvref_t<std::ranges::range_reference_t<T>>>;
 
 template <typename T>
 using columnsHookResult = decltype(qcp_columns(std::declval<T>()));
 
+//! The columns as the adaptor reads them: a hook's reference is read where it is (its const
+//! included), a hook's own object is decayed and read as an lvalue, a plain operand as given.
 template <typename T>
-concept columnsHookAdaptable
-    = columnsHook<T> && columnSource<std::remove_cvref_t<columnsHookResult<T>>>;
+using columnsAsRead = std::conditional_t<std::is_reference_v<T>, T, std::remove_cvref_t<T>&>;
 
 template <typename T>
-concept columnsPlainAdaptable = columnsCall<T> && !columnsHook<T> && columnSource<T>;
+concept columnsHookAdaptable
+    = columnsHook<T> && columnSource<columnsAsRead<columnsHookResult<T>>>;
+
+template <typename T>
+concept columnsPlainAdaptable
+    = columnsCall<T> && !columnsHook<T> && columnSource<columnsAsRead<T>>;
 
 struct Columns
 {

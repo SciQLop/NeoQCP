@@ -27,4 +27,6 @@ private slots:
     void aNumbersHookDoesNotMakeColumns();
     void aColumnsTypeIsNotFlattened();
     void columnsAreCopiedOnce();
+    void columnsAreTakenOverWhenMoved();
+    void columnsConceptMatchesTheRead();
 };

@@ -1,0 +1,12 @@
+[wrap-file]
+directory = xtensor-0.21.5
+source_url = https://github.com/xtensor-stack/xtensor/archive/0.21.5.tar.gz
+source_filename = xtensor-0.21.5.tar.gz
+source_hash = 30cb896b6686683ddaefb12c98bf1109fdfe666136dd027aba1a1e9aa825c241
+patch_filename = xtensor_0.21.5-1_patch.zip
+patch_url = https://wrapdb.mesonbuild.com/v2/xtensor_0.21.5-1/get_patch
+patch_hash = 0e8e51ccbf243c157eb9fff0f286ec388d755e28d23f92f067f6b77fcd92f3d7
+
+[provide]
+xtensor = xtensor_dep
+

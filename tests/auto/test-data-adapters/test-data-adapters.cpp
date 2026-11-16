@@ -123,6 +123,81 @@ private:
     mutable int mReads = 0;
 };
 
+//! A columns hook that hands out a const reference to storage it owns: the adaptor reads it where
+//! it is, so the concept and the call agree on the const container.
+struct SharedColumns
+{
+    std::vector<std::vector<double>> columns { { 1.0, 2.0, 3.0 }, { 4.0, 5.0, 6.0 } };
+};
+
+const std::vector<std::vector<double>>& qcp_columns(const SharedColumns& shared)
+{
+    return shared.columns;
+}
+
+//! Columns only a non-const object iterates, reached through a hook that hands out a const
+//! reference: the adaptor would read the const container, so the concept must refuse it instead of
+//! letting the call fail inside its body.
+struct ConstColumns
+{
+    std::vector<std::vector<double>> values { { 1.0, 2.0 }, { 3.0, 4.0 } };
+
+    std::vector<std::vector<double>>::iterator begin() { return values.begin(); }
+    std::vector<std::vector<double>>::iterator end() { return values.end(); }
+};
+
+struct WrappedColumns
+{
+    ConstColumns columns;
+};
+
+const ConstColumns& qcp_columns(const WrappedColumns& wrapped)
+{
+    return wrapped.columns;
+}
+
+//! A column handed over as a proxy that materializes on demand.
+struct ColumnProxy
+{
+    const double* values = nullptr;
+
+    operator std::vector<double>() const { return { values, values + 2 }; }
+};
+
+//! A columns range that names a column as its value type but hands the reading loop a proxy: the
+//! concept must judge the element reference, which the reading call refuses, and say so itself.
+class ProxiedColumns
+{
+public:
+    struct Iterator
+    {
+        using iterator_concept = std::forward_iterator_tag;
+        using value_type = std::vector<double>;
+        using difference_type = std::ptrdiff_t;
+
+        ColumnProxy operator*() const { return ColumnProxy { rows->data() }; }
+        Iterator& operator++()
+        {
+            ++rows;
+            return *this;
+        }
+        Iterator operator++(int)
+        {
+            Iterator copy = *this;
+            ++rows;
+            return copy;
+        }
+        bool operator==(const Iterator&) const = default;
+
+        const std::array<double, 2>* rows = nullptr;
+    };
+
+    [[nodiscard]] Iterator begin() const { return Iterator { mRows.data() }; }
+    [[nodiscard]] Iterator end() const { return Iterator { mRows.data() + mRows.size() }; }
+
+    std::array<std::array<double, 2>, 2> mRows { { { 1.0, 2.0 }, { 3.0, 4.0 } } };
+};
+
 //! The user type of the last test: a plottable that inherits QCPPlottable1D's data constructor.
 class HookedGraph : public QCPPlottable1D<QCPGraphData>
 {
@@ -184,6 +259,11 @@ static_assert(QCPColumns<DoublesWithColumns>);
 static_assert(!QCPColumns<std::vector<double>>);
 static_assert(!QCPColumns<Samples>);
 static_assert(QCPNumberRange<DoublesWithColumns>);
+static_assert(QCPColumns<std::vector<std::vector<double>>>);
+static_assert(QCPColumns<SharedColumns>);
+static_assert(!QCPColumns<WrappedColumns>);
+static_assert(QCPNumberRange<std::ranges::range_value_t<ProxiedColumns>>);
+static_assert(!QCPColumns<ProxiedColumns>);
 } // namespace
 
 void TestDataAdapters::aVectorIsReadInPlace()
@@ -392,6 +472,11 @@ void TestDataAdapters::aNumbersHookDoesNotMakeColumns()
 void TestDataAdapters::aColumnsTypeIsNotFlattened()
 {
     static_assert(QCPNumberRange<DoublesWithColumns>);
+static_assert(QCPColumns<std::vector<std::vector<double>>>);
+static_assert(QCPColumns<SharedColumns>);
+static_assert(!QCPColumns<WrappedColumns>);
+static_assert(QCPNumberRange<std::ranges::range_value_t<ProxiedColumns>>);
+static_assert(!QCPColumns<ProxiedColumns>);
     static_assert(QCPColumns<DoublesWithColumns>);
 
     const DoublesWithColumns both { 1.0, 2.0, 3.0 };
@@ -404,14 +489,62 @@ void TestDataAdapters::aColumnsTypeIsNotFlattened()
 
 void TestDataAdapters::columnsAreCopiedOnce()
 {
-    std::vector<CountedRange> columns;
-    columns.emplace_back(3);
-    columns.emplace_back(3);
+    std::vector<CountedRange> counted;
+    counted.emplace_back(3);
+    counted.emplace_back(3);
+    const std::vector<double> keys { 0.0, 1.0, 2.0 };
+
+    const QCPGraph readOnce(keys, counted);
+    QCOMPARE(readOnce.componentCount(), 2);
+    QCOMPARE(readOnce.componentValueAt(1, 2), 2.0);
+    QCOMPARE(counted[0].reads(), 3);
+    QCOMPARE(counted[1].reads(), 3);
+
+    // One pass into a buffer of the graph's own: the copy is a different buffer from the caller's,
+    // holding the same values, and the two columns never share one.
+    const std::vector<std::vector<double>> columns { { 1.0, 2.0, 3.0 }, { 4.0, 5.0, 6.0 } };
+    QCPGraph copyingGraph;
+    copyingGraph.setData(keys, columns);
+    const QCPMultiDataSource* const copyingSource = copyingGraph.dataSource();
+    QVERIFY(copyingSource != nullptr);
+    for (int column = 0; column < 2; ++column)
+    {
+        const QCPRawColumn copied = copyingSource->rawColumn(column);
+        QCOMPARE(copied.type, QCPRawColumn::Type::Double);
+        QVERIFY(copied.data != nullptr);
+        QVERIFY(copied.data != static_cast<const void*>(columns[std::size_t(column)].data()));
+        QCOMPARE(copyingSource->valueAt(column, 2), columns[std::size_t(column)][2]);
+    }
+    QVERIFY(copyingSource->rawColumn(0).data != copyingSource->rawColumn(1).data);
+}
+
+void TestDataAdapters::columnsAreTakenOverWhenMoved()
+{
+    QCPGraph graph;
+    std::vector<double> keys { 0.0, 1.0, 2.0 };
+    std::vector<std::vector<double>> columns { { 1.0, 2.0, 3.0 }, { 4.0, 5.0, 6.0 } };
+    const double* const keyBuffer = keys.data();
+    const double* const firstBuffer = columns[0].data();
+    const double* const secondBuffer = columns[1].data();
+
+    graph.setData(std::move(keys), std::move(columns), true);
+
+    const QCPMultiDataSource* const source = graph.dataSource();
+    QVERIFY(source != nullptr);
+    QCOMPARE(source->rawKeyData(), keyBuffer);
+    QCOMPARE(source->rawColumn(0).data, static_cast<const void*>(firstBuffer));
+    QCOMPARE(source->rawColumn(1).data, static_cast<const void*>(secondBuffer));
+}
+
+void TestDataAdapters::columnsConceptMatchesTheRead()
+{
+    const SharedColumns columns;
     const std::vector<double> keys { 0.0, 1.0, 2.0 };
 
     const QCPGraph graph(keys, columns);
     QCOMPARE(graph.componentCount(), 2);
-    QCOMPARE(graph.componentValueAt(1, 2), 2.0);
-    QCOMPARE(columns[0].reads(), 3);
-    QCOMPARE(columns[1].reads(), 3);
+    QCOMPARE(graph.componentValueAt(0, 0), 1.0);
+    QCOMPARE(graph.componentValueAt(0, 2), 3.0);
+    QCOMPARE(graph.componentValueAt(1, 0), 4.0);
+    QCOMPARE(graph.componentValueAt(1, 2), 6.0);
 }
