@@ -225,6 +225,19 @@ struct BuriedData
 ImmovableNumbers qcp_numbers(const BuriedData&) { return {}; }
 ImmovableColumns qcp_columns(const BuriedData&) { return {}; }
 
+//! A hook handing out its storage as a const rvalue: the adaptor owns what it gets, so it copies it.
+struct ExpiringData
+{
+    std::vector<double> numbers { 5.0, 6.0 };
+    std::vector<std::vector<double>> columns { { 1.0 }, { 2.0 } };
+};
+
+const std::vector<double>&& qcp_numbers(const ExpiringData& d) { return std::move(d.numbers); }
+const std::vector<std::vector<double>>&& qcp_columns(const ExpiringData& d)
+{
+    return std::move(d.columns);
+}
+
 //! The user type of the last test: a plottable that inherits QCPPlottable1D's data constructor.
 class HookedGraph : public QCPPlottable1D<QCPGraphData>
 {
@@ -628,6 +641,14 @@ void TestDataAdapters::aConstRvalueIsCopied()
                                  const std::vector<std::vector<double>>&&>);
     static_assert(!std::invocable<decltype(qcp::numbers), const ImmovableNumbers&&>);
     static_assert(!std::invocable<decltype(qcp::columns), const ImmovableColumns&&>);
+    static_assert(std::invocable<decltype(qcp::numbers), const ExpiringData&>);
+    static_assert(std::invocable<decltype(qcp::columns), const ExpiringData&>);
+
+    const ExpiringData expiring;
+    const auto fromHook = qcp::numbers(expiring);
+    QVERIFY((std::ranges::equal(fromHook, std::vector<double> { 5.0, 6.0 })));
+    QVERIFY(std::ranges::data(fromHook) != expiring.numbers.data());
+    QCOMPARE(std::ranges::distance(qcp::columns(expiring)), 2);
 
     std::vector<double> values { 3.0, 4.0 };
     const auto adapted = qcp::numbers(std::move(values));

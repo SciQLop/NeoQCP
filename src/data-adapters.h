@@ -38,9 +38,10 @@ concept contiguousDoubles = std::ranges::contiguous_range<T>
     && std::same_as<std::remove_cv_t<std::ranges::range_value_t<T>>, double>;
 
 //! A range the adaptor has to own is moved into it, which is what the owning view over it requires;
-//! a reference is the caller's storage and is read where it is, so it need not be movable.
+//! an lvalue reference is the caller's storage and is read where it is, so it need not be movable.
+//! An rvalue reference is about to expire: it is owned like a value.
 template <typename T>
-concept movableIfOwned = std::is_reference_v<T> || std::movable<std::remove_cvref_t<T>>;
+concept movableIfOwned = std::is_lvalue_reference_v<T> || std::movable<std::remove_cvref_t<T>>;
 
 //! A const operand the adaptor owns is copied before it is read: a view over it would outlive it,
 //! and views::all refuses a const rvalue outright. A reference is the caller's storage, read where
@@ -84,10 +85,10 @@ struct Numbers
     {
         if constexpr (numbersHook<T>)
         {
-            // A reference is the caller's storage and is read where it is. Anything else is the
+            // An lvalue reference is the caller's storage and is read where it is. Anything else is the
             // hook's own object: it is moved into the range returned here (never a span), and a
             // const value is decayed first, since the adaptor owns what it reads.
-            if constexpr (std::is_reference_v<hookResult<T>>)
+            if constexpr (std::is_lvalue_reference_v<hookResult<T>>)
                 return adaptNumbers(qcp_numbers(std::forward<T>(numbers)));
             else
             {
@@ -161,7 +162,7 @@ using columnsHookResult = decltype(qcp_columns(std::declval<T>()));
 //! included), a hook's own object is moved into the adaptor and read there, a plain operand as
 //! given.
 template <typename T>
-using columnsAsRead = std::conditional_t<std::is_reference_v<T>, T, std::remove_cvref_t<T>&>;
+using columnsAsRead = std::conditional_t<std::is_lvalue_reference_v<T>, T, std::remove_cvref_t<T>&>;
 
 template <typename T>
 concept columnsHookAdaptable = columnsHook<T> && movableIfOwned<columnsHookResult<T>>
@@ -180,9 +181,9 @@ struct Columns
     {
         if constexpr (columnsHook<T>)
         {
-            // A reference is the caller's storage and is viewed where it is. Anything else is the
+            // An lvalue reference is the caller's storage and is viewed where it is. Anything else is the
             // hook's own object: it is moved into the view returned here, never referenced.
-            if constexpr (std::is_reference_v<columnsHookResult<T>>)
+            if constexpr (std::is_lvalue_reference_v<columnsHookResult<T>>)
                 return std::views::all(qcp_columns(std::forward<T>(columns)));
             else
             {
