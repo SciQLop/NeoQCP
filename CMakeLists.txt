@@ -7,7 +7,7 @@ project(NeoQCP VERSION 2.1.1 LANGUAGES CXX)
 option(NEOQCP_WITH_LATEX "Typeset $...$ spans in labels with JKQTMathText" ON)
 option(NEOQCP_TRACY "Instrument for the Tracy profiler" OFF)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 

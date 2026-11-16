@@ -10,7 +10,7 @@ It adds what interactive scientific plotting needs:
 - **Large data stays fluid.** Line data is reduced to pixel resolution, colormaps are resampled on a worker thread, and panning moves cached geometry instead of redrawing.
 - **Data gaps stay gaps.** Missing acquisition periods are left blank instead of being joined by a line.
 - **LaTeX in labels**, themes, spans, timelines, waterfalls, histograms and 2D histograms.
-- **Meson build**, C++20, continuous integration on Linux, macOS and Windows.
+- **Meson build**, C++23, continuous integration on Linux, macOS and Windows.
 
 ![A damped sine with a legend](images/first-plot-interactive.png)
 

@@ -3,7 +3,7 @@
 [![Tests](https://github.com/SciQLop/NeoQCP/actions/workflows/tests.yml/badge.svg)](https://github.com/SciQLop/NeoQCP/actions/workflows/tests.yml)
 [![Documentation](https://readthedocs.org/projects/neoqcp/badge/?version=latest)](https://neoqcp.readthedocs.io/en/latest/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-![C++20](https://img.shields.io/badge/C++-20-blue.svg)
+![C++23](https://img.shields.io/badge/C++-23-blue.svg)
 ![Qt 6.7+](https://img.shields.io/badge/Qt-6.7+-41cd52.svg)
 
 Fast, interactive 2D plotting for Qt 6 applications. NeoQCP is a modernized fork of
@@ -36,7 +36,7 @@ space plasma data, and of its plotting library [SciQLopPlots](https://github.com
 - **Items and interactions.** Shaded spans, click-and-drag item creation, trackpad and touch gestures, and a busy indicator.
 - **Styling.** Light and dark themes, also settable from a Qt stylesheet, and LaTeX in axis labels, legends and titles.
 - **In the browser.** The same code builds for WebAssembly.
-- **A modern build.** Qt 6 only, C++20, Meson or CMake, CI on Linux, macOS, Windows and WebAssembly, and optional [Tracy](https://github.com/wolfpld/tracy) profiling.
+- **A modern build.** Qt 6 only, C++23, Meson or CMake, CI on Linux, macOS, Windows and WebAssembly, and optional [Tracy](https://github.com/wolfpld/tracy) profiling.
 
 It also fixes bugs in QCustomPlot's own code, such as DPI scaling on macOS and Windows, and a
 crash in the date-time axis on Qt 6.10 and newer.
@@ -79,7 +79,7 @@ NeoQCP = NeoQCP_dep
 Then, in your `meson.build`:
 
 ```meson
-project('my-plot-app', 'cpp', default_options: ['cpp_std=c++20'])
+project('my-plot-app', 'cpp', default_options: ['cpp_std=c++23'])
 
 qt = dependency('qt6', modules: ['Core', 'Gui', 'Widgets', 'Svg', 'PrintSupport'])
 neoqcp = dependency('NeoQCP')
@@ -122,7 +122,8 @@ The [migration guide](https://neoqcp.readthedocs.io/en/latest/migrating.html) li
 
 ## Building and testing
 
-You need Qt 6.7 or newer with Qt Shader Tools, a C++20 compiler, Meson 1.1 or newer and Ninja.
+You need Qt 6.7 or newer with Qt Shader Tools, a C++23 compiler (GCC 14, Clang 18 or Apple Clang 16,
+MSVC 17.10), Meson 1.3 or newer and Ninja.
 The tests and examples build with Meson:
 
 ```bash

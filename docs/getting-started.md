@@ -3,8 +3,8 @@
 ## What you need
 
 - Qt 6.7 or newer, with the Core, Gui, Widgets, Svg and PrintSupport modules, and Qt Shader Tools (its `qsb` compiles the shaders).
-- A C++20 compiler.
-- [Meson](https://mesonbuild.com/) 1.1 or newer and Ninja, or CMake 3.21 or newer.
+- A C++23 compiler: GCC 14, Clang 18 or Apple Clang 16, MSVC 17.10 (Visual Studio 2022).
+- [Meson](https://mesonbuild.com/) 1.3 or newer and Ninja, or CMake 3.21 or newer.
 
 ## Build NeoQCP
 
@@ -94,7 +94,7 @@ Pin `revision` to a commit for reproducible builds.
 Then ask for the dependency in your `meson.build`:
 
 ```meson
-project('my-plot-app', 'cpp', default_options: ['cpp_std=c++20'])
+project('my-plot-app', 'cpp', default_options: ['cpp_std=c++23'])
 
 qt = dependency('qt6', modules: ['Core', 'Gui', 'Widgets', 'Svg', 'PrintSupport'])
 neoqcp = dependency('NeoQCP')
