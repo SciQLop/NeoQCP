@@ -58,9 +58,7 @@ public:
     template <QCPNumberRange K, QCPNumberRange V>
     QCPGraph(const K& keys, const V& values, bool alreadySorted = false) : QCPGraph()
     {
-        std::vector<double> keyValues(std::ranges::begin(keys), std::ranges::end(keys));
-        std::vector<double> dataValues(std::ranges::begin(values), std::ranges::end(values));
-        setData(keyValues, dataValues, alreadySorted);
+        setData(qcp::toDoubles(keys), qcp::toDoubles(values), alreadySorted);
     }
     //! Value columns of any numeric type: the constructor form of the multi-column setData().
     template <IndexableNumericRange KC, IndexableNumericRange VC>
@@ -123,8 +121,8 @@ public:
     //! One-column data: keys and values as QVectors (2.x's spelling).
     void setData(const QVector<double>& keys, const QVector<double>& values,
                  bool alreadySorted = false);
-    //! One-column data: keys and values as std::vectors.
-    void setData(const std::vector<double>& keys, const std::vector<double>& values,
+    //! One-column data: keys and values as std::vectors. They are moved into the source.
+    void setData(std::vector<double> keys, std::vector<double> values,
                  bool alreadySorted = false);
     //! One-column data from braced lists, `setData({1, 2}, {3, 4})`: 2.x's QVector call, which
     //! the two container overloads above would make ambiguous.

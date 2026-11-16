@@ -92,6 +92,7 @@ neoqcp_moc_headers = [
             'src/handle.h',
             'src/signal-delivery.h',
             'src/core.h',
+            'src/data-adapters.h',
             'src/datacontainer.h',
             'src/global.h',
             'src/overlay.h',

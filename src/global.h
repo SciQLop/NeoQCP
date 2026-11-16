@@ -68,6 +68,8 @@
 
 // amalgamation: include end
 
+#include "data-adapters.h"
+
 // decl definitions for shared library compilation/usage:
 #if defined(QT_STATIC_BUILD)
 #define QCP_LIB_DECL
@@ -79,19 +81,6 @@
 #define QCP_LIB_DECL
 #endif
 
-
-/*!
-  Any range of numbers goes in: the keys, values and column arguments of the data-taking calls are
-  constrained by this concept, not written once per container type. A std::vector, a QVector, a
-  std::array and a view such as std::views::iota all pass; a range whose elements do not convert to
-  double (QStringList, say) does not.
-
-  The data-taking calls measure a range before they read it, so a forward range is what they need:
-  no random access, no second pass.
-*/
-template <typename R>
-concept QCPNumberRange
-    = std::ranges::input_range<R> && std::convertible_to<std::ranges::range_value_t<R>, double>;
 
 /*!
   The QCP Namespace contains general enums, QFlags and functions used throughout the QCustomPlot

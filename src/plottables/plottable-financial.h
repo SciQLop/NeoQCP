@@ -137,12 +137,11 @@ public:
                  bool alreadySorted = false)
         : QCPFinancial()
     {
-        setData(QVector<double>(std::ranges::begin(keys), std::ranges::end(keys)),
-                QVector<double>(std::ranges::begin(open), std::ranges::end(open)),
-                QVector<double>(std::ranges::begin(high), std::ranges::end(high)),
-                QVector<double>(std::ranges::begin(low), std::ranges::end(low)),
-                QVector<double>(std::ranges::begin(close), std::ranges::end(close)),
-                alreadySorted);
+        setData(qcp::detail::toContainer<QVector<double>>(keys),
+                qcp::detail::toContainer<QVector<double>>(open),
+                qcp::detail::toContainer<QVector<double>>(high),
+                qcp::detail::toContainer<QVector<double>>(low),
+                qcp::detail::toContainer<QVector<double>>(close), alreadySorted);
     }
     virtual ~QCPFinancial() override;
 

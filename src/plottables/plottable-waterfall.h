@@ -75,9 +75,7 @@ public:
     QCPWaterfallGraph(const K& keys, const V& values, bool alreadySorted = false)
         : QCPWaterfallGraph()
     {
-        std::vector<double> keyValues(std::ranges::begin(keys), std::ranges::end(keys));
-        std::vector<double> dataValues(std::ranges::begin(values), std::ranges::end(values));
-        setData(keyValues, dataValues, alreadySorted);
+        setData(qcp::toDoubles(keys), qcp::toDoubles(values), alreadySorted);
     }
     //! Value columns of any numeric type: the constructor form of the multi-column setData().
     template <IndexableNumericRange KC, IndexableNumericRange VC>

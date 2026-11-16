@@ -93,9 +93,8 @@ public:
     QCPPolarGraph(const K& keys, const V& values, bool alreadySorted = false)
         : QCPPolarGraph()
     {
-        setData(QVector<double>(std::ranges::begin(keys), std::ranges::end(keys)),
-                QVector<double>(std::ranges::begin(values), std::ranges::end(values)),
-                alreadySorted);
+        setData(qcp::detail::toContainer<QVector<double>>(keys),
+                qcp::detail::toContainer<QVector<double>>(values), alreadySorted);
     }
 
     // getters:

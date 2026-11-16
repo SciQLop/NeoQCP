@@ -9,6 +9,7 @@
 #include "test-coordinate-system/test-coordinate-system.h"
 #include "test-coords/test-coords.h"
 #include "test-creation-mode/test-creation-mode.h"
+#include "test-data-adapters/test-data-adapters.h"
 #include "test-data-locator/test-data-locator.h"
 #include "test-data-swap/test-data-swap.h"
 #include "test-datacontainer/test-datacontainer.h"
@@ -182,6 +183,7 @@ int main(int argc, char** argv)
     QCPTEST(TestHistogram1D);
     QCPTEST(TestHistogramPlottable);
     QCPTEST(TestErrorBarGeometry);
+    QCPTEST(TestDataAdapters);
     QCPTEST(TestDataLocator);
     QCPTEST(TestRSpan);
     QCPTEST(TestSpan);

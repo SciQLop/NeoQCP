@@ -118,13 +118,12 @@ public:
                       bool alreadySorted = false)
         : QCPStatisticalBox()
     {
-        setData(QVector<double>(std::ranges::begin(keys), std::ranges::end(keys)),
-                QVector<double>(std::ranges::begin(minimum), std::ranges::end(minimum)),
-                QVector<double>(std::ranges::begin(lowerQuartile), std::ranges::end(lowerQuartile)),
-                QVector<double>(std::ranges::begin(median), std::ranges::end(median)),
-                QVector<double>(std::ranges::begin(upperQuartile), std::ranges::end(upperQuartile)),
-                QVector<double>(std::ranges::begin(maximum), std::ranges::end(maximum)),
-                alreadySorted);
+        setData(qcp::detail::toContainer<QVector<double>>(keys),
+                qcp::detail::toContainer<QVector<double>>(minimum),
+                qcp::detail::toContainer<QVector<double>>(lowerQuartile),
+                qcp::detail::toContainer<QVector<double>>(median),
+                qcp::detail::toContainer<QVector<double>>(upperQuartile),
+                qcp::detail::toContainer<QVector<double>>(maximum), alreadySorted);
     }
 
     // getters:

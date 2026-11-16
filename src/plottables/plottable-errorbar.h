@@ -104,14 +104,14 @@ public:
     template <QCPNumberRange E>
     explicit QCPErrorBars(const E& error) : QCPErrorBars()
     {
-        setData(QVector<double>(std::ranges::begin(error), std::ranges::end(error)));
+        setData(qcp::detail::toContainer<QVector<double>>(error));
     }
     //! One error per side, as setData() takes them.
     template <QCPNumberRange EM, QCPNumberRange EP>
     QCPErrorBars(const EM& errorMinus, const EP& errorPlus) : QCPErrorBars()
     {
-        setData(QVector<double>(std::ranges::begin(errorMinus), std::ranges::end(errorMinus)),
-                QVector<double>(std::ranges::begin(errorPlus), std::ranges::end(errorPlus)));
+        setData(qcp::detail::toContainer<QVector<double>>(errorMinus),
+                qcp::detail::toContainer<QVector<double>>(errorPlus));
     }
     virtual ~QCPErrorBars() override;
 

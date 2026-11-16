@@ -320,11 +320,18 @@ template <QCPNumberRange K, QCPNumberRange V>
 QCPPlottable1D<DataType, Base>::QCPPlottable1D(const K& keys, const V& values)
         : QCPPlottable1D()
 {
+    const auto keyRange = qcp::numbers(keys);
+    const auto valueRange = qcp::numbers(values);
     QVector<DataType> data;
-    data.reserve(std::min(std::ranges::distance(keys), std::ranges::distance(values)));
-    auto key = std::ranges::begin(keys);
-    auto value = std::ranges::begin(values);
-    for (; key != std::ranges::end(keys) && value != std::ranges::end(values); ++key, ++value)
+    if constexpr (std::ranges::sized_range<decltype(keyRange)>
+                  && std::ranges::sized_range<decltype(valueRange)>)
+        data.reserve(static_cast<qsizetype>(
+            std::min(std::ranges::size(keyRange), std::ranges::size(valueRange))));
+    auto key = std::ranges::begin(keyRange);
+    auto value = std::ranges::begin(valueRange);
+    const auto keyEnd = std::ranges::end(keyRange);
+    const auto valueEnd = std::ranges::end(valueRange);
+    for (; key != keyEnd && value != valueEnd; ++key, ++value)
         data.append(DataType(double(*key), double(*value)));
     mDataContainer->set(data, false);
 }
