@@ -111,8 +111,8 @@ public:
 
     QCPStatisticalBox();
     //! Keys and the five statistics, as setData() takes them: one box per key.
-    template <QCPNumberRange K, QCPNumberRange MN, QCPNumberRange LQ, QCPNumberRange MD,
-              QCPNumberRange UQ, QCPNumberRange MX>
+    template <QCPNumberRange K, QCPNumbersOnly MN, QCPNumbersOnly LQ, QCPNumbersOnly MD,
+              QCPNumbersOnly UQ, QCPNumbersOnly MX>
     QCPStatisticalBox(const K& keys, const MN& minimum, const LQ& lowerQuartile,
                       const MD& median, const UQ& upperQuartile, const MX& maximum,
                       bool alreadySorted = false)

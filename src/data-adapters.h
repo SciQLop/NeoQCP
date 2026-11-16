@@ -42,6 +42,18 @@ concept contiguousDoubles = std::ranges::contiguous_range<T>
 template <typename T>
 concept movableIfOwned = std::is_reference_v<T> || std::movable<std::remove_cvref_t<T>>;
 
+//! A const operand the adaptor owns is copied before it is read: a view over it would outlive it,
+//! and views::all refuses a const rvalue outright. A reference is the caller's storage, read where
+//! it is, so its constness costs nothing.
+template <typename T>
+concept ownedCopyable = std::is_reference_v<T> || !std::is_const_v<std::remove_reference_t<T>>
+    || std::constructible_from<std::remove_cvref_t<T>, T>;
+
+//! The const operand the adaptor owns: it is copied into a non-const local, as the hook branch
+//! does with a const hook result.
+template <typename T>
+constexpr bool constOwned = !std::is_reference_v<T> && std::is_const_v<std::remove_reference_t<T>>;
+
 template <typename T>
 constexpr auto adaptNumbers(T&& numbers)
 {
@@ -60,8 +72,8 @@ concept numbersHookAdaptable = numbersHook<T> && movableIfOwned<hookResult<T>>
     && numberSource<std::remove_cvref_t<hookResult<T>>>;
 
 template <typename T>
-concept numbersPlainAdaptable
-    = numbersCall<T> && !numbersHook<T> && movableIfOwned<T> && numberSource<T>;
+concept numbersPlainAdaptable = numbersCall<T> && !numbersHook<T> && movableIfOwned<T>
+    && ownedCopyable<T> && numberSource<T>;
 
 struct Numbers
 {
@@ -83,6 +95,11 @@ struct Numbers
                     = qcp_numbers(std::forward<T>(numbers));
                 return adaptNumbers(std::move(hooked));
             }
+        }
+        else if constexpr (constOwned<T>)
+        {
+            std::remove_cvref_t<T> owned = std::forward<T>(numbers);
+            return adaptNumbers(std::move(owned));
         }
         else
             return adaptNumbers(std::forward<T>(numbers));
@@ -152,7 +169,7 @@ concept columnsHookAdaptable = columnsHook<T> && movableIfOwned<columnsHookResul
 
 template <typename T>
 concept columnsPlainAdaptable = columnsCall<T> && !columnsHook<T> && movableIfOwned<T>
-    && columnSource<columnsAsRead<T>>;
+    && ownedCopyable<T> && columnSource<columnsAsRead<T>>;
 
 struct Columns
 {
@@ -173,6 +190,11 @@ struct Columns
                     = qcp_columns(std::forward<T>(columns));
                 return std::views::all(std::move(hooked));
             }
+        }
+        else if constexpr (constOwned<T>)
+        {
+            std::remove_cvref_t<T> owned = std::forward<T>(columns);
+            return std::views::all(std::move(owned));
         }
         else
             return std::views::all(std::forward<T>(columns));
@@ -206,6 +228,16 @@ inline constexpr detail::Columns columns;
 */
 template <typename M>
 concept QCPColumns = requires(const M& m) { qcp::columns(m); };
+
+/*!
+  The one-column value argument of a data form: a \ref QCPNumberRange that is not \ref QCPColumns.
+
+  A type with a \ref qcp::columns hook is columns, never one run of numbers: a number form that took
+  it would flatten it row-major and draw truncated data without a word. The two plottables with a
+  columns form (QCPGraph, QCPWaterfallGraph) take it there; every other data form keeps it out.
+*/
+template <typename R>
+concept QCPNumbersOnly = QCPNumberRange<R> && !QCPColumns<R>;
 
 namespace qcp
 {

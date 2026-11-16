@@ -209,7 +209,7 @@ public:
 
     QCPBars();
     //! Keys and values, as setData() takes them: one bar per pair.
-    template <QCPNumberRange K, QCPNumberRange V>
+    template <QCPNumberRange K, QCPNumbersOnly V>
     QCPBars(const K& keys, const V& values, bool alreadySorted = false) : QCPBars()
     {
         setData(qcp::detail::toContainer<QVector<double>>(keys),

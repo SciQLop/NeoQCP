@@ -21,7 +21,7 @@
   Returns an empty handle when the rect has no such axis pair or the system refuses the graph, as
   add<QCPGraph>() does.
 */
-template <QCPNumberRange K, QCPNumberRange V>
+template <QCPNumberRange K, QCPNumbersOnly V>
 QCPHandle<QCPGraph> QCPAxisRect::line(const K& keys, const V& values, const QCPLineOptions& options)
 {
     const QCPHandle<QCPGraph> graph = add<QCPGraph>(keys, values);

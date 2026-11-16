@@ -106,7 +106,7 @@ public:
 
     QCPCurve();
     //! T, keys and values, as setData() takes them.
-    template <QCPNumberRange T, QCPNumberRange K, QCPNumberRange V>
+    template <QCPNumbersOnly T, QCPNumberRange K, QCPNumbersOnly V>
     QCPCurve(const T& t, const K& keys, const V& values, bool alreadySorted = false) : QCPCurve()
     {
         setData(qcp::detail::toContainer<QVector<double>>(t),
@@ -114,7 +114,7 @@ public:
                 qcp::detail::toContainer<QVector<double>>(values), alreadySorted);
     }
     //! Keys and values, as setData() takes them: a curve whose points follow the keys.
-    template <QCPNumberRange K, QCPNumberRange V>
+    template <QCPNumberRange K, QCPNumbersOnly V>
     QCPCurve(const K& keys, const V& values) : QCPCurve()
     {
         setData(qcp::detail::toContainer<QVector<double>>(keys),

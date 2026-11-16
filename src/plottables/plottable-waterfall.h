@@ -71,8 +71,7 @@ public:
 
     QCPWaterfallGraph();
     //! One row per (key, value) pair, sorted by key.
-    template <QCPNumberRange K, QCPNumberRange V>
-        requires(!QCPColumns<V>)
+    template <QCPNumberRange K, QCPNumbersOnly V>
     QCPWaterfallGraph(const K& keys, const V& values, bool alreadySorted = false)
         : QCPWaterfallGraph()
     {

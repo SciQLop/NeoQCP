@@ -55,8 +55,7 @@ public:
     explicit QCPGraph(QCP::Capabilities required = QCP::capStraightSegments);
     //! One data point per (key, value) pair, sorted by key: add<QCPGraph>(keys, values) needs no
     //! setData() call.
-    template <QCPNumberRange K, QCPNumberRange V>
-        requires(!QCPColumns<V>)
+    template <QCPNumberRange K, QCPNumbersOnly V>
     QCPGraph(const K& keys, const V& values, bool alreadySorted = false) : QCPGraph()
     {
         setData(qcp::toDoubles(keys), qcp::toDoubles(values), alreadySorted);
@@ -140,6 +139,13 @@ public:
         setData(qcp::toDoubles(keys), std::move(copied), alreadySorted);
     }
 
+    //! One-column data from any QCPNumberRange, a span or a view say: read once into the graph's
+    //! own storage, the container overloads below without the container.
+    template <QCPNumberRange K, QCPNumbersOnly V>
+    void setData(const K& keys, const V& values, bool alreadySorted = false)
+    {
+        setData(qcp::toDoubles(keys), qcp::toDoubles(values), alreadySorted);
+    }
     //! One-column data: keys and values as QVectors (2.x's spelling).
     void setData(const QVector<double>& keys, const QVector<double>& values,
                  bool alreadySorted = false);
@@ -560,6 +566,13 @@ public:
 
     Ret setData(const QVector<double>& keys, const QVector<double>& values,
                 bool alreadySorted = false)
+    {
+        return this->apply([&](T& o) { o.setData(keys, values, alreadySorted); });
+    }
+
+    //! The range form of QCPGraph::setData(): a span or a view, read once.
+    template <QCPNumberRange K, QCPNumbersOnly V>
+    Ret setData(const K& keys, const V& values, bool alreadySorted = false)
     {
         return this->apply([&](T& o) { o.setData(keys, values, alreadySorted); });
     }

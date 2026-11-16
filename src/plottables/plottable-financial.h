@@ -131,8 +131,8 @@ public:
 
     QCPFinancial();
     //! Keys, open, high, low and close, as setData() takes them: one candle per key.
-    template <QCPNumberRange K, QCPNumberRange O, QCPNumberRange H, QCPNumberRange L,
-              QCPNumberRange C>
+    template <QCPNumberRange K, QCPNumbersOnly O, QCPNumbersOnly H, QCPNumbersOnly L,
+              QCPNumbersOnly C>
     QCPFinancial(const K& keys, const O& open, const H& high, const L& low, const C& close,
                  bool alreadySorted = false)
         : QCPFinancial()

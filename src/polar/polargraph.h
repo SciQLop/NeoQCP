@@ -89,7 +89,7 @@ public:
 
     explicit QCPPolarGraph(QCP::Capabilities required = QCP::Capabilities());
     //! Keys (angles) and values, as setData() takes them.
-    template <QCPNumberRange K, QCPNumberRange V>
+    template <QCPNumberRange K, QCPNumbersOnly V>
     QCPPolarGraph(const K& keys, const V& values, bool alreadySorted = false)
         : QCPPolarGraph()
     {

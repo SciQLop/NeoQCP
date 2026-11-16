@@ -166,7 +166,7 @@ public:
     // A graph of \a keys and \a values on this rect's axes, in one call: the data goes to the
     // graph's data constructor, and \a options feeds its pen, name and scatter style. Defined in
     // axisrect-shortcuts.h, after the graph and the items exist.
-    template <QCPNumberRange K, QCPNumberRange V>
+    template <QCPNumberRange K, QCPNumbersOnly V>
     QCPHandle<QCPGraph> line(const K& keys, const V& values,
                              const QCPLineOptions& options = { });
     // A text item at \a at, in whatever space \a at names, carrying \a text and \a style.

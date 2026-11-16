@@ -29,4 +29,8 @@ private slots:
     void columnsAreCopiedOnce();
     void columnsAreTakenOverWhenMoved();
     void columnsConceptMatchesTheRead();
+    void setDataTakesAnyRange();
+    void narrowAndIntegerRangesGiveTheSamePoints();
+    void aConstRvalueIsCopied();
+    void columnsAreNotNumbers();
 };

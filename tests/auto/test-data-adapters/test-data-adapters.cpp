@@ -571,3 +571,110 @@ void TestDataAdapters::columnsConceptMatchesTheRead()
     QCOMPARE(graph.componentValueAt(1, 0), 4.0);
     QCOMPARE(graph.componentValueAt(1, 2), 6.0);
 }
+
+void TestDataAdapters::setDataTakesAnyRange()
+{
+    QCustomPlot plot;
+    auto graph = plot.add<QCPGraph>();
+    const std::vector<double> keys { 1.0, 2.0, 3.0 };
+    const std::vector<double> values { 4.0, 5.0, 6.0 };
+
+    graph.setData(keys, std::span<const double>(values));
+    QCOMPARE(graph->dataCount(), 3);
+    QCOMPARE(graph->dataMainValue(2), 6.0);
+
+    // A single-pass view is read once, as a container is.
+    const auto view
+        = std::views::iota(0, 3) | std::views::transform([](int i) { return 10.0 + i; });
+    graph.setData(keys, view);
+    QCOMPARE(graph->dataMainKey(2), 3.0);
+    QCOMPARE(graph->dataMainValue(0), 10.0);
+    QCOMPARE(graph->dataMainValue(2), 12.0);
+
+    // The by-value container overloads keep winning for their own arguments.
+    graph.setData(std::span(keys), std::span(values), true);
+    QCOMPARE(graph->dataCount(), 3);
+    QCOMPARE(graph->dataMainValue(1), 5.0);
+}
+
+void TestDataAdapters::narrowAndIntegerRangesGiveTheSamePoints()
+{
+    const std::vector<double> keys { 1.0, 2.0, 3.0, 4.0 };
+    const std::vector<double> values { 5.0, 6.0, 7.0, 8.0 };
+    const std::array<double, 4> array { 5.0, 6.0, 7.0, 8.0 };
+    const std::vector<int> integers { 5, 6, 7, 8 };
+
+    const QCPGraph fromDoubles(keys, values);
+    const QCPGraph fromSpan(keys, std::span<const double, 4>(array));
+    const QCPGraph fromIntegers(keys, integers);
+
+    QCOMPARE(fromSpan.dataCount(), fromDoubles.dataCount());
+    QCOMPARE(fromIntegers.dataCount(), fromDoubles.dataCount());
+    for (int i = 0; i < fromDoubles.dataCount(); ++i)
+    {
+        QCOMPARE(fromSpan.dataMainKey(i), fromDoubles.dataMainKey(i));
+        QCOMPARE(fromSpan.dataMainValue(i), fromDoubles.dataMainValue(i));
+        QCOMPARE(fromIntegers.dataMainKey(i), fromDoubles.dataMainKey(i));
+        QCOMPARE(fromIntegers.dataMainValue(i), fromDoubles.dataMainValue(i));
+    }
+}
+
+void TestDataAdapters::aConstRvalueIsCopied()
+{
+    // A const rvalue is owned, so it is copied into a non-const local: the concept says so instead
+    // of the call failing inside its body, and a type that cannot be copied is refused.
+    static_assert(std::invocable<decltype(qcp::numbers), const std::vector<double>&&>);
+    static_assert(std::invocable<decltype(qcp::columns),
+                                 const std::vector<std::vector<double>>&&>);
+    static_assert(!std::invocable<decltype(qcp::numbers), const ImmovableNumbers&&>);
+    static_assert(!std::invocable<decltype(qcp::columns), const ImmovableColumns&&>);
+
+    std::vector<double> values { 3.0, 4.0 };
+    const auto adapted = qcp::numbers(std::move(values));
+    using Owned = std::ranges::owning_view<std::vector<double>>;
+    static_assert(std::same_as<std::remove_cvref_t<decltype(adapted)>, Owned>);
+    QVERIFY((std::ranges::equal(adapted, std::vector<double> { 3.0, 4.0 })));
+    QVERIFY(adapted.base().data() != values.data());
+
+    std::vector<std::vector<double>> columns { { 1.0, 2.0 }, { 3.0, 4.0 } };
+    const auto adaptedColumns = qcp::columns(std::move(columns));
+    QCOMPARE(std::ranges::distance(adaptedColumns), 2);
+    auto column = std::ranges::begin(adaptedColumns);
+    QVERIFY((qcp::toDoubles(*column) == std::vector<double> { 1.0, 2.0 }));
+    ++column;
+    QVERIFY((qcp::toDoubles(*column) == std::vector<double> { 3.0, 4.0 }));
+
+    // A const lvalue is still the caller's storage and is read where it is.
+    const std::vector<double> shared { 7.0, 8.0 };
+    const auto inPlace = qcp::numbers(std::as_const(shared));
+    static_assert(std::same_as<std::remove_cvref_t<decltype(inPlace)>, std::span<const double>>);
+    QCOMPARE(inPlace.data(), shared.data());
+}
+
+void TestDataAdapters::columnsAreNotNumbers()
+{
+    static_assert(!QCPNumbersOnly<DoublesWithColumns>);
+    static_assert(QCPNumbersOnly<std::vector<double>>);
+    static_assert(!QCPNumbersOnly<std::vector<std::vector<double>>>);
+
+    // A type with a columns hook is drawn as columns or refused: never flattened row-major.
+    static_assert(!std::constructible_from<QCPBars, std::vector<double>, DoublesWithColumns>);
+    static_assert(!std::constructible_from<QCPCurve, std::vector<double>, DoublesWithColumns>);
+    static_assert(
+        !std::constructible_from<QCPCurve, DoublesWithColumns, std::vector<double>, std::vector<double>>);
+    static_assert(!std::constructible_from<QCPErrorBars, DoublesWithColumns>);
+    static_assert(!std::constructible_from<QCPErrorBars, DoublesWithColumns, DoublesWithColumns>);
+    static_assert(!std::constructible_from<QCPFinancial, std::vector<double>, DoublesWithColumns,
+                                             std::vector<double>, std::vector<double>,
+                                             std::vector<double>>);
+    static_assert(!std::constructible_from<QCPStatisticalBox, std::vector<double>,
+                                             DoublesWithColumns, std::vector<double>,
+                                             std::vector<double>, std::vector<double>,
+                                             std::vector<double>>);
+    static_assert(!std::constructible_from<QCPPolarGraph, std::vector<double>, DoublesWithColumns>);
+    static_assert(!std::constructible_from<HookedGraph, std::vector<double>, DoublesWithColumns>);
+
+    // The two plottables with a columns form take it as columns.
+    static_assert(std::constructible_from<QCPGraph, std::vector<double>, DoublesWithColumns>);
+    static_assert(std::constructible_from<QCPWaterfallGraph, std::vector<double>, DoublesWithColumns>);
+}

@@ -101,13 +101,13 @@ public:
 
     QCPErrorBars();
     //! The same error on both sides, as setData() takes it.
-    template <QCPNumberRange E>
+    template <QCPNumbersOnly E>
     explicit QCPErrorBars(const E& error) : QCPErrorBars()
     {
         setData(qcp::detail::toContainer<QVector<double>>(error));
     }
     //! One error per side, as setData() takes them.
-    template <QCPNumberRange EM, QCPNumberRange EP>
+    template <QCPNumbersOnly EM, QCPNumbersOnly EP>
     QCPErrorBars(const EM& errorMinus, const EP& errorPlus) : QCPErrorBars()
     {
         setData(qcp::detail::toContainer<QVector<double>>(errorMinus),

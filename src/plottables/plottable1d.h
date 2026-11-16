@@ -69,7 +69,7 @@ public:
     //! One data point per (key, value) pair, sorted by key: the constructor form of setData(), so
     //! that add<T>(keys, values) needs no setData() call. A user type inherits it with
     //! using QCPPlottable1D<D>::QCPPlottable1D;
-    template <QCPNumberRange K, QCPNumberRange V>
+    template <QCPNumberRange K, QCPNumbersOnly V>
         requires std::constructible_from<DataType, double, double>
     QCPPlottable1D(const K& keys, const V& values);
     virtual ~QCPPlottable1D() override;
@@ -315,7 +315,7 @@ QCPPlottable1D<DataType, Base>::QCPPlottable1D(QCP::Capabilities required)
   setData(), for the plottables whose data type is made of a key and a value.
 */
 template <class DataType, class Base>
-template <QCPNumberRange K, QCPNumberRange V>
+template <QCPNumberRange K, QCPNumbersOnly V>
     requires std::constructible_from<DataType, double, double>
 QCPPlottable1D<DataType, Base>::QCPPlottable1D(const K& keys, const V& values)
         : QCPPlottable1D()
