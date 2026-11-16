@@ -56,9 +56,17 @@ public:
     //! One data point per (key, value) pair, sorted by key: add<QCPGraph>(keys, values) needs no
     //! setData() call.
     template <QCPNumberRange K, QCPNumberRange V>
+        requires(!QCPColumns<V>)
     QCPGraph(const K& keys, const V& values, bool alreadySorted = false) : QCPGraph()
     {
         setData(qcp::toDoubles(keys), qcp::toDoubles(values), alreadySorted);
+    }
+    //! One component per value column, the 2D form: add<QCPGraph>(keys, columns) needs no setData()
+    //! call.
+    template <QCPNumberRange K, QCPColumns C>
+    QCPGraph(const K& keys, const C& columns, bool alreadySorted = false) : QCPGraph()
+    {
+        setData(keys, columns, alreadySorted);
     }
     //! Value columns of any numeric type: the constructor form of the multi-column setData().
     template <IndexableNumericRange KC, IndexableNumericRange VC>
@@ -116,6 +124,20 @@ public:
             setDataSource(std::make_shared<QCPSoAMultiDataSource<KD, VD>>(
                 std::forward<KC>(keys), std::forward<std::vector<VC>>(valueColumns)));
         }
+    }
+
+    //! One component per value column of any QCPColumns, each column read once into the graph's
+    //! own storage: the 2D form of the data calls.
+    template <QCPNumberRange K, QCPColumns C>
+    void setData(const K& keys, const C& columns, bool alreadySorted = false)
+    {
+        auto adapted = qcp::columns(columns);
+        std::vector<std::vector<double>> copied;
+        if constexpr (std::ranges::sized_range<decltype(adapted)>)
+            copied.reserve(static_cast<std::size_t>(std::ranges::size(adapted)));
+        for (auto&& column : adapted)
+            copied.push_back(qcp::toDoubles(column));
+        setData(qcp::toDoubles(keys), std::move(copied), alreadySorted);
     }
 
     //! One-column data: keys and values as QVectors (2.x's spelling).
@@ -528,6 +550,12 @@ public:
                 o.setData(std::forward<KC>(keys), std::forward<std::vector<VC>>(valueColumns),
                           alreadySorted);
             });
+    }
+
+    template <QCPNumberRange K, QCPColumns C>
+    Ret setData(const K& keys, const C& columns, bool alreadySorted = false)
+    {
+        return this->apply([&](T& o) { o.setData(keys, columns, alreadySorted); });
     }
 
     Ret setData(const QVector<double>& keys, const QVector<double>& values,

@@ -111,6 +111,87 @@ inline constexpr detail::Numbers numbers;
 template <typename R>
 concept QCPNumberRange = requires(const R& r) { qcp::numbers(r); };
 
+namespace qcp::detail
+{
+// The fallback of the qcp_columns call, exactly as qcp_numbers': an ellipsis loses to any user
+// hook, so any hook wins, and a deleted hook is still the best match: its call is ill-formed.
+NoHook qcp_columns(...);
+
+template <typename T>
+concept columnsCall = requires { qcp_columns(std::declval<T>()); };
+
+template <typename T>
+concept columnsHook
+    = columnsCall<T> && !std::same_as<decltype(qcp_columns(std::declval<T>())), NoHook>;
+
+//! A range of columns: every element is itself a QCPNumberRange.
+template <typename T>
+concept columnSource
+    = std::ranges::input_range<T> && QCPNumberRange<std::ranges::range_value_t<T>>;
+
+template <typename T>
+using columnsHookResult = decltype(qcp_columns(std::declval<T>()));
+
+template <typename T>
+concept columnsHookAdaptable
+    = columnsHook<T> && columnSource<std::remove_cvref_t<columnsHookResult<T>>>;
+
+template <typename T>
+concept columnsPlainAdaptable = columnsCall<T> && !columnsHook<T> && columnSource<T>;
+
+struct Columns
+{
+    //! The columns are a view of the caller's data: the call that reads them copies them once.
+    template <typename T>
+        requires columnsHookAdaptable<T> || columnsPlainAdaptable<T>
+    constexpr auto operator()(T&& columns) const
+    {
+        if constexpr (columnsHook<T>)
+        {
+            // A reference is the caller's storage and is viewed where it is. Anything else is the
+            // hook's own object: it is moved into the view returned here, never referenced.
+            if constexpr (std::is_reference_v<columnsHookResult<T>>)
+                return std::views::all(qcp_columns(std::forward<T>(columns)));
+            else
+            {
+                std::remove_cvref_t<columnsHookResult<T>> hooked
+                    = qcp_columns(std::forward<T>(columns));
+                return std::views::all(std::move(hooked));
+            }
+        }
+        else
+            return std::views::all(std::forward<T>(columns));
+    }
+};
+} // namespace qcp::detail
+
+namespace qcp
+{
+/*!
+  The columns of \a columns: the multi-column data calls read their value columns through this,
+  the 2D counterpart of \ref qcp::numbers.
+
+  ADL finds a user's `qcp_columns(const T&)` first: it returns a range whose elements are each a
+  range of numbers, one per column, and that range is what the calls read. Without a hook, a range
+  whose elements are QCPNumberRange is adapted itself. The result is a view: a hook's own object is
+  moved into it, and the call that reads the columns copies them once into its own storage.
+
+  A `void qcp_columns(const T&) = delete` refuses a type: QCPColumns is then false for it.
+*/
+inline constexpr detail::Columns columns;
+} // namespace qcp
+
+/*!
+  A 2D container whose elements are each a range of numbers: a std::vector<std::vector<double>>,
+  say, or a user type through its \ref qcp::columns hook. One element is one value column.
+
+  A range of numbers (std::vector<double>) is not columns: its elements are numbers, not ranges. A
+  type whose \ref qcp::columns hook does not return columns is not either, and the diagnosis is the
+  call's constraint rather than a message.
+*/
+template <typename M>
+concept QCPColumns = requires(const M& m) { qcp::columns(m); };
+
 namespace qcp
 {
 namespace detail

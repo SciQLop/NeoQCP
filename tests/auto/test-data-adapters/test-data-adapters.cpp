@@ -142,6 +142,48 @@ static_assert(QCPNumberRange<Frozen>);
 static_assert(!QCPNumberRange<QStringList>);
 static_assert(!QCPNumberRange<std::vector<QString>>);
 static_assert(!QCPNumberRange<Grid>);
+
+//! A 2D user type: row-major storage, one strided view per column, built on the spot.
+struct Matrix
+{
+    int rows = 0;
+    int cols = 0;
+    std::vector<double> values;
+
+    [[nodiscard]] double at(int row, int col) const
+    {
+        return values[std::size_t(row) * cols + col];
+    }
+};
+
+auto qcp_columns(const Matrix& matrix)
+{
+    const auto column = [&matrix](int col)
+    {
+        return std::views::iota(0, matrix.rows)
+            | std::views::transform([&matrix, col](int row) { return matrix.at(row, col); });
+    };
+    return std::views::iota(0, matrix.cols) | std::views::transform(column);
+}
+
+//! Both a range of numbers and a set of columns: the columns hook makes it 2D (P-7).
+struct DoublesWithColumns : std::vector<double>
+{
+    using std::vector<double>::vector;
+};
+
+std::array<std::vector<double>, 2> qcp_columns(const DoublesWithColumns& doubles)
+{
+    const std::vector<double> column(doubles.begin(), doubles.end());
+    return { column, column };
+}
+
+static_assert(QCPColumns<std::vector<std::vector<double>>>);
+static_assert(QCPColumns<Matrix>);
+static_assert(QCPColumns<DoublesWithColumns>);
+static_assert(!QCPColumns<std::vector<double>>);
+static_assert(!QCPColumns<Samples>);
+static_assert(QCPNumberRange<DoublesWithColumns>);
 } // namespace
 
 void TestDataAdapters::aVectorIsReadInPlace()
@@ -301,4 +343,75 @@ void TestDataAdapters::mixedRangeTypesAreRead()
     const HookedGraph fromView(std::vector<double> { 1.0, 2.0, 3.0, 4.0 }, shorter);
     QCOMPARE(fromView.dataCount(), 4);
     QCOMPARE(fromView.dataMainKey(3), 4.0);
+}
+
+void TestDataAdapters::aVectorOfVectorsGivesComponents()
+{
+    const std::vector<double> keys { 0.0, 1.0, 2.0 };
+    const std::vector<std::vector<double>> columns { { 1.0, 2.0, 3.0 }, { 4.0, 5.0, 6.0 } };
+
+    const QCPGraph graph(keys, columns);
+    QCOMPARE(graph.componentCount(), 2);
+    QCOMPARE(graph.dataCount(), 3);
+    QCOMPARE(graph.componentValueAt(0, 2), 3.0);
+    QCOMPARE(graph.componentValueAt(1, 2), 6.0);
+
+    QCPGraph assigned;
+    assigned.setData(keys, columns);
+    QCOMPARE(assigned.componentCount(), 2);
+    QCOMPARE(assigned.componentValueAt(0, 0), 1.0);
+    QCOMPARE(assigned.componentValueAt(1, 2), 6.0);
+
+    // The waterfall adapter transforms the values it serves (offsets, gain), so only its shape is
+    // comparable here.
+    const QCPWaterfallGraph waterfall(keys, columns);
+    QCOMPARE(waterfall.componentCount(), 2);
+    QCOMPARE(waterfall.dataCount(), 3);
+}
+
+void TestDataAdapters::aColumnsHookAdaptsAMatrix()
+{
+    const Matrix matrix { 3, 2, { 1.0, 4.0, 2.0, 5.0, 3.0, 6.0 } };
+    const std::vector<double> keys { 0.0, 1.0, 2.0 };
+
+    const QCPGraph graph(keys, matrix);
+    QCOMPARE(graph.componentCount(), 2);
+    QCOMPARE(graph.dataCount(), 3);
+    QCOMPARE(graph.componentValueAt(0, 0), 1.0);
+    QCOMPARE(graph.componentValueAt(0, 2), 3.0);
+    QCOMPARE(graph.componentValueAt(1, 0), 4.0);
+    QCOMPARE(graph.componentValueAt(1, 2), 6.0);
+}
+
+void TestDataAdapters::aNumbersHookDoesNotMakeColumns()
+{
+    static_assert(!QCPColumns<std::vector<double>>);
+    static_assert(!QCPColumns<Samples>);
+}
+
+void TestDataAdapters::aColumnsTypeIsNotFlattened()
+{
+    static_assert(QCPNumberRange<DoublesWithColumns>);
+    static_assert(QCPColumns<DoublesWithColumns>);
+
+    const DoublesWithColumns both { 1.0, 2.0, 3.0 };
+    const std::vector<double> keys { 0.0, 1.0, 2.0 };
+
+    const QCPGraph graph(keys, both);
+    QCOMPARE(graph.componentCount(), 2);
+    QCOMPARE(graph.componentValueAt(1, 2), 3.0);
+}
+
+void TestDataAdapters::columnsAreCopiedOnce()
+{
+    std::vector<CountedRange> columns;
+    columns.emplace_back(3);
+    columns.emplace_back(3);
+    const std::vector<double> keys { 0.0, 1.0, 2.0 };
+
+    const QCPGraph graph(keys, columns);
+    QCOMPARE(graph.componentCount(), 2);
+    QCOMPARE(graph.componentValueAt(1, 2), 2.0);
+    QCOMPARE(columns[0].reads(), 3);
+    QCOMPARE(columns[1].reads(), 3);
 }

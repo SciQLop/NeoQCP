@@ -22,4 +22,9 @@ private slots:
     void aByValueHookBuildsAGraph();
     void setDataMovesItsStorage();
     void mixedRangeTypesAreRead();
+    void aVectorOfVectorsGivesComponents();
+    void aColumnsHookAdaptsAMatrix();
+    void aNumbersHookDoesNotMakeColumns();
+    void aColumnsTypeIsNotFlattened();
+    void columnsAreCopiedOnce();
 };

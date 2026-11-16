@@ -72,10 +72,18 @@ public:
     QCPWaterfallGraph();
     //! One row per (key, value) pair, sorted by key.
     template <QCPNumberRange K, QCPNumberRange V>
+        requires(!QCPColumns<V>)
     QCPWaterfallGraph(const K& keys, const V& values, bool alreadySorted = false)
         : QCPWaterfallGraph()
     {
         setData(qcp::toDoubles(keys), qcp::toDoubles(values), alreadySorted);
+    }
+    //! One component per value column: the 2D form of the data calls.
+    template <QCPNumberRange K, QCPColumns C>
+    QCPWaterfallGraph(const K& keys, const C& columns, bool alreadySorted = false)
+        : QCPWaterfallGraph()
+    {
+        setData(keys, columns, alreadySorted);
     }
     //! Value columns of any numeric type: the constructor form of the multi-column setData().
     template <IndexableNumericRange KC, IndexableNumericRange VC>
