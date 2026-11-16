@@ -47,6 +47,7 @@ set(NEOQCP_SOURCES
     src/axis/axistickertext.cpp
     src/axis/axistickertime.cpp
     src/axis/range.cpp
+    src/axis/scale.cpp
     src/axis/labelpainter.cpp
     src/item-creation-state.cpp
     src/items/item.cpp
@@ -115,6 +116,7 @@ set(NEOQCP_MOC_HEADERS
     src/axis/axistickertext.h
     src/axis/axistickertime.h
     src/axis/range.h
+    src/axis/scale.h
     src/axis/labelpainter.h
     src/colorgradient.h
     src/theme.h

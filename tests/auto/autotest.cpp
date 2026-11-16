@@ -59,6 +59,7 @@
 #include "test-repaint/test-repaint.h"
 #include "test-richtext/test-richtext.h"
 #include "test-rspan/test-rspan.h"
+#include "test-scale/test-scale.h"
 #include "test-scatter-rhi/test-scatter-rhi.h"
 #include "test-selection-model/test-selection-model.h"
 #include "test-signal-delivery/test-signal-delivery.h"
@@ -186,6 +187,7 @@ int main(int argc, char** argv)
     QCPTEST(TestDataAdapters);
     QCPTEST(TestDataLocator);
     QCPTEST(TestRSpan);
+    QCPTEST(TestScale);
     QCPTEST(TestSpan);
     QCPTEST(TestItemRecording);
     QCPTEST(TestStatisticalBox);

@@ -40,6 +40,7 @@
 #include "axis/axistickertext.h"
 #include "axis/axistickertime.h"
 #include "axis/range.h"
+#include "axis/scale.h"
 #include "colorgradient.h"
 #include "coords.h"
 #include "coords-custom.h"
