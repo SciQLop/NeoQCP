@@ -16,6 +16,7 @@ struct ResampleCache
     std::vector<double> yAxis;
     double yLower = 0, yUpper = 0;
     int ny = 0;
+    QCPScale xScale;
     QCPScale yScale;
 
     // Reusable scratch buffers for the accumulation loop. Reused across jobs
@@ -39,6 +40,9 @@ struct ResampleCache
 // (geometric mean) so a log colour scale isn't skewed toward the bin's largest sample, with
 // z <= 0 left out of the mean; any other scale averages in scale space.
 //
+// \a xScale places the columns the same way (linear by default): on a log or symlog key axis the
+// grid's columns are equal spans of that axis' scale space, and so are their boundaries.
+//
 // The accumulation loop -- O(visible source cells), independent of target
 // grid size -- is split across worker threads by target-bin range once the
 // job is large enough to amortize dispatch cost; each thread's writes land
@@ -54,6 +58,7 @@ QCPColorMapData* resample(
     const QCPScale& zScale,
     double gapThreshold,
     ResampleCache* cache = nullptr,
-    bool forceSerial = false);
+    bool forceSerial = false,
+    const QCPScale& xScale = QCPScale());
 
 } // namespace qcp::algo2d

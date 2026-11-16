@@ -115,7 +115,7 @@ private:
     QCPScale mBinnedKeyScale;
     bool mResetQueued = false;
     //! The key scale a stale-scale reset is in flight for.
-    std::optional<QCPScale> mResetForLog;
+    std::optional<QCPScale> mResetForScale;
 
     [[nodiscard]] QCPScale keyScale() const;
     [[nodiscard]] bool autoEdges() const;

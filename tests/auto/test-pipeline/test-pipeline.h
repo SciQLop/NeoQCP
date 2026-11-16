@@ -222,6 +222,12 @@ private slots:
     void symlogThinningIsEvenInScaleSpace();
     void l2OnSymlog();
     void contourLevelsOnSymlog();
+    void graphBinsASymlogKeyAxisInScaleSpace();
+    void aGraphRebinsWhenTheKeyScaleChanges();
+    void graphThinningFollowsTheScaleWindow();
+    void stepCentreOnASymlogAxis();
+    void fillThinningOnSymlog();
+    void histogramsRebinOnASymlogScaleChange();
 
 private:
     bool repaintFollows(QCPHistogram2D* hist, const std::function<void()>& change);

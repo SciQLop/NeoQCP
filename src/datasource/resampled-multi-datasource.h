@@ -191,7 +191,7 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
     for (int i = 0; i < l1Count; ++i)
     {
         double k = l1.keys[l1Begin + i];
-        int bin = binning.index(k);
+        int bin = binning.indexWithReciprocal(k);
         int slot = bin * 2;
 
         bool anyValid = false;

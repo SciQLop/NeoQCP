@@ -175,7 +175,7 @@ void QCPHistogram::onPipelineFinished(uint64_t generation)
 {
     if (generation < mAcceptedGeneration)
         return;
-    mResetForLog.reset();
+    mResetForScale.reset();
     auto result = pipelineResult();
     // A job started before the key scale changed: its bins mean nothing in the new scale.
     if (result && result->scale != keyScale())
@@ -365,9 +365,9 @@ void QCPHistogram::queueResetEdges()
 // stale bars up.
 void QCPHistogram::resetForTheStaleScale()
 {
-    if (!scaleIsStale() || mResetForLog == keyScale())
+    if (!scaleIsStale() || mResetForScale == keyScale())
         return;
-    mResetForLog = keyScale();
+    mResetForScale = keyScale();
     resetEdges();
 }
 

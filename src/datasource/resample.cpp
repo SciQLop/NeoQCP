@@ -48,15 +48,56 @@ std::vector<double> generateRange(double start, double end, int n, const QCPScal
     return range;
 }
 
-std::vector<double> generateBinEdges(const std::vector<double>& centers)
+// Column boundaries halfway between two columns *on screen*: arithmetic on a linear axis,
+// geometric on a log one, the scale-space midpoint on any other. The linear branch is the one it
+// has always been, to the operation.
+std::vector<double> generateBinEdges(const std::vector<double>& centers, const QCPScale& scale)
 {
     int n = static_cast<int>(centers.size());
     std::vector<double> edges(n + 1);
     if (n == 0) return edges;
+    const bool log = scale.isLog() && centers.front() > 0 && centers.back() > 0;
+    const bool symlog = !log && scale.isSymlog();
     if (n == 1)
     {
-        edges[0] = centers[0] - 0.5;
-        edges[1] = centers[0] + 0.5;
+        if (log)
+        {
+            edges[0] = centers[0] / std::sqrt(10.0);
+            edges[1] = centers[0] * std::sqrt(10.0);
+        }
+        else if (symlog)
+        {
+            const double pos = scale.toScale(centers[0]);
+            edges[0] = scale.fromScale(pos - 0.5);
+            edges[1] = scale.fromScale(pos + 0.5);
+        }
+        else
+        {
+            edges[0] = centers[0] - 0.5;
+            edges[1] = centers[0] + 0.5;
+        }
+        return edges;
+    }
+    if (log)
+    {
+        edges[0] = centers[0] / std::sqrt(centers[1] / centers[0]);
+        for (int i = 1; i < n; ++i)
+            edges[i] = std::sqrt(centers[i - 1] * centers[i]);
+        edges[n] = centers[n - 1] * std::sqrt(centers[n - 1] / centers[n - 2]);
+        return edges;
+    }
+    if (symlog)
+    {
+        const auto mid = [&](double a, double b)
+        { return scale.fromScale((scale.toScale(a) + scale.toScale(b)) * 0.5); };
+        const double lo = scale.toScale(centers[0]);
+        const double loStep = scale.toScale(centers[1]) - lo;
+        edges[0] = scale.fromScale(lo - loStep * 0.5);
+        for (int i = 1; i < n; ++i)
+            edges[i] = mid(centers[i - 1], centers[i]);
+        const double hi = scale.toScale(centers[n - 1]);
+        const double hiStep = hi - scale.toScale(centers[n - 2]);
+        edges[n] = scale.fromScale(hi + hiStep * 0.5);
         return edges;
     }
     edges[0] = centers[0] - (centers[1] - centers[0]) * 0.5;
@@ -205,8 +246,8 @@ void resampleRange(
     const std::vector<bool>& gapBetween,
     const std::vector<double>& yAxis,
     int ny, int ys,
-    const QCPScale& yScale, bool yLog, bool ySymlog, bool variableY, const QCPScale& zScale,
-    double* accum, uint32_t* counts, uint8_t* nonPositive)
+    const QCPScale& xScale, const QCPScale& yScale, bool yLog, bool ySymlog, bool variableY,
+    const QCPScale& zScale, double* accum, uint32_t* counts, uint8_t* nonPositive)
 {
     auto computeYBinRanges = [&](int col, std::vector<BinRange>& ranges) {
         for (int yj = 0; yj < ys; ++yj)
@@ -270,6 +311,20 @@ void resampleRange(
     if (!variableY)
         computeYBinRanges(xBegin, yBinRanges);
 
+    // A column covers the key span halfway to its neighbours *on screen*, as a row does.
+    const bool xLog = xScale.isLog();
+    const bool xSymlog = !xLog && xScale.isSymlog();
+    const auto xPosition = [&](double key)
+    {
+        if (xLog) return key > 0.0 ? std::log10(key) : std::numeric_limits<double>::quiet_NaN();
+        return xSymlog ? xScale.toScale(key) : key;
+    };
+    const auto xAtPosition = [&](double pos)
+    {
+        if (xLog) return std::pow(10.0, pos);
+        return xSymlog ? xScale.fromScale(pos) : pos;
+    };
+
     // Seed this chunk's own cursor: for the first chunk this is xBegin (same
     // as the single-threaded scan); for any other chunk, a binary search at
     // the chunk's first bin edge (mirrors qcp::algo::binMinMaxMultiParallel's
@@ -281,11 +336,17 @@ void resampleRange(
         double binLo = xEdges[xb];
         double binHi = xEdges[xb + 1];
 
-        int colBegin = acc.lowerBound(srcCursor, xEnd, binLo);
+        const int keyBegin = acc.lowerBound(srcCursor, xEnd, binLo);
+        int colBegin = keyBegin;
         if (colBegin > xBegin) --colBegin;
 
         int colEnd = acc.lowerBound(colBegin, xEnd, binHi);
         if (colEnd < xEnd) ++colEnd;
+        // A bin with no sample of its own (a grid coarser than the pixels) is filled by the
+        // column whose span covers its centre, so a sparse key axis still paints its own band.
+        // keyBegin already is the first key at or past binLo, so this is a comparison, not a search.
+        const bool binHasKeys = keyBegin < xEnd && acc.xAt(keyBegin) < binHi;
+        const double binCenter = (binLo + binHi) * 0.5;
 
         for (int xi = colBegin; xi < colEnd; ++xi)
         {
@@ -295,21 +356,59 @@ void resampleRange(
             bool gapLeft = (ci > 0) && gapBetween[ci - 1];
             bool gapRight = (ci < ctxCount - 1) && gapBetween[ci];
 
-            double leftDist = (!gapLeft && ci > 0)
-                ? xVal - acc.xAt(ctxBegin + ci - 1) : std::numeric_limits<double>::max();
-            double rightDist = (!gapRight && ci < ctxCount - 1)
-                ? acc.xAt(ctxBegin + ci + 1) - xVal : std::numeric_limits<double>::max();
+            double fillLo, fillHi;
+            if (xLog || xSymlog)
+            {
+                const double pos = xPosition(xVal);
+                const double left = (ci > 0 && !gapLeft) ? xPosition(acc.xAt(ctxBegin + ci - 1))
+                                                          : pos;
+                const double right = (ci < ctxCount - 1 && !gapRight)
+                    ? xPosition(acc.xAt(ctxBegin + ci + 1)) : pos;
+                const double lo = std::isfinite(left) ? left : pos;
+                const double hi = std::isfinite(right) ? right : pos;
+                double below, above;
+                if (xLog)
+                {
+                    // Geometric midpoints with each neighbour, as a log axis' rows are: a missing
+                    // one leaves the column on its own value.
+                    const double previous = ci > 0 ? acc.xAt(ctxBegin + ci - 1) : 0.0;
+                    const double next = ci < ctxCount - 1 ? acc.xAt(ctxBegin + ci + 1) : 0.0;
+                    const double geometricBelow = (ci > 0 && !gapLeft && previous > 0)
+                        ? std::sqrt(previous * xVal) : xVal;
+                    const double geometricAbove = (ci < ctxCount - 1 && !gapRight && next > 0)
+                        ? std::sqrt(xVal * next) : xVal;
+                    below = std::log10(std::min(geometricBelow, geometricAbove));
+                    above = std::log10(std::max(geometricBelow, geometricAbove));
+                }
+                else
+                {
+                    // The scale-space midpoints, mirrored at the ends as the rows are.
+                    below = (pos + lo) * 0.5;
+                    above = (pos + hi) * 0.5;
+                    if (ci <= 0 || gapLeft) below = 2.0 * pos - above;
+                    if (ci >= ctxCount - 1 || gapRight) above = 2.0 * pos - below;
+                }
+                fillLo = xAtPosition(std::min(below, above));
+                fillHi = xAtPosition(std::max(below, above));
+            }
+            else
+            {
+                double leftDist = (!gapLeft && ci > 0)
+                    ? xVal - acc.xAt(ctxBegin + ci - 1) : std::numeric_limits<double>::max();
+                double rightDist = (!gapRight && ci < ctxCount - 1)
+                    ? acc.xAt(ctxBegin + ci + 1) - xVal : std::numeric_limits<double>::max();
 
-            if (leftDist == std::numeric_limits<double>::max() && rightDist < std::numeric_limits<double>::max())
-                leftDist = rightDist;
-            if (rightDist == std::numeric_limits<double>::max() && leftDist < std::numeric_limits<double>::max())
-                rightDist = leftDist;
+                if (leftDist == std::numeric_limits<double>::max() && rightDist < std::numeric_limits<double>::max())
+                    leftDist = rightDist;
+                if (rightDist == std::numeric_limits<double>::max() && leftDist < std::numeric_limits<double>::max())
+                    rightDist = leftDist;
 
-            double xHalfSpacing = (leftDist < std::numeric_limits<double>::max())
-                ? std::min(leftDist, rightDist) * 0.5 : 0;
+                double xHalfSpacing = (leftDist < std::numeric_limits<double>::max())
+                    ? std::min(leftDist, rightDist) * 0.5 : 0;
 
-            double fillLo = xVal - xHalfSpacing;
-            double fillHi = xVal + xHalfSpacing;
+                fillLo = xVal - xHalfSpacing;
+                fillHi = xVal + xHalfSpacing;
+            }
 
             if (fillHi < binLo || fillLo > binHi)
                 continue;
@@ -317,11 +416,11 @@ void resampleRange(
             int xBinLo = findBin(fillLo, xAxis);
             int xBinHi = findBinFloor(fillHi, xAxis);
 
-            // ob ranges over [max(xBinLo,xb), min(xBinHi,xb)], which is a
-            // range of width <=1 by construction (it's intersected with the
-            // single value xb) -- so this cell contributes to bin xb or it
-            // doesn't; there's no need to re-derive that per yj below.
-            if (xb < xBinLo || xb > xBinHi)
+            // A sample contributes to the bin that holds its key; with no sample in the bin, the
+            // one whose span covers the bin's centre does. Where a bin holds samples, exactly
+            // those contribute, as they always have.
+            const bool keyInBin = xb >= xBinLo && xb <= xBinHi;
+            if (!keyInBin && (binHasKeys || !(fillLo <= binCenter && binCenter <= fillHi)))
                 continue;
 
             if (variableY)
@@ -371,7 +470,7 @@ void resampleImpl(
     const std::vector<double>& xAxis, const std::vector<double>& yAxis,
     const std::vector<double>& xEdges,
     int nx, int ny, int ys,
-    const QCPScale& yScale, bool variableY, const QCPScale& zScale,
+    const QCPScale& yScale, bool variableY, const QCPScale& zScale, const QCPScale& xScale,
     double gapThreshold,
     double* outData,
     ResampleCache* cache,
@@ -420,8 +519,8 @@ void resampleImpl(
         {
             resampleRange<decltype(space)::value>(acc, xbBegin, xbEnd, xBegin, xEnd, ctxBegin,
                                                  ctxCount, xAxis, xEdges, gapBetween, yAxis, ny,
-                                                 ys, yScale, yLog, ySymlog, variableY, zScale,
-                                                 accum.data(), counts.data(),
+                                                 ys, xScale, yScale, yLog, ySymlog, variableY,
+                                                 zScale, accum.data(), counts.data(),
                                                  nonPositive.data());
         });
     };
@@ -499,7 +598,8 @@ QCPColorMapData* resample(
     const QCPScale& zScale,
     double gapThreshold,
     ResampleCache* cache,
-    bool forceSerial)
+    bool forceSerial,
+    const QCPScale& xScale)
 {
     PROFILE_HERE_N("resample");
     int srcCount = xEnd - xBegin;
@@ -511,11 +611,11 @@ QCPColorMapData* resample(
     int nx = targetWidth;
     int ny = targetHeight;
 
-    auto xAxis = generateRange(xRange.lower, xRange.upper, nx, QCPScale());
+    auto xAxis = generateRange(xRange.lower, xRange.upper, nx, xScale);
 
     // Reuse cached Y axis when Y parameters haven't changed (avoids pow10 on X-only pans)
     std::vector<double> yAxis;
-    if (cache && cache->ny == ny && cache->yScale == yScale
+    if (cache && cache->ny == ny && cache->yScale == yScale && cache->xScale == xScale
         && cache->yLower == yRange.lower && cache->yUpper == yRange.upper)
     {
         yAxis = cache->yAxis;
@@ -529,6 +629,7 @@ QCPColorMapData* resample(
             cache->yLower = yRange.lower;
             cache->yUpper = yRange.upper;
             cache->ny = ny;
+            cache->xScale = xScale;
             cache->yScale = yScale;
         }
     }
@@ -547,12 +648,12 @@ QCPColorMapData* resample(
     int ctxBegin = std::max(0, xBegin - 1);
     int ctxEnd = std::min(src.xSize(), xEnd + 1);
 
-    auto xEdges = generateBinEdges(xAxis);
+    auto xEdges = generateBinEdges(xAxis, xScale);
 
     auto run = [&](const auto& acc) {
         resampleImpl(acc, xBegin, xEnd, ctxBegin, ctxEnd,
                      xAxis, yAxis, xEdges, nx, ny, ys,
-                     yScale, variableY, zScale, gapThreshold, data->rawData(), cache,
+                     yScale, variableY, zScale, xScale, gapThreshold, data->rawData(), cache,
                      forceSerial);
     };
     bool ranRaw = false;

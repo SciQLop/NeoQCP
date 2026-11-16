@@ -135,10 +135,9 @@ void QCPColorMap2::installResampleTransform()
                                  : 1.0;
             };
             double vpKeySz = vp.keyRange.size();
-            double xFrac = vpKeySz > 0 ? xOut.size() / vpKeySz : 1.0;
-            // NOTE: the key (X) axis is always sampled linearly here, even
-            // when the key scale is non-linear -- a log key axis is unsupported
-            // by this layer (image and contours alike, not just contours).
+            double xFrac = vp.keyScale.isLog() ? logFrac(xOut, vp.keyRange)
+                : (vp.keyScale.isSymlog() ? scaleFrac(xOut, vp.keyRange, vp.keyScale)
+                                          : (vpKeySz > 0 ? xOut.size() / vpKeySz : 1.0));
             double vpValSz = vp.valueRange.size();
             double yFrac = vp.valueScale.isLog() ? logFrac(yOut, vp.valueRange)
                 : (vp.valueScale.isSymlog() ? scaleFrac(yOut, vp.valueRange, vp.valueScale)
@@ -155,7 +154,8 @@ void QCPColorMap2::installResampleTransform()
                 cache = qcp::algo2d::ResampleCache{};
             auto& rc = std::any_cast<qcp::algo2d::ResampleCache&>(cache);
             auto* raw = qcp::algo2d::resample(src, xBegin, xEnd,
-                xOut, yOut, w, h, vp.valueScale, zScale, gapThreshold, &rc);
+                xOut, yOut, w, h, vp.valueScale, zScale, gapThreshold, &rc,
+                /*forceSerial=*/false, vp.keyScale);
             return std::shared_ptr<QCPColorMapData>(raw);
         });
 }

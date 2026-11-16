@@ -483,11 +483,11 @@ protected:
     //! \a rows holds each vertex's row in \a ds when asked for, else nothing.
     void recordComponent(QCPDrawContext& context, int column, std::vector<QPointF> line,
                          const std::vector<int>& rows, const QCPMultiDataSource& ds,
-                         bool coloured, double impulseBaseline, bool logKeyAxis) const;
+                         bool coloured, double impulseBaseline, const QCPScale& keyScale) const;
     //! Records \a line in \a style with \a pen; \a dataIdx, when not empty, colours it.
     void recordLine(QCPDrawContext& context, LineStyle style, std::vector<QPointF> line,
                     const QVector<int>& dataIdx, QPen pen, double impulseBaseline,
-                    bool logKeyAxis) const;
+                    const QCPScale& keyScale) const;
     //! The markers of \a line, the selected ones (\a selected per vertex, or \a allSelected when
     //! empty) in the selected style.
     void recordMarkers(QCPDrawContext& context, const QCPGraphComponent& comp,
@@ -522,6 +522,7 @@ protected:
                          bool rawRows, int begin, int end) const;
     void rebuildL2(const ViewportParams& vp) const;
     void onViewportChanged(const QCPRange& newRange, const QCPRange& oldRange);
+    void onKeyScaleChanged();
     void followAxes();
     QList<QMetaObject::Connection> mAxisLinks;
     bool pipelineBusy() const override { return mPipeline.isBusy(); }

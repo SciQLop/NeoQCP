@@ -21,6 +21,7 @@
 #include <plottables/plottable-histogram.h>
 #include <plottables/plottable-histogram2d.h>
 #include <plottables/plottable-graph.h>
+#include <plottables/graph-fill.h>
 #include <plottables/plottable-waterfall.h>
 #include <qcustomplot.h>
 #include <thread>
@@ -71,6 +72,44 @@ public:
 private:
     int mN;
     int mCols;
+};
+
+// Keys spanning [-span, span] with value = key: a symlog key axis has a real linear band to thin,
+// and a bin's value spread says which space its L1 bins were built in.
+class SymmetricLargeMultiSource : public QCPMultiDataSource
+{
+public:
+    SymmetricLargeMultiSource(int n, double span) : mN(n), mSpan(span) {}
+    int size() const override { return mN; }
+    bool empty() const override { return mN == 0; }
+    int columnCount() const override { return 1; }
+    double keyAt(int i) const override { return keyOf(i); }
+    double valueAt(int, int i) const override { return keyOf(i); }
+    QCPRange keyRange(bool& found, QCP::SignDomain) const override
+    {
+        found = mN > 0;
+        return QCPRange(-mSpan, mSpan);
+    }
+    QCPRange valueRange(int, bool& found, QCP::SignDomain, const QCPRange&) const override
+    {
+        found = mN > 0;
+        return QCPRange(-mSpan, mSpan);
+    }
+    int findBegin(double sortKey, bool) const override
+    {
+        return std::clamp(static_cast<int>(std::ceil(tOf(sortKey))), 0, mN);
+    }
+    int findEnd(double sortKey, bool) const override
+    {
+        return std::clamp(static_cast<int>(std::floor(tOf(sortKey))) + 1, 0, mN);
+    }
+
+private:
+    double keyOf(int i) const { return mN > 1 ? -mSpan + 2.0 * mSpan * i / (mN - 1) : 0.0; }
+    double tOf(double key) const { return mN > 1 ? (key + mSpan) / (2.0 * mSpan) * (mN - 1) : 0.0; }
+
+    int mN;
+    double mSpan;
 };
 
 // Level 1 of one value column: the data bins the multi-column resampler builds.
@@ -3820,22 +3859,28 @@ void TestPipeline::symlogThinningIsEvenInScaleSpace()
                                                qcp::algo::kDefaultGapThreshold, nullptr, symlog);
     QVERIFY(!points.empty());
 
-    const auto columnsIn = [&](double fromPx, double toPx) {
+    // Count the buckets the envelope actually used: a bucket is one pixel of scale space, so a
+    // 100 px window holds ~100 of them inside the band as well as outside it.
+    const double bucketWidth = 1.0 / pixelsPerScale;
+    const double anchor = symlog.toScale(points.front().x());
+    const auto bucketsIn = [&](double fromPx, double toPx) {
         std::set<long long> seen;
         for (const QPointF& point : points)
             if (std::isfinite(point.x()))
             {
-                const double px = (symlog.toScale(point.x()) - lo) * pixelsPerScale;
+                const double pos = symlog.toScale(point.x());
+                const double px = (pos - lo) * pixelsPerScale;
                 if (px >= fromPx && px < toPx)
-                    seen.insert(static_cast<long long>(std::floor(px)));
+                    seen.insert(static_cast<long long>(
+                        std::floor((pos - anchor) / bucketWidth + 0.5)));
             }
         return static_cast<int>(seen.size());
     };
     for (const auto& window : { std::pair { 0.0, 100.0 }, std::pair { 450.0, 550.0 },
                                 std::pair { 900.0, 1000.0 } })
     {
-        const int columns = columnsIn(window.first, window.second);
-        QVERIFY2(columns >= 97 && columns <= 100,
+        const int columns = bucketsIn(window.first, window.second);
+        QVERIFY2(columns >= 98 && columns <= 102,
                  qPrintable(QString("window [%1,%2) holds %3 pixel columns of a scan that "
                                     "should hold one per pixel")
                                 .arg(window.first)
@@ -3980,4 +4025,273 @@ void TestPipeline::contourLevelsOnSymlog()
     QCOMPARE(logLevels.size(), 2);
     QVERIFY(std::abs(logLevels[0] - 10.0) < 1e-9);
     QVERIFY(std::abs(logLevels[1] - 100.0) < 1e-9);
+}
+
+// The L1 job is ViewportIndependent, so the axis' key scale reaches it through the transform, and
+// L2 must be rebuilt for it. A graph draws its symlog band as densely as its log flanks only if
+// both hold.
+void TestPipeline::graphBinsASymlogKeyAxisInScaleSpace()
+{
+    const QCPScale symlog = QCPScale::symlog(2);
+    auto* g = mPlot->add<QCPGraph>().get();
+    auto source = std::make_shared<SymmetricLargeMultiSource>(200'000, 1e6);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    mPlot->xAxis->setScale(symlog);
+    mPlot->xAxis->setRange(-1e6, 1e6);
+    mPlot->yAxis->setRange(-1e6, 1e6);
+    g->setDataSource(source);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(g->mL1Cache, "the L1 cache landed");
+    QVERIFY2(g->mL2Result, "L2 was built for the symlog key axis");
+
+    const ViewportParams vp = ViewportParams::fromAxes(mPlot->xAxis, mPlot->yAxis);
+    const int bins = qcp::algo::l2BinCount(vp);
+    const double lo = symlog.toScale(vp.keyRange.lower);
+    const double span = symlog.toScale(vp.keyRange.upper) - lo;
+    const double binWidth = span / bins;
+    int populated = 0;
+    for (int b = 0; 2 * b + 1 < g->mL2Result->size(); ++b)
+    {
+        const double centre = g->mL2Result->keyAt(2 * b);
+        const double upperEdge = g->mL2Result->keyAt(2 * b + 1);
+        const double min = g->mL2Result->valueAt(0, 2 * b);
+        const double max = g->mL2Result->valueAt(0, 2 * b + 1);
+        if (std::isnan(min) || std::isnan(max))
+            continue;
+        ++populated;
+        QVERIFY2(std::abs((symlog.toScale(upperEdge) - symlog.toScale(centre)) - 0.5 * binWidth)
+                     <= 1e-9 * span,
+                 qPrintable(QString("bin %1: its keys are not L2 scale-space steps").arg(b)));
+        // value == key, so a bin's pair spans its own L2 width only when L1 was built in the same
+        // space: linear L1 bins are 100 key units wide here, the band's L2 bins a thousandth of one.
+        QVERIFY2(std::abs(symlog.toScale(max) - symlog.toScale(min)) <= 1.5 * binWidth,
+                 qPrintable(QString("bin %1: its values span %2 scale units, over its width %3 (L1 "
+                                    "was built for another key scale)")
+                                .arg(b)
+                                .arg(symlog.toScale(max) - symlog.toScale(min))
+                                .arg(binWidth)));
+    }
+    QVERIFY2(populated > bins / 2, "most L2 bins hold data");
+}
+
+void TestPipeline::aGraphRebinsWhenTheKeyScaleChanges()
+{
+    // Finding 2: a key scale change with no range change. Both L1 and L2 must be rebuilt in the new
+    // space; the L2 keys of a kept bin are half its width from its centre.
+    auto* g = mPlot->add<QCPGraph>().get();
+    auto source = std::make_shared<SymmetricLargeMultiSource>(200'000, 1e6);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    mPlot->xAxis->setRange(-1e6, 1e6);
+    mPlot->yAxis->setRange(-1e6, 1e6);
+    g->setDataSource(source);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mL2Result);
+
+    const auto keysAreEvenIn = [&](const QCPScale& scale)
+    {
+        const ViewportParams vp = ViewportParams::fromAxes(mPlot->xAxis, mPlot->yAxis);
+        const int bins = qcp::algo::l2BinCount(vp);
+        const double lo = scale.toScale(vp.keyRange.lower);
+        const double span = scale.toScale(vp.keyRange.upper) - lo;
+        const double binWidth = span / bins;
+        for (int b = 0; 2 * b + 1 < g->mL2Result->size(); ++b)
+        {
+            const double centre = g->mL2Result->keyAt(2 * b);
+            const double upper = g->mL2Result->keyAt(2 * b + 1);
+            QVERIFY2(std::abs((scale.toScale(upper) - scale.toScale(centre)) - 0.5 * binWidth)
+                         <= 1e-9 * span,
+                     "the L2 keys are not even in the axis' current scale");
+        }
+    };
+    keysAreEvenIn(QCPScale());
+
+    mPlot->xAxis->setScale(QCPScale::symlog(2));
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 2, 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mL2Result);
+    keysAreEvenIn(QCPScale::symlog(2));
+
+    mPlot->xAxis->setScale(QCPScale::symlog(3));
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 3, 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    keysAreEvenIn(QCPScale::symlog(3));
+}
+
+void TestPipeline::graphThinningFollowsTheScaleWindow()
+{
+    // A graph thins on its key window: one bucket per pixel, four points each, so a 20 px window
+    // holds ~20 distinct pixel columns inside the symlog band as well as outside it.
+    const QCPScale symlog = QCPScale::symlog(2);
+    const int n = 50'000;
+    const double lo = symlog.toScale(-1e6);
+    const double hi = symlog.toScale(1e6);
+    std::vector<double> keys(n), values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = symlog.fromScale(lo + (hi - lo) * i / (n - 1));
+        values[i] = (i % 2) ? 1.0 : -1.0;
+    }
+    auto* g = mPlot->add<QCPGraph>().get();
+    mPlot->xAxis->setScale(symlog);
+    mPlot->xAxis->setRange(-1e6, 1e6);
+    mPlot->yAxis->setRange(-2, 2);
+    g->setDataSource(oneColumnSource(std::move(keys), std::move(values)));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    std::set<int> columns;
+    for (const auto& command : g->mCore.recordedList().commands)
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+            for (const QPointF& p : *line->points)
+                if (std::isfinite(p.x()))
+                    columns.insert(static_cast<int>(std::floor(mPlot->xAxis->coordToPixel(p.x()))));
+    QVERIFY2(!columns.empty(), "the line was recorded");
+    const int width = mPlot->axisRect()->rect().width();
+    const auto columnsIn = [&](int from, int to)
+    {
+        int count = 0;
+        for (int c : columns)
+            if (c >= from && c < to)
+                ++count;
+        return count;
+    };
+    const int band = columnsIn(width / 2 - 10, width / 2 + 10);
+    const int edge = columnsIn(width - 20, width);
+    QVERIFY2(band >= 18 && edge >= 18,
+             qPrintable(QString("columns in a 20 px window: %1 at the band centre, %2 at the edge")
+                            .arg(band)
+                            .arg(edge)));
+}
+
+void TestPipeline::stepCentreOnASymlogAxis()
+{
+    // A centre step sits halfway between two points on screen: on a symlog key axis that is
+    // halfway in its scale space, not at the geometric or the arithmetic midpoint.
+    const QCPScale symlog = QCPScale::symlog(2);
+    auto* g = mPlot->add<QCPGraph>().get();
+    g->setLineStyle(QCPGraph::lsStepCenter);
+    mPlot->xAxis->setScale(symlog);
+    mPlot->xAxis->setRange(0.5, 2000);
+    mPlot->yAxis->setRange(-1, 1);
+    g->setData(std::vector<double> { 1.0, 1000.0 }, std::vector<double> { 0.0, 0.0 });
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    double centre = qQNaN();
+    for (const auto& command : g->mCore.recordedList().commands)
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+            for (const QPointF& p : *line->points)
+                if (std::isfinite(p.x()) && std::abs(p.x() - 1.0) > 1e-9
+                    && std::abs(p.x() - 1000.0) > 1e-9)
+                    centre = p.x();
+    const double want = symlog.fromScale(0.5 * (symlog.toScale(1.0) + symlog.toScale(1000.0)));
+    QVERIFY2(std::isfinite(centre), "a centre vertex was recorded");
+    QVERIFY2(std::abs(centre - want) <= 1e-9 * want,
+             qPrintable(QString("step centre %1, not the scale-space midpoint %2")
+                            .arg(centre)
+                            .arg(want)));
+    QVERIFY2(std::abs(centre - std::sqrt(1000.0)) > 1e-6, "not the log midpoint");
+    QVERIFY2(std::abs(centre - 500.5) > 1e-6, "not the linear midpoint");
+}
+
+void TestPipeline::fillThinningOnSymlog()
+{
+    // Fill rows are binned by pixel; on a symlog axis the bins are equal spans of scale space.
+    const QCPScale symlog = QCPScale::symlog(2);
+    auto* g = mPlot->add<QCPGraph>().get();
+    mPlot->xAxis->setScale(symlog);
+    mPlot->xAxis->setRange(-1e6, 1e6);
+    mPlot->yAxis->setRange(-1, 1);
+
+    const int n = 4000;
+    std::vector<qcp::fill::StripPoint> rows;
+    rows.reserve(n);
+    for (int i = 0; i < n; ++i)
+        rows.push_back({ -1e6 + 2e6 * i / (n - 1), 0.0, (i % 2) ? 1.0 : -1.0, false, i });
+    const auto spans = g->binnedWhenDense(std::move(rows));
+    QVERIFY2(spans.size() >= 2, "the fill was binned");
+
+    const int width = mPlot->axisRect()->rect().width();
+    const double lo = symlog.toScale(-1e6);
+    const double span = symlog.toScale(1e6) - lo;
+    const double binWidth = span / (4.0 * std::max(1, width));
+    for (std::size_t i = 1; i < spans.size(); ++i)
+        QVERIFY2(std::abs((symlog.toScale(spans[i].key) - symlog.toScale(spans[i - 1].key))
+                          - binWidth)
+                     <= 1e-9 * span,
+                 qPrintable(QString("spans %1 and %2 are not one scale-space bin apart")
+                                .arg(i - 1)
+                                .arg(i)));
+}
+
+void TestPipeline::histogramsRebinOnASymlogScaleChange()
+{
+    // A scale change with no range change rebins both histograms in the new space.
+    const QCPScale symlog2 = QCPScale::symlog(2);
+    const QCPScale symlog3 = QCPScale::symlog(3);
+    auto* h1 = mPlot->add<QCPHistogram>().get();
+    mPlot->xAxis->setScale(symlog2);
+    mPlot->xAxis->setRange(-1000, 1000);
+    h1->setBins(4);
+    // The 1D histogram bins the values: these five span the range a 4-bin symlog grid splits.
+    h1->setDataSource(oneColumnSource({ 0.0, 1.0, 2.0, 3.0, 4.0 },
+                                      { -900.0, -5.0, 0.0, 5.0, 900.0 }));
+    QSignalSpy spy1(&h1->pipeline(), &QCPHistogram1DPipeline::finished);
+    QTRY_VERIFY_WITH_TIMEOUT(spy1.count() >= 1, 5000);
+    QVERIFY(h1->histogram());
+    const std::vector<double> edges2 = h1->histogram()->edges;
+    QCOMPARE(h1->histogram()->scale, symlog2);
+
+    mPlot->xAxis->setScale(symlog3);
+    QTRY_VERIFY_WITH_TIMEOUT((mPlot->toPixmap(), spy1.count() >= 2
+                              && h1->histogram()->scale == symlog3), 5000);
+    const std::vector<double> edges3 = h1->histogram()->edges;
+    QVERIFY2(edges2 != edges3, "the 1D histogram rebinned in the new scale space");
+    const auto evenIn = [](const std::vector<double>& edges, const QCPScale& scale)
+    {
+        const double step = scale.toScale(edges[1]) - scale.toScale(edges[0]);
+        for (std::size_t i = 1; i + 1 < edges.size(); ++i)
+            if (std::abs((scale.toScale(edges[i + 1]) - scale.toScale(edges[i])) - step) > 1e-9)
+                return false;
+        return true;
+    };
+    QVERIFY(evenIn(edges3, symlog3));
+
+    auto* h2 = mPlot->add<QCPHistogram2D>().get();
+    h2->setBins(20, 2);
+    std::vector<double> keys, values;
+    // A spread the two threshold values bin differently: 20 bins over [-900, 900] put their edges
+    // at different keys on symlog(2) and symlog(3).
+    for (double key : { -900.0, -377.0, -233.0, -144.0, -89.0, -55.0, -34.0, -21.0, -13.0,
+                        -8.0, -5.0, -3.0, -2.0, 2.0, 3.0, 5.0, 8.0, 13.0, 21.0, 34.0, 55.0,
+                        89.0, 144.0, 233.0, 377.0, 900.0 })
+        for (int row = 0; row < 2; ++row)
+        {
+            keys.push_back(key);
+            values.push_back(row == 0 ? 0.25 : 0.75);
+        }
+    h2->setData(std::move(keys), std::move(values));
+    QSignalSpy spy2(&h2->pipeline(), &QCPHistogramPipeline::finished);
+    QTRY_VERIFY_WITH_TIMEOUT(spy2.count() >= 1, 5000);
+    QVERIFY(h2->shown());
+    const QCPColorMapData before = *h2->shown();
+    // The 2D histogram rebins on the axis' scaleChanged (no draw needed); the grid's counts are
+    // what says so: -15 and 15 share a bin on symlog(3) and take different ones on symlog(2).
+    const auto rebinned = [&]
+    {
+        const QCPColorMapData* cells = h2->pipeline().result();
+        if (!cells || cells->keySize() != before.keySize()
+            || cells->valueSize() != before.valueSize())
+            return false;
+        for (int i = 0; i < cells->keySize(); ++i)
+            for (int j = 0; j < cells->valueSize(); ++j)
+                if (before.cell(i, j) != cells->cell(i, j))
+                    return true;
+        return false;
+    };
+    mPlot->xAxis->setScale(symlog2);
+    QTRY_VERIFY_WITH_TIMEOUT(rebinned(), 5000);
+
 }

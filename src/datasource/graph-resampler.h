@@ -131,6 +131,9 @@ struct MultiColumnBinResult {
 struct GraphResamplerCache {
     MultiColumnBinResult level1;
     QCPRange cachedKeyRange;
+    // The key scale the bins were built in: equal key widths only make sense in one space, and a
+    // symlog axis that turns linear must not keep bins sized for the other.
+    QCPScale keyScale;
     int sourceSize = 0;
     int columnCount = 0;
 };
@@ -152,11 +155,14 @@ class KeyBinning
 {
 public:
     KeyBinning(const QCPRange& range, int numBins, const QCPScale& scale)
-        : mScale(scale.isSymlog() ? &scale : nullptr)
+        : mScale(scale)
+        , mScaled(scale.isSymlog())
         , mBins(numBins)
-        , mWidth(mScale ? (mScale->toScale(range.upper) - mScale->toScale(range.lower)) / numBins
-                        : range.size() / numBins)
-        , mLo(mScale ? mScale->toScale(range.lower) : range.lower)
+        , mWidth((mScaled ? (mScale.toScale(range.upper) - mScale.toScale(range.lower))
+                          : range.size())
+                 / numBins)
+        , mInvWidth(1.0 / mWidth)
+        , mLo(mScaled ? mScale.toScale(range.lower) : range.lower)
     {}
 
     double width() const { return mWidth; }
@@ -167,22 +173,30 @@ public:
     {
         return std::clamp(static_cast<int>((position(key) - mLo) / mWidth), 0, mBins - 1);
     }
+    // The same index by the reciprocal, as the L2 pass has always computed it: dividing and
+    // multiplying round differently, and a kept bin's edges must not move for one ulp.
+    int indexWithReciprocal(double key) const
+    {
+        return std::clamp(static_cast<int>((position(key) - mLo) * mInvWidth), 0, mBins - 1);
+    }
     // Lower edge of a bin, in key units.
     double lowerKey(int bin) const { return keyAt(mLo + bin * mWidth); }
     double centreKey(int bin) const { return keyAt(mLo + (bin + 0.5) * mWidth); }
     double upperKey(int bin) const
     {
         const double centre = mLo + (bin + 0.5) * mWidth;
-        return mScale ? keyAt(mLo + (bin + 1) * mWidth) : centre + mWidth * 0.5;
+        return mScaled ? keyAt(mLo + (bin + 1) * mWidth) : centre + mWidth * 0.5;
     }
 
 private:
-    double position(double key) const { return mScale ? mScale->toScale(key) : key; }
-    double keyAt(double position) const { return mScale ? mScale->fromScale(position) : position; }
+    double position(double key) const { return mScaled ? mScale.toScale(key) : key; }
+    double keyAt(double position) const { return mScaled ? mScale.fromScale(position) : position; }
 
-    const QCPScale* mScale;
+    QCPScale mScale;
+    bool mScaled;
     int mBins;
     double mWidth;
+    double mInvWidth;
     double mLo;
 };
 
@@ -491,7 +505,18 @@ inline int l2BinCount(const ViewportParams& vp)
 template <typename Source>
 inline bool fewEnoughToDrawRaw(const Source& raw, const ViewportParams& vp)
 {
-    const QCPRange scan = lineCacheKeyRange(vp.keyRange, vp.keyScale);
+    QCPRange scan = lineCacheKeyRange(vp.keyRange, vp.keyScale);
+    // The window is widened by its own span so a pan is served from the same bins. On a symlog
+    // axis that widening leaves the data (fromScale of minus a span is enormous), and a source
+    // asked for rows beyond its own range answers none: clamp the probe to the data, or every
+    // symlog viewport would look empty and never build its L2.
+    bool found = false;
+    const QCPRange data = raw.keyRange(found);
+    if (found)
+    {
+        scan.lower = std::max(scan.lower, data.lower);
+        scan.upper = std::min(scan.upper, data.upper);
+    }
     return raw.findEnd(scan.upper) - raw.findBegin(scan.lower) <= l2BinCount(vp);
 }
 
@@ -537,7 +562,7 @@ inline std::shared_ptr<QCPMultiDataSource> buildL1Cache(
     // origin-less cache from being reused when origin is wanted.
     auto* c = std::any_cast<GraphResamplerCache>(&cache);
     if (c && c->sourceSize == srcSize && c->columnCount == N
-        && c->cachedKeyRange == fullKeyRange
+        && c->cachedKeyRange == fullKeyRange && c->keyScale == vp.keyScale
         && (!withOrigin || !c->level1.origin.empty()))
         return nullptr;
     int numBins = std::min(kLevel1TargetBins, srcSize / 10);
@@ -546,6 +571,7 @@ inline std::shared_ptr<QCPMultiDataSource> buildL1Cache(
     newCache.level1 = orderColumnsByTrend(
         binMinMaxMultiParallel(src, 0, srcSize, fullKeyRange, numBins, withOrigin, vp.keyScale));
     newCache.cachedKeyRange = fullKeyRange;
+    newCache.keyScale = vp.keyScale;
     newCache.sourceSize = srcSize;
     newCache.columnCount = N;
     cache = std::move(newCache);

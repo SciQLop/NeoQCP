@@ -64,6 +64,7 @@ private slots:
     void colormap2ExportToPixmap();
     void colormap2ExportToPdf();
     void colorMapRowsOnASymlogAxis();
+    void colormap2KeyAxisFollowsTheScale();
 
 private:
     QCustomPlot* mPlot = nullptr;

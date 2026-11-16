@@ -24,7 +24,8 @@
 #include <utility>
 
 static void ensureL1Transform(QCPGraphPipeline& pipeline, int sourceSize, int colCount,
-                              std::shared_ptr<std::atomic<bool>> wantOrigin);
+                              std::shared_ptr<std::atomic<bool>> wantOrigin,
+                              const QCPScale& keyScale);
 static bool isAboveResampleThreshold(const QCPMultiDataSource& src);
 
 /*! \fn void QCPGraph::deferredDataSwapChanged(bool deferredDataSwap)
@@ -121,7 +122,7 @@ void QCPGraph::followAxes()
         mAxisLinks << connect(keyAxisRaw(), &QCPAxis::rangeChanged, this,
                               &QCPGraph::onViewportChanged);
         mAxisLinks << connect(keyAxisRaw(), &QCPAxis::scaleChanged, this,
-                              [this] { linesChanged(); });
+                              [this] { onKeyScaleChanged(); });
     }
     if (valueAxisRaw())
         mAxisLinks << connect(valueAxisRaw(), &QCPAxis::scaleChanged, this,
@@ -180,8 +181,8 @@ void QCPGraph::systemDidChange()
     }
     if (mDataSource)
     {
-        ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(),
-                               mWantOrigin);
+        ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin,
+                          keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale());
         const QPointer<QCPGraph> alive(this);
         mPipeline.setSource(mDataSource);
         if (!alive)
@@ -217,21 +218,24 @@ void QCPGraph::setDataSource(std::unique_ptr<QCPMultiDataSource> source)
 }
 
 static void ensureL1Transform(QCPGraphPipeline& pipeline, int sourceSize, int colCount,
-                              std::shared_ptr<std::atomic<bool>> wantOrigin)
+                              std::shared_ptr<std::atomic<bool>> wantOrigin,
+                              const QCPScale& keyScale)
 {
     const bool needsResampling = colCount > 0
         && static_cast<int64_t>(sourceSize) * colCount >= qcp::algo::kResampleThreshold;
     if (needsResampling)
     {
-        if (!pipeline.hasTransform())
-        {
-            pipeline.setTransform(TransformKind::ViewportIndependent,
-                [wantOrigin](const QCPMultiDataSource& src,
-                             const ViewportParams& vp,
-                             std::any& cache) -> std::shared_ptr<QCPMultiDataSource> {
-                    return qcp::algo::buildL1Cache(src, vp, cache, wantOrigin->load());
-                });
-        }
+        // The L1 job is viewport independent, so the axis' key scale reaches it through the
+        // transform, not through the job's viewport (which is the default one). Re-baked on every
+        // call: the scale may have changed since the last one.
+        pipeline.setTransform(TransformKind::ViewportIndependent,
+            [wantOrigin, keyScale](const QCPMultiDataSource& src,
+                                   const ViewportParams& vp,
+                                   std::any& cache) -> std::shared_ptr<QCPMultiDataSource> {
+                ViewportParams scaled = vp;
+                scaled.keyScale = keyScale;
+                return qcp::algo::buildL1Cache(src, scaled, cache, wantOrigin->load());
+            });
     }
     else if (pipeline.hasTransform())
     {
@@ -553,7 +557,8 @@ void QCPGraph::applySourceNow(std::shared_ptr<QCPMultiDataSource> source)
         return;
     }
     mPipelineBypassed = false;
-    ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin);
+    ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin,
+                      keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale());
     // The pipeline's busyChanged slot may delete this graph.
     const QPointer<QCPGraph> alive(this);
     mPipeline.setSource(mDataSource);
@@ -588,7 +593,8 @@ void QCPGraph::stagePendingSource(std::shared_ptr<QCPMultiDataSource> source)
         updateEffectiveBusy();
         return;
     }
-    ensureL1Transform(mPipeline, mPendingSource->size(), mPendingSource->columnCount(), mWantOrigin);
+    ensureL1Transform(mPipeline, mPendingSource->size(), mPendingSource->columnCount(), mWantOrigin,
+                      keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale());
     // The pipeline's busyChanged slot may delete this graph.
     const QPointer<QCPGraph> alive(this);
     mPipeline.setSource(mPendingSource);
@@ -653,8 +659,8 @@ bool QCPGraph::commitPendingData()
         // A source staged on the data-space branch had no job. Now that it is the displayed
         // cartesian source, start one; otherwise the frame has no L1 to draw until something
         // else invalidates the pipeline.
-        ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(),
-                               mWantOrigin);
+        ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin,
+                          keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale());
         const QPointer<QCPGraph> alive(this);
         mPipeline.setSource(mDataSource);
         if (!alive)
@@ -688,8 +694,8 @@ void QCPGraph::dataChanged()
         applyColorSizeRule(mDataSource->size());
         mNeedsResampling = !drawsInDataSpace() && isAboveResampleThreshold(*mDataSource);
         if (!drawsInDataSpace())
-            ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(),
-                                   mWantOrigin);
+            ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin,
+                              keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale());
     }
 
     mL1Cache.reset();
@@ -738,6 +744,28 @@ void QCPGraph::rebuildL2(const ViewportParams& vp) const
     if (mL2Result)
         mL2Result->setGapThreshold(mGapThreshold);
     mL2HasOrigin = mL2Result && !mL1Cache->level1.origin.empty();
+}
+
+// The key scale is what the L1 bins are equal in: bins built for another space are not stale, they
+// are meaningless (a linear bin 100 wide around zero holds the whole symlog band). Drop them and
+// build them again.
+void QCPGraph::onKeyScaleChanged()
+{
+    if (mDataSource && !drawsInDataSpace())
+    {
+        mL1Cache.reset();
+        mL2Result.reset();
+        mL2Dirty = false;
+        mNeedsResampling = isAboveResampleThreshold(*mDataSource);
+        ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin,
+                          keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale());
+        // A job already running holds bins of the old scale: this one supersedes it.
+        const QPointer<QCPGraph> alive(this);
+        mPipeline.onDataChanged();
+        if (!alive)
+            return;
+    }
+    linesChanged();
 }
 
 void QCPGraph::onViewportChanged(const QCPRange& newRange, const QCPRange& oldRange)
@@ -1906,29 +1934,46 @@ QVector<QPointF> separatedPairs(const QVector<QPointF>& vertices)
 }
 
 // A centre step sits halfway between two points on screen: on a log key axis that is halfway in
-// log10(key), so the steps are built there and mapped back.
-QVector<QPointF> stepCentreLines(QVector<QPointF> points, bool logKeyAxis)
+// log10(key), on a symlog one halfway in its scale space, so the steps are built there and mapped
+// back.
+QVector<QPointF> stepCentreLines(QVector<QPointF> points, const QCPScale& keyScale)
 {
-    if (!logKeyAxis)
+    if (keyScale.isLinear())
         return qcp::toStepCenterLines(points, /*keyIsVertical=*/false);
+    const auto position = [&](double key)
+    {
+        // Log10 for a log axis: its pictures must not move for one ulp of toScale.
+        if (keyScale.isLog()) return key > 0.0 ? std::log10(key) : qQNaN();
+        return keyScale.toScale(key);
+    };
+    const auto back = [&](double mapped)
+    { return keyScale.isLog() ? std::pow(10.0, mapped) : keyScale.fromScale(mapped); };
     for (QPointF& point : points)
-        point.setX(point.x() > 0.0 ? std::log10(point.x()) : qQNaN());
+        point.setX(position(point.x()));
     QVector<QPointF> vertices = qcp::toStepCenterLines(points, /*keyIsVertical=*/false);
     for (QPointF& vertex : vertices)
-        vertex.setX(std::pow(10.0, vertex.x()));
+        vertex.setX(back(vertex.x()));
     return vertices;
 }
 
 std::vector<qcp::fill::StripPoint> steppedOnScreen(std::vector<qcp::fill::StripPoint> rows,
-                                                   qcp::fill::Step step, bool logKeyAxis)
+                                                   qcp::fill::Step step,
+                                                   const QCPScale& keyScale)
 {
-    if (!logKeyAxis || step != qcp::fill::Step::Center)
+    if (keyScale.isLinear() || step != qcp::fill::Step::Center)
         return qcp::fill::stepped(rows, step);
+    const auto position = [&](double key)
+    {
+        if (keyScale.isLog()) return key > 0.0 ? std::log10(key) : qQNaN();
+        return keyScale.toScale(key);
+    };
+    const auto back = [&](double mapped)
+    { return keyScale.isLog() ? std::pow(10.0, mapped) : keyScale.fromScale(mapped); };
     for (qcp::fill::StripPoint& row : rows)
-        row.key = row.key > 0.0 ? std::log10(row.key) : qQNaN();
+        row.key = position(row.key);
     std::vector<qcp::fill::StripPoint> stepped = qcp::fill::stepped(rows, step);
     for (qcp::fill::StripPoint& row : stepped)
-        row.key = std::pow(10.0, row.key);
+        row.key = back(row.key);
     return stepped;
 }
 
@@ -2060,11 +2105,8 @@ void QCPGraph::draw(QCPDrawContext& context) const
         pixelsPerKey = decades > 0.0 ? axisPixels / decades : 0.0;
     }
     else if (keyScale.isSymlog())
-    {
-        const QCPRange keyRange = keyAxisRaw()->range();
-        const double scaleSpan = keyScale.toScale(keyRange.upper) - keyScale.toScale(keyRange.lower);
-        pixelsPerKey = scaleSpan > 0.0 ? axisPixels / scaleSpan : 0.0;
-    }
+        pixelsPerKey = window.pixelsPerScale > 0.0 ? window.pixelsPerScale
+                                                   : qcpKeyPixelsPerScaleUnit(keyAxisRaw());
     if (!mAdaptiveSampling)
         pixelsPerKey = 0.0; // every row
     const bool coloured = mColor.hasValues() && (ds == mDataSource.get() || mL2HasOrigin);
@@ -2102,7 +2144,7 @@ void QCPGraph::draw(QCPDrawContext& context) const
         if (line.empty())
             continue;
         recordComponent(context, c, std::move(line), sourceIndices, *ds, coloured, impulseBaseline,
-                        logKeyAxis);
+                        keyScale);
     }
     recordSelectionDecoration(context);
 }
@@ -2125,10 +2167,10 @@ void QCPGraph::drawInDataSpace(QCPDrawContext& context) const
         return;
 
     const double baseline = dataSpaceBaseline();
-    const bool logKeyAxis = [this]
+    const QCPScale keyScale = [this]
     {
         const QCPAxis* axis = qobject_cast<const QCPAxis*>(keyAxisBase());
-        return axis && axis->scale().isLog();
+        return axis ? axis->scale() : QCPScale();
     }();
     const bool logValueAxis = [this]
     {
@@ -2166,7 +2208,7 @@ void QCPGraph::drawInDataSpace(QCPDrawContext& context) const
         if (line.empty())
             continue;
         recordComponent(context, c, std::move(line), sourceIndices, ds, coloured, baseline,
-                        logKeyAxis);
+                        keyScale);
     }
     recordSelectionDecoration(context);
 }
@@ -2219,7 +2261,7 @@ std::vector<char> QCPGraph::selectedVertices(int column, const QCPMultiDataSourc
 void QCPGraph::recordComponent(QCPDrawContext& context, int column, std::vector<QPointF> line,
                                     const std::vector<int>& rows,
                                     const QCPMultiDataSource& ds, bool coloured,
-                                    double impulseBaseline, bool logKeyAxis) const
+                                    double impulseBaseline, const QCPScale& keyScale) const
 {
     const QCPGraphComponent& comp = component(column);
     // Defensive: indices that do not match the points are never used.
@@ -2238,7 +2280,7 @@ void QCPGraph::recordComponent(QCPDrawContext& context, int column, std::vector<
         // A plain line without markers is the recorded line: it is handed over, not copied.
         std::vector<QPointF> markerLine = hasMarkers ? line : std::vector<QPointF>();
         recordLine(context, comp.lineStyle, std::move(line), dataIdx,
-                   selected ? selectedLinePen(comp) : comp.pen, impulseBaseline, logKeyAxis);
+                   selected ? selectedLinePen(comp) : comp.pen, impulseBaseline, keyScale);
         if (hasMarkers)
             recordMarkers(context, comp, markerLine, rows, indexed, {}, selected);
         return;
@@ -2252,7 +2294,7 @@ void QCPGraph::recordComponent(QCPDrawContext& context, int column, std::vector<
         recordLine(context, comp.lineStyle,
                    std::vector<QPointF>(line.begin() + first, line.begin() + last),
                    indexed ? dataIdx.mid(first, last - first) : QVector<int>(),
-                   run.selected ? selectedLinePen(comp) : comp.pen, impulseBaseline, logKeyAxis);
+                   run.selected ? selectedLinePen(comp) : comp.pen, impulseBaseline, keyScale);
     }
     if (hasMarkers)
         recordMarkers(context, comp, line, rows, indexed, selected, false);
@@ -2260,7 +2302,7 @@ void QCPGraph::recordComponent(QCPDrawContext& context, int column, std::vector<
 
 void QCPGraph::recordLine(QCPDrawContext& context, LineStyle style, std::vector<QPointF> line,
                                const QVector<int>& dataIdx, QPen pen, double impulseBaseline,
-                               bool logKeyAxis) const
+                               const QCPScale& keyScale) const
 {
     const bool indexed = !dataIdx.isEmpty();
     if (style == lsNone)
@@ -2283,7 +2325,7 @@ void QCPGraph::recordLine(QCPDrawContext& context, LineStyle style, std::vector<
             vertices = qcp::toStepRightLines(points, /*keyIsVertical=*/false);
             break;
         case lsStepCenter:
-            vertices = stepCentreLines(points, logKeyAxis);
+            vertices = stepCentreLines(points, keyScale);
             break;
         case lsImpulse:
             vertices = separatedPairs(
@@ -2460,8 +2502,8 @@ std::vector<qcp::fill::StripPoint> QCPGraph::shapeFillRows(
     // The system's key axis is the one a straight-segment frame draws in log space.
     const QCPAxis* keyAxis = drawsInDataSpace() ? qobject_cast<const QCPAxis*>(keyAxisBase())
                                                 : keyAxisRaw();
-    const bool logKeyAxis = keyAxis && keyAxis->scale().isLog();
-    return steppedOnScreen(std::move(rows), ownerStep(mComponents[fill.owner]), logKeyAxis);
+    const QCPScale keyScale = keyAxis ? keyAxis->scale() : QCPScale();
+    return steppedOnScreen(std::move(rows), ownerStep(mComponents[fill.owner]), keyScale);
 }
 
 std::vector<qcp::fill::StripPoint> QCPGraph::fillToGraphRows(
@@ -2539,6 +2581,21 @@ std::vector<qcp::fill::StripPoint> QCPGraph::binnedWhenDense(
         std::vector<qcp::fill::StripPoint> spans = qcp::fill::binToSpans(rows, width);
         for (qcp::fill::StripPoint& span : spans)
             span.key = std::pow(10.0, span.key);
+        return spans;
+    }
+    if (keyAxisRaw()->scale().isSymlog())
+    {
+        const QCPScale scale = keyAxisRaw()->scale();
+        const QCPRange range = keyAxisRaw()->range();
+        const double width
+            = (scale.toScale(range.upper) - scale.toScale(range.lower)) / quarterPixel;
+        if (!(width > 0.0))
+            return rows;
+        for (qcp::fill::StripPoint& row : rows)
+            row.key = std::isfinite(row.key) ? scale.toScale(row.key) : std::nan("");
+        std::vector<qcp::fill::StripPoint> spans = qcp::fill::binToSpans(rows, width);
+        for (qcp::fill::StripPoint& span : spans)
+            span.key = scale.fromScale(span.key);
         return spans;
     }
     const double width = std::abs(keyAxisRaw()->range().size()) / quarterPixel;

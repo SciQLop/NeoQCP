@@ -1268,3 +1268,59 @@ void TestDataSource2D::colorMapRowsOnASymlogAxis()
                  qPrintable(QString("row %1 is %2, not %3")
                                 .arg(j).arg(cells->cell(0, j), 0, 'g', 17).arg(want[j], 0, 'g', 17)));
 }
+
+// A colour map's columns follow the key axis' scale space too: the source columns are placed
+// evenly in it, so each plateau boundary is where coordToPixel of the scale-space midpoint says.
+void TestDataSource2D::colormap2KeyAxisFollowsTheScale()
+{
+    const auto plateausAreEvenIn = [](QCustomPlot& plot, const QCPScale& scale,
+                                      const std::vector<double>& x)
+    {
+        plot.resize(400, 300);
+        std::vector<double> z; // row-major: z[i * 2 + j]
+        for (double xi : x)
+            for (int j = 0; j < 2; ++j)
+                z.push_back(xi);
+        auto* cm = plot.add<QCPColorMap2>().get();
+        // Four columns far apart are not a gap in the data: the spacing test would break the
+        // span between them.
+        cm->setGapThreshold(0);
+        cm->setData(x, std::vector<double> { 0.0, 1.0 }, std::move(z));
+        plot.yAxis->setRange(0, 1);
+        plot.xAxis->setScale(scale);
+        plot.xAxis->setRange(x.front(), x.back());
+
+        const QCPColorMapData* r = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((r = cm->pipeline().result()) != nullptr, 3000);
+        QVERIFY(r->keySize() > 8);
+        const QCPRange axisRange = plot.xAxis->range();
+        const double axisSpan = scale.toScale(axisRange.upper) - scale.toScale(axisRange.lower);
+        for (int boundary = 0; boundary + 1 < int(x.size()); ++boundary)
+        {
+            const double mid
+                = 0.5 * (scale.toScale(x[boundary]) + scale.toScale(x[boundary + 1]));
+            const double boundaryValue = scale.fromScale(mid);
+            const double expected
+                = (mid - scale.toScale(axisRange.lower)) / axisSpan * r->keySize();
+            int firstAbove = -1;
+            for (int col = 0; col < r->keySize(); ++col)
+                if (!std::isnan(r->cell(col, 0)) && r->cell(col, 0) >= boundaryValue)
+                {
+                    firstAbove = col;
+                    break;
+                }
+            QVERIFY2(firstAbove >= 0, "a column above the boundary exists");
+            QVERIFY2(std::abs(firstAbove - expected) <= 2.0,
+                     qPrintable(QString("boundary %1 lands at column %2, not %3 (value %4)")
+                                    .arg(boundary)
+                                    .arg(firstAbove)
+                                    .arg(expected)
+                                    .arg(boundaryValue)));
+        }
+    };
+
+    QCustomPlot symlogPlot;
+    plateausAreEvenIn(symlogPlot, QCPScale::symlog(2), { -1000.0, -1.0, 100.0, 1000.0 });
+    QCustomPlot logPlot;
+    plateausAreEvenIn(logPlot, QCPScale::log(), { 1.0, 10.0, 100.0, 1000.0 });
+}
