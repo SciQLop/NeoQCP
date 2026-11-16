@@ -218,6 +218,11 @@ private slots:
     void multipleMultiGraphsIndependentOffsets();
     void multiGraphDataChangedReplotSlotDeletingTheGraphIsSafe();
 
+    // Scale-space data pipeline
+    void symlogThinningIsEvenInScaleSpace();
+    void l2OnSymlog();
+    void contourLevelsOnSymlog();
+
 private:
     bool repaintFollows(QCPHistogram2D* hist, const std::function<void()>& change);
     QCustomPlot* mPlot = nullptr;

@@ -182,8 +182,8 @@ private:
     mutable Shown mShown;
     //! The axis scales the binning was made for: a new axis or a blocked scaleChanged
     //! leaves them behind, and draw() catches up.
-    bool mBinnedKeyLog = false;
-    bool mBinnedValueLog = false;
+    QCPScale mBinnedKeyScale;
+    QCPScale mBinnedValueScale;
     bool mRebinQueued = false;
     QMetaObject::Connection mKeyScaleLink;
     QMetaObject::Connection mValueScaleLink;

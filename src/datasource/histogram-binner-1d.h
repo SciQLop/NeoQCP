@@ -13,7 +13,7 @@ struct Histogram1D
     std::vector<double> edges;                // bins + 1, increasing
     std::vector<std::vector<double>> heights; // one vector of `bins` per column
     std::vector<int> counted;                 // values counted per column (for normalization); 0 for pre-binned data, which makes normalize() a no-op
-    bool log = false;
+    QCPScale scale;                           // the scale the bins are even in
 };
 
 namespace detail {
@@ -44,20 +44,21 @@ inline std::optional<QCPRange> finiteValueBounds(const QCPMultiDataSource& src,
     return bounds;
 }
 
-//! bins + 1 edges, evenly spaced in linear or log10 space, the outer two exactly the range;
+//! bins + 1 edges, evenly spaced in scale space, the outer two exactly the range;
 //! none when bins <= 0.
-inline std::vector<double> binEdges(QCPRange range, int bins, bool log)
+inline std::vector<double> binEdges(QCPRange range, int bins, const QCPScale& scale)
 {
     if (bins <= 0)
         return {};
-    const double lo = log ? std::log10(range.lower) : range.lower;
-    const double hi = log ? std::log10(range.upper) : range.upper;
+    const double lo = BinAxis::position(range.lower, scale);
+    const double hi = BinAxis::position(range.upper, scale);
+    const auto data = [&](double pos) {
+        if (scale.isLog()) return std::pow(10.0, pos);
+        return scale.isSymlog() ? scale.fromScale(pos) : pos;
+    };
     std::vector<double> edges(bins + 1);
     for (int i = 0; i <= bins; ++i)
-    {
-        const double mapped = lo + i * (hi - lo) / bins;
-        edges[i] = log ? std::pow(10.0, mapped) : mapped;
-    }
+        edges[i] = data(lo + i * (hi - lo) / bins);
     // Exact outer edges: QCPHistogram compares them with its remembered range.
     edges.front() = range.lower;
     edges.back() = range.upper;
@@ -67,20 +68,21 @@ inline std::vector<double> binEdges(QCPRange range, int bins, bool log)
 //! Counts finite values inside [range.lower, range.upper] of every column into shared bins.
 //! Values outside the range are not counted. Log: non-positive values are skipped.
 //! bins <= 0 gives an empty histogram.
-inline Histogram1D bin1d(const QCPMultiDataSource& src, QCPRange range, int bins, bool log)
+inline Histogram1D bin1d(const QCPMultiDataSource& src, QCPRange range, int bins,
+                         const QCPScale& scale)
 {
     if (bins <= 0)
-        return { {}, {}, {}, log };
-    const BinAxis axis = BinAxis::make(range, bins, log);
+        return { {}, {}, {}, scale };
+    const BinAxis axis = BinAxis::make(range, bins, scale);
     const int columns = src.columnCount();
-    Histogram1D h { binEdges(range, bins, log), std::vector(columns, std::vector<double>(bins, 0.0)),
-                    std::vector<int>(columns, 0), log };
+    Histogram1D h { binEdges(range, bins, scale), std::vector(columns, std::vector<double>(bins, 0.0)),
+                    std::vector<int>(columns, 0), scale };
     for (int c = 0; c < columns; ++c)
         for (int i = 0; i < src.size(); ++i)
         {
             const double v = src.valueAt(c, i);
             // The range check keeps BinAxis::index's clamp from piling outside values into edge bins.
-            if (!detail::binnable(v, log) || v < range.lower || v > range.upper)
+            if (!detail::binnable(v, scale.isLog()) || v < range.lower || v > range.upper)
                 continue;
             ++h.heights[c][axis.index(v)];
             ++h.counted[c];

@@ -26,7 +26,8 @@ public:
                         const QCPRange& inKeyRange = QCPRange()) const override;
     std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
                                      std::vector<int>* sourceIndices = nullptr,
-                                     bool logKeys = false, bool cacheGaps = true) const override;
+                                     const QCPScale& keyScale = QCPScale(),
+                                     bool cacheGaps = true) const override;
 
 private:
     struct TransformedWindow

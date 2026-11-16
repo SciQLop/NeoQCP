@@ -29,6 +29,10 @@ line numbers will drift).
 - Symlog draws and interacts (6f): `QCPScale::symlog()` maps, pans, zooms, exports and survives a
   polar radial axis like the linear and log scales (`docs/axes.md`, "The scale is a value"). Nothing
   to change in SciQLopPlots; a symlog colour mapping still follows the linear colour path.
+- The data pipeline follows the scale (6f): thinning, L2 bins, the line-cache window, colour-map
+  rows, histogram bins and automatic contour levels are equal spans of scale space. Nothing to
+  change in SciQLopPlots, which reads the results; only code that calls the `qcp::algo` helpers
+  directly moves from bools to `QCPScale` (see `docs/migrating.md`).
 - `QCPMarginGroup` was deprecated in 4d and is removed in 5d: see "From milestone 5d" below
   (`src/SciQLopPlot.cpp` ~141). The panel's own `VPlotsAlign` may be replaceable by alignment groups.
 - Linked axes and drag/zoom of every axis by default (4d): the time and axis synchronizers

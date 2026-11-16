@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../axis/scale.h"
+
 #include <cstdint>
 #include <vector>
 
@@ -14,7 +16,7 @@ struct ResampleCache
     std::vector<double> yAxis;
     double yLower = 0, yUpper = 0;
     int ny = 0;
-    bool yLog = false;
+    QCPScale yScale;
 
     // Reusable scratch buffers for the accumulation loop. Reused across jobs
     // via assign() (always resets every element, whatever the previous size
@@ -33,8 +35,9 @@ struct ResampleCache
 // If cache is non-null and the Y parameters match, reuses the cached Y axis
 // (avoids expensive pow10 recomputation on X-only pans).
 //
-// zLogScale averages log10(z) (geometric mean) so a log colour scale isn't
-// skewed toward the bin's largest sample; z <= 0 is left out of the mean.
+// \a yScale and \a zScale place the rows and average the samples: a log scale averages log10(z)
+// (geometric mean) so a log colour scale isn't skewed toward the bin's largest sample, with
+// z <= 0 left out of the mean; any other scale averages in scale space.
 //
 // The accumulation loop -- O(visible source cells), independent of target
 // grid size -- is split across worker threads by target-bin range once the
@@ -47,8 +50,8 @@ QCPColorMapData* resample(
     int xBegin, int xEnd,
     const QCPRange& xRange, const QCPRange& yRange,
     int targetWidth, int targetHeight,
-    bool yLogScale,
-    bool zLogScale,
+    const QCPScale& yScale,
+    const QCPScale& zScale,
     double gapThreshold,
     ResampleCache* cache = nullptr,
     bool forceSerial = false);

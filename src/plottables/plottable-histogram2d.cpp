@@ -76,18 +76,18 @@ void QCPHistogram2D::installTransform()
 {
     int capturedKeyBins = mKeyBins;
     int capturedValueBins = mValueBins;
-    const bool keyLog = keyAxisRaw() && keyAxisRaw()->scale().isLog();
-    const bool valueLog = valueAxisRaw() && valueAxisRaw()->scale().isLog();
-    mBinnedKeyLog = keyLog;
-    mBinnedValueLog = valueLog;
+    const QCPScale keyScale = keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
+    const QCPScale valueScale = valueAxisRaw() ? valueAxisRaw()->scale() : QCPScale();
+    mBinnedKeyScale = keyScale;
+    mBinnedValueScale = valueScale;
 
     mPipeline.setTransform(TransformKind::ViewportIndependent,
-        [capturedKeyBins, capturedValueBins, keyLog, valueLog](
+        [capturedKeyBins, capturedValueBins, keyScale, valueScale](
             const QCPDataSource& src,
             const ViewportParams& /*vp*/,
             std::any& /*cache*/) -> std::shared_ptr<QCPColorMapData> {
             auto* raw = qcp::algo::bin2d(src, capturedKeyBins, capturedValueBins,
-                                         keyLog, valueLog);
+                                         keyScale, valueScale);
             // Empty, not nullptr: the pipeline keeps its previous result on nullptr, so
             // "nothing to bin" would leave the old cells.
             if (!raw)
@@ -219,8 +219,8 @@ const QCPColorMapData* QCPHistogram2D::shown() const
         auto cells = std::make_shared<QCPColorMapData>(keySz, valSz, bins->keyRange(), bins->valueRange());
         // Density needs the cell area, also for log-spaced bins: the 1-D and 2-D
         // histograms read the same rule.
-        const auto keyWidths = qcp::algo::binWidths(bins->keyRange(), keySz, mBinnedKeyLog);
-        const auto valueWidths = qcp::algo::binWidths(bins->valueRange(), valSz, mBinnedValueLog);
+        const auto keyWidths = qcp::algo::binWidths(bins->keyRange(), keySz, mBinnedKeyScale);
+        const auto valueWidths = qcp::algo::binWidths(bins->valueRange(), valSz, mBinnedValueScale);
         double total = 0;
         for (int ki = 0; ki < keySz; ++ki)
             for (int vi = 0; vi < valSz; ++vi)
@@ -281,9 +281,9 @@ bool QCPHistogram2D::canProduceContent() const
 
 bool QCPHistogram2D::binnedForTheAxisScales() const
 {
-    const bool keyLog = keyAxisRaw() && keyAxisRaw()->scale().isLog();
-    const bool valueLog = valueAxisRaw() && valueAxisRaw()->scale().isLog();
-    return keyLog == mBinnedKeyLog && valueLog == mBinnedValueLog;
+    const QCPScale keyScale = keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
+    const QCPScale valueScale = valueAxisRaw() ? valueAxisRaw()->scale() : QCPScale();
+    return keyScale == mBinnedKeyScale && valueScale == mBinnedValueScale;
 }
 
 // refreshBinning() emits busyChanged at once, and nothing may emit during a paint. The scales

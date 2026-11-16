@@ -18,26 +18,27 @@ using namespace qcp::algo;
 namespace {
 
 // Log bins need a positive range; BinAxis::make asserts it.
-std::optional<QCPRange> usableRange(std::optional<QCPRange> range, bool log)
+std::optional<QCPRange> usableRange(std::optional<QCPRange> range, const QCPScale& scale)
 {
-    if (range && log && range->lower <= 0)
+    if (range && scale.isLog() && range->lower <= 0)
         return std::nullopt;
     return range;
 }
 
 std::optional<QCPRange> binningRange(const QCPMultiDataSource& src,
                                      std::optional<QCPRange> fixed,
-                                     std::optional<QCPRange> autoRange, bool log)
+                                     std::optional<QCPRange> autoRange,
+                                     const QCPScale& scale)
 {
-    std::optional<QCPRange> range = usableRange(fixed, log);
+    std::optional<QCPRange> range = usableRange(fixed, scale);
     if (!range)
     {
-        const auto bounds = finiteValueBounds(src, log);
+        const auto bounds = finiteValueBounds(src, scale.isLog());
         if (!bounds)
             return std::nullopt;
-        range = widenedRange(usableRange(autoRange, log), *bounds);
+        range = widenedRange(usableRange(autoRange, scale), *bounds);
     }
-    expandIfFlat(*range, log);
+    expandIfFlat(*range, scale);
     return range;
 }
 
@@ -111,42 +112,42 @@ void QCPHistogram::followKeyAxis()
 
 QCPHistogram::~QCPHistogram() = default;
 
-bool QCPHistogram::keyLog() const
+QCPScale QCPHistogram::keyScale() const
 {
-    return keyAxisRaw() && keyAxisRaw()->scale().isLog();
+    return keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
 }
 
 // The transform's scale alone is not enough: rememberEdges() reinstalls it for the current axis
 // when an older job's result lands, and that result keeps its own scale.
 bool QCPHistogram::scaleIsStale() const
 {
-    const bool shownStale = mDataSource && mResult && mResult->log != keyLog();
-    return keyLog() != mBinnedKeyLog || shownStale;
+    const bool shownStale = mDataSource && mResult && mResult->scale != keyScale();
+    return keyScale() != mBinnedKeyScale || shownStale;
 }
 
 bool QCPHistogram::autoEdges() const
 {
-    return !usableRange(mFixedRange, keyLog());
+    return !usableRange(mFixedRange, keyScale());
 }
 
 void QCPHistogram::installTransform()
 {
     const int bins = mBins;
-    const bool log = keyLog();
-    mBinnedKeyLog = log;
+    const QCPScale scale = keyScale();
+    mBinnedKeyScale = scale;
     const auto normalization = mNormalization;
     const auto fixed = mFixedRange;
     const auto autoRange = mAutoRange;
     mPipeline.setTransform(TransformKind::ViewportIndependent,
-        [bins, log, normalization, fixed, autoRange](const QCPMultiDataSource& src,
+        [bins, scale, normalization, fixed, autoRange](const QCPMultiDataSource& src,
                                                      const ViewportParams&,
                                                      std::any&) -> std::shared_ptr<Histogram1D> {
-            const auto range = binningRange(src, fixed, autoRange, log);
+            const auto range = binningRange(src, fixed, autoRange, scale);
             // An empty histogram, not nullptr: the pipeline keeps its previous result on
             // nullptr, so "nothing to bin" would be indistinguishable from the old bars.
             if (!range)
                 return std::make_shared<Histogram1D>();
-            auto h = std::make_shared<Histogram1D>(bin1d(src, *range, bins, log));
+            auto h = std::make_shared<Histogram1D>(bin1d(src, *range, bins, scale));
             normalize(*h, normalization);
             return h;
         });
@@ -166,7 +167,7 @@ void QCPHistogram::refreshBinning()
 // so its result can be narrower than the edges now shown: bin it again, never shrink.
 bool QCPHistogram::coversAutoEdges(const Histogram1D& h) const
 {
-    const auto known = autoEdges() ? usableRange(mAutoRange, keyLog()) : std::nullopt;
+    const auto known = autoEdges() ? usableRange(mAutoRange, keyScale()) : std::nullopt;
     return !known || (h.edges.front() <= known->lower && h.edges.back() >= known->upper);
 }
 
@@ -177,7 +178,7 @@ void QCPHistogram::onPipelineFinished(uint64_t generation)
     mResetForLog.reset();
     auto result = pipelineResult();
     // A job started before the key scale changed: its bins mean nothing in the new scale.
-    if (result && result->log != keyLog())
+    if (result && result->scale != keyScale())
     {
         resetEdges();
         return;
@@ -234,7 +235,7 @@ void QCPHistogram::setBinned(std::vector<double> edges, std::vector<std::vector<
     mAcceptedGeneration = mPipeline.currentGeneration();
     const std::size_t columns = heights.size();
     takeResult(std::make_shared<Histogram1D>(
-        Histogram1D { std::move(edges), std::move(heights), std::vector<int>(columns, 0), keyLog() }));
+        Histogram1D { std::move(edges), std::move(heights), std::vector<int>(columns, 0), keyScale() }));
 }
 
 void QCPHistogram::setBins(int bins)
@@ -252,7 +253,7 @@ void QCPHistogram::setBins(int bins)
 
 void QCPHistogram::setFixedRange(std::optional<QCPRange> range)
 {
-    if (range && keyLog() && range->lower <= 0)
+    if (range && keyScale().isLog() && range->lower <= 0)
     {
         qWarning() << "QCPHistogram::setFixedRange: log bins need a positive range, ignored";
         return;
@@ -321,7 +322,7 @@ void QCPHistogram::rememberEdges()
 {
     if (!mDataSource || !autoEdges())
         return;
-    mAutoRange = widenedRange(usableRange(mAutoRange, keyLog()),
+    mAutoRange = widenedRange(usableRange(mAutoRange, keyScale()),
                               QCPRange(mResult->edges.front(), mResult->edges.back()));
     installTransform();
 }
@@ -364,9 +365,9 @@ void QCPHistogram::queueResetEdges()
 // stale bars up.
 void QCPHistogram::resetForTheStaleScale()
 {
-    if (!scaleIsStale() || mResetForLog == keyLog())
+    if (!scaleIsStale() || mResetForLog == keyScale())
         return;
-    mResetForLog = keyLog();
+    mResetForLog = keyScale();
     resetEdges();
 }
 

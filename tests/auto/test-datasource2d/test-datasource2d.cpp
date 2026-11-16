@@ -5,6 +5,7 @@
 #include <datasource/resample.h>
 #include <QtTest/QtTest>
 #include <QTemporaryFile>
+#include <array>
 #include <cmath>
 #include <memory>
 #include <span>
@@ -220,7 +221,7 @@ void TestDataSource2D::resampleUniformGrid()
 
     QCPSoADataSource2D src(std::move(x), std::move(y), std::move(z));
 
-    auto* result = qcp::algo2d::resample(src, 0, 5, QCPRange(0, 4), QCPRange(0, 2), 5, 3, false, false, 1.5);
+    auto* result = qcp::algo2d::resample(src, 0, 5, QCPRange(0, 4), QCPRange(0, 2), 5, 3, QCPScale(), QCPScale(), 1.5);
     QVERIFY(result != nullptr);
     QCOMPARE(result->keySize(), 5);
     QCOMPARE(result->valueSize(), 3);
@@ -240,7 +241,7 @@ void TestDataSource2D::resampleVariableY()
     QCPSoADataSource2D src(std::move(x), std::move(y), std::move(z));
     QVERIFY(src.yIs2D());
 
-    auto* result = qcp::algo2d::resample(src, 0, 2, QCPRange(0, 1), QCPRange(10, 25), 2, 2, false, false, 1.5);
+    auto* result = qcp::algo2d::resample(src, 0, 2, QCPRange(0, 1), QCPRange(10, 25), 2, 2, QCPScale(), QCPScale(), 1.5);
     QVERIFY(result != nullptr);
     QVERIFY(result->keySize() > 0);
     QVERIFY(result->valueSize() > 0);
@@ -255,7 +256,7 @@ void TestDataSource2D::resampleGapDetection()
 
     QCPSoADataSource2D src(std::move(x), std::move(y), std::move(z));
 
-    auto* result = qcp::algo2d::resample(src, 0, 6, QCPRange(0, 12), QCPRange(0, 1), 12, 2, false, false, 1.5);
+    auto* result = qcp::algo2d::resample(src, 0, 6, QCPRange(0, 12), QCPRange(0, 1), 12, 2, QCPScale(), QCPScale(), 1.5);
     QVERIFY(result != nullptr);
 
     int midKey = result->keySize() / 2;
@@ -285,12 +286,12 @@ void TestDataSource2D::resampleGapDetectionViewportIndependent()
 
     // Wide viewport covering all data — start from index 0
     auto* r1 = qcp::algo2d::resample(src, 0, total,
-        QCPRange(-5, 50), QCPRange(0, 1), 55, 2, false, false, 2.0);
+        QCPRange(-5, 50), QCPRange(0, 1), 55, 2, QCPScale(), QCPScale(), 2.0);
     QVERIFY(r1);
 
     // Same viewport but start from index 1 (simulating panned xBegin)
     auto* r2 = qcp::algo2d::resample(src, 1, total,
-        QCPRange(-5, 50), QCPRange(0, 1), 55, 2, false, false, 2.0);
+        QCPRange(-5, 50), QCPRange(0, 1), 55, 2, QCPScale(), QCPScale(), 2.0);
     QVERIFY(r2);
 
     // Count NaN columns in each — should be similar (both detect the same gaps)
@@ -335,7 +336,7 @@ void TestDataSource2D::resampleGapBoundaryDataPreserved()
 
     // Use enough bins to resolve each source column
     auto* r = qcp::algo2d::resample(src, 0, 6,
-        QCPRange(0, 12), QCPRange(0, 0.5), 12, 1, false, false, 2.0);
+        QCPRange(0, 12), QCPRange(0, 0.5), 12, 1, QCPScale(), QCPScale(), 2.0);
     QVERIFY(r);
 
     // Bin for x=0 (first point of first segment) must have data
@@ -380,9 +381,9 @@ void TestDataSource2D::resampleParallelMatchesSerial()
     QVERIFY(!src.yIs2D());
 
     auto* serial = qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, ys - 1),
-                                          500, 300, false, false, 1.5, nullptr, /*forceSerial=*/true);
+                                          500, 300, QCPScale(), QCPScale(), 1.5, nullptr, /*forceSerial=*/true);
     auto* parallel = qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, ys - 1),
-                                            500, 300, false, false, 1.5, nullptr, /*forceSerial=*/false);
+                                            500, 300, QCPScale(), QCPScale(), 1.5, nullptr, /*forceSerial=*/false);
     QVERIFY(serial != nullptr);
     QVERIFY(parallel != nullptr);
     QCOMPARE(parallel->keySize(), serial->keySize());
@@ -432,9 +433,9 @@ void TestDataSource2D::resampleParallelMatchesSerialVariableY()
     QVERIFY(src.yIs2D());
 
     auto* serial = qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, nyBudget - 1),
-                                          400, 250, false, false, 1.5, nullptr, /*forceSerial=*/true);
+                                          400, 250, QCPScale(), QCPScale(), 1.5, nullptr, /*forceSerial=*/true);
     auto* parallel = qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, nyBudget - 1),
-                                            400, 250, false, false, 1.5, nullptr, /*forceSerial=*/false);
+                                            400, 250, QCPScale(), QCPScale(), 1.5, nullptr, /*forceSerial=*/false);
     QVERIFY(serial != nullptr);
     QVERIFY(parallel != nullptr);
     QCOMPARE(parallel->keySize(), serial->keySize());
@@ -477,14 +478,14 @@ void TestDataSource2D::parallelResampleMatchesSerial()
     qcp::algo2d::ResampleCache cache;
 
     auto* serial = qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, ys - 1), 200,
-                                          150, false, false, 1.5, nullptr, /*forceSerial=*/true);
+                                          150, QCPScale(), QCPScale(), 1.5, nullptr, /*forceSerial=*/true);
     QVERIFY(serial != nullptr);
 
     for (int job = 0; job < 200; ++job)
     {
         auto* parallel
             = qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, ys - 1), 200, 150,
-                                    false, false, 1.5, &cache, /*forceSerial=*/false);
+                                    QCPScale(), QCPScale(), 1.5, &cache, /*forceSerial=*/false);
         QVERIFY2(parallel, qPrintable(QString("job %1 returned no output").arg(job)));
         QCOMPARE(parallel->keySize(), serial->keySize());
         QCOMPARE(parallel->valueSize(), serial->valueSize());
@@ -516,7 +517,7 @@ void TestDataSource2D::resampleReusedCacheScratchBuffersDontLeakBetweenJobs()
     std::vector<double> y1 = {0, 1};
     std::vector<double> z1(10, 100.0);
     QCPSoADataSource2D src1(x1, y1, z1);
-    auto* r1 = qcp::algo2d::resample(src1, 0, 5, QCPRange(0, 4), QCPRange(0, 1), 5, 2, false, false, 0.0, &cache);
+    auto* r1 = qcp::algo2d::resample(src1, 0, 5, QCPRange(0, 4), QCPRange(0, 1), 5, 2, QCPScale(), QCPScale(), 0.0, &cache);
     QVERIFY(r1);
     delete r1;
 
@@ -524,7 +525,7 @@ void TestDataSource2D::resampleReusedCacheScratchBuffersDontLeakBetweenJobs()
     std::vector<double> y2 = {0, 1};
     std::vector<double> z2(10, 7.0);
     QCPSoADataSource2D src2(x2, y2, z2);
-    auto* r2 = qcp::algo2d::resample(src2, 0, 5, QCPRange(0, 4), QCPRange(0, 1), 5, 2, false, false, 0.0, &cache);
+    auto* r2 = qcp::algo2d::resample(src2, 0, 5, QCPRange(0, 4), QCPRange(0, 1), 5, 2, QCPScale(), QCPScale(), 0.0, &cache);
     QVERIFY(r2);
     for (int i = 0; i < 5; ++i)
         for (int j = 0; j < 2; ++j)
@@ -540,7 +541,7 @@ void TestDataSource2D::resampleLogY()
 
     QCPSoADataSource2D src(std::move(x), std::move(y), std::move(z));
 
-    auto* result = qcp::algo2d::resample(src, 0, 2, QCPRange(0, 1), QCPRange(1, 100), 2, 3, true, false, 1.5);
+    auto* result = qcp::algo2d::resample(src, 0, 2, QCPRange(0, 1), QCPRange(1, 100), 2, 3, QCPScale::log(), QCPScale(), 1.5);
     QVERIFY(result != nullptr);
     QVERIFY(result->keySize() > 0);
     QVERIFY(result->valueSize() > 0);
@@ -557,7 +558,7 @@ void TestDataSource2D::resampleEmptyBins()
 
     QCPSoADataSource2D src(std::move(x), std::move(y), std::move(z));
 
-    auto* result = qcp::algo2d::resample(src, 0, 5, QCPRange(0, 4), QCPRange(0, 1), 5, 2, false, false, 1.5);
+    auto* result = qcp::algo2d::resample(src, 0, 5, QCPRange(0, 4), QCPRange(0, 1), 5, 2, QCPScale(), QCPScale(), 1.5);
     QVERIFY(result != nullptr);
     QCOMPARE(result->keySize(), 5);
     QCOMPARE(result->valueSize(), 2);
@@ -595,7 +596,7 @@ void TestDataSource2D::resampleGapDetectedWhenZoomedIn()
     int xEnd = 6;   // x=11 (exclusive), so columns: x=4, x=10
 
     auto* r = qcp::algo2d::resample(src, xBegin, xEnd,
-        QCPRange(3.5, 10.5), QCPRange(-0.5, 0.5), 100, 1, false, false, 1.5);
+        QCPRange(3.5, 10.5), QCPRange(-0.5, 0.5), 100, 1, QCPScale(), QCPScale(), 1.5);
     QVERIFY(r);
 
     // The gap region (roughly bins 5-95, the middle ~90% of the viewport) must be NaN.
@@ -632,7 +633,7 @@ void TestDataSource2D::resampleGapDetectedWithTwoVisibleColumns()
     int xEnd = 5;   // x=21 (exclusive), columns: x=3, x=20
 
     auto* r = qcp::algo2d::resample(src, xBegin, xEnd,
-        QCPRange(5, 15), QCPRange(-0.5, 0.5), 100, 1, false, false, 1.5);
+        QCPRange(5, 15), QCPRange(-0.5, 0.5), 100, 1, QCPScale(), QCPScale(), 1.5);
     QVERIFY(r);
 
     // Most bins should be NaN since the viewport is inside the gap.
@@ -663,7 +664,7 @@ void TestDataSource2D::resampleLogYNoBinGaps()
     QCPSoADataSource2D src(std::move(x), std::move(y), std::move(z));
 
     auto* r = qcp::algo2d::resample(src, 0, 3,
-        QCPRange(0, 2), QCPRange(1, 10000), 3, 50, true, false, 1.5);
+        QCPRange(0, 2), QCPRange(1, 10000), 3, 50, QCPScale::log(), QCPScale(), 1.5);
     QVERIFY(r);
 
     // Every output bin should have data — no NaN gaps between channels
@@ -820,7 +821,7 @@ void TestDataSource2D::resampleVariableYPerColumn()
 
     // Resample with log Y. Output grid: 3 x-bins, 40 y-bins spanning [1, 10000].
     auto* r = qcp::algo2d::resample(src, 0, 3,
-        QCPRange(0, 2), QCPRange(1, 10000), 3, 40, true, false, 0);
+        QCPRange(0, 2), QCPRange(1, 10000), 3, 40, QCPScale::log(), QCPScale(), 0);
     QVERIFY(r);
 
     // Column 2 (x=2) has Y={1000, 10000}. Its high channel (z=6.0) should
@@ -859,8 +860,8 @@ QCPColorMapData* resampleFourColumnsIntoTwo(std::vector<double> columnValues, bo
         z.insert(z.end(), {v, v});
     QCPSoADataSource2D src(std::vector<double>{0, 1, 2, 3}, std::vector<double>{0, 1},
                            std::move(z));
-    return qcp::algo2d::resample(src, 0, 4, QCPRange(0, 3), QCPRange(0, 1), 2, 2, false,
-                                 zLog, 0);
+    return qcp::algo2d::resample(src, 0, 4, QCPRange(0, 3), QCPRange(0, 1), 2, 2, QCPScale(),
+                                 zLog ? QCPScale::log() : QCPScale(), 0);
 }
 }
 
@@ -1184,7 +1185,8 @@ void TestDataSource2D::resampleFloatMatchesDouble()
     {
         auto run = [&](const QCPDataSource2D& src) {
             return qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(1, 50),
-                                         400, 100, log, log, 1.5, nullptr, false);
+                                         400, 100, log ? QCPScale::log() : QCPScale(),
+                                         log ? QCPScale::log() : QCPScale(), 1.5, nullptr, false);
         };
         std::unique_ptr<QCPColorMapData> got(run(fast)), want(run(reference));
         QVERIFY(got && want);
@@ -1198,4 +1200,71 @@ void TestDataSource2D::resampleFloatMatchesDouble()
                     QCOMPARE(g, w);
             }
     }
+}
+
+void TestDataSource2D::colorMapRowsOnASymlogAxis()
+{
+    // Four source rows far apart on a symlog value axis: the resampled rows must be evenly
+    // spaced in scale space, so each plateau boundary lands where the axis draws it.
+    const QCPScale symlog = QCPScale::symlog(2);
+    mPlot->resize(400, 300);
+    const std::vector<double> y { -1000.0, -1.0, 100.0, 1000.0 };
+    std::vector<double> z; // row-major: z[i * 4 + j]
+    for (int i = 0; i < 2; ++i)
+        for (int j = 0; j < 4; ++j)
+            z.push_back(y[j]);
+    auto* cm = mPlot->add<QCPColorMap2>().get();
+    cm->setData(std::vector<double> { 0.0, 1.0 }, y, std::move(z));
+    mPlot->xAxis->setRange(0, 1);
+    mPlot->yAxis->setScale(symlog);
+    mPlot->yAxis->setRange(-1000, 1000);
+
+    auto* r = cm->pipeline().result();
+    QTRY_VERIFY_WITH_TIMEOUT((r = cm->pipeline().result()) != nullptr, 3000);
+    QVERIFY(r->valueSize() > 8);
+
+    const QCPRange axisRange = mPlot->yAxis->range();
+    const double axisSpan = symlog.toScale(axisRange.upper) - symlog.toScale(axisRange.lower);
+    for (int boundary = 0; boundary < 3; ++boundary)
+    {
+        const double mid = 0.5 * (symlog.toScale(y[boundary]) + symlog.toScale(y[boundary + 1]));
+        const double boundaryValue = symlog.fromScale(mid);
+        const double expectedRow = (mid - symlog.toScale(axisRange.lower)) / axisSpan
+                                   * r->valueSize();
+        int firstAbove = -1;
+        for (int row = 0; row < r->valueSize(); ++row)
+        {
+            const double cell = r->cell(0, row);
+            if (!std::isnan(cell) && cell >= boundaryValue)
+            {
+                firstAbove = row;
+                break;
+            }
+        }
+        QVERIFY2(firstAbove >= 0, "a resampled row above the boundary exists");
+        QVERIFY2(std::abs(firstAbove - expectedRow) <= 2.0,
+                 qPrintable(QString("boundary %1 lands at row %2, not %3 (boundary value %4)")
+                                .arg(boundary).arg(firstAbove).arg(expectedRow).arg(boundaryValue)));
+    }
+
+    // The log case is unchanged: four rows over a 1000-row log grid, recorded at BASE 8dff255.
+    const int ny = 1000;
+    std::vector<double> logX { 0.0, 1.0 }, logY(ny), logZ(2 * ny);
+    for (int j = 0; j < ny; ++j)
+    {
+        logY[j] = std::pow(10.0, 4.0 * j / (ny - 1));
+        logZ[j] = logY[j];
+        logZ[ny + j] = logY[j];
+    }
+    QCPSoADataSource2D logSrc(logX, logY, logZ);
+    std::unique_ptr<QCPColorMapData> cells(qcp::algo2d::resample(
+        logSrc, 0, 2, QCPRange(0, 1), QCPRange(1, 10000), 2, 4, QCPScale::log(),
+        QCPScale::linear(), 1.5, nullptr, true));
+    QVERIFY(cells);
+    const std::array<double, 4> want { 4.2548329965672949, 75.767534375743594,
+                                       1632.3620443728516, 7371.9866965781903 };
+    for (int j = 0; j < 4; ++j)
+        QVERIFY2(std::abs(cells->cell(0, j) - want[j]) <= 1e-12 * std::abs(want[j]),
+                 qPrintable(QString("row %1 is %2, not %3")
+                                .arg(j).arg(cells->cell(0, j), 0, 'g', 17).arg(want[j], 0, 'g', 17)));
 }

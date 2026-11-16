@@ -14,7 +14,7 @@ namespace qcp::algo2d {
 
 namespace {
 
-std::vector<double> generateRange(double start, double end, int n, bool log)
+std::vector<double> generateRange(double start, double end, int n, const QCPScale& scale)
 {
     std::vector<double> range(n);
     if (n <= 1)
@@ -23,12 +23,21 @@ std::vector<double> generateRange(double start, double end, int n, bool log)
             range[0] = start;
         return range;
     }
-    if (log && start > 0 && end > 0)
+    // Log10 rather than QCPScale::toScale: a log axis keeps the exact arithmetic it has always
+    // had, or its reference pictures move.
+    if (scale.isLog() && start > 0 && end > 0)
     {
         double logStart = std::log10(start);
         double step = (std::log10(end) - logStart) / (n - 1);
         for (int i = 0; i < n; ++i)
             range[i] = std::pow(10.0, logStart + i * step);
+    }
+    else if (scale.isSymlog())
+    {
+        const double scaleStart = scale.toScale(start);
+        const double step = (scale.toScale(end) - scaleStart) / (n - 1);
+        for (int i = 0; i < n; ++i)
+            range[i] = scale.fromScale(scaleStart + i * step);
     }
     else
     {
@@ -55,6 +64,38 @@ std::vector<double> generateBinEdges(const std::vector<double>& centers)
         edges[i] = (centers[i - 1] + centers[i]) * 0.5;
     edges[n] = centers[n - 1] + (centers[n - 1] - centers[n - 2]) * 0.5;
     return edges;
+}
+
+// How a column's samples are accumulated. Each space is a template argument rather than a runtime
+// flag: a call the compiler cannot see into (toScale, fromScale) must not sit in the per-sample
+// code of the linear and log paths, where it costs ~20 % on a wide resample.
+enum class ValueSpace { Linear, Log10, Scale };
+
+template <ValueSpace Space>
+double sampleValue(const QCPScale& scale, double v)
+{
+    if constexpr (Space == ValueSpace::Log10) return std::log10(v);
+    else if constexpr (Space == ValueSpace::Scale) return scale.toScale(v);
+    else return v;
+}
+
+template <ValueSpace Space>
+double valueFromMean(const QCPScale& scale, double v)
+{
+    if constexpr (Space == ValueSpace::Log10) return std::pow(10.0, v);
+    else if constexpr (Space == ValueSpace::Scale) return scale.fromScale(v);
+    else return v;
+}
+
+template <typename F>
+void dispatchValueSpace(ValueSpace space, F&& f)
+{
+    switch (space)
+    {
+    case ValueSpace::Log10: f(std::integral_constant<ValueSpace, ValueSpace::Log10> {}); break;
+    case ValueSpace::Scale: f(std::integral_constant<ValueSpace, ValueSpace::Scale> {}); break;
+    default: f(std::integral_constant<ValueSpace, ValueSpace::Linear> {}); break;
+    }
 }
 
 int lowerBoundRaw(const double* x, int begin, int end, double value)
@@ -155,7 +196,7 @@ struct BinRange { int lo, hi; };
 // as each thread owns a non-overlapping [xbBegin, xbEnd) partition -- each
 // worker seeds its own local srcCursor and yBinRanges rather than sharing
 // the sequential-scan state the single-chunk case relies on.
-template <typename Accessor>
+template <ValueSpace Space, typename Accessor>
 void resampleRange(
     const Accessor& acc,
     int xbBegin, int xbEnd,
@@ -164,7 +205,7 @@ void resampleRange(
     const std::vector<bool>& gapBetween,
     const std::vector<double>& yAxis,
     int ny, int ys,
-    bool yLogScale, bool variableY, bool zLogScale,
+    const QCPScale& yScale, bool yLog, bool ySymlog, bool variableY, const QCPScale& zScale,
     double* accum, uint32_t* counts, uint8_t* nonPositive)
 {
     auto computeYBinRanges = [&](int col, std::vector<BinRange>& ranges) {
@@ -176,7 +217,7 @@ void resampleRange(
             {
                 yLo = yHi = yVal;
             }
-            else if (yLogScale && yVal > 0)
+            else if (yLog && yVal > 0)
             {
                 // Boundaries are the geometric means with each neighbour; assign
                 // the smaller to yLo and the larger to yHi so a descending y
@@ -190,6 +231,21 @@ void resampleRange(
                 double gmNext = (yj < ys - 1 && next > 0) ? std::sqrt(yVal * next) : yVal;
                 yLo = std::min(gmPrev, gmNext);
                 yHi = std::max(gmPrev, gmNext);
+            }
+            else if (ySymlog)
+            {
+                // Boundaries are the scale-space midpoints with each neighbour, so the rows cover
+                // equal spans of the axis however the values are distributed on it.
+                const double sp = yScale.toScale(yVal);
+                const double below = (yj > 0) ? (yScale.toScale(acc.yAt(col, yj - 1)) + sp) * 0.5
+                                             : 0.0;
+                const double above = (yj < ys - 1)
+                    ? (sp + yScale.toScale(acc.yAt(col, yj + 1))) * 0.5
+                    : 0.0;
+                const double bBelow = yj > 0 ? below : 2.0 * sp - above;
+                const double bAbove = yj < ys - 1 ? above : 2.0 * sp - below;
+                yLo = std::min(yScale.fromScale(bBelow), yScale.fromScale(bAbove));
+                yHi = std::max(yScale.fromScale(bBelow), yScale.fromScale(bAbove));
             }
             else
             {
@@ -285,13 +341,16 @@ void resampleRange(
                 int yLo = yBinRanges[yj].lo;
                 int yHi = yBinRanges[yj].hi;
 
-                if (zLogScale && zVal <= 0)
+                if constexpr (Space == ValueSpace::Log10)
                 {
-                    for (int yb = yLo; yb <= yHi; ++yb)
-                        nonPositive[obBase + yb] = 1;
-                    continue;
+                    if (zVal <= 0)
+                    {
+                        for (int yb = yLo; yb <= yHi; ++yb)
+                            nonPositive[obBase + yb] = 1;
+                        continue;
+                    }
                 }
-                const double sample = zLogScale ? std::log10(zVal) : zVal;
+                const double sample = sampleValue<Space>(zScale, zVal);
                 for (int yb = yLo; yb <= yHi; ++yb)
                 {
                     int idx = obBase + yb;
@@ -312,7 +371,7 @@ void resampleImpl(
     const std::vector<double>& xAxis, const std::vector<double>& yAxis,
     const std::vector<double>& xEdges,
     int nx, int ny, int ys,
-    bool yLogScale, bool variableY, bool zLogScale,
+    const QCPScale& yScale, bool variableY, const QCPScale& zScale,
     double gapThreshold,
     double* outData,
     ResampleCache* cache,
@@ -350,12 +409,21 @@ void resampleImpl(
     counts.assign(total, 0);
     std::vector<uint8_t> localNonPositive;
     std::vector<uint8_t>& nonPositive = cache ? cache->nonPositive : localNonPositive;
-    nonPositive.assign(zLogScale ? total : 0, 0);
+    const bool yLog = yScale.isLog();
+    const bool ySymlog = yScale.isSymlog();
+    const ValueSpace zSpace = zScale.isLog() ? ValueSpace::Log10
+        : (zScale.isSymlog() ? ValueSpace::Scale : ValueSpace::Linear);
+    nonPositive.assign(zSpace == ValueSpace::Log10 ? total : 0, 0);
 
     auto worker = [&](int xbBegin, int xbEnd) {
-        resampleRange(acc, xbBegin, xbEnd, xBegin, xEnd, ctxBegin, ctxCount,
-                      xAxis, xEdges, gapBetween, yAxis, ny, ys, yLogScale, variableY,
-                      zLogScale, accum.data(), counts.data(), nonPositive.data());
+        dispatchValueSpace(zSpace, [&](auto space)
+        {
+            resampleRange<decltype(space)::value>(acc, xbBegin, xbEnd, xBegin, xEnd, ctxBegin,
+                                                 ctxCount, xAxis, xEdges, gapBetween, yAxis, ny,
+                                                 ys, yScale, yLog, ySymlog, variableY, zScale,
+                                                 accum.data(), counts.data(),
+                                                 nonPositive.data());
+        });
     };
 
     // Parallelize by target-bin range: each thread's writes land in disjoint
@@ -395,22 +463,24 @@ void resampleImpl(
     // thread owns a disjoint range of source columns i (and therefore of
     // dstIdx = j*nx+i, since i doesn't repeat across chunks).
     // A log bin holding only z <= 0 keeps 0 so it still draws the lowest colour.
-    auto binValue = [&](int idx) {
-        if (counts[idx] == 0)
-            return (zLogScale && nonPositive[idx]) ? 0.0 : std::nan("");
-        const double mean = accum[idx] / counts[idx];
-        return zLogScale ? std::pow(10.0, mean) : mean;
-    };
     auto writeOutput = [&](int iBegin, int iEnd) {
-        for (int i = iBegin; i < iEnd; ++i)
+        dispatchValueSpace(zSpace, [&](auto space)
         {
-            for (int j = 0; j < ny; ++j)
+            constexpr ValueSpace S = decltype(space)::value;
+            for (int i = iBegin; i < iEnd; ++i)
             {
-                int srcIdx = i * ny + j;
-                int dstIdx = j * nx + i;
-                outData[dstIdx] = binValue(srcIdx);
+                for (int j = 0; j < ny; ++j)
+                {
+                    const int srcIdx = i * ny + j;
+                    double value = std::nan("");
+                    if (counts[srcIdx] != 0)
+                        value = valueFromMean<S>(zScale, accum[srcIdx] / counts[srcIdx]);
+                    else if constexpr (S == ValueSpace::Log10)
+                        if (nonPositive[srcIdx]) value = 0.0;
+                    outData[j * nx + i] = value;
+                }
             }
-        }
+        });
     };
     if (threadCount <= 1 || static_cast<long long>(nx) * ny < 1'000'000)
         writeOutput(0, nx);
@@ -425,8 +495,8 @@ QCPColorMapData* resample(
     int xBegin, int xEnd,
     const QCPRange& xRange, const QCPRange& yRange,
     int targetWidth, int targetHeight,
-    bool yLogScale,
-    bool zLogScale,
+    const QCPScale& yScale,
+    const QCPScale& zScale,
     double gapThreshold,
     ResampleCache* cache,
     bool forceSerial)
@@ -441,25 +511,25 @@ QCPColorMapData* resample(
     int nx = targetWidth;
     int ny = targetHeight;
 
-    auto xAxis = generateRange(xRange.lower, xRange.upper, nx, false);
+    auto xAxis = generateRange(xRange.lower, xRange.upper, nx, QCPScale());
 
     // Reuse cached Y axis when Y parameters haven't changed (avoids pow10 on X-only pans)
     std::vector<double> yAxis;
-    if (cache && cache->ny == ny && cache->yLog == yLogScale
+    if (cache && cache->ny == ny && cache->yScale == yScale
         && cache->yLower == yRange.lower && cache->yUpper == yRange.upper)
     {
         yAxis = cache->yAxis;
     }
     else
     {
-        yAxis = generateRange(yRange.lower, yRange.upper, ny, yLogScale);
+        yAxis = generateRange(yRange.lower, yRange.upper, ny, yScale);
         if (cache)
         {
             cache->yAxis = yAxis;
             cache->yLower = yRange.lower;
             cache->yUpper = yRange.upper;
             cache->ny = ny;
-            cache->yLog = yLogScale;
+            cache->yScale = yScale;
         }
     }
 
@@ -482,7 +552,7 @@ QCPColorMapData* resample(
     auto run = [&](const auto& acc) {
         resampleImpl(acc, xBegin, xEnd, ctxBegin, ctxEnd,
                      xAxis, yAxis, xEdges, nx, ny, ys,
-                     yLogScale, variableY, zLogScale, gapThreshold, data->rawData(), cache,
+                     yScale, variableY, zScale, gapThreshold, data->rawData(), cache,
                      forceSerial);
     };
     bool ranRaw = false;

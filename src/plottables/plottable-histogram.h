@@ -112,12 +112,12 @@ private:
     uint64_t mAcceptedGeneration = 0;
     //! The key scale the binning was made for: a new key axis, or a scaleChanged that was
     //! blocked, leaves it behind, and draw() catches up.
-    bool mBinnedKeyLog = false;
+    QCPScale mBinnedKeyScale;
     bool mResetQueued = false;
     //! The key scale a stale-scale reset is in flight for.
-    std::optional<bool> mResetForLog;
+    std::optional<QCPScale> mResetForLog;
 
-    [[nodiscard]] bool keyLog() const;
+    [[nodiscard]] QCPScale keyScale() const;
     [[nodiscard]] bool autoEdges() const;
     [[nodiscard]] bool scaleIsStale() const;
     [[nodiscard]] std::shared_ptr<qcp::algo::Histogram1D> pipelineResult() const;

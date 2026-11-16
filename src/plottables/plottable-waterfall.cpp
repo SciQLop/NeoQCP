@@ -68,7 +68,8 @@ QCPWaterfallDataAdapter::transformedWindow(int column, int begin, int end) const
 std::vector<QPointF> QCPWaterfallDataAdapter::linesInData(int column, int begin, int end,
                                                            double pixelsPerKey,
                                                            std::vector<int>* sourceIndices,
-                                                           bool logKeys, bool /*cacheGaps*/) const
+                                                           const QCPScale& keyScale,
+                                                           bool /*cacheGaps*/) const
 {
     if (!mSource || begin >= end) {
         if (sourceIndices) sourceIndices->clear();
@@ -77,7 +78,7 @@ std::vector<QPointF> QCPWaterfallDataAdapter::linesInData(int column, int begin,
     const auto w = transformedWindow(column, begin, end);
     const auto gaps = qcp::algo::detectKeyGaps(w.keys, 0, end - begin, gapThreshold());
     auto pts = qcp::algo::linesInData(w.keys, w.values, 0, end - begin, pixelsPerKey,
-                                      sourceIndices, gapThreshold(), &gaps, logKeys);
+                                      sourceIndices, gapThreshold(), &gaps, keyScale);
     if (sourceIndices)
         for (int& i : *sourceIndices)
             if (i >= 0) i += begin;

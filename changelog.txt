@@ -599,6 +599,17 @@ colour-mapped plottable shows its data with is a value, not an enum.
   - QCPColorGradient::color() and colorize() take a QCPScale instead of a bool logarithmic.
   - ViewportParams carries a QCPScale per axis instead of keyLogScale/valueLogScale, for the
         pipeline code that builds one by hand.
+  - The data pipeline follows the scale: thinning buckets, L2 bins and the line-cache window are
+        equal spans of scale space (a symlog key axis no longer thins its linear band into one
+        pixel), a colour map builds its rows evenly in scale space and places them by the scale, a
+        histogram bins in scale space, and automatic contour levels on a symlog data scale are
+        evenly spaced in it. Log keeps its results.
+  - Breaking for pipeline code that calls the algorithms directly: QCPMultiDataSource::linesInData()
+        and its overrides, qcp::algo::linesInData() and the binning helpers (qcp::algo::bin2d(),
+        bin1d(), binEdges(), expandIfFlat(), binWidths(), BinAxis::make()) take a QCPScale where
+        they took a bool, qcp::algo2d::resample() takes a QCPScale for its rows and for its colour
+        values (and ResampleCache stores the row scale), Histogram1D has a scale instead of a log
+        flag, and a histogram speaks of keyScale() instead of keyLog().
   - A polar angular axis still refuses a non-linear scale, as misuse.
 
 Milestone 6c (the drawing context): units and positions. Additive, except where noted.

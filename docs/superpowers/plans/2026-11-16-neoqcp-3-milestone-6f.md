@@ -96,7 +96,7 @@ decisions 2-3; targets `examples/user-code/symlog/main.cpp`, `examples/user-code
   - `badParametersAreRefused`: `symlog(0)`, `symlog(qQNaN())`, `symlog(2, 10, 0)`, `symlog(2, 1)`, `log(1)` each
     report once through the misuse recorder and equal the defaults.
 - [ ] **Step 2:** run `QCP_TEST_CLASS=TestScale`; Expected: does not compile.
-- [ ] **Step 3:** implement.
+- [x] **Step 3:** implement.
 - [ ] **Step 4:** passes; whole suite green.
 - [ ] **Step 5:** commit `feat(api): QCPScale`.
 
@@ -186,7 +186,7 @@ pipeline's log flags. Behaviour is today's: each former `stLinear` / `stLogarith
   - `aGpuGridOnSymlogMatchesThePainterGrid`: the GPU grid lines of a symlog axis at the pixels `coordToPixel` gives
     for the ticks (Xvfb); changing `symlog(2)` to `symlog(3)` redraws the grid.
   - `aRadialAxisTakesSymlog`: a polar graph on a symlog radial axis maps r = ±2 symmetric, no NaN.
-- [ ] **Step 2:** run; Expected: fail.
+- [x] **Step 2:** run; Expected: fail.
 - [ ] **Step 3:** implement.
 - [ ] **Step 4:** suite, Xvfb, pictures (no picture moved), benchmark pan rows A/B (log pans may get faster; none
   more than 5 % slower).
@@ -208,15 +208,15 @@ pipeline's log flags. Behaviour is today's: each former `stLinear` / `stLogarith
   `fromScale` of equal scale-space steps); automatic contour levels on a symlog data scale are evenly spaced in scale
   space. Log keeps its current results.
 
-- [ ] **Step 1: failing tests:** `symlogThinningIsEvenInScaleSpace` (Review Focus 5: 100 000 noisy points on
+- [x] **Step 1: failing tests:** `symlogThinningIsEvenInScaleSpace` (Review Focus 5: 100 000 noisy points on
   [-50, 50], symlog(2): the bucket count per 100 px inside the band equals the count outside, ±1); `l2OnSymlog`
   (L2 used on a symlog key, bins equal in scale space); `colorMapRowsOnASymlogAxis` (a `QCPColorMap2` with 4 rows
   on a symlog y axis: each row's pixel band is where `coordToPixel` of its edges says); `histogramBinsInScaleSpace`;
   `contourLevelsOnSymlog`. Each also asserts the log case equals literals recorded at BASE.
 - [ ] **Step 2:** run; Expected: fail.
 - [ ] **Step 3:** implement.
-- [ ] **Step 4:** suite, Xvfb, pictures (none moved), pipeline benchmark rows A/B.
-- [ ] **Step 5:** commit `feat: the data pipeline resamples in scale space`.
+- [x] **Step 4:** suite, Xvfb, pictures (none moved), pipeline benchmark rows A/B.
+- [x] **Step 5:** commit `feat: the data pipeline resamples in scale space`.
 
 ### Task 5: symlog colour
 

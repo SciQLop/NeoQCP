@@ -21,4 +21,5 @@ private slots:
     void interiorEdgesAreEvenlySpacedFromTheRangeStart();
     void aSingleValueIsNormalizedToo();
     void aColumnWithNothingCountedStaysZero();
+    void histogramBinsInScaleSpace();
 };

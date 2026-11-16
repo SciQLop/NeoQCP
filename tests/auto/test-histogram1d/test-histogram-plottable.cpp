@@ -159,7 +159,7 @@ void TestHistogramPlottable::binsFollowALogKeyAxis()
     mPlot->xAxis->setScale(QCPScale::log());
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
-    QVERIFY(h->histogram()->log);
+    QVERIFY(h->histogram()->scale.isLog());
     QCOMPARE(h->histogram()->edges.front(), 1.0);
     QCOMPARE(h->histogram()->edges[1], 10.0);
     QCOMPARE(h->histogram()->edges[2], 100.0);
@@ -273,7 +273,7 @@ void TestHistogramPlottable::nonPositiveFixedRangeFallsBackToAutoWhenTheAxisTurn
     QSignalSpy ready(h, &QCPHistogram::histogramReady);
     mPlot->xAxis->setScale(QCPScale::log());
     QVERIFY(ready.wait(5000));
-    QVERIFY(h->histogram()->log);
+    QVERIFY(h->histogram()->scale.isLog());
     QCOMPARE(h->histogram()->edges.front(), 1.0);
 }
 
@@ -284,11 +284,11 @@ void TestHistogramPlottable::rebinsForTheScaleOfANewKeyAxis()
     h->setBins(3);
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
-    QVERIFY(!h->histogram()->log);
+    QVERIFY(!h->histogram()->scale.isLog());
     h->setKeyAxis(mPlot->xAxis2);
     mPlot->xAxis2->setScale(QCPScale::log());
     mPlot->replot();
-    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->scale.isLog(), 5000);
     const auto& edges = h->histogram()->edges;
     QCOMPARE(edges.size(), std::size_t(4));
     QCOMPARE(edges.front(), 1.0);
@@ -311,7 +311,7 @@ void TestHistogramPlottable::rebinForANewScaleEmitsNothingDuringPaint()
     QSignalSpy busy(&h->pipeline(), &QCPHistogram1DPipeline::busyChanged);
     mPlot->replot();
     QCOMPARE(busy.count(), 0);
-    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->scale.isLog(), 5000);
 }
 
 // No draw is asked for: only the axis signal can notice the new scale.
@@ -325,7 +325,7 @@ void TestHistogramPlottable::rebinsForANewKeyAxisScaleWithoutADraw()
     h->setKeyAxis(mPlot->xAxis2);
     mPlot->xAxis2->setRange(1, 1000);
     mPlot->xAxis2->setScale(QCPScale::log());
-    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->scale.isLog(), 5000);
 }
 
 void TestHistogramPlottable::theAxisItLeftIsNoLongerListenedTo()
@@ -355,7 +355,7 @@ void TestHistogramPlottable::exportRightAfterAScaleChangeBinsForTheNewScale()
     mPlot->xAxis2->setScale(QCPScale::log());
     h->setKeyAxis(mPlot->xAxis2);
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
-    QVERIFY(h->histogram()->log);
+    QVERIFY(h->histogram()->scale.isLog());
     QCOMPARE(h->histogram()->edges.front(), 1.0);
     QCOMPARE(h->histogram()->edges.back(), 1000.0);
 }
@@ -395,7 +395,7 @@ void TestHistogramPlottable::resultOfTheOldScaleIsNotShownUnderTheNewOne()
     QThread::msleep(100); // the job ends and posts its result, which nothing handles yet
     mPlot->replot();      // queues the reset behind that result
     QVERIFY(settle(h));
-    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 2000);
+    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->scale.isLog(), 2000);
 }
 
 // Every frame showing stale bars asks for a reset; all but the first would supersede the job
@@ -422,7 +422,7 @@ void TestHistogramPlottable::staleScaleIsResetOnceUnderAReplotStream()
     QCOMPARE(h->pipeline().currentGeneration() - before, uint64_t(1));
     gate->open = true;
     QVERIFY(settle(h));
-    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 2000);
+    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->scale.isLog(), 2000);
 }
 
 void TestHistogramPlottable::autoEdgesNeverShrinkWhileJobsOverlap()
@@ -943,7 +943,7 @@ void TestHistogramPlottable::fixedRangeStartingAtZeroFallsBackWhenTheAxisTurnsLo
     QSignalSpy ready(h, &QCPHistogram::histogramReady);
     mPlot->xAxis->setScale(QCPScale::log());
     QVERIFY(ready.wait(5000));
-    QVERIFY(h->histogram()->log);
+    QVERIFY(h->histogram()->scale.isLog());
     QCOMPARE(h->histogram()->edges.front(), 1.0);
 }
 
@@ -991,7 +991,7 @@ void TestHistogramPlottable::keyAxisScaleChangeRebinsWithoutADraw()
     QSignalSpy ready(h, &QCPHistogram::histogramReady);
     mPlot->xAxis->setScale(QCPScale::log());
     QVERIFY(ready.wait(5000));
-    QVERIFY(h->histogram()->log);
+    QVERIFY(h->histogram()->scale.isLog());
 }
 
 // The transform was rebuilt for the new scale (setBins), so only the bars on show tell they are
@@ -1061,17 +1061,17 @@ void TestHistogramPlottable::staleScaleIsResetAgainAfterAJobDelivered()
     mPlot->xAxis2->setScale(QCPScale::log());
     h->setKeyAxis(mPlot->xAxis2);
     mPlot->replot();
-    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->scale.isLog(), 5000);
     QVERIFY(settle(h));
     h->setVisible(false);
     h->setKeyAxis(mPlot->xAxis);
     h->setBins(4);
-    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && !h->histogram()->log, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && !h->histogram()->scale.isLog(), 5000);
     QVERIFY(settle(h));
     h->setKeyAxis(mPlot->xAxis2);
     h->setVisible(true);
     mPlot->replot();
-    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->scale.isLog(), 5000);
 }
 
 // A job of the old scale lands on a hidden plot: nothing but its own check can ask for the new bars.
@@ -1087,7 +1087,7 @@ void TestHistogramPlottable::resultOfTheOldScaleIsResetWithoutADraw()
     QVERIFY(gate->waitEntered());
     mPlot->xAxis2->setScale(QCPScale::log());
     gate->open = true;
-    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->scale.isLog(), 5000);
 }
 
 void TestHistogramPlottable::nonPositiveBinCountsAreIgnored()
@@ -1192,7 +1192,7 @@ void TestHistogramPlottable::exportOfAStaleScaleForgetsTheAutoRange()
     mPlot->xAxis2->setScale(QCPScale::log());
     h->setKeyAxis(mPlot->xAxis2);
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
-    QVERIFY(h->histogram()->log);
+    QVERIFY(h->histogram()->scale.isLog());
     QCOMPARE(h->histogram()->edges.front(), 10.0);
     QCOMPARE(h->histogram()->edges.back(), 100.0);
 }

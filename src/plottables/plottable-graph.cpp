@@ -2042,9 +2042,11 @@ void QCPGraph::draw(QCPDrawContext& context) const
     if (begin >= end)
         return;
 
-    const bool logKeyAxis = keyAxisRaw()->scale().isLog();
+    const QCPScale keyScale = keyAxisRaw()->scale();
+    const bool logKeyAxis = keyScale.isLog();
     // The thinning buckets are equal spans of the key, mapped to equal pixel spans: on a log axis
-    // that span is a decade, so pixelsPerKey counts pixels per decade there.
+    // that span is a decade, so pixelsPerKey counts pixels per decade there; on a symlog axis it is
+    // equal spans of scale space, so it counts pixels per scale unit.
     const double axisPixels = window.pixelsPerKey > 0.0
         ? window.pixelsPerKey * keyAxisRaw()->range().size()
         : (keyAxisRaw()->coordToPixel(keyAxisRaw()->range().upper)
@@ -2056,6 +2058,12 @@ void QCPGraph::draw(QCPDrawContext& context) const
         const QCPRange keyRange = keyAxisRaw()->range();
         const double decades = std::log10(keyRange.upper / keyRange.lower);
         pixelsPerKey = decades > 0.0 ? axisPixels / decades : 0.0;
+    }
+    else if (keyScale.isSymlog())
+    {
+        const QCPRange keyRange = keyAxisRaw()->range();
+        const double scaleSpan = keyScale.toScale(keyRange.upper) - keyScale.toScale(keyRange.lower);
+        pixelsPerKey = scaleSpan > 0.0 ? axisPixels / scaleSpan : 0.0;
     }
     if (!mAdaptiveSampling)
         pixelsPerKey = 0.0; // every row
@@ -2090,7 +2098,7 @@ void QCPGraph::draw(QCPDrawContext& context) const
         std::vector<int> sourceIndices;
         std::vector<QPointF> line
             = ds->linesInData(c, begin, end, pixelsPerKey, wantsRows ? &sourceIndices : nullptr,
-                              logKeyAxis);
+                              keyScale);
         if (line.empty())
             continue;
         recordComponent(context, c, std::move(line), sourceIndices, *ds, coloured, impulseBaseline,
@@ -2153,7 +2161,7 @@ void QCPGraph::drawInDataSpace(QCPDrawContext& context) const
         std::vector<int> sourceIndices;
         std::vector<QPointF> line
             = ds.linesInData(c, begin, end, /*pixelsPerKey=*/0.0,
-                             wantsRows ? &sourceIndices : nullptr, /*logKeys=*/false,
+                             wantsRows ? &sourceIndices : nullptr, /*keyScale=*/QCPScale(),
                              /*cacheGaps=*/false);
         if (line.empty())
             continue;

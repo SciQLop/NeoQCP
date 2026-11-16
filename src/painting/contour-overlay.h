@@ -83,7 +83,7 @@ private:
                                                 const QCPScale& dataScale) const;
     const Lines& linesFor(const QCPColorMapData* grid, const Key& key, bool exporting);
     void recordLines(QCPDrawContext& context, const QCPColorMapData* grid, const Lines& lines,
-                     bool keyLog, bool valueLog) const;
+                     const QCPScale& keyScale, const QCPScale& valueScale) const;
     void recordLabels(QCPDrawContext& context, const QCPColorMapData* grid, const QCPAxis* keyAxis,
                       const QCPAxis* valueAxis);
     void clear();

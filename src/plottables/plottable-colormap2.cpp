@@ -94,7 +94,7 @@ void QCPColorMap2::installResampleTransform()
 {
     mPipeline.setTransform(TransformKind::ViewportDependent,
         [gapThreshold = mGapThreshold,
-         zLog = mRenderer.dataScale().isLog()](
+         zScale = mRenderer.dataScale()](
             const QCPDataSource2D& src,
             const ViewportParams& vp,
             std::any& cache) -> std::shared_ptr<QCPColorMapData> {
@@ -129,6 +129,11 @@ void QCPColorMap2::installResampleTransform()
                 double denom = std::log10(vp.upper) - std::log10(vp.lower);
                 return denom > 0 ? (std::log10(data.upper) - std::log10(data.lower)) / denom : 1.0;
             };
+            auto scaleFrac = [](const QCPRange& data, const QCPRange& vp, const QCPScale& scale) {
+                double denom = scale.toScale(vp.upper) - scale.toScale(vp.lower);
+                return denom > 0 ? (scale.toScale(data.upper) - scale.toScale(data.lower)) / denom
+                                 : 1.0;
+            };
             double vpKeySz = vp.keyRange.size();
             double xFrac = vpKeySz > 0 ? xOut.size() / vpKeySz : 1.0;
             // NOTE: the key (X) axis is always sampled linearly here, even
@@ -136,7 +141,8 @@ void QCPColorMap2::installResampleTransform()
             // by this layer (image and contours alike, not just contours).
             double vpValSz = vp.valueRange.size();
             double yFrac = vp.valueScale.isLog() ? logFrac(yOut, vp.valueRange)
-                                            : (vpValSz > 0 ? yOut.size() / vpValSz : 1.0);
+                : (vp.valueScale.isSymlog() ? scaleFrac(yOut, vp.valueRange, vp.valueScale)
+                                            : (vpValSz > 0 ? yOut.size() / vpValSz : 1.0));
             int pixW = std::clamp(static_cast<int>(vp.plotWidthPx * xFrac), 1, 32768);
             int pixH = std::clamp(static_cast<int>(vp.plotHeightPx * yFrac), 1, 32768);
 
@@ -149,7 +155,7 @@ void QCPColorMap2::installResampleTransform()
                 cache = qcp::algo2d::ResampleCache{};
             auto& rc = std::any_cast<qcp::algo2d::ResampleCache&>(cache);
             auto* raw = qcp::algo2d::resample(src, xBegin, xEnd,
-                xOut, yOut, w, h, vp.valueScale.isLog(), zLog, gapThreshold, &rc);
+                xOut, yOut, w, h, vp.valueScale, zScale, gapThreshold, &rc);
             return std::shared_ptr<QCPColorMapData>(raw);
         });
 }

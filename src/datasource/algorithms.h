@@ -1,5 +1,6 @@
 #pragma once
 #include "abstract-datasource.h"
+#include "../axis/scale.h"
 #include "../Profiling.hpp"
 #include <algorithm>
 #include <cmath>
@@ -324,6 +325,26 @@ struct LogKeyBucketGrid
     }
 };
 
+// The same buckets on a scale axis: equal widths in key units would thin the linear band of a
+// symlog axis into one pixel. \a anchor and \a width are in scale units, the keys it returns are
+// in key units.
+struct ScaleBucketGrid
+{
+    QCPScale scale;
+    double anchor;
+    double width;
+
+    double startFor(double k) const
+    {
+        const double pos = scale.toScale(k);
+        return scale.fromScale(anchor + std::floor((pos - anchor) / width) * width);
+    }
+    double epsilonFor(double start) const
+    {
+        return scale.fromScale(scale.toScale(start) + width) - start;
+    }
+};
+
 // The min/max envelope: one bucket per grid cell, up to four points per bucket (first, min,
 // max, last) so peaks survive when many samples land on one pixel.
 template <typename Out, typename Idx, IndexableNumericRange KC, IndexableNumericRange VC,
@@ -472,15 +493,16 @@ void envelopeInto(const KC& keys, const VC& values, int begin, int end, int rese
 
 namespace detail {
 
-// Data-space counterpart: the same envelope, one bucket per 1 / pixelsPerKey key units, or per
-// 1 / pixelsPerKey decades when the key axis is logarithmic. The points are written straight into
-// the vector that goes back to the caller.
+// Data-space counterpart: the same envelope, one bucket per 1 / pixelsPerKey key units, per
+// 1 / pixelsPerKey decades when the key axis is logarithmic, or per 1 / pixelsPerKey scale units
+// when it is not linear. The points are written straight into the vector that goes back to the
+// caller.
 template <bool WithIndices, IndexableNumericRange KC, IndexableNumericRange VC>
 std::vector<QPointF> linesInDataImpl(const KC& keys, const VC& values, int begin, int end,
                                      double pixelsPerKey, double gapThreshold,
                                      const GapVector* precomputedGaps,
                                      [[maybe_unused]] std::vector<int>* sourceIndices,
-                                     bool logKeys)
+                                     const QCPScale& keyScale)
 {
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(keys)));
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(values)));
@@ -498,9 +520,14 @@ std::vector<QPointF> linesInDataImpl(const KC& keys, const VC& values, int begin
 
     const double firstKey = static_cast<double>(keys[begin]);
     const double lastKey = static_cast<double>(keys[end - 1]);
-    const bool decades = logKeys && firstKey > 0 && lastKey > 0;
-    const double keySpan = pixelsPerKey
-        * (decades ? qAbs(std::log10(lastKey) - std::log10(firstKey)) : qAbs(lastKey - firstKey));
+    const bool decades = keyScale.isLog() && firstKey > 0 && lastKey > 0;
+    // Log10 rather than QCPScale::toScale: a log axis must keep the exact decade arithmetic it
+    // has always had (toScale computes log/ln(base), one ulp off, which moves log pictures).
+    const double scaleSpan = keyScale.isSymlog()
+        ? qAbs(keyScale.toScale(lastKey) - keyScale.toScale(firstKey))
+        : qAbs(lastKey - firstKey);
+    const double keySpan = pixelsPerKey * (decades ? qAbs(std::log10(lastKey) - std::log10(firstKey))
+                                                   : scaleSpan);
     // A NaN end key makes the span NaN: the envelope's reserve size would overflow, draw raw.
     if (pixelsPerKey <= 0 || !std::isfinite(keySpan) || static_cast<double>(dataCount) < 2 * keySpan + 2)
     {
@@ -513,6 +540,11 @@ std::vector<QPointF> linesInDataImpl(const KC& keys, const VC& values, int begin
         if (decades)
             envelopeInto(keys, values, begin, end, reserveHint, gapThreshold, precomputedGaps, pts,
                          idx, LogKeyBucketGrid { std::log10(firstKey), 1.0 / pixelsPerKey },
+                         DataPointMap {});
+        else if (keyScale.isSymlog())
+            envelopeInto(keys, values, begin, end, reserveHint, gapThreshold, precomputedGaps, pts,
+                         idx, ScaleBucketGrid { keyScale, keyScale.toScale(firstKey),
+                                                1.0 / pixelsPerKey },
                          DataPointMap {});
         else
             envelopeInto(keys, values, begin, end, reserveHint, gapThreshold, precomputedGaps, pts,
@@ -527,20 +559,21 @@ std::vector<QPointF> linesInDataImpl(const KC& keys, const VC& values, int begin
 
 // Data-space line points in (key, value) units, NaN-separated where a key gap or a visible
 // NaN hole breaks the line. pixelsPerKey <= 0 keeps every
-// point; otherwise the line is thinned to the min/max envelope, one bucket per key pixel (per
-// pixel of log10(key) when \a logKeys: pixelsPerKey then counts pixels per decade).
+// point; otherwise the line is thinned to the min/max envelope, one bucket per key pixel: per
+// pixel of key when \a keyScale is linear, per pixel of log10(key) when it is logarithmic
+// (pixelsPerKey then counts pixels per decade), per pixel of scale space otherwise.
 template <IndexableNumericRange KC, IndexableNumericRange VC>
 std::vector<QPointF> linesInData(const KC& keys, const VC& values, int begin, int end,
                                  double pixelsPerKey, std::vector<int>* sourceIndices = nullptr,
                                  double gapThreshold = kDefaultGapThreshold,
                                  const GapVector* precomputedGaps = nullptr,
-                                 bool logKeys = false)
+                                 const QCPScale& keyScale = QCPScale())
 {
     if (!sourceIndices)
         return detail::linesInDataImpl<false>(keys, values, begin, end, pixelsPerKey, gapThreshold,
-                                             precomputedGaps, nullptr, logKeys);
+                                             precomputedGaps, nullptr, keyScale);
     return detail::linesInDataImpl<true>(keys, values, begin, end, pixelsPerKey, gapThreshold,
-                                         precomputedGaps, sourceIndices, logKeys);
+                                         precomputedGaps, sourceIndices, keyScale);
 }
 
 } // namespace qcp::algo

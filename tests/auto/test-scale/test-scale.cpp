@@ -110,6 +110,26 @@ void TestScale::roundTrips()
         QVERIFY(sameValue(scale.toScale(zoomed.lower) - scale.toScale(center),
                           -2.0 * (scale.toScale(center) - scale.toScale(range.lower))));
     }
+
+    // The log scale is defined on |v|: a range below zero keeps its sign through a pan and a
+    // zoom. Recorded at BASE 8dff255: a pan by half the span moves both ends by that offset in
+    // log10|v| (span -3 -> -1.5, still negative), and a zoom by 2 about the read centre doubles
+    // the span with both ends moving further from zero.
+    const QCPRange negative(-1000.0, -1.0);
+    const double negativeSpan = log.toScale(negative.upper) - log.toScale(negative.lower);
+    QVERIFY(sameValue(negativeSpan, -3.0));
+    const QCPRange panned = log.shifted(negative, 0.5 * negativeSpan);
+    QVERIFY(panned.lower < 0.0 && panned.upper < 0.0);
+    QVERIFY(close(panned.lower, -31.622776601683793));
+    QVERIFY(close(panned.upper, -0.03162277660168379));
+    QVERIFY(sameValue(log.toScale(panned.upper) - log.toScale(panned.lower), negativeSpan));
+
+    const double negativeCentre = 0.5 * (negative.lower + negative.upper);
+    const QCPRange zoomedNegative = log.scaled(negative, 2.0, negativeCentre);
+    QVERIFY(zoomedNegative.lower < negative.lower);
+    QVERIFY(zoomedNegative.upper > negative.upper);
+    QVERIFY(sameValue(log.toScale(zoomedNegative.upper) - log.toScale(zoomedNegative.lower),
+                      2.0 * negativeSpan));
 }
 
 void TestScale::badParametersAreRefused()

@@ -145,11 +145,52 @@ inline MultiColumnBinResult orderColumnsByTrend(MultiColumnBinResult bins)
     return bins;
 }
 
+// Where each source key falls and where each bin's edges are. Bins are even in key units on a
+// linear axis, and even in scale units on a symlog one: even key widths would put every bin of the
+// linear band (where a key pixel is a few units wide) on the same key value.
+class KeyBinning
+{
+public:
+    KeyBinning(const QCPRange& range, int numBins, const QCPScale& scale)
+        : mScale(scale.isSymlog() ? &scale : nullptr)
+        , mBins(numBins)
+        , mWidth(mScale ? (mScale->toScale(range.upper) - mScale->toScale(range.lower)) / numBins
+                        : range.size() / numBins)
+        , mLo(mScale ? mScale->toScale(range.lower) : range.lower)
+    {}
+
+    double width() const { return mWidth; }
+    int binCount() const { return mBins; }
+
+    // Bin index of \a key, clamped into [0, binCount).
+    int index(double key) const
+    {
+        return std::clamp(static_cast<int>((position(key) - mLo) / mWidth), 0, mBins - 1);
+    }
+    // Lower edge of a bin, in key units.
+    double lowerKey(int bin) const { return keyAt(mLo + bin * mWidth); }
+    double centreKey(int bin) const { return keyAt(mLo + (bin + 0.5) * mWidth); }
+    double upperKey(int bin) const
+    {
+        const double centre = mLo + (bin + 0.5) * mWidth;
+        return mScale ? keyAt(mLo + (bin + 1) * mWidth) : centre + mWidth * 0.5;
+    }
+
+private:
+    double position(double key) const { return mScale ? mScale->toScale(key) : key; }
+    double keyAt(double position) const { return mScale ? mScale->fromScale(position) : position; }
+
+    const QCPScale* mScale;
+    int mBins;
+    double mWidth;
+    double mLo;
+};
+
 inline MultiColumnBinResult binMinMaxMulti(
     const QCPMultiDataSource& src,
     int begin, int end,
     const QCPRange& keyRange,
-    int numBins, bool withOrigin = false);
+    int numBins, bool withOrigin = false, const QCPScale& keyScale = QCPScale());
 
 namespace detail {
 
@@ -233,7 +274,7 @@ inline MultiColumnBinResult binMinMaxMultiImpl(
     const QCPMultiDataSource& src,
     int begin, int end,
     const QCPRange& keyRange,
-    int numBins)
+    int numBins, const QCPScale& keyScale)
 {
     MultiColumnBinResult out;
     int N = src.columnCount();
@@ -245,16 +286,14 @@ inline MultiColumnBinResult binMinMaxMultiImpl(
     out.values.resize(N * numBins * 2, std::numeric_limits<double>::quiet_NaN());
     if constexpr (WithOrigin) out.origin.assign(N * numBins * 2, -1);
 
-    const double binWidth = keyRange.size() / numBins;
-    const double halfWidth = binWidth * 0.5;
-    const double keyLo = keyRange.lower;
+    const KeyBinning binning(keyRange, numBins, keyScale);
+    if (!(binning.width() > 0)) return out;
     const int s = numBins * 2;
 
     for (int b = 0; b < numBins; ++b)
     {
-        double binCenter = keyLo + (b + 0.5) * binWidth;
-        out.keys[b * 2 + 0] = binCenter;
-        out.keys[b * 2 + 1] = binCenter + halfWidth;
+        out.keys[b * 2 + 0] = binning.centreKey(b);
+        out.keys[b * 2 + 1] = binning.upperKey(b);
     }
 
     // Pre-compute bin indices for all source points (keys are shared across columns)
@@ -265,7 +304,7 @@ inline MultiColumnBinResult binMinMaxMultiImpl(
     {
         double k = rawKeys ? rawKeys[i] : src.keyAt(i);
         if (!std::isfinite(k)) { bins[i - begin] = -1; continue; }
-        bins[i - begin] = std::clamp(static_cast<int>((k - keyLo) / binWidth), 0, numBins - 1);
+        bins[i - begin] = binning.index(k);
         ++validCount;
     }
     if (validCount == 0) return out;
@@ -284,12 +323,12 @@ inline MultiColumnBinResult binMinMaxMultiParallelImpl(
     const QCPMultiDataSource& src,
     int begin, int end,
     const QCPRange& keyRange,
-    int numBins)
+    int numBins, const QCPScale& keyScale)
 {
     PROFILE_HERE_N("binMinMaxMultiParallel");
     int threadCount = innerThreadCount();
     if (threadCount <= 1 || (end - begin) < 1'000'000)
-        return binMinMaxMulti(src, begin, end, keyRange, numBins, WithOrigin);
+        return binMinMaxMulti(src, begin, end, keyRange, numBins, WithOrigin, keyScale);
 
     int N = src.columnCount();
     MultiColumnBinResult out;
@@ -301,16 +340,14 @@ inline MultiColumnBinResult binMinMaxMultiParallelImpl(
     out.values.resize(N * numBins * 2, std::numeric_limits<double>::quiet_NaN());
     if constexpr (WithOrigin) out.origin.assign(N * numBins * 2, -1);
 
-    const double binWidth = keyRange.size() / numBins;
-    const double halfWidth = binWidth * 0.5;
-    const double keyLo = keyRange.lower;
+    const KeyBinning binning(keyRange, numBins, keyScale);
+    if (!(binning.width() > 0)) return out;
     const int s = numBins * 2;
 
     for (int b = 0; b < numBins; ++b)
     {
-        double binCenter = keyLo + (b + 0.5) * binWidth;
-        out.keys[b * 2 + 0] = binCenter;
-        out.keys[b * 2 + 1] = binCenter + halfWidth;
+        out.keys[b * 2 + 0] = binning.centreKey(b);
+        out.keys[b * 2 + 1] = binning.upperKey(b);
     }
 
     threadCount = std::min(threadCount, numBins);
@@ -326,7 +363,7 @@ inline MultiColumnBinResult binMinMaxMultiParallelImpl(
         {
             double k = rawKeys ? rawKeys[srcBegin + i] : src.keyAt(srcBegin + i);
             if (!std::isfinite(k)) { bins[i] = -1; continue; }
-            bins[i] = std::clamp(static_cast<int>((k - keyLo) / binWidth), binBegin, binEnd - 1);
+            bins[i] = std::clamp(binning.index(k), binBegin, binEnd - 1);
         }
 
         foldRowStepRatios(src, srcBegin, bins, binRatio.data());
@@ -342,8 +379,8 @@ inline MultiColumnBinResult binMinMaxMultiParallelImpl(
         int binBegin = t * binsPerChunk;
         int binEnd = (t == threadCount - 1) ? numBins : (t + 1) * binsPerChunk;
 
-        double chunkKeyLo = keyLo + binBegin * binWidth;
-        double chunkKeyHi = keyLo + binEnd * binWidth;
+        const double chunkKeyLo = binning.lowerKey(binBegin);
+        const double chunkKeyHi = binning.lowerKey(binEnd);
         int srcBegin_ = (t == 0) ? begin : src.findBegin(chunkKeyLo, false);
         int srcEnd_ = (t == threadCount - 1) ? end : src.findEnd(chunkKeyHi, false);
         srcBegin_ = std::clamp(srcBegin_, begin, end);
@@ -369,20 +406,22 @@ inline MultiColumnBinResult binMinMaxMulti(
     const QCPMultiDataSource& src,
     int begin, int end,
     const QCPRange& keyRange,
-    int numBins, bool withOrigin)
+    int numBins, bool withOrigin, const QCPScale& keyScale)
 {
-    return withOrigin ? detail::binMinMaxMultiImpl<true>(src, begin, end, keyRange, numBins)
-                      : detail::binMinMaxMultiImpl<false>(src, begin, end, keyRange, numBins);
+    return withOrigin
+        ? detail::binMinMaxMultiImpl<true>(src, begin, end, keyRange, numBins, keyScale)
+        : detail::binMinMaxMultiImpl<false>(src, begin, end, keyRange, numBins, keyScale);
 }
 
 inline MultiColumnBinResult binMinMaxMultiParallel(
     const QCPMultiDataSource& src,
     int begin, int end,
     const QCPRange& keyRange,
-    int numBins, bool withOrigin = false)
+    int numBins, bool withOrigin = false, const QCPScale& keyScale = QCPScale())
 {
-    return withOrigin ? detail::binMinMaxMultiParallelImpl<true>(src, begin, end, keyRange, numBins)
-                      : detail::binMinMaxMultiParallelImpl<false>(src, begin, end, keyRange, numBins);
+    return withOrigin
+        ? detail::binMinMaxMultiParallelImpl<true>(src, begin, end, keyRange, numBins, keyScale)
+        : detail::binMinMaxMultiParallelImpl<false>(src, begin, end, keyRange, numBins, keyScale);
 }
 
 constexpr int kLevel1TargetBins = 100'000;
@@ -478,7 +517,7 @@ inline RowRange rawRowsInView(const Source& raw, const QCPRange& keyRange)
 // Stores the L1 cache in the std::any; returns nullptr (L2 is done synchronously).
 inline std::shared_ptr<QCPMultiDataSource> buildL1Cache(
     const QCPMultiDataSource& src,
-    const ViewportParams& /*vp*/,
+    const ViewportParams& vp,
     std::any& cache, bool withOrigin = false)
 {
     PROFILE_HERE_N("buildL1Cache");
@@ -505,7 +544,7 @@ inline std::shared_ptr<QCPMultiDataSource> buildL1Cache(
 
     GraphResamplerCache newCache;
     newCache.level1 = orderColumnsByTrend(
-        binMinMaxMultiParallel(src, 0, srcSize, fullKeyRange, numBins, withOrigin));
+        binMinMaxMultiParallel(src, 0, srcSize, fullKeyRange, numBins, withOrigin, vp.keyScale));
     newCache.cachedKeyRange = fullKeyRange;
     newCache.sourceSize = srcSize;
     newCache.columnCount = N;

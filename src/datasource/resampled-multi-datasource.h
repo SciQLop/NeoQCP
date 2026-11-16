@@ -65,7 +65,8 @@ public:
     // kept, so a colour lookup still finds the data row it came from.
     std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
                                      std::vector<int>* sourceIndices = nullptr,
-                                     bool logKeys = false, bool cacheGaps = true) const override
+                                     const QCPScale& keyScale = QCPScale(),
+                                     bool cacheGaps = true) const override
     {
         if (sourceIndices) sourceIndices->clear();
         if (column < 0 || column >= mBins.numColumns) return {};
@@ -110,7 +111,7 @@ public:
                                      std::span<const double>(mBins.values.data() + column * s, s),
                                      begin, end, pixelsPerKey,
                                      sourceIndices ? &bins : nullptr, gapThreshold(),
-                                     &gaps, logKeys);
+                                     &gaps, keyScale);
         if (sourceIndices)
             for (const int bin : bins)
                 sourceIndices->push_back(originOf(bin));
@@ -160,10 +161,7 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
     MultiColumnBinResult l2;
     l2.numColumns = N;
 
-    const double binWidth = vp.keyRange.size() / l2Bins;
-    const double halfWidth = binWidth * 0.5;
-    const double keyLo = vp.keyRange.lower;
-    const double invBinWidth = 1.0 / binWidth;
+    const KeyBinning binning(vp.keyRange, l2Bins, vp.keyScale);
     int l2Stride = l2Bins * 2;
 
     l2.values.resize(N * l2Stride);
@@ -193,7 +191,7 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
     for (int i = 0; i < l1Count; ++i)
     {
         double k = l1.keys[l1Begin + i];
-        int bin = std::clamp(static_cast<int>((k - keyLo) * invBinWidth), 0, l2Bins - 1);
+        int bin = binning.index(k);
         int slot = bin * 2;
 
         bool anyValid = false;
@@ -235,10 +233,9 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
         l2.gapRatio[outSize] = dropped.keep(binRatio[b]);
         l2.gapRatio[outSize + 1] = 0.f;
 
-        double binCenter = keyLo + (b + 0.5) * binWidth;
         int srcSlot = b * 2;
-        l2.keys[outSize] = binCenter;
-        l2.keys[outSize + 1] = binCenter + halfWidth;
+        l2.keys[outSize] = binning.centreKey(b);
+        l2.keys[outSize + 1] = binning.upperKey(b);
         for (int c = 0; c < N; ++c)
         {
             double* colOut = l2.values.data() + c * l2Stride;
@@ -331,7 +328,8 @@ inline std::shared_ptr<QCPResampledMultiDataSource> binRawViewport(
 {
     const auto rows = rawRowsInView(raw, vp.keyRange);
     return std::make_shared<QCPResampledMultiDataSource>(orderColumnsByTrend(dropEmptyBins(
-        binMinMaxMultiParallel(raw, rows.begin, rows.end, vp.keyRange, l2BinCount(vp), withOrigin))));
+        binMinMaxMultiParallel(raw, rows.begin, rows.end, vp.keyRange, l2BinCount(vp), withOrigin,
+                               vp.keyScale))));
 }
 
 } // namespace detail

@@ -24,12 +24,13 @@ public:
     // The line of one column in (key, value) units, with a NaN marker wherever a key gap
     // (gapsBefore) or a NaN hole breaks it. pixelsPerKey <= 0 returns every point; otherwise the
     // line is reduced to a min/max envelope, one bucket per key pixel. A source that is already a resampled level never thins again.
-    // sourceIndices, when given, receives each point's source row (-1 for a marker). With
-    // \a logKeys the buckets are equal spans of log10(key) and pixelsPerKey counts pixels per
-    // decade.
+    // sourceIndices, when given, receives each point's source row (-1 for a marker). The buckets
+    // follow \a keyScale: equal key spans when linear, equal decades when logarithmic (pixelsPerKey
+    // then counts pixels per decade), equal scale spans otherwise.
     virtual std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
                                             std::vector<int>* sourceIndices = nullptr,
-                                            bool logKeys = false, bool cacheGaps = true) const;
+                                            const QCPScale& keyScale = QCPScale(),
+                                            bool cacheGaps = true) const;
 
     // Element i is set when the step into row begin + i is a key gap under
     // gapThreshold(), exactly what linesInData breaks on. Generic and slow here. cacheGaps = false

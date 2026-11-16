@@ -301,7 +301,7 @@ QCPColorMapData* benchmarkResample(int nx, int ys)
     };
 
     return qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, ys - 1), 1500, 800,
-                                 false, false, 0.0);
+                                 QCPScale(), QCPScale(), 0.0);
 }
 }
 
@@ -342,7 +342,7 @@ benchmarkResampleWide(const QCPSoADataSource2D<std::span<const double>, std::spa
     // clamps to 4x a ~1458px-wide viewport) -- the exact regime measured at
     // ~1.1-1.5s single-threaded during the original investigation.
     return qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, ys - 1), 5832, ys,
-                                 false, false, 0.0, nullptr, forceSerial);
+                                 QCPScale(), QCPScale(), 0.0, nullptr, forceSerial);
 }
 }
 
@@ -440,7 +440,7 @@ void Benchmark::QCPColorMap2_ResamplePanSequence()
             int xBegin = step * 100;
             int xEnd = nx - 20 * 100 + step * 100;
             delete qcp::algo2d::resample(src, xBegin, xEnd, QCPRange(xBegin, xEnd - 1),
-                                         QCPRange(0, ys - 1), 1500, 800, false, false, 0.0, &cache);
+                                         QCPRange(0, ys - 1), 1500, 800, QCPScale(), QCPScale(), 0.0, &cache);
         }
     }
 }
@@ -472,7 +472,7 @@ void Benchmark::QCPColorMap2_ResamplePanSequenceSmall()
             int xBegin = step;
             int xEnd = nx - 100 + step;
             delete qcp::algo2d::resample(src, xBegin, xEnd, QCPRange(xBegin, xEnd - 1),
-                                         QCPRange(0, ys - 1), 800, 400, false, false, 0.0, &cache);
+                                         QCPRange(0, ys - 1), 800, 400, QCPScale(), QCPScale(), 0.0, &cache);
         }
     }
 }

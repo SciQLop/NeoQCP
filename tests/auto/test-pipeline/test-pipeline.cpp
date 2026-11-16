@@ -14,6 +14,7 @@
 #include <future>
 #include <limits>
 #include <optional>
+#include <set>
 #include <painting/draw-commands.h>
 #include <plottables/plottable-colormap.h>
 #include <plottables/plottable-colormap2.h>
@@ -1784,7 +1785,7 @@ void TestPipeline::bin2dLogKeyBinning()
     auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::move(keys), std::move(vals));
     // keyLog = true, valueLog = false
-    auto* result = qcp::algo::bin2d(*src, 3, 1, true, false);
+    auto* result = qcp::algo::bin2d(*src, 3, 1, QCPScale::log(), QCPScale());
     QVERIFY(result);
 
     // Grid keeps the linear coordinate extent [1, 1000]; the renderer's
@@ -1808,7 +1809,7 @@ void TestPipeline::bin2dLogDropsNonPositive()
     std::vector<double> vals = {5.0, 5.0, 5.0, 5.0};
     auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::move(keys), std::move(vals));
-    auto* result = qcp::algo::bin2d(*src, 2, 1, true, false);
+    auto* result = qcp::algo::bin2d(*src, 2, 1, QCPScale::log(), QCPScale());
     QVERIFY(result);
 
     // -5 dropped: range is the positive extent [1, 100].
@@ -1828,7 +1829,7 @@ void TestPipeline::bin2dLogAllNonPositiveNoGrid()
     std::vector<double> vals = {1.0, 2.0, 3.0};
     auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::move(keys), std::move(vals));
-    auto* result = qcp::algo::bin2d(*src, 4, 4, true, false);
+    auto* result = qcp::algo::bin2d(*src, 4, 4, QCPScale::log(), QCPScale());
     QVERIFY(!result);
 }
 
@@ -3796,4 +3797,187 @@ void TestPipeline::histogram2dContourLabelsFollowAColourScaleToggle()
     for (const auto& label : hist->lastContourLabels())
         QVERIFY2(levels.contains(label.level),
                  qPrintable(QString("label level %1 is not a current level").arg(label.level)));
+}
+
+// Thinning, L2 bins and the line cache are equal spans of scale space: a symlog axis gets as
+// many buckets per pixel in its linear band as on its log sides.
+void TestPipeline::symlogThinningIsEvenInScaleSpace()
+{
+    const QCPScale symlog = QCPScale::symlog(2);
+    constexpr int kPoints = 100001;
+    const double lo = symlog.toScale(-50.0);
+    const double hi = symlog.toScale(50.0);
+    // Uniform in scale space, so a bucket count per window measures the bucket grid, not the
+    // sample density.
+    std::vector<double> keys(kPoints), values(kPoints);
+    for (int i = 0; i < kPoints; ++i)
+    {
+        keys[i] = symlog.fromScale(lo + (hi - lo) * i / (kPoints - 1));
+        values[i] = (i % 2) ? 1.0 : -1.0;
+    }
+    const double pixelsPerScale = 1000.0 / (hi - lo);
+    const auto points = qcp::algo::linesInData(keys, values, 0, kPoints, pixelsPerScale, nullptr,
+                                               qcp::algo::kDefaultGapThreshold, nullptr, symlog);
+    QVERIFY(!points.empty());
+
+    const auto columnsIn = [&](double fromPx, double toPx) {
+        std::set<long long> seen;
+        for (const QPointF& point : points)
+            if (std::isfinite(point.x()))
+            {
+                const double px = (symlog.toScale(point.x()) - lo) * pixelsPerScale;
+                if (px >= fromPx && px < toPx)
+                    seen.insert(static_cast<long long>(std::floor(px)));
+            }
+        return static_cast<int>(seen.size());
+    };
+    for (const auto& window : { std::pair { 0.0, 100.0 }, std::pair { 450.0, 550.0 },
+                                std::pair { 900.0, 1000.0 } })
+    {
+        const int columns = columnsIn(window.first, window.second);
+        QVERIFY2(columns >= 97 && columns <= 100,
+                 qPrintable(QString("window [%1,%2) holds %3 pixel columns of a scan that "
+                                    "should hold one per pixel")
+                                .arg(window.first)
+                                .arg(window.second)
+                                .arg(columns)));
+    }
+
+    // The log case is unchanged: same fixture as BASE, recorded there (8dff255).
+    std::vector<double> logKeys(kPoints), logValues(kPoints);
+    for (int i = 0; i < kPoints; ++i)
+    {
+        logKeys[i] = std::pow(10.0, 3.0 * i / (kPoints - 1));
+        logValues[i] = (i % 2) ? 1.0 : -1.0;
+    }
+    const auto logPoints = qcp::algo::linesInData(logKeys, logValues, 0, kPoints, 1000.0 / 3.0,
+                                                  nullptr, qcp::algo::kDefaultGapThreshold,
+                                                  nullptr, QCPScale::log());
+    QCOMPARE(logPoints.size(), std::size_t(2037));
+    QVERIFY(std::abs(logPoints.front().x() - 1.001732917212951)
+            <= 1e-9 * 1.001732917212951);
+    int logColumns[3] = { 0, 0, 0 };
+    const int windows[3][2] = { { 0, 100 }, { 450, 550 }, { 900, 1000 } };
+    std::set<long long> seen[3];
+    for (const QPointF& point : logPoints)
+    {
+        if (!std::isfinite(point.x())) continue;
+        const double px = (std::log10(point.x()) / 3.0) * 1000.0;
+        for (int w = 0; w < 3; ++w)
+            if (px >= windows[w][0] && px < windows[w][1])
+                seen[w].insert(static_cast<long long>(std::floor(px)));
+    }
+    for (int w = 0; w < 3; ++w) logColumns[w] = static_cast<int>(seen[w].size());
+    QCOMPARE(logColumns[0], 100);
+    QCOMPARE(logColumns[1], 100);
+    QCOMPARE(logColumns[2], 100);
+}
+
+// An L2 level on a symlog key axis bins the data in scale space, one bin per L2 unit of scale.
+void TestPipeline::l2OnSymlog()
+{
+    const QCPScale symlog = QCPScale::symlog(2);
+    constexpr int kPoints = 20000;
+    const double lo = symlog.toScale(-50.0);
+    const double hi = symlog.toScale(50.0);
+    std::vector<double> keys(kPoints), values(kPoints);
+    for (int i = 0; i < kPoints; ++i)
+    {
+        keys[i] = symlog.fromScale(lo + (hi - lo) * i / (kPoints - 1));
+        values[i] = (i % 2) ? 1.0 : -1.0;
+    }
+    const auto src = oneColumnSource(keys, values);
+
+    ViewportParams vp;
+    vp.keyRange = QCPRange(-50, 50);
+    vp.plotWidthPx = 200;
+    vp.keyScale = symlog;
+    std::any cache;
+    qcp::algo::buildL1Cache(*src, vp, cache);
+    const auto* l1 = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
+    QVERIFY(l1 != nullptr);
+    QVERIFY(!l1->level1.keys.empty());
+
+    const auto l2 = qcp::algo::resampleL2Multi(*l1, vp, *src);
+    QVERIFY2(l2 != nullptr, "a symlog key axis is resampled to L2, not drawn raw");
+    const int bins = qcp::algo::l2BinCount(vp);
+    QCOMPARE(l2->size(), 2 * bins);
+    for (int b = 0; b < bins; ++b)
+    {
+        const double lower = l2->keyAt(2 * b);
+        const double upper = l2->keyAt(2 * b + 1);
+        QVERIFY(std::isfinite(lower) && std::isfinite(upper));
+        QVERIFY(lower < upper);
+        const double centre = symlog.fromScale(lo + (b + 0.5) * (hi - lo) / bins);
+        QVERIFY2(std::abs(lower - centre) <= 1e-9 * std::max(1.0, std::abs(centre)),
+                 qPrintable(QString("bin %1 starts at %2, not at the scale-space centre %3")
+                                .arg(b).arg(lower).arg(centre)));
+        QVERIFY(std::isfinite(l2->valueAt(0, 2 * b)));
+        QVERIFY(std::isfinite(l2->valueAt(0, 2 * b + 1)));
+    }
+
+    // The log case is unchanged: an L2 level is still refused there.
+    vp.keyScale = QCPScale::log();
+    QVERIFY(qcp::algo::resampleL2Multi(*l1, vp, *src) == nullptr);
+}
+
+// Automatic contour levels on a symlog data scale are evenly spaced in scale space; on a log
+// data scale they stay geometric (recorded at BASE: bounds [1, 1000] give 10 and 100).
+void TestPipeline::contourLevelsOnSymlog()
+{
+    auto* hist = mPlot->add<QCPHistogram2D>().get();
+    hist->setBins(4, 2); // two value rows: contours need a grid, not a line of cells
+    // Both value rows hold the same counts, so the grid's data bounds are the counts (1..4).
+    std::vector<double> keys, values;
+    for (int bin = 0; bin < 4; ++bin)
+        for (int row = 0; row < 2; ++row)
+            for (int sample = 0; sample <= bin; ++sample)
+            {
+                keys.push_back(0.2 + 0.8 * bin);
+                values.push_back(row == 0 ? 0.25 : 0.75);
+            }
+    hist->setData(std::move(keys), std::move(values));
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+
+    const QCPScale symlog = QCPScale::symlog(2);
+    hist->setDataScale(symlog);
+    hist->setAutoContourLevels(2);
+    QTRY_VERIFY_WITH_TIMEOUT((mPlot->toPixmap(), hist->lastContourLevels().size() == 2), 5000);
+    const QVector<double> levels = hist->lastContourLevels();
+    QCOMPARE(levels.size(), 2);
+    const double span = symlog.toScale(4.0) - symlog.toScale(1.0);
+    for (int i = 0; i < 2; ++i)
+    {
+        const double want = symlog.fromScale(symlog.toScale(1.0) + (i + 1) * span / 3.0);
+        QVERIFY2(std::abs(levels[i] - want) <= 1e-9 * std::max(1.0, std::abs(want)),
+                 qPrintable(QString("level %1 is %2, not the scale-space step %3")
+                                .arg(i).arg(levels[i]).arg(want)));
+    }
+    QVERIFY2(std::abs(levels[0] - 2.0) > 1e-6 && std::abs(levels[1] - 3.0) > 1e-6,
+             "levels are linear: even steps of the data, not of the scale");
+
+    auto* logHist = mPlot->add<QCPHistogram2D>().get();
+    logHist->setBins(2, 2);
+    std::vector<double> logKeys, logValues;
+    for (int row = 0; row < 2; ++row)
+    {
+        logKeys.push_back(0.25);
+        logValues.push_back(row == 0 ? 0.25 : 0.75);
+        for (int sample = 0; sample < 1000; ++sample)
+        {
+            logKeys.push_back(0.75);
+            logValues.push_back(row == 0 ? 0.25 : 0.75);
+        }
+    }
+    logHist->setData(std::move(logKeys), std::move(logValues));
+    QSignalSpy logSpy(&logHist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(logSpy.wait(2000));
+    logHist->setDataScale(QCPScale::log());
+    logHist->setAutoContourLevels(2);
+    QTRY_VERIFY_WITH_TIMEOUT((mPlot->toPixmap(), logHist->lastContourLevels().size() == 2), 5000);
+    const QVector<double> logLevels = logHist->lastContourLevels();
+    QCOMPARE(logLevels.size(), 2);
+    QVERIFY(std::abs(logLevels[0] - 10.0) < 1e-9);
+    QVERIFY(std::abs(logLevels[1] - 100.0) < 1e-9);
 }
