@@ -1,4 +1,5 @@
 #include "test-repaint.h"
+#include "../wait-for-rhi.h"
 #include "axis/labelrenderer.h"
 #include "datasource/soa-multi-datasource.h"
 #include "items/item-bracket.h"
@@ -2544,14 +2545,7 @@ QCustomPlot* shownGpuPlot(QWidget& host)
     host.show();
     if (!QTest::qWaitForWindowExposed(&host))
         return nullptr;
-    QElapsedTimer waited;
-    waited.start();
-    while (!plot->rhi() && waited.elapsed() < 5000)
-    {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
-        QTest::qWait(10);
-    }
-    return plot->rhi() ? plot : nullptr;
+    return waitForRhi(*plot) ? plot : nullptr;
 }
 
 // The columns where the middle row of the plot is inked.

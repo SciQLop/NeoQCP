@@ -1,6 +1,7 @@
 #include "test-draw-context.h"
 
 #include "../misuse-recorder.h"
+#include "../wait-for-rhi.h"
 
 #include <painting/command-replay-rhi.h>
 #include <painting/draw-commands.h>
@@ -173,7 +174,10 @@ static_assert(sizeof(qcp::LineCmd) <= 96);
 static_assert(sizeof(qcp::CircleCmd) <= 96);
 static_assert(sizeof(qcp::RoundedRectCmd) <= 96);
 static_assert(sizeof(qcp::BoxedTextCmd) <= 96);
-static_assert(sizeof(qcp::QCPDrawCommand) <= 104);
+// The variant adds its index to the largest command: 8 bytes with libstdc++ and MSVC, 16 with
+// libc++ (measured with clang -stdlib=libc++: 96-byte alternatives, 112-byte variant).
+constexpr std::size_t kCommandSlotBudget = 96 + 16;
+static_assert(sizeof(qcp::QCPDrawCommand) <= kCommandSlotBudget);
 // A batch is a header: its arrays live behind one pointer, so a recording that holds no batch pays
 // nothing for the ones that exist, and a batch costs a command slot like any other.
 static_assert(sizeof(qcp::RectsCmd) <= 96);
@@ -182,7 +186,7 @@ static_assert(sizeof(qcp::EllipsesCmd) <= 96);
 void TestDrawContext::drawListIsCompact()
 {
     // The static_asserts above are the contract; this keeps the slot visible in the report.
-    QVERIFY(sizeof(qcp::QCPDrawCommand) <= 104);
+    QVERIFY(sizeof(qcp::QCPDrawCommand) <= kCommandSlotBudget);
 }
 
 void TestDrawContext::polylineMatchesHandPainting()
@@ -2084,14 +2088,7 @@ QCustomPlot* shownPlot(QWidget& host)
     host.show();
     if (!QTest::qWaitForWindowExposed(&host))
         return nullptr;
-    QElapsedTimer waited;
-    waited.start();
-    while (!plot->rhi() && waited.elapsed() < 5000)
-    {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
-        QTest::qWait(10);
-    }
-    return plot->rhi() ? plot : nullptr;
+    return waitForRhi(*plot) ? plot : nullptr;
 }
 
 void TestDrawContext::everyHelperDrawsTheSamePicture()
