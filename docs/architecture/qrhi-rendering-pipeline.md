@@ -53,7 +53,7 @@ replot()
 
 Only layers whose content changed are repainted. Range changes mark the layers that depend on them (axes, grid, plottables); a layer that holds only static content keeps its texture.
 
-A layer **translates** instead of repainting when it is a pure pan: every visible plottable on it reports the same pixel offset (`QCPLayer::pixelOffset()`, which asks each data-only recording through `QCPDrawnBase::stallPixelOffset()`), and the layer holds no item and no layout element that paints. The old texture and the cached GPU geometry are then shifted by that offset.
+A layer **translates** instead of repainting when it is a pure pan: every visible plottable on it reports the same pixel offset (`QCPLayer::pixelOffset()`, which asks each plottable's `stallPixelOffset()`, answered by its `QCPDrawnCore` from a data-only recording), and the layer holds no item, no layout element that paints, and no painter slice. The old texture and the cached GPU geometry are then shifted by that offset.
 
 A plottable whose async pipeline has not delivered yet (`canProduceContent()` false) does not clear its buffer: the stale frame stays on screen instead of blinking.
 
