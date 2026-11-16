@@ -37,6 +37,28 @@ std::vector<double> qcp_numbers(const Waveform& waveform)
     return { waveform.frequency, 2 * waveform.frequency };
 }
 
+//! A hook that returns a view only a non-const object can iterate: the adaptor must not make the
+//! copy it iterates const.
+struct Filtered
+{
+    std::vector<double> values { 1, 2, 3, 4 };
+};
+
+auto qcp_numbers(const Filtered& filtered)
+{
+    return filtered.values | std::views::filter([](double value) { return value > 2.0; });
+}
+
+//! A hook that returns a const container by value: the result is decayed, then owned and read.
+struct Frozen
+{
+};
+
+const std::vector<double> qcp_numbers(const Frozen&)
+{
+    return { 7.0, 8.0 };
+}
+
 //! A container that opts out: a deleted hook is the best match, so the call does not compile.
 struct Grid : std::vector<double>
 {
@@ -115,6 +137,8 @@ static_assert(QCPNumberRange<QVector<double>>);
 static_assert(QCPNumberRange<std::array<double, 4>>);
 static_assert(QCPNumberRange<Samples>);
 static_assert(QCPNumberRange<Waveform>);
+static_assert(QCPNumberRange<Filtered>);
+static_assert(QCPNumberRange<Frozen>);
 static_assert(!QCPNumberRange<QStringList>);
 static_assert(!QCPNumberRange<std::vector<QString>>);
 static_assert(!QCPNumberRange<Grid>);
@@ -220,4 +244,61 @@ void TestDataAdapters::aHookedTypeReachesEveryPlotType()
 
     const HookedGraph hooked(keys, values);
     QCOMPARE(hooked.dataCount(), 4);
+}
+
+void TestDataAdapters::aFilterHookIsRead()
+{
+    QVERIFY((qcp::toDoubles(Filtered { }) == std::vector<double> { 3.0, 4.0 }));
+
+    const Filtered filtered;
+    const QCPGraph graph(filtered, filtered);
+    QCOMPARE(graph.dataCount(), 2);
+    QCOMPARE(graph.dataMainKey(0), 3.0);
+    QCOMPARE(graph.dataMainValue(1), 4.0);
+}
+
+void TestDataAdapters::aConstHookResultIsRead()
+{
+    QVERIFY((qcp::toDoubles(Frozen { }) == std::vector<double> { 7.0, 8.0 }));
+    QVERIFY((std::ranges::equal(qcp::numbers(Frozen { }), std::vector<double> { 7.0, 8.0 })));
+}
+
+void TestDataAdapters::aByValueHookBuildsAGraph()
+{
+    const QCPGraph graph(Waveform { }, Waveform { });
+    QCOMPARE(graph.dataCount(), 2);
+    QCOMPARE(graph.dataMainKey(0), 2.0);
+    QCOMPARE(graph.dataMainValue(0), 2.0);
+    QCOMPARE(graph.dataMainKey(1), 4.0);
+    QCOMPARE(graph.dataMainValue(1), 4.0);
+}
+
+void TestDataAdapters::setDataMovesItsStorage()
+{
+    QCPGraph graph;
+    std::vector<double> keys { 1.0, 2.0, 3.0 };
+    std::vector<double> values { 4.0, 5.0, 6.0 };
+    const double* const keyBuffer = keys.data();
+    const double* const valueBuffer = values.data();
+
+    graph.setData(std::move(keys), std::move(values), true);
+
+    const QCPMultiDataSource* const source = graph.dataSource();
+    QVERIFY(source != nullptr);
+    QCOMPARE(source->rawKeyData(), keyBuffer);
+    QCOMPARE(source->rawColumn(0).data, static_cast<const void*>(valueBuffer));
+}
+
+void TestDataAdapters::mixedRangeTypesAreRead()
+{
+    const QVector<float> floats { 5.0f, 6.0f, 7.0f, 8.0f };
+    const HookedGraph fromFloats(std::vector<double> { 1.0, 2.0, 3.0, 4.0 }, floats);
+    QCOMPARE(fromFloats.dataCount(), 4);
+    QCOMPARE(fromFloats.dataMainValue(0), 5.0);
+
+    const auto shorter
+        = std::views::iota(0, 9) | std::views::take_while([](int i) { return i < 4; });
+    const HookedGraph fromView(std::vector<double> { 1.0, 2.0, 3.0, 4.0 }, shorter);
+    QCOMPARE(fromView.dataCount(), 4);
+    QCOMPARE(fromView.dataMainKey(3), 4.0);
 }

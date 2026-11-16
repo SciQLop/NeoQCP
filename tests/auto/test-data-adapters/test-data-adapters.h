@@ -17,4 +17,9 @@ private slots:
     void aNonCommonRangeIsRead();
     void copiesOnce();
     void aHookedTypeReachesEveryPlotType();
+    void aFilterHookIsRead();
+    void aConstHookResultIsRead();
+    void aByValueHookBuildsAGraph();
+    void setDataMovesItsStorage();
+    void mixedRangeTypesAreRead();
 };

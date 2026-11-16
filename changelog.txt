@@ -655,6 +655,10 @@ Milestone 6b (plot-free construction). Breaking, in the 3.0 preview line.
   - add<T>(args...) always means T(args...): the arguments a plottable add used to forward to setData() are
         gone, with the (keyAxis, valueAxis) constructors of QCPPlottable, QCPPlottable1D and every built-in
         plottable. setData() keeps its forms.
+  - QCPGraph::setData(std::vector<double>, std::vector<double>, bool) takes its two vectors by value and
+        moves them into the growable source: source-breaking only for code that names that overload's type
+        (a pointer to it, a subclass hiding it); a call with lvalues copies once, as before, and one with
+        rvalues hands its storage over.
   - A plottable built outside a plot runs no transform there: a data constructor keeps the source, and its
         pipeline (the L1 resample of a dense graph, the binning of a colour map or a histogram) starts on the
         plot's pool when the plottable joins a plot. add<QCPGraph>(keys, values) over a large source never

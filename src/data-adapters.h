@@ -48,8 +48,10 @@ constexpr auto adaptNumbers(T&& numbers)
 }
 
 template <typename T>
-concept numbersHookAdaptable
-    = numbersHook<T> && numberSource<decltype(qcp_numbers(std::declval<T>()))>;
+using hookResult = decltype(qcp_numbers(std::declval<T>()));
+
+template <typename T>
+concept numbersHookAdaptable = numbersHook<T> && numberSource<std::remove_cvref_t<hookResult<T>>>;
 
 template <typename T>
 concept numbersPlainAdaptable = numbersCall<T> && !numbersHook<T> && numberSource<T>;
@@ -63,8 +65,17 @@ struct Numbers
     {
         if constexpr (numbersHook<T>)
         {
-            auto&& hooked = qcp_numbers(std::forward<T>(numbers));
-            return adaptNumbers(std::forward<decltype(hooked)>(hooked));
+            // A reference is the caller's storage and is read where it is. Anything else is the
+            // hook's own object: it is moved into the range returned here (never a span), and a
+            // const value is decayed first, since the adaptor owns what it reads.
+            if constexpr (std::is_reference_v<hookResult<T>>)
+                return adaptNumbers(qcp_numbers(std::forward<T>(numbers)));
+            else
+            {
+                std::remove_cvref_t<hookResult<T>> hooked
+                    = qcp_numbers(std::forward<T>(numbers));
+                return adaptNumbers(std::move(hooked));
+            }
         }
         else
             return adaptNumbers(std::forward<T>(numbers));
@@ -108,10 +119,12 @@ namespace detail
 template <typename Container, QCPNumberRange R>
 auto toContainer(const R& r) -> Container
 {
-    const auto adapted = qcp::numbers(r);
+    // Not const: a view such as std::views::filter iterates a non-const object only, and the
+    // adaptor's copy is this local's.
+    auto adapted = qcp::numbers(r);
     Container out;
     if constexpr (std::ranges::sized_range<decltype(adapted)>)
-        out.reserve(static_cast<std::size_t>(std::ranges::size(adapted)));
+        out.reserve(static_cast<typename Container::size_type>(std::ranges::size(adapted)));
     for (auto&& value : adapted)
         out.push_back(static_cast<double>(value));
     return out;

@@ -348,8 +348,10 @@ void QCPGraph::setData(std::vector<double> keys, std::vector<double> values,
 {
     const auto keyCount = keys.size();
     QCP_CHECK_OR_RETURN(keyCount == values.size(), "keys and values have different sizes");
-    auto source = std::make_shared<QCPGrowableMultiDataSource>(
-        std::move(keys), std::vector<std::vector<double>>{std::move(values)}, alreadySorted);
+    std::vector<std::vector<double>> columns;
+    columns.push_back(std::move(values)); // not {std::move(values)}: a braced list copies
+    auto source = std::make_shared<QCPGrowableMultiDataSource>(std::move(keys),
+                                                               std::move(columns), alreadySorted);
     if (source->size() != keyCount || source->columnCount() != 1)
         return; // the source refused the shape or a non-finite key: no change
     setOwnedSource(std::move(source));
