@@ -1046,6 +1046,41 @@ void TestColorByScalar::aLineFollowsItsScale()
              qPrintable(QString("the line kept its own gradient: pixel is %1").arg(left.name())));
 }
 
+// A coloured line's lookup follows a symlog data scale: a negative scalar is a colour, not a gap,
+// and z = 1 takes the scale-space bucket 155 where the linear path gives 128.
+void TestColorByScalar::aColouredLineTakesSymlog()
+{
+    qcp::ColorScalarMapper mapper;
+    mapper.setValues(std::make_shared<const std::vector<double>>(
+        std::vector<double> { -1e4, -1.0, 0.0, 1.0, 1e4 }));
+    mapper.setRange(QCPRange(-1e4, 1e4));
+    mapper.setScale(QCPScale::symlog(1));
+    QCOMPARE(mapper.bucket(0), 0);     // a negative scalar is a colour on symlog, not a gap
+    QCOMPARE(mapper.bucket(1), 100);   // 0.391304
+    QCOMPARE(mapper.bucket(2), 128);   // 0 is the middle entry
+    QCOMPARE(mapper.bucket(3), 155);   // 0.608696, where linear gives 128
+    QCOMPARE(mapper.bucket(4), 255);
+
+    auto* mg = mPlot->add<QCPGraph>().get();
+    std::vector<double> keys(200), values(200, 0.0), scalar(200, 1.0);
+    std::iota(keys.begin(), keys.end(), 0.0);
+    mg->setDataSource(makeSource(keys, { values }));
+    mg->setComponentPens({ QPen(QBrush(Qt::black), 6) });
+    mg->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
+    mg->setDataScale(QCPScale::symlog(1));
+    mg->setDataRange(QCPRange(-1e4, 1e4));
+    mg->setColorValues(scalar);
+    mPlot->xAxis->setRange(0, 199);
+    mPlot->yAxis->setRange(-1, 1);
+
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+    const QColor painted = pixelAt(mPlot, img, 100.0, 0.0);
+    QVERIFY2(qAbs(painted.red() - 155) <= 8,
+             qPrintable(QStringLiteral("the line's grey is %1, the symlog lookup gives 155 "
+                                       "(the linear one 128)")
+                            .arg(painted.red())));
+}
+
 void TestColorByScalar::rescaleSeesALine()
 {
     auto* map = mPlot->add<QCPColorMap>().get();

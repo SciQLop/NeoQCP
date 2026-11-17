@@ -474,6 +474,45 @@ void TestScale::colorizeOverloadsAgreeOnALogScale()
 }
 
 // A data scale chosen before the add is not the joined colour scale's to overwrite.
+// The colour lookup follows a symlog data scale: each z maps through the scale, so z = 1 sits at
+// the scale-space fraction 0.60870 where the linear path gives 0.50005, and the two sides mirror.
+void TestScale::aSymlogColourScaleIsSymmetric()
+{
+    QCPColorGradient gradient(QCPColorGradient::gpGrayscale);
+    gradient.setLevelCount(1001);
+    const QCPRange range(-1e4, 1e4);
+    const QCPScale scale = QCPScale::symlog(1);
+
+    // The grey level of a colour is its gradient entry: 0 the first, 255 the last.
+    const auto fraction = [&](double z) { return qRed(gradient.color(z, range, scale)) / 255.0; };
+    const auto at = [&](double z) { return QStringLiteral("z = %1 at fraction %2").arg(z).arg(fraction(z)); };
+    const auto mirrors = [&](double z) { return qAbs(fraction(-z) - (1.0 - fraction(z))) <= 0.006; };
+
+    QVERIFY2(qAbs(fraction(0.0) - 0.5) <= 0.006, qPrintable(at(0.0)));
+    QVERIFY2(qAbs(fraction(1.0) - 0.60870) <= 0.006,
+             qPrintable(at(1.0) + QStringLiteral(", not the scale-space 0.60870")));
+    QVERIFY2(qAbs(fraction(10.0) - 0.70652) <= 0.006,
+             qPrintable(at(10.0) + QStringLiteral(", not the scale-space 0.70652")));
+    for (const double z : { 1.0, 10.0, 1e3, 1e4 })
+        QVERIFY2(mirrors(z), qPrintable(QStringLiteral("z = %1 does not mirror").arg(z)));
+
+    // The bulk overloads a map's renderer uses read the same lookup.
+    std::array<double, 7> values { -1e4, -10.0, -1.0, 0.0, 1.0, 10.0, 1e4 };
+    std::array<QRgb, 7> opaque {};
+    std::array<QRgb, 7> withAlpha {};
+    std::array<unsigned char, 7> alpha {};
+    alpha.fill(255);
+    gradient.colorize(values.data(), range, opaque.data(), int(values.size()), 1, scale);
+    gradient.colorize(values.data(), alpha.data(), range, withAlpha.data(), int(values.size()), 1,
+                      scale);
+    for (size_t i = 0; i < values.size(); ++i)
+    {
+        const QRgb expected = gradient.color(values[i], range, scale);
+        QCOMPARE(opaque[i], expected);
+        QCOMPARE(withAlpha[i], expected);
+    }
+}
+
 void TestScale::aDataScaleSetBeforeTheAddWins()
 {
     QCustomPlot plot;

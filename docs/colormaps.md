@@ -90,6 +90,7 @@ This also covers NaN values in z, and pixels no column reaches.
 - A logarithmic **y** axis is supported. The rows are resampled in log space, so every channel keeps its true height on screen.
 - A logarithmic **x** axis is not: x is always resampled linearly.
 - For a logarithmic **z**, pass `QCPScale::log()` to `setDataScale()` on the map or on its colour scale. Cells that fall in one pixel are then averaged in log space (a geometric mean), so a few large values do not swamp the rest. Values at or below zero are left out of that mean.
+- For a symlog **z**, pass `QCPScale::symlog(threshold)`. Each value is colourised where the scale puts it, so a range that straddles zero keeps its two signs apart and the linear band readable. The colour bar takes the same data scale.
 
 Also give each log axis a `QCPAxisTickerLog`. Changing the scale does not change the ticker.
 {doc}`axes` has the details.
@@ -174,7 +175,7 @@ The gradient example below does this for each stripe.
 You can also make a scale yourself, put it in the plot layout and attach it with `setColorScale()`, as in the first example.
 It replaces the rect's scale for that plottable, and stays through the same changes. {doc}`layout` explains layouts.
 
-Once attached, the map and the scale share three properties: the gradient, the data range and the data scale type.
+Once attached, the map and the scale share three properties: the gradient, the data range and the data scale.
 Change one on either side and the other follows.
 Several maps can share one scale. They then always use the same colours.
 

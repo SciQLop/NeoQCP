@@ -27,4 +27,5 @@ private slots:
     void aLogColourScaleMapsAsBefore();
     void aDataScaleSetBeforeTheAddWins();
     void colorizeOverloadsAgreeOnALogScale();
+    void aSymlogColourScaleIsSymmetric();
 };

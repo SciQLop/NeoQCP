@@ -62,6 +62,7 @@ private slots:
 
     void aColouredLineShowsItsRectScale();
     void aLineFollowsItsScale();
+    void aColouredLineTakesSymlog();
     void rescaleSeesALine();
     void aCurveFollowsItsScale();
 

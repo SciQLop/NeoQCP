@@ -33,6 +33,8 @@ private slots:
 
     // The renderer of a map made later reads the values the scale already had.
     void aSecondMapTakesTheRectsGradient();
+    // The bar's axis takes the data scale, so its pixel for z = 1 is the lookup of z = 1.
+    void theColourBarFollowsTheDataScale();
 
     // A rect-owned scale is part of the plot like a layout one: alignment groups and the mouse see it.
     void groupedRectsLeaveRoomForTheScale();

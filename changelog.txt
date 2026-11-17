@@ -591,7 +591,8 @@ colour-mapped plottable shows its data with is a value, not an enum.
         did; an equal scale emits nothing. Linear, log and symlog all draw: a symlog axis maps as a
         straight line in its own scale space (a linear band around zero, logarithmic outside it), and
         panning, zooming, drags, the grid, the kept line geometry and a polar radial axis all follow
-        that space. A symlog colour mapping still takes the linear colour path for now.
+        that space. A symlog colour mapping follows it too: the gradient lookup, the colour-map
+        renderer, the colour bar's axis and a coloured line's scalars all map through toScale.
   - QCPColorScale, QCPColorMapped and the plottables that carry a data scale: setDataScale(),
         dataScale(), dataScaleChanged() and the `dataScale` property replace the *DataScaleType
         names. A data scale set before the plottable is added to a rect now wins over the rect

@@ -602,10 +602,21 @@ void QCPColorScale::rescaleDataRange(bool onlyVisibleMaps)
             double center = (newRange.lower + newRange.upper)
                 * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
                        // validRange returned false for other reason
-            if (!mDataScale.isLog())
+            if (mDataScale.isLinear())
             {
                 newRange.lower = center - mDataRange.size() / 2.0;
                 newRange.upper = center + mDataRange.size() / 2.0;
+            }
+            else if (mDataScale.isSymlog())
+            {
+                // A symlog range is even in its own space: half the data range there, about the
+                // centre's scale-space coordinate.
+                const double half = 0.5
+                    * (mDataScale.toScale(mDataRange.upper)
+                       - mDataScale.toScale(mDataRange.lower));
+                const double at = mDataScale.toScale(center);
+                newRange.lower = mDataScale.fromScale(at - half);
+                newRange.upper = mDataScale.fromScale(at + half);
             }
             else // a logarithmic scale: a range is a ratio
             {

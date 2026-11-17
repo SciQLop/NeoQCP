@@ -94,7 +94,9 @@ colorScale->setDataScale(QCPScale::log());      // a logarithmic colour mapping
 zero, logarithmic outside it, and one straight line in the scale's own space, so a line or a point
 at zero has a pixel, panning moves the range by an offset there, and zooming keeps the point under
 the pointer on its pixel, as a zoom does on any axis. The default threshold is 2. A colour scale's
-symlog data scale still maps its colours linearly; that mapping comes with the rest of the milestone.
+symlog data scale maps its colours through the same space: z and -z are mirror colours, zero sits in
+the middle, and the colour bar's axis takes the scale, so a bar pixel is the colour the map gives
+that value.
 
 `scaleChanged` reports the new scale.
 

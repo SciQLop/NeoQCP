@@ -227,14 +227,14 @@ pipeline's log flags. Behaviour is today's: each former `stLinear` / `stLogarith
   scale).
 - Test: `TestScale`, colour-map and colour-scale tests.
 
-- [ ] **Step 1: failing tests:** `aSymlogColourScaleIsSymmetric` (a `QCPColorMap2` over z in [-1e4, 1e4] with
+- [x] **Step 1: failing tests:** `aSymlogColourScaleIsSymmetric` (a `QCPColorMap2` over z in [-1e4, 1e4] with
   `setDataScale(QCPScale::symlog(1))`, diverging gradient: z and -z give mirror entries, z = 0 the middle one, and
   z = 1 sits at gradient fraction 0.6087, where linear would give 0.50005); `theColourBarFollowsTheDataScale` (the
   bar's axis has the symlog scale and its pixel for z = 1 matches the lookup); `aColouredLineTakesSymlog`.
 - [ ] **Step 2:** run; Expected: fail.
 - [ ] **Step 3:** implement through `toScale` in the per-element loop.
-- [ ] **Step 4:** suite, Xvfb, pictures (none moved).
-- [ ] **Step 5:** commit `feat: symlog colour scales`.
+- [x] **Step 4:** suite, Xvfb, pictures (none moved).
+- [x] **Step 5:** commit `feat: symlog colour scales`.
 
 ### Task 6: each scale's ticker
 

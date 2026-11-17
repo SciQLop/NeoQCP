@@ -200,6 +200,35 @@ void TestColorScale::aSecondMapTakesTheRectsGradient()
 
 // Two stacked rects share their right margin through a group; only the top one shows a scale. Both
 // must stop short of it, so their right edges line up left of the bar.
+// A colour bar's axis takes the data scale, so the bar's pixel for z = 1 is the entry the lookup
+// gives z = 1, the scale-space fraction 0.60870 rather than the linear 0.50005.
+void TestColorScale::theColourBarFollowsTheDataScale()
+{
+    auto* map = mPlot->add<QCPColorMap2>().get();
+    map->setData(std::vector<double> { 0, 1 }, std::vector<double> { 0 },
+                 std::vector<double> { -1e4, 1e4 });
+    map->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
+    map->setDataScale(QCPScale::symlog(1));
+    map->setDataRange(QCPRange(-1e4, 1e4));
+    settle(mPlot, map);
+
+    const auto scale = mPlot->axisRect()->colorScale();
+    QVERIFY(scale);
+    QVERIFY2(scale->dataScale().isSymlog(), "the bar did not take the data scale");
+    QCOMPARE(scale->axis()->scale(), QCPScale::symlog(1));
+
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+    const int x = scale->axis()->axisRect()->rect().center().x();
+    const int y = qRound(scale->axis()->coordToPixel(1.0));
+    const QColor pixel = img.pixelColor(x, y);
+    const QColor lookup = QColor::fromRgba(
+        scale->gradient().color(1.0, QCPRange(-1e4, 1e4), scale->dataScale()));
+    QVERIFY2(qAbs(pixel.red() - lookup.red()) <= 3,
+             qPrintable(QStringLiteral("the bar pixel for z = 1 is grey %1, the lookup gives %2")
+                            .arg(pixel.red())
+                            .arg(lookup.red())));
+}
+
 void TestColorScale::groupedRectsLeaveRoomForTheScale()
 {
     auto* bottom = new QCPAxisRect(mPlot);

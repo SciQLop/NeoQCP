@@ -229,47 +229,86 @@ void QCPColorGradient::setPeriodic(bool enabled)
 */
 namespace
 {
-// Colour level per unit of data. A range of zero width (a colormap whose data range was never
+// The value space of the colour lookup, chosen once per call. A template argument rather than a
+// runtime flag: toScale() is out of line, and a call the compiler cannot see into must not sit in
+// the per-value code of the linear and log rows, where it cost ~20 % of a colour-map row
+// (resample.cpp's ValueSpace makes the same choice).
+struct LinearPosition
+{
+    double lower = 0.0;
+    double factor = 0.0;
+    double operator()(double v) const { return (v - lower) * factor; }
+};
+
+struct LogPosition
+{
+    double lower = 0.0;
+    double factor = 0.0;
+    double operator()(double v) const { return qLn(v / lower) * factor; }
+};
+
+struct ScalePosition
+{
+    QCPScale scale;
+    double scaledLower = 0.0;
+    double factor = 0.0;
+    double operator()(double v) const { return (scale.toScale(v) - scaledLower) * factor; }
+};
+
+// Colour level per unit of position. A range of zero width (a colormap whose data range was never
 // set or rescaled) gives infinity, and casting the resulting position to an integer is undefined:
 // x86 painted the first colour and ARM the last. Every value takes the first colour instead.
-double positionToIndexFactor(int levelCount, const QCPRange& range, bool logarithmic)
+double finiteFactor(double factor)
 {
-    const double factor = !logarithmic ? (levelCount - 1) / range.size()
-                                       : (levelCount - 1) / qLn(range.upper / range.lower);
     return qIsFinite(factor) ? factor : 0.0;
+}
+
+LinearPosition linearPosition(int levelCount, const QCPRange& range)
+{
+    return { range.lower, finiteFactor((levelCount - 1) / range.size()) };
+}
+
+LogPosition logPosition(int levelCount, const QCPRange& range)
+{
+    return { range.lower, finiteFactor((levelCount - 1) / qLn(range.upper / range.lower)) };
+}
+
+ScalePosition scalePosition(int levelCount, const QCPRange& range, const QCPScale& scale)
+{
+    const double lower = scale.toScale(range.lower);
+    return { scale, lower, finiteFactor((levelCount - 1) / (scale.toScale(range.upper) - lower)) };
+}
+
+//! Runs \a f with the position map of \a scale's value space, built once.
+template <typename F>
+void dispatchPosition(const QCPScale& scale, int levelCount, const QCPRange& range, F&& f)
+{
+    if (scale.isLog())
+        f(logPosition(levelCount, range));
+    else if (scale.isSymlog())
+        f(scalePosition(levelCount, range, scale));
+    else
+        f(linearPosition(levelCount, range));
 }
 } // namespace
 
-void QCPColorGradient::colorize(const double* data, const QCPRange& range, QRgb* scanLine, int n,
-                                int dataIndexFactor, const QCPScale& scale)
-{
-    // If you change something here, make sure to also adapt color() and the other colorize()
-    // overload
-    if (!data)
-    {
-        qDebug() << Q_FUNC_INFO << "null pointer given as data";
-        return;
-    }
-    if (!scanLine)
-    {
-        qDebug() << Q_FUNC_INFO << "null pointer given as scanLine";
-        return;
-    }
-    if (mColorBufferInvalidated)
-        updateColorBuffer();
+/*! \internal
 
+  One scanline of \a n values through \a position, its value space's position map. \a alpha is read
+  only when \a WithAlpha, so the opaque row keeps the loop it had.
+*/
+template <bool WithAlpha, typename Position>
+void QCPColorGradient::colorizeRow(const Position& position, const double* data,
+                                   const unsigned char* alpha, QRgb* scanLine, int n,
+                                   int dataIndexFactor)
+{
     const bool skipNanCheck = mNanHandling == nhNone;
-    // Log is the only non-linear colour mapping: a symlog scale takes the linear path until the
-    // scale-space colour math lands.
-    const bool logarithmic = scale.isLog();
-    const double posToIndexFactor = positionToIndexFactor(mLevelCount, range, logarithmic);
     for (int i = 0; i < n; ++i)
     {
         const double value = data[dataIndexFactor * i];
         if (skipNanCheck || !std::isnan(value))
         {
-            qint64 index = qint64((!logarithmic ? value - range.lower : qLn(value / range.lower))
-                                  * posToIndexFactor);
+            qint64 index = qint64(position(value));
             if (!mPeriodic)
             {
                 index = qBound(qint64(0), index, qint64(mLevelCount - 1));
@@ -280,7 +319,25 @@ void QCPColorGradient::colorize(const double* data, const QCPRange& range, QRgb*
                 if (index < 0)
                     index += mLevelCount;
             }
-            scanLine[i] = mColorBuffer.at(index);
+            if constexpr (WithAlpha)
+            {
+                if (alpha[dataIndexFactor * i] == 255)
+                {
+                    scanLine[i] = mColorBuffer.at(index);
+                }
+                else
+                {
+                    const QRgb rgb = mColorBuffer.at(index);
+                    const float alphaF = alpha[dataIndexFactor * i] / 255.0f;
+                    scanLine[i] = qRgba(
+                        int(qRed(rgb) * alphaF), int(qGreen(rgb) * alphaF),
+                        int(qBlue(rgb) * alphaF),
+                        int(qAlpha(rgb) * alphaF)); // also multiply r,g,b with alpha, to conform to
+                                                    // Format_ARGB32_Premultiplied
+                }
+            }
+            else
+                scanLine[i] = mColorBuffer.at(index);
         }
         else
         {
@@ -303,6 +360,30 @@ void QCPColorGradient::colorize(const double* data, const QCPRange& range, QRgb*
             }
         }
     }
+}
+
+void QCPColorGradient::colorize(const double* data, const QCPRange& range, QRgb* scanLine, int n,
+                                int dataIndexFactor, const QCPScale& scale)
+{
+    // If you change something here, make sure to also adapt color() and the other colorize()
+    // overload
+    if (!data)
+    {
+        qDebug() << Q_FUNC_INFO << "null pointer given as data";
+        return;
+    }
+    if (!scanLine)
+    {
+        qDebug() << Q_FUNC_INFO << "null pointer given as scanLine";
+        return;
+    }
+    if (mColorBufferInvalidated)
+        updateColorBuffer();
+
+    dispatchPosition(scale, mLevelCount, range,
+                     [&](const auto& position) {
+                         colorizeRow<false>(position, data, nullptr, scanLine, n, dataIndexFactor);
+                     });
 }
 
 /*! \overload
@@ -337,70 +418,18 @@ void QCPColorGradient::colorize(const double* data, const unsigned char* alpha,
     if (mColorBufferInvalidated)
         updateColorBuffer();
 
-    const bool skipNanCheck = mNanHandling == nhNone;
-    // Log is the only non-linear colour mapping: a symlog scale takes the linear path until the
-    // scale-space colour math lands.
-    const bool logarithmic = scale.isLog();
-    const double posToIndexFactor = positionToIndexFactor(mLevelCount, range, logarithmic);
-    for (int i = 0; i < n; ++i)
-    {
-        const double value = data[dataIndexFactor * i];
-        if (skipNanCheck || !std::isnan(value))
-        {
-            qint64 index = qint64((!logarithmic ? value - range.lower : qLn(value / range.lower))
-                                  * posToIndexFactor);
-            if (!mPeriodic)
-            {
-                index = qBound(qint64(0), index, qint64(mLevelCount - 1));
-            }
-            else
-            {
-                index %= mLevelCount;
-                if (index < 0)
-                    index += mLevelCount;
-            }
-            if (alpha[dataIndexFactor * i] == 255)
-            {
-                scanLine[i] = mColorBuffer.at(index);
-            }
-            else
-            {
-                const QRgb rgb = mColorBuffer.at(index);
-                const float alphaF = alpha[dataIndexFactor * i] / 255.0f;
-                scanLine[i] = qRgba(
-                    int(qRed(rgb) * alphaF), int(qGreen(rgb) * alphaF), int(qBlue(rgb) * alphaF),
-                    int(qAlpha(rgb) * alphaF)); // also multiply r,g,b with alpha, to conform to
-                                                // Format_ARGB32_Premultiplied
-            }
-        }
-        else
-        {
-            switch (mNanHandling)
-            {
-                case nhLowestColor:
-                    scanLine[i] = mColorBuffer.first();
-                    break;
-                case nhHighestColor:
-                    scanLine[i] = mColorBuffer.last();
-                    break;
-                case nhTransparent:
-                    scanLine[i] = qRgba(0, 0, 0, 0);
-                    break;
-                case nhNanColor:
-                    scanLine[i] = mNanColor.rgba();
-                    break;
-                case nhNone:
-                    break; // shouldn't happen
-            }
-        }
-    }
+    dispatchPosition(scale, mLevelCount, range,
+                     [&](const auto& position) {
+                         colorizeRow<true>(position, data, alpha, scanLine, n, dataIndexFactor);
+                     });
 }
 
 /*! \internal
 
   This method is used to colorize a single data value given in \a position, to colors. The data
   range that shall be used for mapping the data value to the gradient is passed in \a range. \a
-  scale says how the data value maps to a color: linearly, or logarithmically.
+  scale says how the data value maps to a color: linearly, logarithmically, or through a symlog
+  scale's own space.
 
   If an entire array of data values shall be converted, rather use \ref colorize, for better
   performance.
@@ -432,10 +461,9 @@ QRgb QCPColorGradient::color(double position, const QCPRange& range, const QCPSc
         }
     }
 
-    const bool logarithmic = scale.isLog();
-    const double posToIndexFactor = positionToIndexFactor(mLevelCount, range, logarithmic);
-    int index = int((!logarithmic ? position - range.lower : qLn(position / range.lower))
-                    * posToIndexFactor);
+    int index = 0;
+    dispatchPosition(scale, mLevelCount, range,
+                     [&](const auto& map) { index = int(map(position)); });
     if (!mPeriodic)
     {
         index = qBound(0, index, mLevelCount - 1);

@@ -50,6 +50,8 @@ public:
         const bool log = mScale.isLog();
         if (log && v <= 0)
             return kGap;
+        if (mScale.isSymlog())
+            return toBucket(scalePosition(v));
         return toBucket(log ? logPosition(v) : linearPosition(v));
     }
 
@@ -70,6 +72,12 @@ private:
         if (mRange.lower <= 0 || mRange.upper <= mRange.lower)
             return 0.0;
         return std::log(v / mRange.lower) / std::log(mRange.upper / mRange.lower);
+    }
+    double scalePosition(double v) const
+    {
+        const double lower = mScale.toScale(mRange.lower);
+        const double span = mScale.toScale(mRange.upper) - lower;
+        return span > 0 ? (mScale.toScale(v) - lower) / span : 0.0;
     }
     static int toBucket(double t)
     {

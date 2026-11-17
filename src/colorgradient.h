@@ -195,6 +195,10 @@ protected:
     // non-virtual methods:
     bool stopsUseAlpha() const;
     void updateColorBuffer();
+    //! One scanline through a value space's position map: the linear, log and scale-space rows.
+    template <bool WithAlpha, typename Position>
+    void colorizeRow(const Position& position, const double* data, const unsigned char* alpha,
+                     QRgb* scanLine, int n, int dataIndexFactor);
 };
 
 #endif // QCP_COLORGRADIENT_H

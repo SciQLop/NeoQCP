@@ -771,6 +771,17 @@ QCPRange rangeWithHalfACell(QCPAxis* axis, const QCPRange& range, int size)
             = std::exp(0.5 * std::abs(std::log(range.upper / range.lower)) / double(size - 1));
         return QCPRange(range.lower / growth, range.upper * growth);
     }
+    if (axis->scale().isSymlog())
+    {
+        // Cells are even in the scale's own space: half a cell is half a scale step, not half a
+        // data step that the band would squash.
+        const QCPScale& scale = axis->scale();
+        const double half
+            = 0.5 * std::abs(scale.toScale(range.upper) - scale.toScale(range.lower))
+            / double(size - 1);
+        return QCPRange(scale.fromScale(scale.toScale(range.lower) - half),
+                        scale.fromScale(scale.toScale(range.upper) + half));
+    }
     const double half = 0.5 * range.size() / double(size - 1);
     return QCPRange(range.lower - half, range.upper + half);
 }
