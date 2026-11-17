@@ -146,7 +146,8 @@ void QCPColorMapped::applyDataScale(const QCPScale& scale)
     if (!alive)
         return;
     const QCPEmissionScope scope(mParentPlot);
-    qcpEmit(this, mParentPlot, &QCPColorMapped::dataScaleChanged, mDataScale);
+    qcpEmitCurrent(this, mParentPlot, &QCPColorMapped::dataScaleChanged,
+                   [this] { return mDataScale; });
     if (mDataScale.isLog())
         applyDataRange(mDataRange);
 }

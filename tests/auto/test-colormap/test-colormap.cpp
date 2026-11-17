@@ -909,6 +909,26 @@ void TestColorMap::QCPColorMap2_colourSlotDeletingTheMapIsSafe()
   colourSettersSurviveADeletingSlot<QCPColorMap2>(mPlot);
 }
 
+// A state signal reports the state a listener finds when it runs, not the one the setter saw: two
+// scale changes in one emission scope both arrive as the last of them.
+void TestColorMap::QCPColorMap2_dataScaleSignalCarriesTheCurrentScale()
+{
+  QVERIFY(mPlot->removePlottable(mColorMap));
+  auto* cm = mPlot->add<QCPColorMap2>().get();
+  QVector<QCPScale> heard;
+  connect(cm, &QCPColorMap2::dataScaleChanged, mPlot,
+          [&heard](const QCPScale& scale) { heard.append(scale); });
+  {
+    const QCPEmissionScope scope(mPlot);
+    cm->setDataScale(QCPScale::log());
+    cm->setDataScale(QCPScale::symlog(1));
+    QVERIFY2(heard.isEmpty(), "the open scope defers the signal");
+  }
+  QCOMPARE(heard.size(), 2);
+  for (const QCPScale& scale : heard)
+    QCOMPARE(scale, QCPScale::symlog(1));
+}
+
 void TestColorMap::QCPHistogram2D_colourSlotDeletingTheMapIsSafe()
 {
   QVERIFY(mPlot->removePlottable(mColorMap));
