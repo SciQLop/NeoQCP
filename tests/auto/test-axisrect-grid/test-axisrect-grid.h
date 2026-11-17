@@ -21,6 +21,10 @@ private slots:
     void aHoleDoesNotMoveKeptRects();
     void columnsAndRowsAlign();
     void misuseIsRefused();
+    void aLegendTheUserTookOutStaysOut();
+    void aDeletedPlotLayoutIsBuiltAgain();
+    void aDestroyedSlotMayDeleteTheDroppedRect();
+    void aReentrantCallIsRefused();
 
 private:
     void renderOnce(QSize size);

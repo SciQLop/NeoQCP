@@ -51,6 +51,8 @@ struct QCPAxisRectGridState
     QCPAxisRectGridOptions options;
     int rows = 0;
     int columns = 0;
+    //! True while a call walks the layout: a slot that re-enters is refused, not run on half a grid.
+    bool running = false;
 };
 
 namespace qcp

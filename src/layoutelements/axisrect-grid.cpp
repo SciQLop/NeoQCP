@@ -122,6 +122,23 @@ bool gridCellsAreRects(QCPLayoutGrid& layout)
     return true;
 }
 
+//! Held while applyAxisRectGrid walks the layout: a slot that re-enters finds it set.
+class RunningGuard
+{
+public:
+    explicit RunningGuard(bool& flag)
+        : mFlag(flag)
+    {
+        mFlag = true;
+    }
+    ~RunningGuard() { mFlag = false; }
+    RunningGuard(const RunningGuard&) = delete;
+    RunningGuard& operator=(const RunningGuard&) = delete;
+
+private:
+    bool& mFlag;
+};
+
 void dissolveGroup(const QPointer<QCPAlignmentGroup>& group)
 {
     if (!group)
@@ -151,11 +168,12 @@ QList<QCPLayoutElement*> gridRow(QCPLayoutGrid& layout, int row, int columns)
 }
 
 //! Takes the plot's legend out of the dropped rect it sits in, so the plot keeps its legend.
-void rescueLegend(QCPLayoutGrid& layout, const QPointer<QCPLayoutElement>& legend, int rows,
+//! Returns whether it did: a legend the user had taken out of every layout stays out.
+bool rescueLegend(QCPLayoutGrid& layout, const QPointer<QCPLayoutElement>& legend, int rows,
                   int columns)
 {
     if (!legend)
-        return;
+        return false;
     const int oldRows = layout.rowCount();
     const int oldColumns = layout.columnCount();
     for (int row = 0; row < oldRows; ++row)
@@ -174,9 +192,10 @@ void rescueLegend(QCPLayoutGrid& layout, const QPointer<QCPLayoutElement>& legen
                 if (child.get() == legend.get())
                 {
                     static_cast<void>(rect->insetLayout()->take(legend.get()));
-                    return;
+                    return true;
                 }
         }
+    return false;
 }
 } // namespace
 
@@ -184,6 +203,11 @@ bool qcp::applyAxisRectGrid(QCPLayoutGrid& layout, int rows, int columns,
                             const QCPAxisRectGridOptions& options, QCPAxisRectGridState& state,
                             const std::function<QCPAxisRect*()>& makeRect)
 {
+    QCP_CHECK_OR_RETURN(!state.running,
+                        "setAxisRectGrid is already running (re-entered from a slot?): nothing "
+                        "changed",
+                        false);
+    const RunningGuard running(state.running);
     QCP_CHECK_OR_RETURN(rows > 0, "a grid needs at least one row", false);
     QCP_CHECK_OR_RETURN(columns > 0, "a grid needs at least one column", false);
     QCP_CHECK_OR_RETURN(options.rowStretch.size() <= rows,
@@ -221,7 +245,7 @@ bool qcp::applyAxisRectGrid(QCPLayoutGrid& layout, int rows, int columns,
     }
 
     const QPointer<QCPLayoutElement> legend(plot->legend.get());
-    rescueLegend(layout, legend, rows, columns);
+    const bool legendWasRescued = rescueLegend(layout, legend, rows, columns);
 
     // Drop the rects outside the new grid, with everything they own (C1).
     const int oldRows = layout.rowCount();
@@ -259,7 +283,7 @@ bool qcp::applyAxisRectGrid(QCPLayoutGrid& layout, int rows, int columns,
     if (!plot)
         return false;
 
-    if (legend && !legend->layout())
+    if (legendWasRescued && legend && !legend->layout())
         if (auto* home = qobject_cast<QCPAxisRect*>(layout.element(0, 0).get()))
             home->insetLayout()->addElement(legend.get(), Qt::AlignRight | Qt::AlignTop);
 

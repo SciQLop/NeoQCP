@@ -276,6 +276,75 @@ void TestAxisRectGrid::aHoleDoesNotMoveKeptRects()
     QCOMPARE(mPlot->plotLayout()->columnStretchFactors(), (QList<double> { 2.0, 1.0 }));
 }
 
+void TestAxisRectGrid::aLegendTheUserTookOutStaysOut()
+{
+    QCPLegend* const legend = mPlot->legend.get();
+    QVERIFY(mPlot->axisRect()->insetLayout()->take(legend));
+    QVERIFY(!legend->layout());
+
+    mPlot->setAxisRectGrid(2, 1);
+
+    // Only a legend rescued from a dropped rect goes back in.
+    QVERIFY(mPlot->legend);
+    QCOMPARE(mPlot->legend.get(), legend);
+    QVERIFY(!legend->layout());
+}
+
+void TestAxisRectGrid::aDeletedPlotLayoutIsBuiltAgain()
+{
+    mPlot->plotLayout().remove();
+    QCOMPARE(mPlot->axisRectCount(), 0);
+
+    const int before = gMisuses;
+    mPlot->setAxisRectGrid(2, 1);
+
+    QCOMPARE(gMisuses, before);
+    QCOMPARE(mPlot->axisRectCount(), 2);
+    QVERIFY(mPlot->axisRect(1, 0));
+}
+
+void TestAxisRectGrid::aDestroyedSlotMayDeleteTheDroppedRect()
+{
+    mPlot->setAxisRectGrid(2, 1);
+    QCPHandle<QCPAxisRect> dropped = mPlot->axisRect(1, 0);
+    const QCPHandle<QCPGraph> graph
+        = dropped->add<QCPGraph>(std::vector<double> { 0.0, 1.0 }, std::vector<double> { 0.0, 1.0 });
+    QVERIFY(graph);
+    connect(graph.get(), &QObject::destroyed, mPlot, [dropped]() mutable { dropped.remove(); });
+
+    const int before = gMisuses;
+    mPlot->setAxisRectGrid(1, 1);
+
+    QVERIFY(!dropped);
+    QVERIFY(!graph);
+    QCOMPARE(gMisuses, before);
+    QCOMPARE(mPlot->axisRectCount(), 1);
+    QVERIFY(mPlot->axisRect(0, 0));
+}
+
+void TestAxisRectGrid::aReentrantCallIsRefused()
+{
+    mPlot->setAxisRectGrid(2, 1);
+    const QCPHandle<QCPGraph> graph = mPlot->axisRect(1, 0)->add<QCPGraph>(
+        std::vector<double> { 0.0, 1.0 }, std::vector<double> { 0.0, 1.0 });
+    QVERIFY(graph);
+    int reentered = 0;
+    connect(graph.get(), &QObject::destroyed, mPlot,
+            [this, &reentered]
+            {
+                ++reentered;
+                mPlot->setAxisRectGrid(1, 1);
+            });
+
+    const int before = gMisuses;
+    mPlot->setAxisRectGrid(1, 1);
+
+    QCOMPARE(reentered, 1);
+    QCOMPARE(gMisuses, before + 1);
+    QCOMPARE(mPlot->axisRectCount(), 1);
+    QVERIFY(mPlot->axisRect(0, 0));
+}
+
 void TestAxisRectGrid::columnsAndRowsAlign()
 {
     mPlot->setAxisRectGrid(2, 2);

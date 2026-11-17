@@ -585,7 +585,10 @@ Milestone 6e (multi-panel plots). Step 1 of the panel design.
         new grid is removed the way QCPHandle::remove() removes one: its plottables, items, colour
         scale and insets (and theirs) go first, so its handles become empty and the legend loses the
         plottables' rows. A legend that sat in a dropped rect's inset moves back to the rect in
-        cell (0, 0), so the plot never loses it. A later call grows or shrinks the grid the same
+        cell (0, 0), at its default top-right placement, so the plot never loses it; a legend the
+        user had taken out of every layout stays out, and one nested inside a dropped rect goes with
+        it (legend becomes null). A plot layout the user deleted is built again before the grid is.
+        A later call grows or shrinks the grid the same
         way, and the rects in the kept cells survive, even when the user left a hole before them: the
         kept cells are filled before the grid is compacted, so no kept rect changes cell. A new
         rect is built like the plot's default one: four axes on the axes layer, their grids on the
@@ -607,12 +610,13 @@ Milestone 6e (multi-panel plots). Step 1 of the panel design.
         lists the plot layout's cells first, row after row, then the rects nested in them (an
         inset layout included) in layout order (M1, P-7).
   - Refused as misuse, with nothing changed: fewer than one row or column, more stretch factors than
-        rows or columns, a stretch factor that is not finite and greater than zero, and a plot-layout
-        cell that does not hold an axis rect (a title row, a nested layout, a polar area).
+        rows or columns, a stretch factor that is not finite and greater than zero, a plot-layout
+        cell that does not hold an axis rect (a title row, a nested layout, a polar area), and a call
+        made while one is already running (re-entered from a destroyed() slot, say).
   - A plot being destroyed delivers nothing through qcpEmit: the layout's teardown signals and the
-        last layerChanged(nullptr) included. Plain QObject::destroyed still arrives.
-  - Deleting the plot from a plottable's or an item's destroyed() slot is safe: the object is
-        unlisted and un-parented first, so the plot does not free it a second time (clearItems() and
+        last layerChanged(nullptr) included. Plain QObject::destroyed still arrives. Deleting the
+        plot from a plottable's or an item's destroyed() slot is safe too: the object is unlisted and
+        un-parented first, so the plot does not free it a second time (clearItems() and
         clearPlottables() included).
 
 Milestone 6f (scales). Breaking, in the 3.0 preview line: the scale an axis, a colour scale or a
