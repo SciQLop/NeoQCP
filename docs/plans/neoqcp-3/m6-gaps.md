@@ -124,6 +124,8 @@ Counts are `grep -o` hits on the 2026-11-14 tree (`src/`, `tests/`, `examples/` 
    compile.
 5. **6e, multi-panel:** the rect grid, shared rescale, `setTitle`, `addInset`. Shared-x and peak-fit compile.
 6. **6f, scales:** `QCPScale`, symlog and its ticker, `colorMap` with options. Symlog and spectrogram compile.
+   **Done 2026-11-17** (`milestone-6f-rulings.md`); symlog and spectrogram compile once 6e lands (they need
+   `setAxisRectGrid`).
 7. **6g, fill and zoom indicator:** `QCPFillBetween` (deleting the component fills), `zoomIndicator`. Fill-between
    and inset-zoom compile.
 8. **6h, annotations:** `QCPItemAnnotation` and `QCPConnector`. Annotations compiles.
