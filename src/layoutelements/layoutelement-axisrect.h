@@ -100,8 +100,8 @@ struct QCPColorMapOptions
     QCPColorGradient gradient = QCPColorGradient::gpViridis;
     QCPScale dataScale = QCPScale::linear();
     bool colorBar = true;
-    std::optional<QCPRange> dataRange;
-    QString name;
+    std::optional<QCPRange> dataRange = std::nullopt;
+    QString name = {};
 };
 
 class QCP_LIB_DECL QCPAxisRect : public QCPArea

@@ -23,8 +23,8 @@ struct ViewportParams {
     QCPRange valueRange;
     int plotWidthPx = 0;
     int plotHeightPx = 0;
-    QCPScale keyScale;
-    QCPScale valueScale;
+    QCPScale keyScale = QCPScale();
+    QCPScale valueScale = QCPScale();
 
     bool operator==(const ViewportParams&) const = default;
     static ViewportParams fromAxes(const QCPAxis* keyAxis, const QCPAxis* valueAxis);

@@ -4019,7 +4019,7 @@ void TestPipeline::contourLevelsOnSymlog()
     const QCPScale symlog = QCPScale::symlog(2);
     hist->setDataScale(symlog);
     hist->setAutoContourLevels(2);
-    QTRY_VERIFY_WITH_TIMEOUT((mPlot->toPixmap(), hist->lastContourLevels().size() == 2), 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(((void)mPlot->toPixmap(), hist->lastContourLevels().size() == 2), 5000);
     const QVector<double> levels = hist->lastContourLevels();
     QCOMPARE(levels.size(), 2);
     const double span = symlog.toScale(4.0) - symlog.toScale(1.0);
@@ -4051,7 +4051,7 @@ void TestPipeline::contourLevelsOnSymlog()
     QVERIFY(logSpy.wait(2000));
     logHist->setDataScale(QCPScale::log());
     logHist->setAutoContourLevels(2);
-    QTRY_VERIFY_WITH_TIMEOUT((mPlot->toPixmap(), logHist->lastContourLevels().size() == 2), 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(((void)mPlot->toPixmap(), logHist->lastContourLevels().size() == 2), 5000);
     const QVector<double> logLevels = logHist->lastContourLevels();
     QCOMPARE(logLevels.size(), 2);
     QVERIFY(std::abs(logLevels[0] - 10.0) < 1e-9);
@@ -4294,7 +4294,7 @@ void TestPipeline::histogramsRebinOnASymlogScaleChange()
     QCOMPARE(h1->histogram()->scale, symlog2);
 
     mPlot->xAxis->setScale(symlog3);
-    QTRY_VERIFY_WITH_TIMEOUT((mPlot->toPixmap(), spy1.count() >= 2
+    QTRY_VERIFY_WITH_TIMEOUT(((void)mPlot->toPixmap(), spy1.count() >= 2
                               && h1->histogram()->scale == symlog3), 5000);
     const std::vector<double> edges3 = h1->histogram()->edges;
     QVERIFY2(edges2 != edges3, "the 1D histogram rebinned in the new scale space");
