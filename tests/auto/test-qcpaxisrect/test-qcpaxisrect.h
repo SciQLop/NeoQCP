@@ -14,6 +14,12 @@ private slots:
   void xAxisAndYAxisAreEmptyOnceTheAxisIsRemoved();
   void lineTakesDataAndOptions();
   void lineWithNoPenDrawsMarkersOnly();
+  void colorMapInOneCall();
+  void colorMapFromColumns();
+  void raggedColumnsAreRefused();
+  void colorMapWithoutColorBar();
+  void colorMapFromAView();
+  void spectrogramSingleRect();
   void textTakesAPositionAndAStyle();
   void textAppliesEveryStyleField();
   void textItemMathTextIsOnByDefault();

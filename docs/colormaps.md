@@ -97,6 +97,38 @@ Also give each log axis a `QCPAxisTickerLog`. Changing the scale does not change
 
 `rescaleDataRange(true)` reads the z range straight from your data, so it works right after `setData()`.
 
+### One call: `ax->colorMap`
+
+`QCPAxisRect::colorMap(x, y, z, options)` is `add<QCPColorMap2>()` with the styling a caller would
+apply right after, the way a one-call `ax->line()` is a graph with its pen. Flat `z` is x-major,
+`z[i * ny + j]`, as `setData()` reads it.
+
+```{literalinclude} snippets/colormaps.cpp
+:start-after: // [colormaps_one_call]
+:end-before: // [/colormaps_one_call]
+:language: cpp
+:dedent:
+```
+
+The options are named after the setter each one feeds:
+
+- `gradient`: the colour gradient. Viridis when unset.
+- `dataScale`: the scale of z. Linear when unset; `QCPScale::log()` or `QCPScale::symlog(t)` for
+  the others, on the colours and on the bar.
+- `colorBar`: `true` puts the map on the rect's colour bar. `false` leaves it on no colour scale at
+  all: no bar, and no room taken by one.
+- `dataRange`: the range the bar covers. Unset fits it on the data given, as
+  `rescaleDataRange(true)` does.
+- `name`: the name a legend shows.
+
+One column of z per x value works too: give `z` as a range of ranges, `z[i]` the column at `x[i]`,
+each of `y.size()` values. The columns are flattened x-major for you. Ragged columns, or a column
+count other than `x.size()`, are refused with a warning, and no map is made.
+
+The bar belongs to the rect, not to the map: a second `colorMap()` on the same rect re-styles the
+same bar, so the first map changes with it. Give the second map a colour scale of its own with
+`setColorScale()` when the two need different gradients or ranges.
+
 ### Contour lines
 
 `QCPColorMap2` can draw contour lines on top of the colours.

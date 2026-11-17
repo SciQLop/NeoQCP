@@ -27,12 +27,14 @@
 #define QCP_LAYOUTELEMENT_AXISRECT_H
 
 #include "../axis/axis.h"
+#include "../colorgradient.h"
 #include "../coords.h"
 #include "../global.h"
 #include "../painting/draw-context.h"
 #include "../scatterstyle.h"
 #include "area.h"
 #include <concepts>
+#include <optional>
 #include <tuple>
 
 namespace qcp
@@ -54,6 +56,7 @@ class QCPItem;
 class QCPItemEllipse;
 class QCPItemText;
 class QCPColorScale;
+class QCPColorMap2;
 
 template <typename T, typename Self = void>
 class QCPColorScaleOps;
@@ -80,6 +83,25 @@ struct QCPShapeOptions
 {
     QPen pen;
     QBrush brush;
+};
+
+/*!
+  How QCPAxisRect::colorMap() styles the map it makes: its gradient and data scale, whether it takes
+  the rect's colour bar, the range there, and its name. Each field is named after the setter it
+  feeds, so a designated initialiser list reads as the setters it replaces.
+
+  \a colorBar is \c true for the rect's shared colour scale, which the add joins by itself, and
+  \c false for no colour scale at all: the map is then coloured by its own gradient and data scale,
+  and an unused bar takes no room. \a dataRange unset fits the range on the data given, as
+  rescaleDataRange() does.
+*/
+struct QCPColorMapOptions
+{
+    QCPColorGradient gradient = QCPColorGradient::gpViridis;
+    QCPScale dataScale = QCPScale::linear();
+    bool colorBar = true;
+    std::optional<QCPRange> dataRange;
+    QString name;
 };
 
 class QCP_LIB_DECL QCPAxisRect : public QCPArea
@@ -175,6 +197,21 @@ public:
     // The built-in ellipse item between the corners \a a and \a b, each in its own space.
     QCPHandle<QCPItemEllipse> ellipse(QCP::Position a, QCP::Position b,
                                       const QCPShapeOptions& options = { });
+
+    // A colour map of \a z over the grid of \a x and \a y, in one call: the ranges go through
+    // qcp::toDoubles into the map's own storage, and \a options feeds its gradient, data scale,
+    // name, colour bar and data range. Flat \a z is x-major: z[i * y.size() + j] belongs to
+    // x[i], y[j] (x.size() * y.size() values), which is the layout QCPColorMap2::setData takes.
+    // Defined in axisrect-shortcuts.h, after the map exists.
+    template <QCPNumberRange X, QCPNumberRange Y, QCPNumbersOnly Z>
+    QCPHandle<QCPColorMap2> colorMap(const X& x, const Y& y, const Z& z,
+                                     const QCPColorMapOptions& options = { });
+    // The columns form of colorMap(): one column of \a z per \a x value, each of y.size() values,
+    // flattened x-major. Ragged columns, or a count other than x.size(), are misuse: one report and
+    // an empty handle.
+    template <QCPNumberRange X, QCPNumberRange Y, QCPColumns Z>
+    QCPHandle<QCPColorMap2> colorMap(const X& x, const Y& y, const Z& z,
+                                     const QCPColorMapOptions& options = { });
 
     QCPHandle<QCPAxis> addAxis(QCPAxis::AxisType type, QCPAxis* axis = nullptr);
     QList<QCPHandle<QCPAxis>> addAxes(QCPAxis::AxisTypes types);

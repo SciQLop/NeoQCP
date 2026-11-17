@@ -628,6 +628,13 @@ colour-mapped plottable shows its data with is a value, not an enum.
         values (and ResampleCache stores the row scale), Histogram1D has a scale instead of a log
         flag, and a histogram speaks of keyScale() instead of keyLog().
   - A polar angular axis still refuses a non-linear scale, as misuse.
+  - QCPAxisRect::colorMap(x, y, z, options), with QCPColorMapOptions, is a colour map in one call:
+        add<QCPColorMap2>() with the gradient, data scale, name, colour bar and data range applied
+        through the map's setters, flat z x-major as setData() reads it, and a range fitted on the
+        data when dataRange is unset. The columns form takes one column of z per x value and flattens
+        it x-major; ragged columns or a count other than x.size() are misuse, one report and no map.
+        colorBar = false leaves the map on no colour scale. A second map on the same rect re-styles
+        the rect's shared bar.
 
 Milestone 6c (the drawing context): units and positions. Additive, except where noted.
   - QCP::PixelLength and the `_px` literal (namespace QCP::Literals, spelled like Qt::Literals):

@@ -1,6 +1,7 @@
 #include "test-qcpaxisrect.h"
 #include "../expect-debug.h"
 #include "../keep-images.h"
+#include "../reference-image.h"
 #include "axis/labelrenderer.h"
 #if NEOQCP_WITH_LATEX
 #include "axis/latexlabelrenderer.h"
@@ -11,7 +12,12 @@
 #error "NEOQCP_WITH_LATEX must be defined by the build configuration (0 or 1)"
 #endif
 
+#include <QElapsedTimer>
+
 #include <array>
+#include <complex>
+#include <numbers>
+#include <random>
 #include <ranges>
 #include <vector>
 
@@ -100,7 +106,99 @@ QCPRange zoomedBy(const QCPAxis* axis, double factor, double pixel)
     return QCPRange((start.lower - center) * factor + center,
                     (start.upper - center) * factor + center);
 }
+
+// The colour-map grid: three x values, four y values, z[i * 4 + j] = 10 * i + j (x-major), so
+// every value is distinct and the last flat value is the corner (2, 3).
+std::vector<double> gridValues()
+{
+    std::vector<double> z;
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 4; ++j)
+            z.push_back(10.0 * i + j);
+    return z;
 }
+
+// examples/user-code/spectrogram: Hann windows of nfft samples, overlap samples shared, a
+// one-sided power spectral density per window. Copied so the picture test draws the target itself.
+struct Spectrogram
+{
+    std::vector<double> time, frequency, power;
+};
+
+Spectrogram spectrogram(const std::vector<double>& signal, int nfft, double rate, int overlap)
+{
+    std::vector<double> window(nfft);
+    double energy = 0;
+    for (int n = 0; n < nfft; ++n)
+    {
+        window[n] = 0.5 - 0.5 * std::cos(2 * std::numbers::pi * n / (nfft - 1));
+        energy += window[n] * window[n];
+    }
+    Spectrogram s;
+    for (int k = 1; k <= nfft / 2; ++k)
+        s.frequency.push_back(k * rate / nfft);
+    for (std::size_t start = 0; start + nfft <= signal.size(); start += nfft - overlap)
+    {
+        s.time.push_back((start + nfft / 2.0) / rate);
+        for (int k = 1; k <= nfft / 2; ++k)
+        {
+            std::complex<double> sum = 0;
+            for (int n = 0; n < nfft; ++n)
+                sum += window[n] * signal[start + n]
+                    * std::polar(1.0, -2 * std::numbers::pi * k * n / nfft);
+            s.power.push_back((k < nfft / 2 ? 2 : 1) * std::norm(sum) / (rate * energy));
+        }
+    }
+    return s;
+}
+
+// The spectrum panel of examples/user-code/spectrogram: noise, a 100 Hz tone and a 400 Hz chirp
+// over one rect, log frequency, log power colour.
+void drawSpectrogram(QCustomPlot& plot)
+{
+    std::mt19937 rng(19680801);
+    std::uniform_real_distribution<double> noise(0.0, 0.01);
+    const double dt = 0.0005;
+    std::vector<double> t, x;
+    for (int i = 0; i < 41000; ++i)
+    {
+        t.push_back(i * dt);
+        const bool chirp = t.back() > 10 && t.back() < 12;
+        x.push_back(std::sin(2 * std::numbers::pi * 100 * t.back())
+                    + (chirp ? 2 * std::sin(2 * std::numbers::pi * 400 * t.back()) : 0)
+                    + noise(rng));
+    }
+    const Spectrogram s = spectrogram(x, 1024, 1 / dt, 128);
+
+    QCPAxisRect* spectrum = plot.axisRect();
+    spectrum->colorMap(s.time, s.frequency, s.power,
+                       { .gradient = QCPColorGradient::gpViridis, .dataScale = QCPScale::log() });
+    spectrum->yAxis()->setScale(QCPScale::log());
+    spectrum->yAxis()->setLabel("Frequency (Hz)");
+    spectrum->colorScale()->setLabel("power (1/Hz)");
+
+    // The rest of the target's main(), on its own rect: fit the axes, then the first 20 s.
+    plot.rescaleAxes();
+    spectrum->xAxis()->setRange(0, 20);
+}
+
+// A colour map draws from the plottable pipeline: let the result land before the picture.
+bool waitUntilIdle(QCustomPlot& plot)
+{
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < 10000)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        bool busy = false;
+        for (int i = 0; i < plot.plottableCount(); ++i)
+            busy = busy || plot.plottable(i)->busy();
+        if (!busy)
+            return true;
+    }
+    return false;
+}
+} // namespace
 
 void TestQCPAxisRect::init()
 {
@@ -1093,4 +1191,142 @@ void TestQCPAxisRect::aLinkedScaledAxisDragMovesItsSourceLinearly()
                             .arg(mPlot->xAxis->range().upper)
                             .arg(expected.lower)
                             .arg(expected.upper)));
+}
+
+void TestQCPAxisRect::colorMapInOneCall()
+{
+    QCPAxisRect *ar = mPlot->axisRect();
+    const std::vector<double> x { 0, 1, 2 };
+    const std::vector<double> y { 10, 20, 30, 40 };
+    const std::vector<double> z = gridValues();
+
+    const QCPHandle<QCPColorMap2> map = ar->colorMap(
+        x, y, z, { .gradient = QCPColorGradient::gpJet, .dataScale = QCPScale::symlog(2) });
+    QVERIFY(map);
+
+    // The data reaches the map's own storage, x-major: z[i * ySize() + j].
+    const QCPDataSource2D *source = map->dataSource();
+    QCOMPARE(source->xSize(), 3);
+    QCOMPARE(source->ySize(), 4);
+    QCOMPARE(source->zAt(0, 0), 0.0);
+    QCOMPARE(source->zAt(0, 3), 3.0);
+    QCOMPARE(source->zAt(1, 0), 10.0);
+    QCOMPARE(source->zAt(2, 3), z.back());
+    QCOMPARE(map->keyAxis().get(), ar->xAxis().get());
+
+    // The options went through the map's setters, which forward to the rect's shared colour scale,
+    // and the range was fitted on the data given.
+    const auto scale = ar->colorScale();
+    QVERIFY(scale);
+    QCOMPARE(map->colorScale().get(), scale.get());
+    QCOMPARE(scale->gradient(), QCPColorGradient(QCPColorGradient::gpJet));
+    QCOMPARE(scale->dataScale(), QCPScale::symlog(2));
+    QCOMPARE(scale->dataRange(), QCPRange(0, 23));
+    QCOMPARE(map->gradient(), QCPColorGradient(QCPColorGradient::gpJet));
+    QCOMPARE(map->dataScale(), QCPScale::symlog(2));
+    QCOMPARE(map->dataRange(), QCPRange(0, 23));
+}
+
+void TestQCPAxisRect::colorMapFromColumns()
+{
+    QCPAxisRect *ar = mPlot->axisRect();
+    const std::vector<double> x { 0, 1, 2 };
+    const std::vector<double> y { 10, 20, 30, 40 };
+    // One column of z per x value: columns[i][j] is z at x[i], y[j].
+    std::vector<std::vector<double>> columns(3, std::vector<double>(4));
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 4; ++j)
+            columns[i][j] = 10.0 * i + j;
+
+    const QCPHandle<QCPColorMap2> map = ar->colorMap(x, y, columns);
+    QVERIFY(map);
+
+    // The columns flatten x-major: the same source values as the flat form.
+    const QCPDataSource2D *source = map->dataSource();
+    QCOMPARE(source->xSize(), 3);
+    QCOMPARE(source->ySize(), 4);
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 4; ++j)
+            QCOMPARE(source->zAt(i, j), 10.0 * i + j);
+}
+
+void TestQCPAxisRect::raggedColumnsAreRefused()
+{
+    QCPAxisRect *ar = mPlot->axisRect();
+    const std::vector<double> y { 10, 20 };
+
+    gMisuses = 0;
+    const auto previous = qcp::setMisuseHandler(countMisuse);
+    const QCPHandle<QCPColorMap2> ragged =
+        ar->colorMap(std::vector<double> { 0, 1 }, y, std::vector<std::vector<double>> { { 1, 2 }, { 3 } });
+    qcp::setMisuseHandler(previous);
+    QVERIFY2(!ragged, "ragged columns make no map");
+    QCOMPARE(gMisuses, 1); // one report says why
+
+    // Two whole columns for three x values: the count is what is wrong.
+    gMisuses = 0;
+    const auto again = qcp::setMisuseHandler(countMisuse);
+    const QCPHandle<QCPColorMap2> tooFew = ar->colorMap(
+        std::vector<double> { 0, 1, 2 }, y, std::vector<std::vector<double>> { { 1, 2 }, { 3, 4 } });
+    qcp::setMisuseHandler(again);
+    QVERIFY2(!tooFew, "one column per x value, or no map");
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestQCPAxisRect::colorMapWithoutColorBar()
+{
+    QCPAxisRect *ar = mPlot->axisRect();
+    const QCPHandle<QCPColorMap2> map =
+        ar->colorMap(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 },
+                     std::vector<double> { 1, 2, 3, 4 }, { .colorBar = false });
+    QVERIFY(map);
+
+    // Joined to no colour scale, and its own range still fits the data.
+    QVERIFY(!map->colorScale());
+    QCOMPARE(map->dataRange(), QCPRange(1, 4));
+
+    // The rect's bar is the one the add made; nothing uses it, so it takes no room.
+    const auto scale = ar->colorScale();
+    QVERIFY(scale);
+    mPlot->replot();
+    QVERIFY2(!scale->visible(), "the bar of an unused colour scale stays hidden");
+}
+
+void TestQCPAxisRect::colorMapFromAView()
+{
+    QCPAxisRect *ar = mPlot->axisRect();
+    // A view goes in like a container: one pass over it fills the map's x column.
+    const auto keys = std::views::iota(0, 3);
+    const QCPHandle<QCPColorMap2> map = ar->colorMap(keys, std::vector<double> { 10, 20, 30, 40 },
+                                                     gridValues());
+    QVERIFY(map);
+    const QCPDataSource2D *source = map->dataSource();
+    QCOMPARE(source->xSize(), 3);
+    QCOMPARE(source->xAt(2), 2.0);
+    QCOMPARE(source->zAt(2, 3), 23.0);
+}
+
+void TestQCPAxisRect::spectrogramSingleRect()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QFont font = qcp::test::referenceFont();
+    font.setPixelSize(10);
+    plot.setFont(font);
+    for (QCPAxis *axis : plot.axisRect()->axes())
+    {
+        axis->setTickLabelFont(font);
+        axis->setLabelFont(font);
+    }
+    drawSpectrogram(plot);
+    plot.replot();
+    QVERIFY2(waitUntilIdle(plot), "the colour map did not finish its first picture in 10 s");
+    plot.replot();
+    const QImage image
+        = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+
+    QString why;
+    QVERIFY2(qcp::test::matchesReference(image, QStringLiteral("test-qcpaxisrect"),
+                                         QStringLiteral("spectrogram-single-rect.png"), &why),
+             qPrintable(why));
 }

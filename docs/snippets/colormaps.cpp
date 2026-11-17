@@ -103,6 +103,28 @@ DOC_SNIPPET(colormaps_log, 600, 360)
     // [/colormaps_log]
 }
 
+DOC_CODE(colormaps_one_call)
+{
+    // [colormaps_one_call]
+    const std::vector<double> time { 0, 1, 2 };
+    const std::vector<double> frequency { 10, 20, 30, 40 };
+    std::vector<double> power;                              // x-major: power[i * 4 + j]
+    for (double t : time)
+        for (double f : frequency)
+            power.push_back(std::exp(-f / 20) * (1 + t));
+
+    // The whole map: the data in, a viridis gradient, a log z, the rect's colour bar, and a range
+    // fitted on the data because none is given.
+    customPlot->axisRect()->colorMap(time, frequency, power,
+                                     { .gradient = QCPColorGradient::gpViridis,
+                                       .dataScale = QCPScale::log() });
+
+    customPlot->xAxis->setLabel("time [s]");
+    customPlot->yAxis->setLabel("frequency [Hz]");
+    customPlot->rescaleAxes();
+    // [/colormaps_one_call]
+}
+
 DOC_SNIPPET(colormaps_contours, 600, 360)
 {
     // [colormaps_contours]
