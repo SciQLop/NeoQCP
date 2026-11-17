@@ -1,0 +1,28 @@
+#ifndef TEST_AXISRECT_GRID_H
+#define TEST_AXISRECT_GRID_H
+
+#include <QtTest/QtTest>
+
+class QCustomPlot;
+
+class TestAxisRectGrid : public QObject
+{
+    Q_OBJECT
+private slots:
+    void init();
+    void cleanup();
+
+    void aGridKeepsTheFirstRect();
+    void stretchFactorsApply();
+    void aSecondCallGrowsAndShrinks();
+    void columnsAndRowsAlign();
+    void misuseIsRefused();
+
+private:
+    void renderOnce(QSize size);
+    void settle();
+
+    QCustomPlot* mPlot = nullptr;
+};
+
+#endif // TEST_AXISRECT_GRID_H

@@ -30,6 +30,7 @@
 #include "axis/range.h"
 #include "global.h"
 #include "handle-ops.h"
+#include "layoutelements/axisrect-grid.h"
 #include "painting/paintbuffer.h"
 #include "plottables/plottable.h"
 #include "selectionrect.h"
@@ -497,8 +498,15 @@ public:
     Q_INVOKABLE [[nodiscard]] bool moveLayer(QCPLayer* layer, QCPLayer* otherLayer, LayerInsertMode insertMode = limAbove);
 
     // axis rect/layout interface:
+    //! Makes a \a rows by \a columns grid of axis rects in the plot layout, keeping the rects in
+    //! the kept cells and dropping the others with their plottables, items, colour scale and
+    //! insets.
+    void setAxisRectGrid(int rows, int columns, const QCPAxisRectGridOptions& options = { });
     [[nodiscard]] int axisRectCount() const;
     [[nodiscard]] QCPHandle<QCPAxisRect> axisRect(int index = 0) const;
+    //! The rect in \a row and \a column of the grid; a cell holding no rect is misuse and an empty
+    //! handle.
+    [[nodiscard]] QCPHandle<QCPAxisRect> axisRect(int row, int column) const;
     [[nodiscard]] QList<QCPHandle<QCPAxisRect>> axisRects() const;
     //! The areas of the plot, in layout order: axis rects and polar areas alike.
     [[nodiscard]] QList<QCPHandle<QCPArea>> areas() const;
@@ -620,6 +628,7 @@ protected:
     quint64 mFrameEpoch = qcp::nextFrameEpoch(); // bumped when a frame starts painting (frameEpoch)
     double mBufferDevicePixelRatio;
     QPointer<QCPLayoutGrid> mPlotLayout;
+    QCPAxisRectGridState mAxisRectGrid;
     bool mAutoAddPlottableToLegend;
     QList<QCPPlottable*> mPlottables;
     QList<QCPPlottableGroup*> mPlottableGroups;
@@ -808,6 +817,10 @@ protected:
     //! reference to the layer, without deleting it. Called by removeLayer and ~QCPLayer.
     void unlistLayer(QCPLayer* layer);
     void createPlotLayout();
+    //! A full axis rect the way the constructor makes the default one: four axes on the axes layer,
+    //! their grids on the grid layer, the rect on the background layer, themed and with the default
+    //! inset-layout margins. The grid and the constructor both build through here (C9).
+    QCPAxisRect* createAxisRect();
     void deleteLooseElements();
     QCPTheme* ownedTheme();
     void updateLayerIndices() const;

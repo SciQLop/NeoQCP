@@ -73,6 +73,7 @@
 #include "alignment-group.h"
 #include "layout.h"
 #include "layoutelements/area.h"
+#include "layoutelements/axisrect-grid.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "layoutelements/layoutelement-colorscale.h"
 #include "layoutelements/layoutelement-legend.h"

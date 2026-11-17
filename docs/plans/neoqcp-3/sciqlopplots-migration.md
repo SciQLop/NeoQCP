@@ -557,6 +557,17 @@ that no section above lists, and the behaviour changes of 5f.
   off: a label SciQLopPlots builds with a default style is plain from now on, so a label that wants `$...$`
   typeset passes `.mathText = true`.
 
+## From milestone 6e (a grid of axis rects)
+
+- `QCustomPlot::setAxisRectGrid(rows, columns, options)` builds the panel grid in one call, and
+  `axisRect(row, column)` addresses a cell. The hand-built panel layout (`SciQLopPlot.cpp` ~687 adds
+  a colour-scale column, ~717 a title row) becomes the grid plus the rect's own colour scale, which
+  counts in that rect's margin, and the rect's `setTitle()`. A rect already in a kept cell survives
+  a later call with its plottables, items, colour scale and insets; a rect outside the new grid is
+  removed with everything it owns, as `QCPHandle::remove()` would.
+- The grid's alignment groups take the rects' left/right and top/bottom sides from any group they
+  were in, so a `VPlotsAlign` over the same plots no longer aligns those sides.
+
 ## From n11 (range data calls, C++23)
 
 ### Compile breaks

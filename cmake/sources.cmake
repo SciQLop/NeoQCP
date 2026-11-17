@@ -66,6 +66,7 @@ set(NEOQCP_SOURCES
     src/items/item-rspan.cpp
     src/items/item-span.cpp
     src/layoutelements/area.cpp
+    src/layoutelements/axisrect-grid.cpp
     src/layoutelements/layoutelement-axisrect.cpp
     src/layoutelements/layoutelement-colorscale.cpp
     src/layoutelements/layoutelement-legend.cpp
@@ -154,6 +155,7 @@ set(NEOQCP_MOC_HEADERS
     src/layout.h
     src/alignment-group.h
     src/layoutelements/area.h
+    src/layoutelements/axisrect-grid.h
     src/layoutelements/axisrect-shortcuts.h
     src/layoutelements/layoutelement-axisrect.h
     src/layoutelements/layoutelement-colorscale.h

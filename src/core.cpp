@@ -57,6 +57,7 @@
 #include "painting/grid-rhi-layer.h"
 #include "painting/scatter-rhi-layer.h"
 #include <QSet>
+#include <QQueue>
 #include <rhi/qrhi.h>
 #include "embedded_shaders.h"
 #include "painting/rhi-utils.h"
@@ -570,6 +571,29 @@ using qcp::guarded;
   signals.
 */
 
+/*! \internal
+
+  A complete axis rect, built the way the constructor builds the default one: the constructor and
+  setAxisRectGrid both come through here, so a grid's rects differ from the default one only by the
+  legend it adds (C9).
+*/
+QCPAxisRect* QCustomPlot::createAxisRect()
+{
+    auto* rect = new QCPAxisRect(this, true);
+    rect->setLayer(QLatin1String("background"));
+    for (QCPAxis::AxisType type :
+         { QCPAxis::atBottom, QCPAxis::atLeft, QCPAxis::atTop, QCPAxis::atRight })
+    {
+        QCPAxis* axis = rect->axis(type).get();
+        axis->setLayer(QLatin1String("axes"));
+        axis->grid()->setLayer(QLatin1String("grid"));
+        if (mTheme)
+            applyThemeToAxis(axis);
+    }
+    rect->insetLayout()->setMargins(QMargins(12, 12, 12, 12));
+    return rect;
+}
+
 /*!
   Constructs a QCustomPlot and sets reasonable default values.
 */
@@ -640,7 +664,7 @@ QCustomPlot::QCustomPlot(QWidget* parent)
 
     // create initial layout, axis rect and legend:
     createPlotLayout();
-    QCPAxisRect* defaultAxisRect = new QCPAxisRect(this, true);
+    QCPAxisRect* defaultAxisRect = createAxisRect();
     mPlotLayout->addElement(0, 0, defaultAxisRect);
     xAxis = defaultAxisRect->axis(QCPAxis::atBottom);
     yAxis = defaultAxisRect->axis(QCPAxis::atLeft);
@@ -649,17 +673,6 @@ QCustomPlot::QCustomPlot(QWidget* parent)
     legend = new QCPLegend;
     legend->setVisible(false);
     defaultAxisRect->insetLayout()->addElement(legend, Qt::AlignRight | Qt::AlignTop);
-    defaultAxisRect->insetLayout()->setMargins(QMargins(12, 12, 12, 12));
-
-    defaultAxisRect->setLayer(QLatin1String("background"));
-    xAxis->setLayer(QLatin1String("axes"));
-    yAxis->setLayer(QLatin1String("axes"));
-    xAxis2->setLayer(QLatin1String("axes"));
-    yAxis2->setLayer(QLatin1String("axes"));
-    xAxis->grid()->setLayer(QLatin1String("grid"));
-    yAxis->grid()->setLayer(QLatin1String("grid"));
-    xAxis2->grid()->setLayer(QLatin1String("grid"));
-    yAxis2->grid()->setLayer(QLatin1String("grid"));
     legend->setLayer(QLatin1String("legend"));
 
     // create selection rect instance:
@@ -2726,6 +2739,35 @@ bool QCustomPlot::moveLayer(QCPLayer* layer, QCPLayer* otherLayer,
 }
 
 /*!
+  Makes the plot layout a \a rows by \a columns grid of axis rects. \a options sets the shares
+  (stored here, applied with the shared axes) and the stretch factors of the rows and columns.
+
+  The rects already in the grid stay in their cells as long as the cell is inside the new grid: in
+  particular the default rect in cell (0, 0) keeps its plottables, items, colour scale, insets and
+  the legend. A rect outside the new grid is removed with everything it owns - its plottables,
+  items, colour scale and insets (and theirs) - the way QCPHandle::remove() removes a rect. Handles
+  to it become empty and the legend loses the plottables' rows.
+
+  Every column shares a left and a right edge and every row a top and a bottom edge, whether the
+  axes are shared or not, so the data areas line up like matplotlib subplots (P-1). A second call
+  undoes the previous grid's alignment groups and stretch factors before applying the new ones; a
+  row or column whose stretch factor is missing from \a options is reset to 1 (M9).
+
+  Refused with one misuse report and no change: a non-positive row or column count, more stretch
+  factors than rows or columns, and a plot layout holding anything but axis rects in its cells (a
+  title row from insertRow, a legend added to the main layout, a nested layout or a polar area).
+
+  \see axisRect(int, int), axisRects, QCPAxisRectGridOptions
+*/
+void QCustomPlot::setAxisRectGrid(int rows, int columns, const QCPAxisRectGridOptions& options)
+{
+    if (!mPlotLayout || mBeingDestroyed)
+        return;
+    qcp::applyAxisRectGrid(*mPlotLayout, rows, columns, options, mAxisRectGrid,
+                           [this] { return createAxisRect(); });
+}
+
+/*!
   Returns the number of axis rects in the plot.
 
   All axis rects can be accessed via QCustomPlot::axisRect().
@@ -2746,36 +2788,33 @@ int QCustomPlot::axisRectCount() const
   added, all of them may be accessed with this function in a linear fashion (even when they are
   nested in a layout hierarchy or inside other axis rects via QCPAxisRect::insetLayout).
 
-  The order of the axis rects is given by the fill order of the \ref QCPLayout that is holding
-  them. For example, if the axis rects are in the top level grid layout (accessible via \ref
-  QCustomPlot::plotLayout), they are ordered from left to right, top to bottom, if the layout's
-  default \ref QCPLayoutGrid::setFillOrder "setFillOrder" of \ref QCPLayoutGrid::foColumnsFirst
-  "foColumnsFirst" wasn't changed.
+  The rects are listed breadth-first in layout order: the cells of the plot layout first, in its
+  fill order (row after row for a grid built by setAxisRectGrid(), which sets \ref
+  QCPLayoutGrid::foColumnsFirst "foColumnsFirst"), then the rects nested in those cells, their
+  inset layouts included, in the order their layouts list them. So in a grid, index 0 is the cell
+  (0, 0).
 
-  If you want to access axis rects by their row and column index, use the layout interface. For
-  example, use \ref QCPLayoutGrid::element of the top level grid layout, and \c qobject_cast the
-  returned layout element to \ref QCPAxisRect. (See also \ref thelayoutsystem.)
+  To address a cell of the plot layout grid by row and column, use axisRect(int, int).
 
-  \see axisRectCount, axisRects, QCPLayoutGrid::setFillOrder
+  \see axisRectCount, axisRect(int, int), axisRects, QCPLayoutGrid::setFillOrder
 */
 QCPAxisRect* QCustomPlot::firstAxisRect() const
 {
-    // Same depth-first order as axisRects(), stopping at the first rect: allocating the full list
+    // Same breadth-first order as axisRects(), stopping at the first rect: allocating the full list
     // per item dominated the add benchmark.
-    QVarLengthArray<QCPLayoutElement*, 16> stack;
+    QQueue<QCPLayoutElement*> queue;
     if (mPlotLayout)
-        stack.append(mPlotLayout);
-    while (!stack.isEmpty())
+        queue.enqueue(mPlotLayout);
+    while (!queue.isEmpty())
     {
-        QCPLayoutElement* element = stack.back();
-        stack.pop_back();
+        QCPLayoutElement* element = queue.dequeue();
         for (QCPLayoutElement* child : element->elementsRaw(false))
         {
             if (!child)
                 continue;
             if (auto* rect = qobject_cast<QCPAxisRect*>(child))
                 return rect;
-            stack.append(child);
+            queue.enqueue(child);
         }
     }
     return nullptr;
@@ -2804,15 +2843,31 @@ QCPHandle<QCPAxisRect> QCustomPlot::axisRect(int index) const
 }
 
 /*!
-  Returns all axis rects in the plot.
+  Returns the axis rect in \a row and \a column of the plot layout grid, normally built by
+  setAxisRectGrid().
 
-  The order of the axis rects is given by the fill order of the \ref QCPLayout that is holding
-  them. For example, if the axis rects are in the top level grid layout (accessible via \ref
-  QCustomPlot::plotLayout), they are ordered from left to right, top to bottom, if the layout's
-  default \ref QCPLayoutGrid::setFillOrder "setFillOrder" of \ref QCPLayoutGrid::foColumnsFirst
-  "foColumnsFirst" wasn't changed.
+  A cell outside the layout, or a cell that holds another layout element, is misuse (one report) and
+  returns an empty handle.
 
-  \see axisRectCount, axisRect, QCPLayoutGrid::setFillOrder
+  \see setAxisRectGrid, axisRect(int), axisRects
+*/
+QCPHandle<QCPAxisRect> QCustomPlot::axisRect(int row, int column) const
+{
+    QCP_CHECK_OR_RETURN(row >= 0 && column >= 0, "a grid cell needs a non-negative row and column",
+                        { });
+    if (mPlotLayout && mPlotLayout->hasElement(row, column))
+        if (auto* rect = qobject_cast<QCPAxisRect*>(mPlotLayout->element(row, column).get()))
+            return QCPHandle<QCPAxisRect>(rect);
+    QCP_CHECK_OR_RETURN(false, "there is no axis rect in that grid cell", { });
+}
+
+/*!
+  Returns all axis rects in the plot, breadth-first in layout order: the cells of the plot layout
+  first, in its fill order (row after row for a grid built by setAxisRectGrid(), which sets \ref
+  QCPLayoutGrid::foColumnsFirst "foColumnsFirst"), then the rects nested in those cells, their
+  inset layouts included, in the order their layouts list them.
+
+  \see axisRectCount, axisRect, axisRect(int, int), QCPLayoutGrid::setFillOrder
 */
 QList<QCPHandle<QCPAxisRect>> QCustomPlot::axisRects() const
 {
@@ -2854,17 +2909,19 @@ QList<QCPHandle<QCPArea>> QCustomPlot::areas() const
 QList<QCPArea*> QCustomPlot::areasRaw() const
 {
     QList<QCPArea*> result;
-    QStack<QCPLayoutElement*> elementStack;
+    QQueue<QCPLayoutElement*> elementQueue;
     if (mPlotLayout)
-        elementStack.push(mPlotLayout);
+        elementQueue.enqueue(mPlotLayout);
 
-    while (!elementStack.isEmpty())
+    // Breadth-first: the layout's own cells first, in the fill order, then the rects nested in them
+    // (insets, nested layouts), in layout order (M1, P-7).
+    while (!elementQueue.isEmpty())
     {
-        for (QCPLayoutElement* element : elementStack.pop()->elementsRaw(false))
+        for (QCPLayoutElement* element : elementQueue.dequeue()->elementsRaw(false))
         {
             if (element)
             {
-                elementStack.push(element);
+                elementQueue.enqueue(element);
                 if (QCPArea* area = qobject_cast<QCPArea*>(element))
                     result.append(area);
             }
