@@ -497,6 +497,31 @@ private:
     //! The grid raw, null until gridIfExists() would answer one: the range-change mark pass (K8).
     [[nodiscard]] QCPGrid* gridRaw() const { return mGrid.data(); }
 
+    //! The range's ends in the scale's own space, with the range and scale they came from.
+    struct ScaledEnds
+    {
+        QCPRange range;
+        QCPScale scale;
+        double lower = 0.0;
+        double upper = 0.0;
+        bool valid = false;
+    };
+    //! The ends the symlog pixel mapping interpolates between: two logarithms that only move with
+    //! the range or the scale, kept next to the pair they came from.
+    [[nodiscard]] const ScaledEnds& scaledEnds() const
+    {
+        if (!mScaledEnds.valid || !(mScaledEnds.range == mRange) || !(mScaledEnds.scale == mScale))
+        {
+            mScaledEnds.lower = mScale.toScale(mRange.lower);
+            mScaledEnds.upper = mScale.toScale(mRange.upper);
+            mScaledEnds.range = mRange;
+            mScaledEnds.scale = mScale;
+            mScaledEnds.valid = true;
+        }
+        return mScaledEnds;
+    }
+    mutable ScaledEnds mScaledEnds;
+
     friend class QCustomPlot;
     friend class QCPGrid;
     friend class QCPAxisRect;

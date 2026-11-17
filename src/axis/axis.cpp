@@ -1714,8 +1714,8 @@ double QCPAxis::pixelToCoord(double value) const
         }
         else // symlog: the band and both log halves are one straight line in scale space
         {
-            const double lower = mScale.toScale(mRange.lower);
-            const double upper = mScale.toScale(mRange.upper);
+            const double lower = scaledEnds().lower;
+            const double upper = scaledEnds().upper;
             if (!mRangeReversed)
                 return mScale.fromScale(lower + (value - left) / width * (upper - lower));
             else
@@ -1748,8 +1748,8 @@ double QCPAxis::pixelToCoord(double value) const
         }
         else // symlog: the band and both log halves are one straight line in scale space
         {
-            const double lower = mScale.toScale(mRange.lower);
-            const double upper = mScale.toScale(mRange.upper);
+            const double lower = scaledEnds().lower;
+            const double upper = scaledEnds().upper;
             if (!mRangeReversed)
                 return mScale.fromScale(lower + (bottom - value) / height * (upper - lower));
             else
@@ -1803,8 +1803,8 @@ double QCPAxis::coordToPixel(double value) const
         }
         else // symlog: every value has a place, the band included
         {
-            const double lower = mScale.toScale(mRange.lower);
-            const double upper = mScale.toScale(mRange.upper);
+            const double lower = scaledEnds().lower;
+            const double upper = scaledEnds().upper;
             if (!mRangeReversed)
                 return left + (mScale.toScale(value) - lower) / (upper - lower) * width;
             else
@@ -1846,8 +1846,8 @@ double QCPAxis::coordToPixel(double value) const
         }
         else // symlog: every value has a place, the band included
         {
-            const double lower = mScale.toScale(mRange.lower);
-            const double upper = mScale.toScale(mRange.upper);
+            const double lower = scaledEnds().lower;
+            const double upper = scaledEnds().upper;
             if (!mRangeReversed)
                 return bottom - (mScale.toScale(value) - lower) / (upper - lower) * height;
             else

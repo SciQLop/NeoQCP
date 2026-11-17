@@ -119,6 +119,7 @@ private slots:
     void QCPGpu_HistogramPan();
 
     void QCPCoords_CoordToPixel1M();
+    void QCPCoords_SymlogCoordToPixel1M();
     void QCPTransform_Map1M();
     void QCPDrawContext_ReplayData1M();
     void QCPDrawContext_ReplayMarkers100k();
@@ -2395,6 +2396,30 @@ void Benchmark::QCPCoords_CoordToPixel1M()
     std::vector<double> keys, values;
     millionPoints(keys, values);
     mPlot->xAxis->setRange(0, 1000);
+    mPlot->yAxis->setRange(-1, 1);
+    mPlot->replot();
+    std::vector<QPointF> out(keys.size());
+    QBENCHMARK
+    {
+        const QCPAxis* key = mPlot->xAxis;
+        const QCPAxis* value = mPlot->yAxis;
+        for (std::size_t i = 0; i < keys.size(); ++i)
+            out[i] = QPointF(key->coordToPixel(keys[i]), value->coordToPixel(values[i]));
+    }
+    QCOMPARE(int(out.size()), 1000000);
+}
+
+void Benchmark::QCPCoords_SymlogCoordToPixel1M()
+{
+    // The same loop on a scale whose pixel mapping is linear between two logarithms of the range's
+    // ends: what it costs to recompute those two per point is what the ends cache is for.
+    std::vector<double> keys, values;
+    millionPoints(keys, values);
+    for (double& key : keys)
+        key -= 500.0;
+    mPlot->xAxis->setScale(QCPScale::symlog(2));
+    mPlot->yAxis->setScale(QCPScale::symlog(2));
+    mPlot->xAxis->setRange(-500, 500);
     mPlot->yAxis->setRange(-1, 1);
     mPlot->replot();
     std::vector<QPointF> out(keys.size());
