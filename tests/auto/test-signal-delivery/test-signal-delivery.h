@@ -48,6 +48,9 @@ private slots:
     void slotDeletingThePlotDropsTheRestOfTheChain();
     void teardownOpensNoDelivery();
     void aDestroyedPlotDeliversNothing();
+    void plottableDestroyedSlotDeletingThePlotIsSafe();
+    void itemDestroyedSlotDeletingThePlotIsSafe();
+    void clearItemsWithDestroyedSlotDeletingThePlotIsSafe();
     void oneArgumentRangeSlotConnects();
     void slotReenteringAScopedSetterLeavesTheLastSignalCurrent();
     void linkedAxisLastRangeSignalIsItsRange();

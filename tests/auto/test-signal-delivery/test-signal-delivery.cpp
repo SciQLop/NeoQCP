@@ -533,6 +533,47 @@ void TestSignalDelivery::nestedEventKeepsOuterEntriesQueued()
     QVERIFY(ranA);
 }
 
+void TestSignalDelivery::plottableDestroyedSlotDeletingThePlotIsSafe()
+{
+    auto* plot = new QCustomPlot;
+    QCPGraph* graph = plot->addGraph().get();
+    graph->setData(QVector<double>{ 0, 1 }, QVector<double>{ 0, 1 });
+    const QPointer<QCustomPlot> alive(plot);
+    // ~QObject sends destroyed() while the plottable is still a child of the plot: the plot's own
+    // deletion then reaches it again unless deletePlottable un-parents it first.
+    connect(graph, &QObject::destroyed, plot, [plot] { delete plot; });
+
+    static_cast<void>(plot->removePlottable(graph));
+
+    QVERIFY(!alive);
+}
+
+void TestSignalDelivery::itemDestroyedSlotDeletingThePlotIsSafe()
+{
+    auto* plot = new QCustomPlot;
+    auto* item = plot->add<QCPItemText>().get();
+    const QPointer<QCustomPlot> alive(plot);
+    connect(item, &QObject::destroyed, plot, [plot] { delete plot; });
+
+    static_cast<void>(plot->removeItem(item));
+
+    QVERIFY(!alive);
+}
+
+void TestSignalDelivery::clearItemsWithDestroyedSlotDeletingThePlotIsSafe()
+{
+    auto* plot = new QCustomPlot;
+    auto* first = plot->add<QCPItemText>().get();
+    static_cast<void>(plot->add<QCPItemText>());
+    const QPointer<QCustomPlot> alive(plot);
+    connect(first, &QObject::destroyed, plot, [plot] { delete plot; });
+
+    const int removed = plot->clearItems();
+
+    QCOMPARE(removed, 2);
+    QVERIFY(!alive);
+}
+
 void TestSignalDelivery::deleteLaterAndDeleteDeliverNoTeardownSignals()
 {
     const auto teardownOf = [](bool later)

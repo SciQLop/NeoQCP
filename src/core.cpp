@@ -1991,8 +1991,12 @@ void QCustomPlot::deletePlottable(QCPPlottable* plottable)
     // Unlisted while still whole, so a subclass's own legend row goes too; the destructor skips it.
     QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
     plottable->mRegisteredPlot = nullptr;
+    // Un-parented first: ~QObject sends destroyed() before it unregisters from its parent, so a
+    // slot that deletes the plot would reach this plottable again and free it twice.
+    plottable->setParent(nullptr);
     delete plottable;
-    // Only now: a slot may call removePlottable again, and must find this one gone.
+    // Only now: a slot may call removePlottable again, and must find this one gone. The group is one
+    // of the plot's children too: a slot that deleted the plot left a null QPointer here.
     if (group)
         group->memberLeft();
 }
@@ -2373,8 +2377,11 @@ bool QCustomPlot::removeItem(QCPItem* item)
         // Unlisted first: a slot on destroyed() that calls removeItem or clearItems must find it gone.
         mItems.removeAt(index);
         item->mRegisteredPlot = nullptr;
-        delete item;
+        // Un-parented and counted before the delete: destroyed() runs while the item is still one of
+        // the plot's children, and a slot that deletes the plot must not free it twice.
+        item->setParent(nullptr);
         ++mItemsEpoch;
+        delete item;
         return true;
     }
     else
@@ -2419,12 +2426,17 @@ int QCustomPlot::deleteAllItems()
     // them. The guarded snapshot skips any that such a slot deletes itself.
     const auto items = guarded(mItems);
     for (QCPItem* item : std::as_const(mItems))
+    {
         item->mRegisteredPlot = nullptr;
+        item->setParent(nullptr); // as in removeItem: a destroyed() slot must not free it twice
+    }
     QSet<QCPLayerable*> dying;
     for (const auto& item : items)
         if (item)
             dying.insert(item.data());
     mItems.clear();
+    if (!items.isEmpty())
+        ++mItemsEpoch;
     // One pass per layer instead of one removeChild() per item, and mLayer is cleared so the
     // destructors do not search the layer again.
     for (QCPLayer* layer : std::as_const(mLayers))
@@ -2432,8 +2444,6 @@ int QCustomPlot::deleteAllItems()
     // Oldest first: Qt's children indexOf finds each at the front, where erase is a pointer bump.
     for (const auto& item : items)
         delete item.data();
-    if (!items.isEmpty())
-        ++mItemsEpoch;
     return items.size();
 }
 
