@@ -158,6 +158,7 @@ An inset is a second axis rect drawn inside a first one, as matplotlib's `inset_
 The rect passed to `addInset` is a fraction of the parent's data rect, (0, 0) top left.
 The inset's own data rect lands there; its tick labels fall outside it, inside the parent.
 It has its own four axes and an opaque background in the plot's background colour.
+Its grid is painted with it, on its own background layer, not by the plot's GPU grid layer: that one draws a rect's grid far below the inset.
 It draws above everything of the parent, plottables added to the parent later included: it has its own layers above the plot's "axes" layer.
 A drag or a wheel zoom inside it moves the inset, not the parent.
 It follows the parent when the plot resizes and is deleted with it.

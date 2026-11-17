@@ -428,6 +428,46 @@ QString describe(const QRect& r)
 {
     return QStringLiteral("%1,%2 %3x%4").arg(r.x()).arg(r.y()).arg(r.width()).arg(r.height());
 }
+
+// A shown plot whose frames go through QRhi, or false: a GPU pixel test needs the real backend.
+bool showOnTheGpu(QCustomPlot& plot)
+{
+    plot.show();
+    if (!QTest::qWaitForWindowExposed(&plot))
+        return false;
+    QCoreApplication::processEvents();
+    return plot.rhi() != nullptr;
+}
+
+// The pixels of \a rect of \a image that \a match accepts.
+template <typename Match>
+int countColour(const QImage& image, const QRect& rect, Match match)
+{
+    int count = 0;
+    for (int y = rect.top(); y <= rect.bottom(); ++y)
+        for (int x = rect.left(); x <= rect.right(); ++x)
+            if (match(image.pixelColor(x, y)))
+                ++count;
+    return count;
+}
+
+// \a rect in plot pixels, in the pixels of a frame drawn at \a scale.
+QRect scaledRect(const QRect& rect, double scale)
+{
+    return QRect(qRound(rect.left() * scale), qRound(rect.top() * scale),
+                 qRound(rect.width() * scale), qRound(rect.height() * scale));
+}
+
+bool isRed(const QColor& c)
+{
+    return c.red() > 170 && c.green() < 90 && c.blue() < 90;
+}
+
+bool isBlue(const QColor& c)
+{
+    return c.blue() > 150 && c.red() < 120 && c.green() < 120;
+}
+
 } // namespace
 
 void TestQCPAxisRect::anInsetSitsInTheParentsAxisRatio()
@@ -545,6 +585,117 @@ void TestQCPAxisRect::anInsetExportsLikeTheScreen()
     hiddenPlot.toPixmap(400, 300);
     QCOMPARE(hiddenInset->rect(), shownInset->rect());
     QCOMPARE(hiddenPlot.axisRect(1, 0)->rect(), shownPlot.axisRect(1, 0)->rect());
+}
+
+void TestQCPAxisRect::anInsetGridShowsOnTheGpu()
+{
+    // An inset's grid is painted on its own background layer: the plot's GPU grid layer draws a
+    // rect's grid at the "grid" layer, far under the inset's opaque background, where it never shows.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    if (!showOnTheGpu(plot))
+        QSKIP("no QRhi available in this environment");
+    QCPAxisRect* parent = plot.axisRect().get();
+    parent->xAxis()->setRange(0, 3);
+    parent->yAxis()->setRange(0, 3);
+    auto inset = parent->addInset(QRectF(0.3, 0.15, 0.6, 0.6));
+    inset->xAxis()->setRange(0, 3);
+    inset->yAxis()->setRange(0, 3);
+    inset->xAxis()->grid()->setPen(QPen(Qt::blue));
+    inset->yAxis()->grid()->setPen(QPen(Qt::blue));
+    plot.replot(QCustomPlot::rpImmediateRefresh);
+
+    const QImage frame = plot.grabFramebuffer();
+    const double scale = frame.width() / double(plot.width());
+    const QRect data = inset->rect();
+    const int row = qRound((data.top() + data.height() * 0.3) * scale);
+    int drawn = 0;
+    for (int x = qRound((data.left() + 2) * scale); x < qRound((data.right() - 1) * scale); ++x)
+    {
+        if (!isBlue(frame.pixelColor(x, row)))
+            continue;
+        ++drawn;
+        double nearest = 1e9;
+        for (double tick : inset->xAxis()->tickVector())
+            nearest = std::min(nearest, std::abs(x - inset->xAxis()->coordToPixel(tick) * scale));
+        QVERIFY2(nearest <= 2.5,
+                 qPrintable(QStringLiteral("a grid pixel at %1 is not at a tick (%2)")
+                                .arg(x)
+                                .arg(nearest)));
+    }
+    QVERIFY2(drawn > 0, "the inset's grid must show on the GPU frame");
+}
+
+void TestQCPAxisRect::aLegendKeepsItsPixelsOverAnInset()
+{
+    // The legend draws above an inset's data, GPU lines included: an inset placed over it keeps
+    // the legend's pixels.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    if (!showOnTheGpu(plot))
+        QSKIP("no QRhi available in this environment");
+    QCPAxisRect* parent = plot.axisRect().get();
+    parent->xAxis()->setRange(0, 1);
+    parent->yAxis()->setRange(0, 1);
+    plot.legend->setVisible(true);
+    plot.legend->setBrush(QBrush(Qt::yellow));
+    parent->line(std::vector<double> { 0, 1 }, std::vector<double> { 0.5, 0.5 },
+                 { .pen = QPen(Qt::green, 3), .name = QStringLiteral("signal") });
+    // The inset's own line must not add a row: its red legend icon would count as red pixels.
+    plot.setAutoAddPlottableToLegend(false);
+
+    auto inset = parent->addInset(QRectF(0.5, 0.03, 0.47, 0.5));
+    inset->xAxis()->setRange(0, 1);
+    inset->yAxis()->setRange(0, 1);
+    QCPColorGradient redGradient;
+    redGradient.setColorStopAt(0.0, QColor(Qt::red));
+    redGradient.setColorStopAt(1.0, QColor(Qt::red));
+    auto map = inset->colorMap(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 },
+                               std::vector<double> { 0.5, 0.5, 0.5, 0.5 },
+                               { .gradient = redGradient, .colorBar = false });
+    QVERIFY(map);
+    plot.replot();
+    QTRY_VERIFY_WITH_TIMEOUT(!map->pipeline().isBusy(), 2000);
+    plot.replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+    (void)plot.grabFramebuffer(); // the frame the map's image lands in is the next one
+    plot.replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+
+    const QImage frame = plot.grabFramebuffer();
+    const double scale = frame.width() / double(plot.width());
+    const QRect legendBox = scaledRect(plot.legend->rect().adjusted(1, 1, -1, -1), scale);
+    const int yellow = countColour(frame, legendBox,
+                                   [](const QColor& c)
+                                   { return c.red() > 170 && c.green() > 170 && c.blue() < 120; });
+    const int red = countColour(frame, legendBox, isRed);
+    QVERIFY2(yellow > 20, "the legend's background must still be there");
+    QVERIFY2(red == 0, qPrintable(QStringLiteral("the inset's GPU image covers the legend: %1 red pixels").arg(red)));
+}
+
+void TestQCPAxisRect::anInsetDrawsAboveItsParentOnTheGpu()
+{
+    // The export path's anInsetDrawsAboveItsParent, on the screen frame: the inset's own layers
+    // compose after the parent's GPU line.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    if (!showOnTheGpu(plot))
+        QSKIP("no QRhi available in this environment");
+    QCPAxisRect* parent = plot.axisRect().get();
+    parent->xAxis()->setRange(0, 1);
+    parent->yAxis()->setRange(0, 1);
+    auto inset = parent->addInset(QRectF(0.25, 0.25, 0.5, 0.5));
+    parent->line(std::vector<double> { 0, 1 }, std::vector<double> { 0.5, 0.5 },
+                 { .pen = QPen(Qt::red, 9) });
+    plot.replot(QCustomPlot::rpImmediateRefresh);
+
+    const QImage frame = plot.grabFramebuffer();
+    const double scale = frame.width() / double(plot.width());
+    const QRect inside = inset->rect().adjusted(3, 3, -3, -3);
+    QCOMPARE(countColour(frame, scaledRect(inside, scale), isRed), 0);
+    const QPoint outside(parent->rect().left() + 5, parent->rect().center().y());
+    QVERIFY2(isRed(frame.pixelColor(qRound(outside.x() * scale), qRound(outside.y() * scale))),
+             "the parent's line is drawn outside the inset");
 }
 
 void TestQCPAxisRect::lineTakesDataAndOptions()

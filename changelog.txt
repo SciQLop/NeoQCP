@@ -627,9 +627,12 @@ Milestone 6e (multi-panel plots). Step 1 of the panel design.
         data rect sits at axisRatio of the parent's data rect ((0, 0) top left; the new
         QCPLayoutInset::ipInnerRect placement measures it in the area's rect, not in the inset
         layout's margin-reduced one); its tick labels fall outside. It has four axes, the theme, an
-        opaque background in the plot's background colour, and its own three layers right above the
-        plot's "axes" layer, where its plottables and items go: it draws above everything of its
-        parent. It follows the parent and goes with it; axisRects() lists it after the cells.
+        opaque background in the plot's background colour, and its own three layers (background and
+        grid, data, axes) right above the plot's "axes" layer, where its plottables and items go:
+        it draws above everything of its parent. Its background and data layers are buffered, so
+        its GPU lines stay above its background, and its grid is painted on its background layer
+        instead of being taken by the plot's GPU grid layer, which draws every rect's grid far
+        below it. It follows the parent and goes with it; axisRects() lists it after the cells.
   - Rescale fits the union of a link (decision 13): QCPAxisBase::rescale() on an axis linked with no
         functions, or on its source, fits the data of the source and of every such follower, and
         sets the range once on the source; QCustomPlot::rescaleAxes() rescales each link once.

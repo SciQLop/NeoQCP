@@ -1002,7 +1002,12 @@ bool QCustomPlot::gridLayerDraws(const QCPAxis* axis)
     // Every replot and layer replot starts a frame epoch, so the list follows the layout tree.
     if (mGridLayerRectsEpoch != mFrameEpoch)
     {
-        mGridLayerRects = axisRectsRaw();
+        // A rect with its own layers (an inset) paints its grid itself, on its background layer:
+        // the grid layer draws far below the inset's opaque background, where the grid never shows.
+        mGridLayerRects.clear();
+        for (QCPAxisRect* rect : axisRectsRaw())
+            if (!rect->ownDataLayer())
+                mGridLayerRects.append(rect);
         mGridLayerRectsEpoch = mFrameEpoch;
     }
     return mGridLayerRects.contains(axis->axisRectRaw());
@@ -4013,6 +4018,8 @@ void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QS
         {
             for (auto* ar : axisRectsRaw())
             {
+                if (ar->ownDataLayer())
+                    continue; // an inset paints its grid itself, on its background layer
                 for (auto* axis : ar->axesRaw())
                     grl->registerAxis(axis);
             }

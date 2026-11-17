@@ -35,6 +35,9 @@ private slots:
   void anInsetTakesTheMouseFirst();
   void anInsetDrawsAboveItsParent();
   void anInsetExportsLikeTheScreen();
+  void anInsetGridShowsOnTheGpu();
+  void aLegendKeepsItsPixelsOverAnInset();
+  void anInsetDrawsAboveItsParentOnTheGpu();
   void textTakesAPositionAndAStyle();
   void textAppliesEveryStyleField();
   void textItemMathTextIsOnByDefault();

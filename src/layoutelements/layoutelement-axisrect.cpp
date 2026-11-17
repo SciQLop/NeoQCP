@@ -1087,8 +1087,10 @@ QCPHandle<QCPAxisRect> QCPAxisRect::addInset(const QRectF& axisRatio)
 /*! \internal
 
   Gives an inset three layers right above the plot's "axes" layer (or on top when there is none):
-  its background and grids, its plottables and items, its axes. The rect, its grids and its axes
-  move there now; what is added to it later goes to the middle one.
+  its background and grids, its plottables and items, its axes. The background and data layers are
+  buffered, so the render loop composites each one where it lands: the inset's GPU lines stay above
+  its background and are not drawn over the legend's pixels. The rect, its grids and its axes move
+  there now; what is added to it later goes to the middle one.
 */
 void QCPAxisRect::makeOwnLayers()
 {
@@ -1101,6 +1103,8 @@ void QCPAxisRect::makeOwnLayers()
         if (!mParentPlot->addLayer(base + QLatin1String(names[i]), below, QCustomPlot::limAbove))
             return;
         made[i] = mParentPlot->layer(base + QLatin1String(names[i])).get();
+        if (i < 2)
+            made[i]->setMode(QCPLayer::lmBuffered);
         below = made[i];
     }
     mOwnLayers = { made[0], made[1], made[2] };
