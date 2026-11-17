@@ -105,6 +105,11 @@ that value.
 `QCPAxisTickerSymlog` for a symlog one. A scale equal to the current one gets that ticker
 again but emits no `scaleChanged`. Call `setTicker()` after `setScale()` to choose your own.
 
+A scale the axis refuses changes nothing, ticker included: the polar angular axis only takes the
+linear scale, so asking it for a log one leaves its 30° ticker and its range alone. A subclass
+whose geometry only knows one scale overrides `defaultTicker()` to say which ticker its scale
+brings (the polar angular axis returns its fixed 30° one).
+
 `scaleChanged` reports the new scale.
 
 ## Tickers
@@ -126,7 +131,7 @@ Tickers are shared pointers: several axes can share one, and changing it changes
 - <a href="api/classQCPAxisTickerDateTime.html">QCPAxisTickerDateTime</a> reads coordinates as seconds since 1970-01-01 UTC. Its ticks fall on round dates and times. `setDateTimeFormat()` takes a `QDateTime::toString()` format. Labels use local time unless you call `setTimeZone()`. `dateTimeToKey()` and `keyToDateTime()` convert between coordinates and `QDateTime`.
 - <a href="api/classQCPAxisTickerTime.html">QCPAxisTickerTime</a> shows durations, in seconds. The format uses `%d`, `%h`, `%m`, `%s` and `%z` for days, hours, minutes, seconds and milliseconds. `setFieldWidth()` sets the zero padding of each.
 - <a href="api/classQCPAxisTickerLog.html">QCPAxisTickerLog</a> is for logarithmic axes, see above. `setSubTickCount()` sets the sub ticks per decade.
-- <a href="api/classQCPAxisTickerSymlog.html">QCPAxisTickerSymlog</a> is the symlog axis' own ticker: decades outward from the linear band plus zero, thinned by the tick count, with the sub ticks on the mantissas outside the band and on a linear grid inside it. Decade labels are abbreviated as on a log axis. `scale()` returns the scale it draws.
+- <a href="api/classQCPAxisTickerSymlog.html">QCPAxisTickerSymlog</a> is the symlog axis' own ticker: decades outward from the linear band plus zero, thinned by the tick count, with the sub ticks on the mantissas outside the band and on a linear grid inside it. Decade labels are abbreviated as on a log axis. `scale()` returns the scale it draws. It follows matplotlib's `SymmetricalLogLocator`, with one caveat: the thinning step comes from the axis' `setTickCount()`, so a range of many decades thins where matplotlib, whose locator has a fixed budget of 15 ticks, keeps every decade. A decade the thinning skips keeps a sub tick, and both ends of the band get one. A base with no integer mantissas (a base barely above one) subdivides each gap linearly instead, as a thinned log axis does: a legal scale, however extreme, costs a bounded number of ticks.
 - <a href="api/classQCPAxisTickerText.html">QCPAxisTickerText</a> puts your own labels at your own positions, and nothing else. `addTick(position, label)` adds one; `setTicks()` replaces them all.
 - <a href="api/classQCPAxisTickerFixed.html">QCPAxisTickerFixed</a> uses the step you give with `setTickStep()`. With `setScaleStrategy(QCPAxisTickerFixed::ssMultiples)` it may use multiples of it when zoomed out, instead of crowding the axis.
 - <a href="api/classQCPAxisTickerPi.html">QCPAxisTickerPi</a> labels multiples of π as fractions. `setPiValue(180)` makes it work on degrees. `setPiSymbol()` and `setFractionStyle()` change the look.

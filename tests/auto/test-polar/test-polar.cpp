@@ -1340,6 +1340,19 @@ void TestPolar::theAngularAxisRefusesALogScale()
     QCOMPARE(angular->scale(), QCPScale::linear());
     QCOMPARE(int(test_misuse::calls.size()), 1);
     test_misuse::calls.clear();
+
+    // A refused scale must leave the ring's 30° ticker alone, and so must a scale equal to the
+    // current one: the scale's own default ticker is a plain linear one, which would put the ring
+    // back on auto ticks.
+    for (const QCPScale& scale : { QCPScale::log(), QCPScale::linear() })
+    {
+        angular->setScale(scale);
+        auto* ticker = dynamic_cast<QCPAxisTickerFixed*>(angular->ticker().data());
+        QVERIFY(ticker != nullptr);
+        QCOMPARE(ticker->tickStep(), 30.0);
+    }
+    QCOMPARE(int(test_misuse::calls.size()), 1);
+    test_misuse::calls.clear();
 }
 
 void TestPolar::angularWheelZoomRequeuesTheRepaint()

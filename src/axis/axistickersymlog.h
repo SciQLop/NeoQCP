@@ -4,6 +4,8 @@
 #include "axisticker.h"
 #include "scale.h"
 
+#include <vector>
+
 class QCP_LIB_DECL QCPAxisTickerSymlog : public QCPAxisTicker
 {
 public:
@@ -22,9 +24,11 @@ protected:
 
     [[nodiscard]] double decadeStep() const;
     [[nodiscard]] QVector<double> symlogDecades(const QCPRange& range) const;
+    void addBandSubTicks(QVector<double>& candidates, int subTickCount) const;
+    void addOutsideSubTicks(std::vector<double>& candidates, int subTickCount,
+                            const QVector<double>& ticks) const;
 
     // reimplemented virtual methods:
-    virtual int getSubTickCount(double tickStep) override;
     virtual QVector<double> createTickVector(double tickStep, const QCPRange& range) override;
     virtual QVector<double> createSubTickVector(int subTickCount,
                                                 const QVector<double>& ticks) override;

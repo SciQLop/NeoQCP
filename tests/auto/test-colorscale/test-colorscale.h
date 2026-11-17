@@ -35,6 +35,8 @@ private slots:
     void aSecondMapTakesTheRectsGradient();
     // The bar's axis takes the data scale, so its pixel for z = 1 is the lookup of z = 1.
     void theColourBarFollowsTheDataScale();
+    // A scale change on the bar installs its ticker once: the colour scale's follow-up adds none.
+    void aBarScaleChangeInstallsItsTickerOnce();
     // A constant map on a symlog data scale keeps its width in the scale's own space.
     void aConstantMapRescalesInScaleSpace();
 

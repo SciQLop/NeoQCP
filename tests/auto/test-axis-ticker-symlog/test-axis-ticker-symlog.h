@@ -12,4 +12,9 @@ private slots:
     void subTicksOutsideTheBandKeepTheMantissas();
     void aRangeInsideTheBandTakesItsEnds();
     void noDecadeInRangeFallsBackToEvenSteps();
+    void aBaseOtherThanTenKeepsItsMantissas();
+    void thinnedDecadesBecomeSubTicks();
+    void subTicksInTheFallback();
+    void extremeScalesStayBounded_data();
+    void extremeScalesStayBounded();
 };

@@ -16,23 +16,6 @@
 #include <cmath>
 #include <utility>
 
-namespace
-{
-//! The ticker a scale brings: the linear one, the log one with the scale's base, the symlog one.
-QSharedPointer<QCPAxisTicker> tickerFor(const QCPScale& scale)
-{
-    if (scale.isSymlog())
-        return QSharedPointer<QCPAxisTickerSymlog>::create(scale);
-    if (scale.isLog())
-    {
-        const auto ticker = QSharedPointer<QCPAxisTickerLog>::create();
-        ticker->setLogBase(scale.base());
-        return ticker;
-    }
-    return QSharedPointer<QCPAxisTicker>::create();
-}
-} // namespace
-
 /*! \fn void QCPAxisBase::rangeReversedChanged(bool rangeReversed)
 
   This signal is emitted when \ref rangeReversed changes, by \ref setRangeReversed or by the
@@ -114,7 +97,8 @@ void QCPAxisBase::detachLinks()
   The scale also installs the ticker that suits it (\ref QCPAxisTicker, QCPAxisTickerLog,
   QCPAxisTickerSymlog), on every call, so a ticker set before the scale is replaced. A ticker set
   after it stays. A scale equal to the current one leaves the range alone and emits no
-  \ref scaleChanged, but still installs its ticker.
+  \ref scaleChanged, but still installs its ticker. A scale the axis refuses changes nothing, its
+  ticker included: see \ref scaleWillChange.
 
   A linked axis takes its range from its source: a scale change only picks its ticks, it never
   writes a sanitized range back into the source.
@@ -126,10 +110,11 @@ void QCPAxisBase::setScale(const QCPScale& scale)
     std::optional<QCPEmissionScope> scope;
     if (defersEmissions())
         scope.emplace(mParentPlot);
-    setTicker(tickerFor(scale));
-    if (mScale == scale)
+    const bool changes = mScale != scale;
+    if (changes && !scaleWillChange(scale))
         return;
-    if (!scaleWillChange(scale))
+    setTicker(defaultTicker(scale));
+    if (!changes)
         return;
     mScale = scale;
     mScaleKind = scale.kind();
@@ -142,6 +127,25 @@ void QCPAxisBase::setScale(const QCPScale& scale)
     }
     scaleDidChange();
     qcpEmitCurrent(this, mParentPlot, &QCPAxisBase::scaleChanged, [this] { return mScale; });
+}
+
+/*! \internal
+
+  Returns the ticker \a scale brings: the plain one for a linear scale, QCPAxisTickerLog with the
+  scale's base, QCPAxisTickerSymlog for a symlog scale. A subclass whose geometry only knows one
+  scale overrides it, so that setScale never puts a ticker the geometry cannot show.
+*/
+QSharedPointer<QCPAxisTicker> QCPAxisBase::defaultTicker(const QCPScale& scale)
+{
+    if (scale.isSymlog())
+        return QSharedPointer<QCPAxisTickerSymlog>::create(scale);
+    if (scale.isLog())
+    {
+        const auto ticker = QSharedPointer<QCPAxisTickerLog>::create();
+        ticker->setLogBase(scale.base());
+        return ticker;
+    }
+    return QSharedPointer<QCPAxisTicker>::create();
 }
 
 /*! \internal

@@ -184,6 +184,7 @@ So attach the scale first, then set the gradient and the range. Or set them on t
 
 - `setLabel()` names the colour bar.
 - `axis()` is a normal <a href="api/classQCPAxis.html">QCPAxis</a>: change its ticker, number format and fonts as on any axis.
+- `setDataScale()` on the scale also gives that scale to the bar's axis, so the bar's ticks come from the matching ticker: a log data scale brings a `QCPAxisTickerLog`. Changing the data scale therefore resets the bar's ticker; set a custom one after it.
 - `setType()` places the bar: `QCPAxis::atRight` (the default), `atLeft`, `atTop` or `atBottom`.
 - `setBarWidth()` sets its thickness in pixels.
 - `setRangeDrag()` and `setRangeZoom()` let the user drag and zoom the data range with the mouse.

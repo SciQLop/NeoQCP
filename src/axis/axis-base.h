@@ -243,6 +243,10 @@ protected:
     //! one scale.
     virtual bool scaleWillChange([[maybe_unused]] const QCPScale& scale) { return true; }
 
+    // The ticker a scale brings: \ref setScale installs it on every call. A subclass whose geometry
+    // only knows one scale (the polar angular axis) returns its own ticker for it.
+    virtual QSharedPointer<QCPAxisTicker> defaultTicker(const QCPScale& scale);
+
     virtual void scaleDidChange();
     // Dirties what a look change moves. The default dirties the axis alone; a cartesian axis also
     // dirties the rect's layers.

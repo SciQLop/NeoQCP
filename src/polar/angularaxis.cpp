@@ -275,11 +275,7 @@ QCPPolarAxisAngular::QCPPolarAxisAngular(QCPPolarArea* area)
     mRange = QCPRange(0, 360);
     mRangeDraggable = false;
     mRangeZoomable = false;
-    mTicker = QSharedPointer<QCPAxisTickerFixed>::create();
-    if (QCPAxisTickerFixed* fixedTicker = mTicker.dynamicCast<QCPAxisTickerFixed>().data())
-    {
-        fixedTicker->setTickStep(30);
-    }
+    mTicker = defaultTicker(QCPScale::linear());
     setAntialiased(true);
 
 
@@ -1146,6 +1142,19 @@ bool QCPPolarAxisAngular::scaleWillChange(const QCPScale& scale)
 {
     QCP_CHECK_OR_RETURN(scale.isLinear(), "a polar angular axis has no non-linear scale", false);
     return true;
+}
+
+/*! \internal
+
+  The ring takes a 30 degree ticker whatever the (always linear) scale brings: the automatic ticks
+  of a plain linear ticker would spread a handful of degrees over the circle instead.
+*/
+QSharedPointer<QCPAxisTicker> QCPPolarAxisAngular::defaultTicker(
+    [[maybe_unused]] const QCPScale& scale)
+{
+    const auto ticker = QSharedPointer<QCPAxisTickerFixed>::create();
+    ticker->setTickStep(30);
+    return ticker;
 }
 
 /*! \internal

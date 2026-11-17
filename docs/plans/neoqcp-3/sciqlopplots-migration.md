@@ -32,7 +32,9 @@ line numbers will drift).
 - Each scale brings its ticker (6f): `setScale()` installs a linear, log or symlog ticker, so a
   `setTicker()` made before it is replaced. SciQLopPlots sets its own ticker right after
   `setScaleType()` / `setDataScaleType()` (`src/SciQLopPlotAxis.cpp` ~138, ~737), so it still
-  wins; nothing to change, but do not reorder those two calls.
+  wins; nothing to change, but do not reorder those two calls. The same holds for a colour scale:
+  `QCPColorScale::setDataScale()` gives the bar's axis its scale (and so its ticker), so a custom
+  bar ticker goes after it, and setting the same data scale again now leaves the ticker alone.
 - The data pipeline follows the scale (6f): thinning, L2 bins, the line-cache window, colour-map
   rows, histogram bins and automatic contour levels are equal spans of scale space. Nothing to
   change in SciQLopPlots, which reads the results; only code that calls the `qcp::algo` helpers

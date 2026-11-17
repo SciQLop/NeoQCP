@@ -211,6 +211,24 @@ bool sameColour(const QColor& a, const QColor& b, int tolerance)
 // A colour bar's axis takes the data scale, so the bar's pixel for z = 1 is the entry the lookup
 // gives z = 1, the scale-space fraction 0.60870 rather than the linear 0.50005. A map drawn through
 // the same scale gives a diverging gradient's mirror colours for z and -z and the middle at zero.
+void TestColorScale::aBarScaleChangeInstallsItsTickerOnce()
+{
+    const auto scale = mPlot->add<QCPColorScale>(0, 1);
+    QVERIFY(scale);
+    QCPAxis* bar = scale->axis();
+    QSignalSpy installs(bar, &QCPAxis::tickerChanged);
+
+    // The bar takes a scale of its own and the colour scale follows it: two paths to one setScale,
+    // which must install the scale's ticker once, not twice.
+    bar->setScale(QCPScale::log());
+    QVERIFY2(scale->dataScale().isLog(), "the colour scale did not follow the bar's scale");
+    QVERIFY(dynamic_cast<QCPAxisTickerLog*>(bar->ticker().data()) != nullptr);
+    // Two installs: the axis' own setScale, and the rect's opposite axis, which follows through
+    // signal synchronization. The colour scale's follow-up adds none; without that guard it would
+    // install a third, equal ticker.
+    QCOMPARE(installs.count(), 2);
+}
+
 void TestColorScale::theColourBarFollowsTheDataScale()
 {
     std::vector<double> keys;

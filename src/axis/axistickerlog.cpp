@@ -175,8 +175,12 @@ QVector<double> QCPAxisTickerLog::createTickVector(double tickStep, const QCPRan
         return {};
     }
 
-    const double ratio = positive ? range.upper / range.lower : range.lower / range.upper;
-    const double baseTickCount = qLn(ratio) * mLogBaseLnInv;
+    // The decade count of the range, from the difference of the two logs: the ratio of the ends
+    // overflows to infinity for a range wider than about 1e308, and the tick count would be
+    // garbage.
+    const double lowerMagnitude = qLn(positive ? range.lower : -range.upper);
+    const double upperMagnitude = qLn(positive ? range.upper : -range.lower);
+    const double baseTickCount = (upperMagnitude - lowerMagnitude) * mLogBaseLnInv;
     mMantissaTicks = false;
     if (baseTickCount < 1.6)
     {
@@ -189,19 +193,32 @@ QVector<double> QCPAxisTickerLog::createTickVector(double tickStep, const QCPRan
     }
 
     const double exactPowerStep = baseTickCount / double(mTickCount + qcp::kTickCountEpsilon);
-    const double newLogBase = qPow(mLogBase, qMax(int(cleanMantissa(exactPowerStep)), 1));
+    // A base barely above one makes the step far past what an int holds, so it stays a double: the
+    // walk below is bounded by the range it crosses, not by the step.
+    const double powerStep
+        = qMax(1.0, std::floor(qMin(cleanMantissa(exactPowerStep), 1e15)));
+    const double newLogBase = qPow(mLogBase, powerStep);
     const double lnNewLogBase = qLn(newLogBase);
 
-    double currentTick = positive
-        ? qPow(newLogBase, qFloor(qLn(range.lower) / lnNewLogBase))
-        : -qPow(newLogBase, qCeil(qLn(-range.lower) / lnNewLogBase));
+    const double sign = positive ? 1.0 : -1.0;
+    const double firstExponent = positive ? std::floor(qLn(range.lower) / lnNewLogBase)
+                                          : std::ceil(qLn(-range.lower) / lnNewLogBase);
+    double currentTick = sign * qPow(newLogBase, firstExponent);
+    // The power below the range can be too small for a double: it underflows to zero, which has no
+    // place on a log axis. Start at the first power a double holds instead.
+    for (int skipped = 0; currentTick == 0.0 && skipped < 64; ++skipped)
+        currentTick = sign * qPow(newLogBase, firstExponent + double(skipped + 1));
 
     QVector<double> result;
+    if (currentTick == 0.0 || !std::isfinite(currentTick))
+        return result;
     result.append(currentTick);
     // currentTick might reach zero for ranges ~1e-300, guard against infinite loop
     while (currentTick < range.upper && (positive ? currentTick > 0 : currentTick < 0))
     {
         currentTick = positive ? currentTick * newLogBase : currentTick / newLogBase;
+        if (!std::isfinite(currentTick))
+            break;
         result.append(currentTick);
     }
     return result;

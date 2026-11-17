@@ -285,6 +285,7 @@ protected:
     virtual void draw(QCPPainter* painter) override;
     void markAppearanceDirty() override;
     bool scaleWillChange(const QCPScale& scale) override;
+    QSharedPointer<QCPAxisTicker> defaultTicker(const QCPScale& scale) override;
     void rangeDidChange(const QCPRange& oldRange) override;
     bool checkLinkSource(const QCPAxisBase* source) const override;
 

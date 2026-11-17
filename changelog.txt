@@ -597,12 +597,16 @@ colour-mapped plottable shows its data with is a value, not an enum.
         (log) or the new QCPAxisTickerSymlog (symlog) every time it is called, an equal scale
         included (which still emits no scaleChanged), and a setTicker after it wins. A colour
         scale's axis gets the same through setDataScale. Behaviour change: a ticker set before
-        setScale is replaced.
+        setScale is replaced. A scale the axis refuses installs nothing, and the new virtual
+        QCPAxisBase::defaultTicker() lets a subclass say which ticker its scale brings: the polar
+        angular axis returns its fixed 30 degree one.
   - QCPAxisTickerSymlog (axis/axistickersymlog.h) follows matplotlib's SymmetricalLogLocator:
         decades outward from the threshold on both sides plus 0, thinned to the tick count, the
         mantissas 2 to 9 x base^k outside the linear band, a linear sub grid at base^floor(
-        log_base(threshold)) / (subTickCount + 1) inside it, and a fallback to even steps when no
-        decade falls in the range. Symlog decade labels are abbreviated like log ones.
+        log_base(threshold)) / (subTickCount + 1) inside it, a sub tick on a decade the thinning
+        skipped and on both ends of the band, and a fallback to even steps when fewer than two
+        decades fall in the range. Symlog decade labels are abbreviated like log ones. Both
+        tickers stay bounded for any legal base (1.0001, 1e6, 2^40) and any double range.
   - QCPColorScale, QCPColorMapped and the plottables that carry a data scale: setDataScale(),
         dataScale(), dataScaleChanged() and the `dataScale` property replace the *DataScaleType
         names. A data scale set before the plottable is added to a rect now wins over the rect

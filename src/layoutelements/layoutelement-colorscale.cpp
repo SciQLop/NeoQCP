@@ -386,7 +386,8 @@ void QCPColorScale::setDataScale(const QCPScale& scale)
         const QCPEmissionScope scope(mParentPlot);
         update();
         mDataScale = scale;
-        if (mColorAxis)
+        // An axis already on this scale keeps its ticker: setScale would install a fresh default one.
+        if (mColorAxis && mColorAxis.data()->scale() != mDataScale)
             mColorAxis.data()->setScale(mDataScale);
         if (mDataScale.isLog())
             setDataRange(mDataRange.sanitizedForLogScale());
