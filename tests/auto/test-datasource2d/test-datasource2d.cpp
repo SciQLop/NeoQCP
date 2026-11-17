@@ -1219,9 +1219,12 @@ void TestDataSource2D::colorMapRowsOnASymlogAxis()
     mPlot->yAxis->setScale(symlog);
     mPlot->yAxis->setRange(-1000, 1000);
 
-    auto* r = cm->pipeline().result();
-    QTRY_VERIFY_WITH_TIMEOUT((r = cm->pipeline().result()) != nullptr, 3000);
-    QVERIFY(r->valueSize() > 8);
+    // The first result races the plot's layout: on macOS the pipeline had run before the axisRect
+    // settled and the grid was a few rows tall. Lay out with the axes in place, then wait for the
+    // settled grid.
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QCPColorMapData* r = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT((r = cm->pipeline().result()) && r->valueSize() > 8, 3000);
 
     const QCPRange axisRange = mPlot->yAxis->range();
     const double axisSpan = symlog.toScale(axisRange.upper) - symlog.toScale(axisRange.lower);
@@ -1290,9 +1293,10 @@ void TestDataSource2D::colormap2KeyAxisFollowsTheScale()
         plot.xAxis->setScale(scale);
         plot.xAxis->setRange(x.front(), x.back());
 
+        // Same race as colorMapRowsOnASymlogAxis: the first result may predate the layout.
+        plot.replot(QCustomPlot::rpImmediateRefresh);
         const QCPColorMapData* r = nullptr;
-        QTRY_VERIFY_WITH_TIMEOUT((r = cm->pipeline().result()) != nullptr, 3000);
-        QVERIFY(r->keySize() > 8);
+        QTRY_VERIFY_WITH_TIMEOUT((r = cm->pipeline().result()) && r->keySize() > 8, 3000);
         const QCPRange axisRange = plot.xAxis->range();
         const double axisSpan = scale.toScale(axisRange.upper) - scale.toScale(axisRange.lower);
         for (int boundary = 0; boundary + 1 < int(x.size()); ++boundary)

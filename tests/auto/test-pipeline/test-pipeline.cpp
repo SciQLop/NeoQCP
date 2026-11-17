@@ -3929,9 +3929,21 @@ void TestPipeline::symlogThinningIsEvenInScaleSpace()
     const auto logPoints = qcp::algo::linesInData(logKeys, logValues, 0, kPoints, 1000.0 / 3.0,
                                                   nullptr, qcp::algo::kDefaultGapThreshold,
                                                   nullptr, QCPScale::log());
-    QCOMPARE(logPoints.size(), std::size_t(2037));
+    // The pins in the log case are glibc's: the keys are pow(10, 3i/(n-1)) and the buckets are
+    // log10, so MSVC's and Apple's libm differ in the last ulp and a key sitting on a bucket edge
+    // changes bucket (2037 buckets here, 2026 there). Linux runs the bit-identical pins as the
+    // regression guard; the other platforms assert what the test is about - the log case thins to
+    // one bucket per pixel - with room for an edge key changing bucket.
     QVERIFY(std::abs(logPoints.front().x() - 1.001732917212951)
             <= 1e-9 * 1.001732917212951);
+#if defined(__GLIBC__)
+    QCOMPARE(logPoints.size(), std::size_t(2037));
+#else
+    QVERIFY2(logPoints.size() >= std::size_t(2037) * 99 / 100
+                 && logPoints.size() <= std::size_t(2037) * 101 / 100,
+             qPrintable(QString("the log case thins to %1 buckets, not ~2037")
+                            .arg(logPoints.size())));
+#endif
     int logColumns[3] = { 0, 0, 0 };
     const int windows[3][2] = { { 0, 100 }, { 450, 550 }, { 900, 1000 } };
     std::set<long long> seen[3];
@@ -3944,9 +3956,18 @@ void TestPipeline::symlogThinningIsEvenInScaleSpace()
                 seen[w].insert(static_cast<long long>(std::floor(px)));
     }
     for (int w = 0; w < 3; ++w) logColumns[w] = static_cast<int>(seen[w].size());
+#if defined(__GLIBC__)
     QCOMPARE(logColumns[0], 100);
     QCOMPARE(logColumns[1], 100);
     QCOMPARE(logColumns[2], 100);
+#else
+    // Off glibc an edge key can change bucket, which can leave the window's border pixel empty.
+    for (int w = 0; w < 3; ++w)
+        QVERIFY2(logColumns[w] >= 98 && logColumns[w] <= 100,
+                 qPrintable(QString("window %1 holds %2 of 100 pixel columns")
+                                .arg(w)
+                                .arg(logColumns[w])));
+#endif
 }
 
 // An L2 level on a symlog key axis bins the data in scale space, one bin per L2 unit of scale.
