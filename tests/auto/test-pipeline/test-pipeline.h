@@ -226,6 +226,7 @@ private slots:
     void aGraphRebinsWhenTheKeyScaleChanges();
     void aGraphFollowsANewKeyAxisScale();
     void aGraphRejectsAnOldScaleBinLandingLate();
+    void aGraphRestartsAnL1BuildWhenItsAxisMoves();
     void graphThinningFollowsTheScaleWindow();
     void stepCentreOnASymlogAxis();
     void fillThinningOnSymlog();

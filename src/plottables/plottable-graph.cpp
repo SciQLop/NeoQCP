@@ -130,9 +130,10 @@ void QCPGraph::followAxes()
     linesChanged(); // pixels computed for the old axes mean nothing on the new ones
     mL2Dirty = mL1Cache != nullptr; // nor do the bins resampled for the old key range
     // An axis change inside the cartesian branch keeps the L1 only while the key space is the same
-    // one: a new axis on another scale needs its bins built there.
+    // one: a new axis on another scale needs its bins built there. A job already in flight matters
+    // as much as a cache -- it was made from a closure baked in the old space.
     const QCPScale keyScale = keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
-    if (mL1Cache && !(keyScale == mL1Scale))
+    if ((mL1Cache || mPipeline.hasTransform()) && !(keyScale == mL1Scale))
         restartL1Cache();
 }
 

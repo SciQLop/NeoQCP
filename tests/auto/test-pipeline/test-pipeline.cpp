@@ -4385,3 +4385,27 @@ void TestPipeline::aGraphRejectsAnOldScaleBinLandingLate()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QTRY_VERIFY_WITH_TIMEOUT(g->mL1Cache && g->mL1Cache->keyScale.isSymlog(), 60000);
 }
+
+void TestPipeline::aGraphRestartsAnL1BuildWhenItsAxisMoves()
+{
+    // The first L1 job is still in flight when the graph moves to an axis of another scale: there is
+    // no cache yet, but the closure that job was made from bins in the old space.
+    auto* g = mPlot->add<QCPGraph>().get();
+    auto source = std::make_shared<SymmetricLargeMultiSource>(2'000'000, 1e6);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    mPlot->xAxis->setRange(-1e6, 1e6);
+    mPlot->yAxis->setRange(-1e6, 1e6);
+
+    const QCPScale symlog = QCPScale::symlog(2);
+    mPlot->xAxis2->setScale(symlog);
+    mPlot->xAxis2->setRange(-1e6, 1e6);
+    g->setDataSource(source); // the L1 build starts here, in the linear space
+    QVERIFY(!g->mL1Cache);
+    g->setKeyAxis(mPlot->xAxis2); // and moves before it lands
+
+    QTRY_VERIFY_WITH_TIMEOUT(g->mL1Cache != nullptr, 60000);
+    QVERIFY2(g->mL1Cache->keyScale == symlog,
+             "the bins of the job started on the old axis were installed");
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mL2Result);
+}

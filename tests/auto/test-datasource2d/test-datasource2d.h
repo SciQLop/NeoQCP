@@ -66,6 +66,7 @@ private slots:
     void colorMapRowsOnASymlogAxis();
     void colormap2KeyAxisFollowsTheScale();
     void resampleLogAxisEndsAreFullWidth();
+    void resampleSymlogColumnBesideZeroIsFullWidth();
 
 private:
     QCustomPlot* mPlot = nullptr;

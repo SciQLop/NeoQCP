@@ -365,21 +365,23 @@ void resampleRange(
             double fillLo, fillHi;
             if (xLog || xSymlog)
             {
-                const double previous = (ci > 0 && !gapLeft) ? acc.xAt(ctxBegin + ci - 1) : 0.0;
-                const double next = (ci < ctxCount - 1 && !gapRight) ? acc.xAt(ctxBegin + ci + 1)
-                                                                     : 0.0;
+                // Whether a neighbour exists is decided by the index and the gaps, never by its
+                // value: a symlog axis routinely has a sample at 0, and 0 is not "missing".
+                const bool hasPrevious = ci > 0 && !gapLeft;
+                const bool hasNext = ci < ctxCount - 1 && !gapRight;
+                const double previous = hasPrevious ? acc.xAt(ctxBegin + ci - 1) : 0.0;
+                const double next = hasNext ? acc.xAt(ctxBegin + ci + 1) : 0.0;
                 if (xSymlog)
                 {
                     // Scale-space midpoints, a missing end mirrored in the same space.
                     const double pos = xScale.toScale(xVal);
-                    const double lo = std::isfinite(previous) && previous != 0.0
+                    const double lo = hasPrevious && std::isfinite(previous)
                         ? xScale.toScale(previous) : pos;
-                    const double hi = std::isfinite(next) && next != 0.0 ? xScale.toScale(next)
-                                                                        : pos;
+                    const double hi = hasNext && std::isfinite(next) ? xScale.toScale(next) : pos;
                     double below = (pos + lo) * 0.5;
                     double above = (pos + hi) * 0.5;
-                    if (ci <= 0 || gapLeft) below = 2.0 * pos - above;
-                    if (ci >= ctxCount - 1 || gapRight) above = 2.0 * pos - below;
+                    if (!hasPrevious || !std::isfinite(previous)) below = 2.0 * pos - above;
+                    if (!hasNext || !std::isfinite(next)) above = 2.0 * pos - below;
                     fillLo = xScale.fromScale(std::min(below, above));
                     fillHi = xScale.fromScale(std::max(below, above));
                 }

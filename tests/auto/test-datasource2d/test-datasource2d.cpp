@@ -1388,4 +1388,89 @@ void TestDataSource2D::resampleLogAxisEndsAreFullWidth()
     QVERIFY2(keyAtColumnEdge(lastColumn + 0.5) > 200.0,
              qPrintable(QString("the last column ends at %1, not ~316")
                             .arg(keyAtColumnEdge(lastColumn + 0.5))));
+
+    // The column before a gap mirrors the known half too: keys {1, 10, 1000} with the default gap
+    // threshold flag the 10 -> 1000 step, so 10's span runs to 10*sqrt(10) = 31.6, not to 10.
+    std::vector<double> gx { 1.0, 10.0, 1000.0 };
+    std::vector<double> gz; // value = key
+    for (double xi : gx)
+        for (int j = 0; j < 2; ++j)
+            gz.push_back(xi);
+    QCPSoADataSource2D gapSrc(gx, y2, gz);
+    std::unique_ptr<QCPColorMapData> gapGrid(qcp::algo2d::resample(
+        gapSrc, 0, 3, QCPRange(1, 1000), QCPRange(0, 1), 200, 2, QCPScale(), QCPScale(), 1.5,
+        nullptr, /*forceSerial=*/true, logScale));
+    QVERIFY(gapGrid);
+    const double gapSpan = std::log10(1000.0) - std::log10(1.0);
+    const auto keyAtGapColumn = [&](double column)
+    { return std::pow(10.0, std::log10(1.0) + (column + 0.5) * gapSpan / gapGrid->keySize()); };
+    int lastBeforeGap = -1;
+    for (int col = 0; col < gapGrid->keySize(); ++col)
+        if (!std::isnan(gapGrid->cell(col, 0)) && keyAtGapColumn(col) < 500.0)
+            lastBeforeGap = col;
+    QVERIFY(lastBeforeGap >= 0);
+    QVERIFY2(keyAtGapColumn(lastBeforeGap) > 15.0,
+             qPrintable(QString("the column before the gap stops at %1, not past 15")
+                            .arg(keyAtGapColumn(lastBeforeGap))));
+
+    // A descending log axis (a spectrogram stored top band first) mirrors the same way, and the
+    // rows keep their order rather than inverting.
+    std::vector<double> dy { 100.0, 10.0 };
+    std::vector<double> dz; // value = row key
+    for (int i = 0; i < 2; ++i)
+        for (int j = 0; j < 2; ++j)
+            dz.push_back(dy[j]);
+    QCPSoADataSource2D descSrc(x, dy, dz);
+    std::unique_ptr<QCPColorMapData> descGrid(qcp::algo2d::resample(
+        descSrc, 0, 2, QCPRange(0, 1), QCPRange(1, 1000), 2, 200, logScale, QCPScale(), 0.0,
+        nullptr, /*forceSerial=*/true));
+    QVERIFY(descGrid);
+    int firstData = -1, lastData = -1;
+    for (int row = 0; row < descGrid->valueSize(); ++row)
+        if (!std::isnan(descGrid->cell(0, row)))
+        {
+            if (firstData < 0)
+                firstData = row;
+            lastData = row;
+        }
+    QVERIFY(firstData > 0 && lastData > firstData);
+    const double descSpan = std::log10(1000.0) - std::log10(1.0);
+    const auto keyAtDescRow = [&](double row)
+    { return std::pow(10.0, std::log10(1.0) + (row + 0.5) * descSpan / descGrid->valueSize()); };
+    // The grid is always ascending in value: the descending rows' mirrored ends put 10's span at
+    // 3.16 and 100's at 316, so the data covers both, in that order.
+    QVERIFY2(keyAtDescRow(firstData) < 5.0,
+             qPrintable(QString("the lowest descending row is at %1, not ~3.2")
+                            .arg(keyAtDescRow(firstData))));
+    QVERIFY2(keyAtDescRow(lastData) > 200.0,
+             qPrintable(QString("the highest descending row is at %1, not ~316")
+                            .arg(keyAtDescRow(lastData))));
+}
+
+// A symlog key axis routinely has a sample at 0. The column beside it must span to the midpoint in
+// scale space like any other, not collapse to half a column because 0 doubles as the "no neighbour"
+// sentinel.
+void TestDataSource2D::resampleSymlogColumnBesideZeroIsFullWidth()
+{
+    const QCPScale symlog = QCPScale::symlog(2);
+    const std::vector<double> x { -2.0, -1.0, 0.0, 1.0, 2.0 };
+    const std::vector<double> y { 0.0, 1.0 };
+    std::vector<double> z; // row-major: z[i * 2 + j], every column's value = its key
+    for (double xi : x)
+        for (int j = 0; j < 2; ++j)
+            z.push_back(xi);
+    QCPSoADataSource2D src(x, y, z);
+
+    std::unique_ptr<QCPColorMapData> grid(qcp::algo2d::resample(
+        src, 0, 5, QCPRange(-2, 2), QCPRange(0, 1), 200, 2, QCPScale(), QCPScale(), 0.0, nullptr,
+        /*forceSerial=*/true, symlog));
+    QVERIFY(grid);
+    // The five spans tile [-2, 2] in scale space, so every cell has a value: a half-width column
+    // leaves a ring of empty cells beside the zero key.
+    int empty = 0;
+    for (int col = 0; col < grid->keySize(); ++col)
+        if (std::isnan(grid->cell(col, 0)))
+            ++empty;
+    QVERIFY2(empty == 0, qPrintable(QString("%1 of %2 columns hold nothing").arg(empty)
+                                        .arg(grid->keySize())));
 }
