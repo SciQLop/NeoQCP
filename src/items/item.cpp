@@ -454,7 +454,10 @@ void QCPItemPosition::setArea(QCPArea* area)
     mArea = area;
     mAxisRect = qobject_cast<QCPAxisRect*>(area);
     if (mParentItem)
+    {
         mParentItem->noteFramesChanged();
+        mParentItem->followPositionsLayer();
+    }
 }
 
 /*!
@@ -1011,7 +1014,10 @@ void QCPItemPosition::setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
         mAxisRect = qobject_cast<QCPAxisRect*>(mArea.data());
     }
     if (mParentItem)
+    {
         mParentItem->noteFramesChanged();
+        mParentItem->followPositionsLayer();
+    }
 }
 
 /*!
@@ -1570,6 +1576,24 @@ void QCPItem::noteFramesChanged()
 {
     if (QCPLayer* itemLayer = layer())
         itemLayer->invalidateItemFrames();
+}
+
+/*! \internal
+
+  The item draws on the data layer of the inset its first position that names an area measures in,
+  above the inset's opaque background, and on the plot's default layers when it leaves one.
+*/
+void QCPItem::followPositionsLayer()
+{
+    if (!mParentPlot)
+        return;
+    for (QCPItemPosition* position : mPositions)
+        if (QCPArea* area = position->areaRaw())
+        {
+            mParentPlot->followAreaLayer(this, area);
+            return;
+        }
+    mParentPlot->followAreaLayer(this, nullptr);
 }
 
 QCPHandle<QCPAxisRect> QCPItem::clipAxisRect() const

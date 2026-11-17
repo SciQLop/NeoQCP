@@ -160,6 +160,8 @@ The inset's own data rect lands there; its tick labels fall outside it, inside t
 It has its own four axes and an opaque background in the plot's background colour.
 Its grid is painted with it, on its own background layer, not by the plot's GPU grid layer: that one draws a rect's grid far below the inset.
 It draws above everything of the parent, plottables added to the parent later included: it has its own layers above the plot's "axes" layer.
+A newer inset draws above the older ones, and an inset of an inset stays inside its parent's stack.
+A plottable or an item moved onto an inset's axes (its `setAxisRect`, an item position's `setAxisRect`) joins the inset's own data layer, so it is drawn in the inset; moved back off, it returns to the plot's `"main"` or `"annotations"` layer and goes under the inset's background.
 A drag or a wheel zoom inside it moves the inset, not the parent.
 It follows the parent when the plot resizes and is deleted with it.
 `axisRects()` lists it after the grid's cells; it is not a cell.

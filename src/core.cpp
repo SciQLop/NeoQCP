@@ -1890,6 +1890,44 @@ bool QCustomPlot::adoptPlottable(QCPPlottable* plottable, QCPCoordinateSystem* s
 
 /*! \internal
 
+  A plottable or an item whose area changed joins the data layer of the inset it now hangs on, and
+  goes back to the layer it would have had outside one ("main" for a plottable, "annotations" for an
+  item) when it leaves: an inset's opaque background covers everything under its own layers, so the
+  plot's default layers would hide it.
+*/
+void QCustomPlot::followAreaLayer(QCPLayerable* object, const QCPArea* area)
+{
+    if (!object || mBeingDestroyed || !object->layer())
+        return;
+    QCPLayer* own = nullptr;
+    if (const auto* rect = qobject_cast<const QCPAxisRect*>(area))
+        own = rect->ownDataLayer();
+    QCPLayer* target = own;
+    if (!target)
+    {
+        if (!isInsetDataLayer(object->layer()))
+            return;
+        target = qobject_cast<QCPItem*>(object) ? layer(QLatin1String("annotations")).get()
+                                                : layer(QLatin1String("main")).get();
+    }
+    if (target && target != object->layer())
+        object->setLayer(target);
+}
+
+//! \internal
+
+bool QCustomPlot::isInsetDataLayer(const QCPLayer* layer) const
+{
+    if (!layer)
+        return false;
+    for (const QCPAxisRect* rect : axisRectsRaw())
+        if (rect->ownDataLayer() == layer)
+            return true;
+    return false;
+}
+
+/*! \internal
+
   Unlinks every parent anchor between \a item and the rest of the plot, both directions, keeping the
   pixel positions (the plot is still there to compute them).
 */

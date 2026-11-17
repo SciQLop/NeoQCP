@@ -1076,7 +1076,7 @@ QCPHandle<QCPAxisRect> QCPAxisRect::addInset(const QRectF& axisRatio)
                         QCPHandle<QCPAxisRect> { });
     const QCPEmissionScope scope(mParentPlot);
     QCPAxisRect* inset = mParentPlot->createAxisRect();
-    inset->makeOwnLayers();
+    inset->makeOwnLayers(this);
     inset->setBackground(mParentPlot->backgroundBrush());
     QCPLayoutInset* layout = mInsetLayout;
     layout->addElement(inset, axisRatio);
@@ -1086,16 +1086,26 @@ QCPHandle<QCPAxisRect> QCPAxisRect::addInset(const QRectF& axisRatio)
 
 /*! \internal
 
-  Gives an inset three layers right above the plot's "axes" layer (or on top when there is none):
-  its background and grids, its plottables and items, its axes. The background and data layers are
-  buffered, so the render loop composites each one where it lands: the inset's GPU lines stay above
-  its background and are not drawn over the legend's pixels. The rect, its grids and its axes move
-  there now; what is added to it later goes to the middle one.
+  Gives an inset three layers: its background and grids, its plottables and items, its axes. They
+  sit above every inset's layers, so a newer inset draws on top of the older ones; an inset of an
+  inset takes its layers above its parent's only, so it stays inside the parent's stack instead of
+  jumping over the insets made after that parent. The background and data layers are buffered, so
+  the render loop composites each one where it lands: the inset's GPU lines stay above its
+  background. The rect, its grids and its axes move there now; what is added to it later goes to
+  the middle one.
 */
-void QCPAxisRect::makeOwnLayers()
+void QCPAxisRect::makeOwnLayers(const QCPAxisRect* container)
 {
+    QCPLayer* below = container ? container->ownTopLayer() : nullptr;
+    if (!below)
+        for (QCPAxisRect* rect : mParentPlot->axisRectsRaw())
+            if (QCPLayer* top = rect->ownTopLayer(); top && (!below || top->index() > below->index()))
+                below = top;
+    if (!below)
+        below = mParentPlot->layer(QLatin1String("axes")).get();
+    if (!below && !mParentPlot->mLayers.isEmpty())
+        below = mParentPlot->mLayers.last();
     const QString base = QStringLiteral("inset %1 ").arg(quintptr(this), 0, 16);
-    QCPLayer* below = mParentPlot->layer(QLatin1String("axes")).get();
     QCPLayer* made[3] = { };
     const char* names[3] = { "back", "data", "axes" };
     for (int i = 0; i < 3; ++i)

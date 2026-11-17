@@ -340,6 +340,9 @@ public:
     //! Tells the layer the frames its positions follow changed (a position was rebound): the
     //! layer's frame lists are rebuilt before the next repaint or hit test.
     void noteFramesChanged();
+    //! Moves the item onto the data layer of the inset its positions measure in, and back when they
+    //! leave one.
+    void followPositionsLayer();
 
     //! The first position, without copying the list: the view asks it for its axes every frame.
     [[nodiscard]] const QCPItemPosition* firstPosition() const { return mPositions.value(0); }

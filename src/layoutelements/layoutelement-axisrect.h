@@ -341,8 +341,11 @@ private:
     int titleExtent() const;
     void styleTitle();
     void placeTitle();
-    // Gives an inset its own layers above the plot's and moves its rect, grids and axes there.
-    void makeOwnLayers();
+    // Gives an inset its own layers above \a container's own (an inset of an inset) or above every
+    // inset's, and moves its rect, grids and axes there.
+    void makeOwnLayers(const QCPAxisRect* container);
+    // The topmost of an inset's own layers.
+    QCPLayer* ownTopLayer() const { return mOwnLayers.axes.data(); }
     void removeOwnLayers();
     // Where a plottable or an item added to this rect goes: its own data layer, if it has one.
     QCPLayer* ownDataLayer() const { return mOwnLayers.data.data(); }

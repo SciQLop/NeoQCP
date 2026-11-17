@@ -38,6 +38,9 @@ private slots:
   void anInsetGridShowsOnTheGpu();
   void aLegendKeepsItsPixelsOverAnInset();
   void anInsetDrawsAboveItsParentOnTheGpu();
+  void theNewestInsetIsOnTop();
+  void aPlottableMovedOntoAnInsetIsDrawn();
+  void anItemFollowsTheAreaItIsIn();
   void textTakesAPositionAndAStyle();
   void textAppliesEveryStyleField();
   void textItemMathTextIsOnByDefault();

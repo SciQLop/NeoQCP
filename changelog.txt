@@ -632,7 +632,12 @@ Milestone 6e (multi-panel plots). Step 1 of the panel design.
         it draws above everything of its parent. Its background and data layers are buffered, so
         its GPU lines stay above its background, and its grid is painted on its background layer
         instead of being taken by the plot's GPU grid layer, which draws every rect's grid far
-        below it. It follows the parent and goes with it; axisRects() lists it after the cells.
+        below it. A newer inset's layers go above the older insets', so the newest inset draws on
+        top; an inset of an inset puts its layers above its parent's only, inside the parent's
+        stack. A plottable or an item moved onto an inset's axes joins the inset's data layer, and
+        goes back to "main" / "annotations" when it leaves the inset: it is drawn in the inset, and
+        under the inset's opaque background again once it is back on the parent. It follows the
+        parent and goes with it; axisRects() lists it after the cells.
   - Rescale fits the union of a link (decision 13): QCPAxisBase::rescale() on an axis linked with no
         functions, or on its source, fits the data of the source and of every such follower, and
         sets the range once on the source; QCustomPlot::rescaleAxes() rescales each link once.

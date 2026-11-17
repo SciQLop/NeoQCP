@@ -608,6 +608,11 @@ private:
     // The part of adopt() after the default axes are known: a plottable joins this plot in the given
     // system, owned by the given area. What an area uses to readd an object of its own kind.
     bool adoptPlottable(QCPPlottable* plottable, QCPCoordinateSystem* system, QCPArea* area);
+    // The one place a plottable or an item re-picks its layer when the area it hangs on changes:
+    // onto an inset's data layer, or back to the layer it would have outside one.
+    void followAreaLayer(QCPLayerable* object, const QCPArea* area);
+    //! Whether \a layer is the data layer of one of this plot's insets.
+    [[nodiscard]] bool isInsetDataLayer(const QCPLayer* layer) const;
     void cutAnchorLinks(QCPItem* item);
     // Also themes a rect's own colour scale, which QCPAxisRect makes after the theme was set.
     void applyThemeToAxis(QCPAxis* axis);

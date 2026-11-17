@@ -900,6 +900,10 @@ void QCPPlottable::setSystem(QCPCoordinateSystem* system)
     // The area it draws in is the one it hangs on: hiding the area it left must not hide it, and
     // an onlyVisible rescale of the new area must find it.
     setParentLayerable(system ? system->area() : nullptr);
+    // The area it hangs on decides its layer too: an inset's data layer, above the inset's opaque
+    // background, and the plot's "main" again when it leaves one.
+    if (mParentPlot)
+        mParentPlot->followAreaLayer(this, system ? system->area() : nullptr);
     mKeyAxis = system && projectsOntoAxes(system) ? qobject_cast<QCPAxis*>(system->keyAxis())
                                                   : nullptr;
     mValueAxis = system && projectsOntoAxes(system) ? qobject_cast<QCPAxis*>(system->valueAxis())

@@ -698,6 +698,98 @@ void TestQCPAxisRect::anInsetDrawsAboveItsParentOnTheGpu()
              "the parent's line is drawn outside the inset");
 }
 
+void TestQCPAxisRect::theNewestInsetIsOnTop()
+{
+    // Each inset inserts its layers above the older insets', so the one added last draws on top; an
+    // inset of an inset stays inside its parent's stack.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* parent = plot.axisRect().get();
+    auto older = parent->addInset(QRectF(0.1, 0.1, 0.6, 0.6));
+    auto newer = parent->addInset(QRectF(0.3, 0.3, 0.6, 0.6));
+    auto nested = older->addInset(QRectF(0.05, 0.05, 0.3, 0.3));
+    older->setBackground(QBrush(Qt::red));
+    newer->setBackground(QBrush(Qt::green));
+    nested->setBackground(QBrush(Qt::blue));
+    const QImage image
+        = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+
+    const QRect overlap = older->rect().intersected(newer->rect());
+    QVERIFY2(!overlap.isEmpty(), "the two insets overlap");
+    const QColor second = image.pixelColor(overlap.center());
+    QVERIFY2(second.green() > 150 && second.red() < 100,
+             qPrintable(QStringLiteral("the newest inset must be on top, found %1,%2,%3")
+                            .arg(second.red())
+                            .arg(second.green())
+                            .arg(second.blue())));
+    const QColor insideNested = image.pixelColor(nested->rect().center());
+    QVERIFY2(insideNested.blue() > 150 && insideNested.red() < 100,
+             "an inset of an inset draws above its parent inset");
+}
+
+
+void TestQCPAxisRect::aPlottableMovedOntoAnInsetIsDrawn()
+{
+    // A plottable moved onto an inset's axes joins the inset's layer, so its opaque background does
+    // not hide it; moved off, it goes back to the plot's data layer.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* parent = plot.axisRect().get();
+    parent->xAxis()->setRange(0, 1);
+    parent->yAxis()->setRange(0, 1);
+    auto inset = parent->addInset(QRectF(0.25, 0.25, 0.5, 0.5));
+    inset->xAxis()->setRange(0, 1);
+    inset->yAxis()->setRange(0, 1);
+    auto graph = parent->line(std::vector<double> { 0, 1 }, std::vector<double> { 0.5, 0.5 },
+                              { .pen = QPen(Qt::red, 9) });
+
+    qcp::ops::setAxisRect(*graph, inset.get());
+    plot.replot();
+    QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(countColour(image, inset->rect().adjusted(3, 3, -3, -3), isRed) > 0,
+             "a plottable moved onto an inset is drawn in it");
+
+    qcp::ops::setAxisRect(*graph, parent);
+    plot.replot();
+    image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QCOMPARE(countColour(image, inset->rect().adjusted(3, 3, -3, -3), isRed), 0);
+    QCOMPARE(graph->layer(), plot.layer(QStringLiteral("main")).get());
+}
+
+
+void TestQCPAxisRect::anItemFollowsTheAreaItIsIn()
+{
+    // An item whose positions name an inset measures there and draws there; moved back to the
+    // parent rect, it goes under the inset's opaque background again.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* parent = plot.axisRect().get();
+    auto inset = parent->addInset(QRectF(0.25, 0.25, 0.5, 0.5));
+    auto item = plot.add<QCPItemRect>();
+    for (QCPItemPosition* position : { item->topLeft, item->bottomRight })
+    {
+        position->setType(QCPItemPosition::ptAxisRectRatio);
+        position->setAxisRect(inset.get());
+    }
+    item->topLeft->setCoords(0.2, 0.2);
+    item->bottomRight->setCoords(0.8, 0.8);
+    item->setBrush(QBrush(Qt::red));
+    item->setPen(QPen(Qt::NoPen));
+
+    plot.replot();
+    QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(countColour(image, inset->rect().adjusted(4, 4, -4, -4), isRed) > 100,
+             "an item placed on an inset is drawn in it");
+
+    for (QCPItemPosition* position : { item->topLeft, item->bottomRight })
+        position->setAxisRect(parent);
+    plot.replot();
+    image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QCOMPARE(countColour(image, inset->rect().adjusted(4, 4, -4, -4), isRed), 0);
+    QCOMPARE(item->layer(), plot.layer(QStringLiteral("annotations")).get());
+}
+
+
 void TestQCPAxisRect::lineTakesDataAndOptions()
 {
   QCPAxisRect *ar = mPlot->axisRect();
