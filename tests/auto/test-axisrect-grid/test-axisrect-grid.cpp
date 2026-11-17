@@ -441,3 +441,123 @@ void TestAxisRectGrid::misuseIsRefused()
     QCOMPARE(gMisuses, reported + 2);
     QCOMPARE(mPlot->axisRectCount(), 2);
 }
+
+void TestAxisRectGrid::shareXLinksEachColumn()
+{
+    // P-2: each column's bottom axes follow the bottom rect's, which keeps the column's labels.
+    mPlot->setAxisRectGrid(2, 2, { .shareX = true });
+    for (int column = 0; column < 2; ++column)
+    {
+        QCPAxis* source = mPlot->axisRect(1, column)->xAxis().get();
+        QCPAxis* follower = mPlot->axisRect(0, column)->xAxis().get();
+        QCOMPARE(follower->linkSource(), source);
+        QVERIFY(follower->isIdentityFollower());
+        QVERIFY(!follower->tickLabels());
+        QVERIFY(source->tickLabels());
+    }
+    mPlot->axisRect(0, 0)->xAxis()->setRange(3, 7);
+    QCOMPARE(mPlot->axisRect(1, 0)->xAxis()->range(), QCPRange(3, 7));
+    QVERIFY(mPlot->axisRect(1, 1)->xAxis()->range() != QCPRange(3, 7)); // columns are independent
+    QVERIFY(mPlot->axisRect(0, 0)->yAxis()->linkSource() == nullptr);   // y is not shared
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestAxisRectGrid::shareYLinksEachRow()
+{
+    mPlot->setAxisRectGrid(2, 2, { .shareY = true });
+    for (int row = 0; row < 2; ++row)
+    {
+        QCPAxis* source = mPlot->axisRect(row, 0)->yAxis().get();
+        QCPAxis* follower = mPlot->axisRect(row, 1)->yAxis().get();
+        QCOMPARE(follower->linkSource(), source);
+        QVERIFY(!follower->tickLabels());
+        QVERIFY(source->tickLabels());
+    }
+    mPlot->axisRect(0, 1)->yAxis()->setScale(QCPScale::log()); // a shared axis shares its scale
+    QCOMPARE(mPlot->axisRect(0, 0)->yAxis()->scale(), QCPScale::log());
+    QCOMPARE(mPlot->axisRect(1, 0)->yAxis()->scale(), QCPScale::linear());
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestAxisRectGrid::dragAndZoomMoveTheColumn_data()
+{
+    QTest::addColumn<QCPScale>("scale");
+    QTest::newRow("linear") << QCPScale::linear();
+    QTest::newRow("log") << QCPScale::log();
+    QTest::newRow("symlog") << QCPScale::symlog(2);
+}
+
+void TestAxisRectGrid::dragAndZoomMoveTheColumn()
+{
+    // Review Focus 4, a guard (a follower's drags go through its source once linked: M3).
+    QFETCH(QCPScale, scale);
+    mPlot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
+    mPlot->setAxisRectGrid(2, 1, { .shareX = true });
+    QCPAxisRect* top = mPlot->axisRect(0, 0).get();
+    QCPAxisRect* bottom = mPlot->axisRect(1, 0).get();
+    bottom->xAxis()->setScale(scale);
+    bottom->xAxis()->setRange(1, 100);
+    renderOnce(QSize(400, 400));
+    settle();
+    QCOMPARE(top->xAxis()->scale(), scale);
+
+    const QPoint start = top->rect().center();
+    QTest::mousePress(mPlot, Qt::LeftButton, Qt::NoModifier, start);
+    QTest::mouseMove(mPlot, start + QPoint(40, 0));
+    QTest::mouseRelease(mPlot, Qt::LeftButton, Qt::NoModifier, start + QPoint(40, 0));
+    QVERIFY(bottom->xAxis()->range() != QCPRange(1, 100));
+    QCOMPARE(top->xAxis()->range(), bottom->xAxis()->range());
+
+    const QCPRange beforeZoom = bottom->xAxis()->range();
+    QWheelEvent wheel(QPointF(top->rect().center()), mPlot->mapToGlobal(top->rect().center()),
+                      QPoint(), QPoint(0, 120), Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase,
+                      false);
+    QCoreApplication::sendEvent(mPlot, &wheel);
+    QVERIFY(bottom->xAxis()->range() != beforeZoom);
+    QCOMPARE(top->xAxis()->range(), bottom->xAxis()->range());
+    QVERIFY(std::isfinite(top->xAxis()->range().lower) && std::isfinite(top->xAxis()->range().upper));
+}
+
+void TestAxisRectGrid::aSecondCallReshares()
+{
+    // P-5, M2: unsharing removes the grid's links and shows the labels the grid hid, never a
+    // label the user hid.
+    mPlot->setAxisRectGrid(2, 2, { .shareX = true });
+    QCPAxis* userHidden = mPlot->axisRect(1, 1)->xAxis().get(); // a source: the grid keeps its labels
+    userHidden->setTickLabels(false);
+    mPlot->setAxisRectGrid(2, 2);
+    for (int column = 0; column < 2; ++column)
+    {
+        QCPAxis* top = mPlot->axisRect(0, column)->xAxis().get();
+        QCOMPARE(top->linkSource(), nullptr);
+        QVERIFY(top->tickLabels());
+    }
+    QVERIFY(!userHidden->tickLabels());
+    mPlot->axisRect(0, 0)->xAxis()->setRange(3, 7);
+    QVERIFY(mPlot->axisRect(1, 0)->xAxis()->range() != QCPRange(3, 7));
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestAxisRectGrid::sharingAndAFullAxesBox()
+{
+    // C4: sharing composes with setupFullAxesBox(true) in both orders, and unsharing restores the
+    // box's own link.
+    mPlot->setAxisRectGrid(2, 1, { .shareX = true });
+    QCPAxisRect* top = mPlot->axisRect(0, 0).get();
+    QCPAxisRect* bottom = mPlot->axisRect(1, 0).get();
+    top->setupFullAxesBox(true);
+    QCOMPARE(top->axis(QCPAxis::atTop)->linkSource(), bottom->xAxis().get());
+    QCOMPARE(gMisuses, 0);
+
+    QCustomPlot other;
+    other.axisRect()->setupFullAxesBox(true);
+    other.setAxisRectGrid(2, 1, { .shareX = true });
+    QCPAxisRect* first = other.axisRect(0, 0).get();
+    QCPAxisRect* second = other.axisRect(1, 0).get();
+    QCOMPARE(first->xAxis()->linkSource(), second->xAxis().get());
+    QCOMPARE(first->axis(QCPAxis::atTop)->linkSource(), second->xAxis().get());
+    other.setAxisRectGrid(2, 1);
+    QCOMPARE(first->xAxis()->linkSource(), nullptr);
+    QCOMPARE(first->axis(QCPAxis::atTop)->linkSource(), first->xAxis().get());
+    QCOMPARE(gMisuses, 0);
+}

@@ -600,6 +600,12 @@ Milestone 6e (multi-panel plots). Step 1 of the panel design.
         to 1 when its entry is missing (M9). A list longer than the grid, or a factor that is not
         finite and greater than zero (0, a negative number, NaN), is misuse and the call changes
         nothing.
+  - Shared axes (P-2): shareX links the bottom axis of every rect of a column to the bottom rect's,
+        which keeps the column's tick labels, and hides the others' tick labels; shareY does the same
+        per row with the left axes, the leftmost keeping its labels. The links are identity links, so
+        the shared axes share range, scale and the rescale union. A later call without a share
+        undoes it: the links go, the axes a full axes box had linked return to it, and only the
+        labels the grid hid show again.
   - The margins always align, shared axes or not: one QCPAlignmentGroup per column aligns its rects'
         left and right sides, one per row their top and bottom sides, as matplotlib's subplots do.
         A rect's colour scale counts in its margin, so a column's data edges align with a bar beside

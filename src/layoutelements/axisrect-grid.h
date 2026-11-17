@@ -37,12 +37,14 @@ struct QCPAxisRectGridOptions
 */
 struct QCPAxisRectGridState
 {
-    //! One shared axis: \a follower now reads \a originalSource; labelsWereOn puts the labels back.
+    //! One axis the share moved: \a follower was linked to \a originalSource without functions (or
+    //! not linked, when it is null) before the grid linked it; \a hidLabels when the grid hid its
+    //! tick labels, which unsharing shows again.
     struct Share
     {
         QPointer<QCPAxis> follower;
         QPointer<QCPAxis> originalSource;
-        bool labelsWereOn = true;
+        bool hidLabels = false;
     };
 
     QList<QPointer<QCPAlignmentGroup>> columnGroups;

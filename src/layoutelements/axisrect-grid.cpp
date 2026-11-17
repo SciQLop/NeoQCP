@@ -177,6 +177,66 @@ QList<QCPLayoutElement*> gridRow(QCPLayoutGrid& layout, int row, int columns)
 
 //! Takes the plot's legend out of the dropped rect it sits in, so the plot keeps its legend.
 //! Returns whether it did: a legend the user had taken out of every layout stays out.
+// Undoes the shares a previous call made (P-5): the grid's followers leave their sources, the axes
+// the share handed over return to the source they had (a full axes box's top axis, say), and the
+// tick labels the grid hid show again. A label the user hid stays hidden.
+void unshare(QList<QCPAxisRectGridState::Share>& shares)
+{
+    const QList<QCPAxisRectGridState::Share> records = shares;
+    shares.clear();
+    for (const auto& record : records)
+        if (record.follower)
+            record.follower->unlink();
+    for (const auto& record : records)
+    {
+        if (!record.follower)
+            continue;
+        if (record.originalSource)
+            record.follower->linkTo(record.originalSource);
+        if (record.hidLabels)
+            record.follower->setTickLabels(true);
+    }
+}
+
+// Links \a follower to \a source without functions and hides its tick labels (P-2), recording what
+// unsharing restores: the follower's own identity source, and the identity followers it drove,
+// which linkTo hands to \a source (C4).
+void shareAxis(QCPAxis* follower, QCPAxis* source, QList<QCPAxisRectGridState::Share>& shares)
+{
+    if (!follower || !source || follower == source)
+        return;
+    for (QCPAxisBase* user : follower->identityFollowers())
+        if (auto* axis = qobject_cast<QCPAxis*>(user))
+            shares.append({ axis, follower, false });
+    auto* original = follower->isIdentityFollower()
+        ? qobject_cast<QCPAxis*>(follower->linkSource())
+        : nullptr;
+    const bool hide = follower->tickLabels();
+    shares.append({ follower, original, hide });
+    follower->linkTo(source);
+    if (hide)
+        follower->setTickLabels(false);
+}
+
+void shareAxes(QCPLayoutGrid& layout, int rows, int columns, const QCPAxisRectGridOptions& options,
+               QList<QCPAxisRectGridState::Share>& shares)
+{
+    const auto rect = [&](int row, int column)
+    { return qobject_cast<QCPAxisRect*>(layout.element(row, column).get()); };
+    if (options.shareX)
+        for (int column = 0; column < columns; ++column)
+            if (QCPAxisRect* bottom = rect(rows - 1, column))
+                for (int row = 0; row < rows - 1; ++row)
+                    if (QCPAxisRect* above = rect(row, column))
+                        shareAxis(above->xAxis().get(), bottom->xAxis().get(), shares);
+    if (options.shareY)
+        for (int row = 0; row < rows; ++row)
+            if (QCPAxisRect* left = rect(row, 0))
+                for (int column = 1; column < columns; ++column)
+                    if (QCPAxisRect* right = rect(row, column))
+                        shareAxis(right->yAxis().get(), left->yAxis().get(), shares);
+}
+
 bool rescueLegend(QCPLayoutGrid& layout, const QPointer<QCPLayoutElement>& legend, int rows,
                   int columns)
 {
@@ -238,7 +298,9 @@ bool qcp::applyAxisRectGrid(QCPLayoutGrid& layout, int rows, int columns,
     const QList<QPointer<QCPAlignmentGroup>> oldRowGroups = state.rowGroups;
     state.columnGroups.clear();
     state.rowGroups.clear();
-    state.shares.clear(); // the shared-axis step rebuilds them from the new options
+    unshare(state.shares); // the shares are rebuilt below from the new options
+    if (!plot)
+        return false;
     for (const QPointer<QCPAlignmentGroup>& group : oldColumnGroups)
     {
         if (!plot)
@@ -326,6 +388,10 @@ bool qcp::applyAxisRectGrid(QCPLayoutGrid& layout, int rows, int columns,
         if (members.size() > 1)
             state.rowGroups.append(QCPAlignmentGroup::create(members, QCP::msTop | QCP::msBottom));
     }
+
+    shareAxes(layout, rows, columns, options, state.shares);
+    if (!plot)
+        return false;
 
     state.options = options;
     state.rows = rows;

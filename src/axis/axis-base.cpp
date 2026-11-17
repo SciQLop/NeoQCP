@@ -515,6 +515,15 @@ void QCPAxisBase::rescale(bool onlyVisiblePlottables)
     target->rescaleTo(unionRange, haveRange);
 }
 
+QList<QCPAxisBase*> QCPAxisBase::identityFollowers() const
+{
+    QList<QCPAxisBase*> result;
+    for (const QPointer<QCPAxisBase>& user : mLinkedAxes)
+        if (user && user->isIdentityFollower())
+            result.append(user.data());
+    return result;
+}
+
 bool QCPAxisBase::isIdentityFollower() const
 {
     return mLink && mLink->identity && mLink->source;

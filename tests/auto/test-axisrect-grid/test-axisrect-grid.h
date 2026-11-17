@@ -26,6 +26,12 @@ private slots:
     void aDestroyedSlotMayDeleteTheDroppedRect();
     void aReentrantCallIsRefused();
     void aDestroyedSlotMayDeleteThePlot();
+    void shareXLinksEachColumn();
+    void shareYLinksEachRow();
+    void dragAndZoomMoveTheColumn_data();
+    void dragAndZoomMoveTheColumn();
+    void aSecondCallReshares();
+    void sharingAndAFullAxesBox();
 
 private:
     void renderOnce(QSize size);
