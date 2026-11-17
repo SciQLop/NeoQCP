@@ -129,10 +129,11 @@ void QCPGraph::followAxes()
                               [this] { linesChanged(); });
     linesChanged(); // pixels computed for the old axes mean nothing on the new ones
     mL2Dirty = mL1Cache != nullptr; // nor do the bins resampled for the old key range
-    // An axis change inside the cartesian branch keeps the L1 only while the key space is the same
-    // one: a new axis on another scale needs its bins built there. A job already in flight matters
-    // as much as a cache -- it was made from a closure baked in the old space.
-    const QCPScale keyScale = keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
+    // An axis change inside the cartesian branch keeps the L1 only while the binning space is the
+    // same one: a new axis binning elsewhere needs its bins built there. A job already in flight
+    // matters as much as a cache -- it was made from a closure baked in the old space.
+    const QCPScale keyScale = qcp::algo::binningSpace(keyAxisRaw() ? keyAxisRaw()->scale()
+                                                                 : QCPScale());
     if ((mL1Cache || mPipeline.hasTransform()) && !(keyScale == mL1Scale))
         restartL1Cache();
 }
@@ -141,7 +142,7 @@ void QCPGraph::followAxes()
 // a new scale needs a new closure.
 void QCPGraph::bakeL1Transform(const QCPMultiDataSource& src)
 {
-    mL1Scale = keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
+    mL1Scale = qcp::algo::binningSpace(keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale());
     ensureL1Transform(mPipeline, src.size(), src.columnCount(), mWantOrigin, mL1Scale);
 }
 
@@ -289,7 +290,7 @@ static void ensureL1Transform(QCPGraphPipeline& pipeline, int sourceSize, int co
                                    const ViewportParams& vp,
                                    std::any& cache) -> std::shared_ptr<QCPMultiDataSource> {
                 ViewportParams scaled = vp;
-                scaled.keyScale = keyScale;
+                scaled.keyScale = qcp::algo::binningSpace(keyScale);
                 return qcp::algo::buildL1Cache(src, scaled, cache, wantOrigin->load());
             });
     }
@@ -798,11 +799,18 @@ void QCPGraph::rebuildL2(const ViewportParams& vp) const
     mL2HasOrigin = mL2Result && !mL1Cache->level1.origin.empty();
 }
 
-// The key scale is what the L1 bins are equal in: bins built for another space are not stale, they
-// are meaningless (a linear bin 100 wide around zero holds the whole symlog band). Drop them and
-// build them again.
+// The key scale is what the L1 bins are equal in, but only symlog changes that space: bins built
+// for another one are not stale, they are meaningless (a linear bin 100 wide around zero holds the
+// whole symlog band), so those go and are built again. A log axis turning linear keeps its bins --
+// only the pixels moved, and the L2 spans, which do read the axis' scale, are rebuilt from them.
 void QCPGraph::onKeyScaleChanged()
 {
+    if (qcp::algo::binningSpace(keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale()) == mL1Scale)
+    {
+        mL2Dirty = mL1Cache != nullptr;
+        linesChanged();
+        return;
+    }
     restartL1Cache();
 }
 

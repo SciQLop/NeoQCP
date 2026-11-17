@@ -382,8 +382,9 @@ protected:
     // Read by the L1 transform on the pipeline thread: build origin tables only for coloured
     // graphs.
     std::shared_ptr<std::atomic<bool>> mWantOrigin = std::make_shared<std::atomic<bool>>(false);
-    // The key scale the L1 transform closure was baked with: a new axis or a new scale needs a
-    // new closure, and bins built for another space are meaningless rather than stale.
+    // The binning space the L1 transform closure was baked with (see qcp::algo::binningSpace): a
+    // new axis or a new space needs a new closure, and bins built for another space are meaningless
+    // rather than stale.
     QCPScale mL1Scale;
     mutable bool mL2HasOrigin = false;
     // The lines this object draws from changed: bump the revision, paint the layer again.

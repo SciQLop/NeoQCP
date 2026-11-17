@@ -148,6 +148,13 @@ inline MultiColumnBinResult orderColumnsByTrend(MultiColumnBinResult bins)
     return bins;
 }
 
+// The space the L1 bins are equal in: a symlog axis bins in scale space, a linear and a log axis
+// both bin in key units. Moving between the latter two therefore keeps the bins.
+inline QCPScale binningSpace(const QCPScale& keyScale)
+{
+    return keyScale.isSymlog() ? keyScale : QCPScale::linear();
+}
+
 // Where each source key falls and where each bin's edges are. Bins are even in key units on a
 // linear axis, and even in scale units on a symlog one: even key widths would put every bin of the
 // linear band (where a key pixel is a few units wide) on the same key value.

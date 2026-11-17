@@ -4331,6 +4331,39 @@ void TestPipeline::histogramsRebinOnASymlogScaleChange()
 
 }
 
+void TestPipeline::aLogToLinearScaleChangeKeepsTheL1Bins()
+{
+    // Only a symlog axis bins in another space: a log axis and a linear one both bin in key units,
+    // so turning one into the other keeps the bins that were already built there.
+    auto* g = mPlot->add<QCPGraph>().get();
+    std::vector<double> keys(200'000);
+    std::vector<double> values(keys.size());
+    for (size_t i = 0; i < keys.size(); ++i)
+    {
+        keys[i] = std::pow(10.0, -3.0 + 9.0 * static_cast<double>(i) / keys.size());
+        values[i] = std::sin(static_cast<double>(i) * 0.0001);
+    }
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    mPlot->xAxis->setScale(QCPScale::log());
+    mPlot->xAxis->setRange(1e-3, 1e6);
+    mPlot->yAxis->setRange(-1.0, 1.0);
+    g->setDataSource(oneColumnSource(std::move(keys), std::move(values)));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mL1Cache);
+    const auto* keptBins = g->mL1Cache.get();
+    const int jobsBefore = spy.count();
+
+    mPlot->xAxis->setScale(QCPScale::linear());
+
+    QVERIFY2(g->mL1Cache.get() == keptBins,
+             "the linear axis dropped L1 bins that were still valid in its own space");
+    QCOMPARE(spy.count(), jobsBefore);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(g->mL2Result, "the frame after the scale change drew nothing from the kept bins");
+}
+
 void TestPipeline::aGraphFollowsANewKeyAxisScale()
 {
     // Moving a graph to another key axis is not a branch change, but the new axis' scale is a
