@@ -36,6 +36,7 @@ private slots:
 
     // QCPGraph pipeline integration
     void multiGraphPipelinePassthrough();
+    void aScaleChangeOnASmallGraphDoesNotReplotPerGraph();
 
     // QCPColorMap2 pipeline integration
     void colormap2PipelineDefault();

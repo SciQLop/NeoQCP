@@ -171,15 +171,20 @@ void QCPGraph::restartL1Cache()
     }
     mNeedsResampling = isAboveResampleThreshold(*mDataSource);
     bakeL1Transform(*mDataSource);
+    if (!mPipeline.hasTransform())
+    {
+        // Below the resample threshold there is nothing to bin again: the pixels of the old scale
+        // are stale, not the data. Replotting here ran once per graph on a shared axis, inside the
+        // setScale() that changed it; a scale change only dirties what it draws.
+        mAcceptedGeneration = mPipeline.currentGeneration() + 1;
+        linesChanged();
+        return;
+    }
     const QPointer<QCPGraph> alive(this);
-    if (mPipeline.hasTransform())
-        mPipeline.onDataChanged();
-    else if (mParentPlot)
-        mParentPlot->replot();
+    mPipeline.onDataChanged();
     if (!alive)
         return; // a busyChanged slot deleted this graph
-    mAcceptedGeneration = mPipeline.hasTransform() ? mPipeline.currentGeneration()
-                                                    : mPipeline.currentGeneration() + 1;
+    mAcceptedGeneration = mPipeline.currentGeneration();
     linesChanged();
 }
 

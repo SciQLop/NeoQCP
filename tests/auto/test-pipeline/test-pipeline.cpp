@@ -638,6 +638,20 @@ void TestPipeline::multiGraphPipelinePassthrough()
     QCOMPARE(graph->dataSource()->size(), 3);
 }
 
+// A scale change on a graph with no bins to rebuild only dirties its pixels. It used to replot
+// at once, so one setScale() on a shared axis replotted once per graph on it, all inside the call.
+void TestPipeline::aScaleChangeOnASmallGraphDoesNotReplotPerGraph()
+{
+    for (int i = 0; i < 20; ++i)
+        mPlot->addGraph()->setData(QVector<double> { 1.0, 2.0, 3.0 },
+                                   QVector<double> { 1.0, 2.0, 3.0 });
+    QSignalSpy replotted(mPlot, &QCustomPlot::afterReplot);
+    mPlot->xAxis->setScale(QCPScale::log());
+    QCOMPARE(replotted.count(), 0); // not one per graph, nor any at all inside the call
+    QTest::qWait(50);
+    QVERIFY2(replotted.count() <= 1, qPrintable(QString::number(replotted.count())));
+}
+
 void TestPipeline::colormap2PipelineDefault()
 {
     if (!showAndHasRhi(mPlot)) QSKIP("No QRhi available — pipeline needs viewport from draw()");
