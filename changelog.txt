@@ -584,15 +584,19 @@ Milestone 6e (multi-panel plots). Step 1 of the panel design.
         in one call. A rect already in a kept cell stays there with what it owns; a rect outside the
         new grid is removed the way QCPHandle::remove() removes one: its plottables, items, colour
         scale and insets (and theirs) go first, so its handles become empty and the legend loses the
-        plottables' rows. A later call grows or shrinks the grid the same way, and the rects in the
-        kept cells survive. A new rect is built like the plot's default one: four axes on the axes
-        layer, their grids on the grid layer, the rect on the background layer, in the plot's theme,
-        with the 12 px inset-layout margins.
+        plottables' rows. A legend that sat in a dropped rect's inset moves back to the rect in
+        cell (0, 0), so the plot never loses it. A later call grows or shrinks the grid the same
+        way, and the rects in the kept cells survive, even when the user left a hole before them: the
+        kept cells are filled before the grid is compacted, so no kept rect changes cell. A new
+        rect is built like the plot's default one: four axes on the axes layer, their grids on the
+        grid layer, the rect on the background layer, in the plot's theme, with the 12 px
+        inset-layout margins.
   - QCPAxisRectGridOptions (layoutelements/axisrect-grid.h): shareX and shareY, and the rowStretch
         and columnStretch lists. A stretch list shorter than the grid leaves the missing entries at
         1; every call sets the whole list, so a row or column an earlier call had stretched returns
-        to 1 when its entry is missing (M9). A list longer than the grid is misuse and the call
-        changes nothing.
+        to 1 when its entry is missing (M9). A list longer than the grid, or a factor that is not
+        finite and greater than zero (0, a negative number, NaN), is misuse and the call changes
+        nothing.
   - The margins always align, shared axes or not: one QCPAlignmentGroup per column aligns its rects'
         left and right sides, one per row their top and bottom sides, as matplotlib's subplots do.
         A rect's colour scale counts in its margin, so a column's data edges align with a bar beside
@@ -603,8 +607,8 @@ Milestone 6e (multi-panel plots). Step 1 of the panel design.
         lists the plot layout's cells first, row after row, then the rects nested in them (an
         inset layout included) in layout order (M1, P-7).
   - Refused as misuse, with nothing changed: fewer than one row or column, more stretch factors than
-        rows or columns, and a plot-layout cell that does not hold an axis rect (a title row, a
-        nested layout, a polar area).
+        rows or columns, a stretch factor that is not finite and greater than zero, and a plot-layout
+        cell that does not hold an axis rect (a title row, a nested layout, a polar area).
 
 Milestone 6f (scales). Breaking, in the 3.0 preview line: the scale an axis, a colour scale or a
 colour-mapped plottable shows its data with is a value, not an enum.

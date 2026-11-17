@@ -15,6 +15,10 @@ private slots:
     void aGridKeepsTheFirstRect();
     void stretchFactorsApply();
     void aSecondCallGrowsAndShrinks();
+    void aSlotDeletingDroppedContentsIsSafe();
+    void aDeferredSlotThatDeletesThePlotIsSafe();
+    void aDeferredSlotReenteringIsDeferred();
+    void aHoleDoesNotMoveKeptRects();
     void columnsAndRowsAlign();
     void misuseIsRefused();
 

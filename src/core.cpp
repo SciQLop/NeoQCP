@@ -2746,7 +2746,8 @@ bool QCustomPlot::moveLayer(QCPLayer* layer, QCPLayer* otherLayer,
   particular the default rect in cell (0, 0) keeps its plottables, items, colour scale, insets and
   the legend. A rect outside the new grid is removed with everything it owns - its plottables,
   items, colour scale and insets (and theirs) - the way QCPHandle::remove() removes a rect. Handles
-  to it become empty and the legend loses the plottables' rows.
+  to it become empty and the legend loses the plottables' rows. A legend that sat in a dropped
+  rect's inset moves back to the rect in cell (0, 0), so the plot never loses it.
 
   Every column shares a left and a right edge and every row a top and a bottom edge, whether the
   axes are shared or not, so the data areas line up like matplotlib subplots (P-1). A second call
@@ -2754,17 +2755,21 @@ bool QCustomPlot::moveLayer(QCPLayer* layer, QCPLayer* otherLayer,
   row or column whose stretch factor is missing from \a options is reset to 1 (M9).
 
   Refused with one misuse report and no change: a non-positive row or column count, more stretch
-  factors than rows or columns, and a plot layout holding anything but axis rects in its cells (a
-  title row from insertRow, a legend added to the main layout, a nested layout or a polar area).
+  factors than rows or columns, a stretch factor that is not finite and greater than zero, and a
+  plot layout holding anything but axis rects in its cells (a title row from insertRow, a legend
+  added to the main layout, a nested layout or a polar area). The call reports instead of doing
+  anything while the plot is being destroyed, and holds the signals its removals queue until it is
+  done, so a slot cannot run in the middle of the walk.
 
   \see axisRect(int, int), axisRects, QCPAxisRectGridOptions
 */
 void QCustomPlot::setAxisRectGrid(int rows, int columns, const QCPAxisRectGridOptions& options)
 {
-    if (!mPlotLayout || mBeingDestroyed)
-        return;
-    qcp::applyAxisRectGrid(*mPlotLayout, rows, columns, options, mAxisRectGrid,
-                           [this] { return createAxisRect(); });
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", );
+    QCP_CHECK_OR_RETURN(mPlotLayout, "the plot has no layout", );
+    const QCPEmissionScope scope(this);
+    static_cast<void>(qcp::applyAxisRectGrid(*mPlotLayout, rows, columns, options, mAxisRectGrid,
+                                             [this] { return createAxisRect(); }));
 }
 
 /*!

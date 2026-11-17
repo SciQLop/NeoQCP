@@ -16,8 +16,8 @@ class QCPLayoutGrid;
 /*! \brief The options of QCustomPlot::setAxisRectGrid(): the shares (stored, applied by the
   shared-axis step) and the per-row/per-column stretch factors.
 
-  A stretch list shorter than the grid leaves the missing entries at 1; a longer one is misuse and
-  the call changes nothing.
+  A stretch list shorter than the grid leaves the missing entries at 1. A longer one, or a factor
+  that is not finite and greater than zero, is misuse and the call changes nothing.
 
   \see QCustomPlot::setAxisRectGrid
 */
@@ -58,10 +58,9 @@ namespace qcp
 //! Builds the grid of axis rects in \a layout: validates first (one misuse and false on bad input),
 //! drops the rects outside the new grid, fills the missing cells with \a makeRect and aligns every
 //! column and row. Keeps the rects already in the kept cells.
-QCP_LIB_DECL bool applyAxisRectGrid(QCPLayoutGrid& layout, int rows, int columns,
-                                    const QCPAxisRectGridOptions& options,
-                                    QCPAxisRectGridState& state,
-                                    const std::function<QCPAxisRect*()>& makeRect);
+bool applyAxisRectGrid(QCPLayoutGrid& layout, int rows, int columns,
+                       const QCPAxisRectGridOptions& options, QCPAxisRectGridState& state,
+                       const std::function<QCPAxisRect*()>& makeRect);
 } // namespace qcp
 
 #endif // QCP_AXISRECT_GRID_H
