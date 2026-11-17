@@ -241,7 +241,7 @@ Hold the source by `QPointer` instead, and build a fresh `QBindable` inside the 
 A few more things to know:
 
 - **A pointer that goes null on its own has no signal.** A plottable's axes, an error bar's data plottable and a tracer's graph are held weakly. When the target is deleted, the property reads null, but its change signal does not fire. The target's `destroyed()` is the notification.
-- **Deleting the plot from a `destroyed()` slot is safe.** NeoQCP delivers nothing through its own signals while the plot is being destroyed, and a plottable or an item is unlisted and un-parented before it is deleted, so a slot never sees half a plot and nothing is freed twice. Qt's own `QObject::destroyed` still arrives; a mutator called from such a slot reports misuse and changes nothing.
+- **Deleting the plot from a `destroyed()` slot is safe.** NeoQCP delivers nothing through its own signals while the plot is being destroyed, and a plottable or an item is unlisted and un-parented before it is deleted, so a slot never sees half a plot and nothing is freed twice. Qt's own `QObject::destroyed` still arrives; a mutator called from such a slot reports misuse and changes nothing. One exception: a slot that runs while the plot itself is being destroyed (`isBeingDestroyed()`, its destructor deleting a plottable, say) must not delete it again, it already is.
 - **A late connect can miss one change.** NeoQCP queues a change signal only if something listens at that moment. A slot connected after the write, but before delivery, does not get that change. Read the property once when you connect.
 
 ## New classes

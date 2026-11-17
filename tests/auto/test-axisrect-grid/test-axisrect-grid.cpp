@@ -345,6 +345,27 @@ void TestAxisRectGrid::aReentrantCallIsRefused()
     QVERIFY(mPlot->axisRect(0, 0));
 }
 
+void TestAxisRectGrid::aDestroyedSlotMayDeleteThePlot()
+{
+    mPlot->setAxisRectGrid(2, 1);
+    const QCPHandle<QCPGraph> graph = mPlot->axisRect(1, 0)->add<QCPGraph>(
+        std::vector<double> { 0.0, 1.0 }, std::vector<double> { 0.0, 1.0 });
+    QVERIFY(graph);
+    connect(graph.get(), &QObject::destroyed, mPlot,
+            [this]
+            {
+                QCustomPlot* const plot = mPlot;
+                mPlot = nullptr;
+                delete plot;
+            });
+
+    // The walk must not write into the plot its slot just deleted.
+    mPlot->setAxisRectGrid(1, 1);
+
+    QVERIFY(!mPlot);
+    QVERIFY(!graph);
+}
+
 void TestAxisRectGrid::columnsAndRowsAlign()
 {
     mPlot->setAxisRectGrid(2, 2);

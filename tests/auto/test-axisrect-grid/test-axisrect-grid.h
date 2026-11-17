@@ -25,6 +25,7 @@ private slots:
     void aDeletedPlotLayoutIsBuiltAgain();
     void aDestroyedSlotMayDeleteTheDroppedRect();
     void aReentrantCallIsRefused();
+    void aDestroyedSlotMayDeleteThePlot();
 
 private:
     void renderOnce(QSize size);

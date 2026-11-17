@@ -126,16 +126,24 @@ bool gridCellsAreRects(QCPLayoutGrid& layout)
 class RunningGuard
 {
 public:
-    explicit RunningGuard(bool& flag)
-        : mFlag(flag)
+    RunningGuard(QCustomPlot* plot, bool& flag)
+        : mPlot(plot)
+        , mFlag(flag)
     {
         mFlag = true;
     }
-    ~RunningGuard() { mFlag = false; }
+    // A slot may delete the plot mid-walk; the flag then lives in freed memory, so it is only
+    // written while the plot is still there.
+    ~RunningGuard()
+    {
+        if (mPlot)
+            mFlag = false;
+    }
     RunningGuard(const RunningGuard&) = delete;
     RunningGuard& operator=(const RunningGuard&) = delete;
 
 private:
+    QPointer<QCustomPlot> mPlot;
     bool& mFlag;
 };
 
@@ -203,11 +211,12 @@ bool qcp::applyAxisRectGrid(QCPLayoutGrid& layout, int rows, int columns,
                             const QCPAxisRectGridOptions& options, QCPAxisRectGridState& state,
                             const std::function<QCPAxisRect*()>& makeRect)
 {
+    const QPointer<QCustomPlot> plot(layout.parentPlot().get());
     QCP_CHECK_OR_RETURN(!state.running,
                         "setAxisRectGrid is already running (re-entered from a slot?): nothing "
                         "changed",
                         false);
-    const RunningGuard running(state.running);
+    const RunningGuard running(plot, state.running);
     QCP_CHECK_OR_RETURN(rows > 0, "a grid needs at least one row", false);
     QCP_CHECK_OR_RETURN(columns > 0, "a grid needs at least one column", false);
     QCP_CHECK_OR_RETURN(options.rowStretch.size() <= rows,
@@ -218,7 +227,6 @@ bool qcp::applyAxisRectGrid(QCPLayoutGrid& layout, int rows, int columns,
                         "row stretch factors must be finite and greater than zero", false);
     QCP_CHECK_OR_RETURN(usableStretch(options.columnStretch),
                         "column stretch factors must be finite and greater than zero", false);
-    const QPointer<QCustomPlot> plot(layout.parentPlot().get());
     QCP_CHECK_OR_RETURN(plot, "the layout belongs to no plot", false);
     QCP_CHECK_OR_RETURN(gridCellsAreRects(layout),
                         "the plot layout holds something that is not an axis rect (a title row, a "
