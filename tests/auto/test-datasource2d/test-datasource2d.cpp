@@ -1474,3 +1474,81 @@ void TestDataSource2D::resampleSymlogColumnBesideZeroIsFullWidth()
     QVERIFY2(empty == 0, qPrintable(QString("%1 of %2 columns hold nothing").arg(empty)
                                         .arg(grid->keySize())));
 }
+
+// A log axis over a range that is not positive falls back to a linear grid (generateRange), and the
+// columns must be measured in that same space: geometric midpoints on a negative key make no sense,
+// and the NaN they produced sent every column to the first bin.
+void TestDataSource2D::resampleLogKeyAxisFallsBackOnANonPositiveRange()
+{
+    const QCPScale logScale = QCPScale::log();
+    const std::vector<double> x { -1000.0, -100.0, -10.0, -1.0 };
+    const std::vector<double> y { 0.0, 1.0 };
+    std::vector<double> z; // row-major: z[i * 2 + j], every column's value = its key
+    for (double xi : x)
+        for (int j = 0; j < 2; ++j)
+            z.push_back(xi);
+    QCPSoADataSource2D src(x, y, z);
+
+    std::unique_ptr<QCPColorMapData> grid(qcp::algo2d::resample(
+        src, 0, 4, QCPRange(-1000, -1), QCPRange(0, 1), 4, 2, QCPScale(), QCPScale(), 0.0, nullptr,
+        /*forceSerial=*/true, logScale));
+    QVERIFY(grid);
+    // The linear grid holds -1000, -666.7, -333.3 and -1; the linear column spans put -1000 in the
+    // first two bins, leave the third empty, and gather -100, -10 and -1 into the last one.
+    QCOMPARE(grid->cell(0, 0), -1000.0);
+    QCOMPARE(grid->cell(1, 0), -1000.0);
+    QVERIFY2(std::isnan(grid->cell(2, 0)), "no sample covers the third bin");
+    QVERIFY2(qAbs(grid->cell(3, 0) - (-111.0 / 3.0)) < 1e-9,
+             qPrintable(QString("the last bin holds %1, not the mean of -100, -10 and -1")
+                            .arg(grid->cell(3, 0))));
+}
+
+// A sample at or below zero on a positive log key axis has no bin: it must be dropped, not folded
+// into the first bin (which is where the NaN span used to send it).
+void TestDataSource2D::resampleSkipsANonPositiveColumnOnALogKeyAxis()
+{
+    const QCPScale logScale = QCPScale::log();
+    const std::vector<double> x { -5.0, 1.0, 10.0, 100.0 };
+    const std::vector<double> y { 0.0, 1.0 };
+    std::vector<double> z; // every column's value = its key
+    for (double xi : x)
+        for (int j = 0; j < 2; ++j)
+            z.push_back(xi);
+    QCPSoADataSource2D src(x, y, z);
+
+    std::unique_ptr<QCPColorMapData> grid(qcp::algo2d::resample(
+        src, 0, 4, QCPRange(1, 100), QCPRange(0, 1), 4, 2, QCPScale(), QCPScale(), 0.0, nullptr,
+        /*forceSerial=*/true, logScale));
+    QVERIFY(grid);
+    QCOMPARE(grid->cell(0, 0), 1.0);
+    for (int col = 0; col < grid->keySize(); ++col)
+        QVERIFY2(std::isnan(grid->cell(col, 0)) || grid->cell(col, 0) > 0.0,
+                 qPrintable(QString("column %1 holds %2, the dropped key -5 leaked into it")
+                                .arg(col)
+                                .arg(grid->cell(col, 0))));
+}
+
+// The row side follows the same rule: a log value axis over a non-positive range bins linearly.
+void TestDataSource2D::resampleLogValueAxisFallsBackOnANonPositiveRange()
+{
+    const QCPScale logScale = QCPScale::log();
+    const std::vector<double> x { 0.0, 1.0 };
+    const std::vector<double> y { -1000.0, 1.0 };
+    std::vector<double> z; // every row's value = its key
+    for (int i = 0; i < 2; ++i)
+        for (double yi : y)
+            z.push_back(yi);
+    QCPSoADataSource2D src(x, y, z);
+
+    std::unique_ptr<QCPColorMapData> grid(qcp::algo2d::resample(
+        src, 0, 2, QCPRange(0, 1), QCPRange(-1000, 1000), 2, 5, logScale, QCPScale(), 0.0, nullptr,
+        /*forceSerial=*/true));
+    QVERIFY(grid);
+    // Linear half-spacings reach the row below from the key 1 row; a geometric span of a single
+    // positive value collapses onto itself and stops two rows higher.
+    QCOMPARE(grid->cell(0, 0), -1000.0);
+    QVERIFY2(
+        qAbs(grid->cell(0, 1) - (-499.5)) < 1e-9,
+        qPrintable(
+            QString("the second row holds %1, not the mean of -1000 and 1").arg(grid->cell(0, 1))));
+}

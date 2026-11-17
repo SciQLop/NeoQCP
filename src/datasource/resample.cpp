@@ -327,8 +327,10 @@ void resampleRange(
     if (!variableY)
         computeYBinRanges(xBegin, yBinRanges);
 
-    // A column covers the key span halfway to its neighbours *on screen*, as a row does.
-    const bool xLog = xScale.isLog();
+    // A column covers the key span halfway to its neighbours *on screen*, as a row does. A log
+    // axis only takes that rule over a positive range, the same condition generateRange grids with:
+    // on a non-positive one the axis is linear and so are its columns.
+    const bool xLog = xScale.isLog() && xAxis.front() > 0.0;
     const bool xSymlog = !xLog && xScale.isSymlog();
 
     // Seed this chunk's own cursor: for the first chunk this is xBegin (same
@@ -385,10 +387,14 @@ void resampleRange(
                     fillLo = xScale.fromScale(std::min(below, above));
                     fillHi = xScale.fromScale(std::max(below, above));
                 }
-                else if (xVal > 0.0)
-                    fillLo = geometricHalf(previous, xVal, next, &fillHi);
                 else
-                    fillLo = fillHi = std::numeric_limits<double>::quiet_NaN();
+                {
+                    // A key at or below zero has no place on a log axis: its geometric span would
+                    // be meaningless, and the NaN it used to produce landed in the first bin.
+                    if (!(xVal > 0.0))
+                        continue;
+                    fillLo = geometricHalf(previous, xVal, next, &fillHi);
+                }
             }
             else
             {
@@ -507,8 +513,10 @@ void resampleImpl(
     counts.assign(total, 0);
     std::vector<uint8_t> localNonPositive;
     std::vector<uint8_t>& nonPositive = cache ? cache->nonPositive : localNonPositive;
-    const bool yLog = yScale.isLog();
-    const bool ySymlog = yScale.isSymlog();
+    // A log axis only bins geodesically over a positive range, as generateRange grids it: on a
+    // non-positive one the rows are linear and take the linear spacing rule.
+    const bool yLog = yScale.isLog() && yAxis.front() > 0.0;
+    const bool ySymlog = !yLog && yScale.isSymlog();
     const ValueSpace zSpace = zScale.isLog() ? ValueSpace::Log10
         : (zScale.isSymlog() ? ValueSpace::Scale : ValueSpace::Linear);
     nonPositive.assign(zSpace == ValueSpace::Log10 ? total : 0, 0);

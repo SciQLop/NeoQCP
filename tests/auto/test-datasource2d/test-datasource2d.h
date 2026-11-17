@@ -67,6 +67,9 @@ private slots:
     void colormap2KeyAxisFollowsTheScale();
     void resampleLogAxisEndsAreFullWidth();
     void resampleSymlogColumnBesideZeroIsFullWidth();
+    void resampleLogKeyAxisFallsBackOnANonPositiveRange();
+    void resampleSkipsANonPositiveColumnOnALogKeyAxis();
+    void resampleLogValueAxisFallsBackOnANonPositiveRange();
 
 private:
     QCustomPlot* mPlot = nullptr;
