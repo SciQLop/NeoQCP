@@ -607,6 +607,10 @@ colour-mapped plottable shows its data with is a value, not an enum.
         skipped and on both ends of the band, and a fallback to even steps when fewer than two
         decades fall in the range. Symlog decade labels are abbreviated like log ones. Both
         tickers stay bounded for any legal base (1.0001, 1e6, 2^40) and any double range.
+  - The protected hooks of a scale change are QCPAxisBase::scaleWillChange(const QCPScale&), which
+        returns false to refuse the scale, and scaleDidChange(); scaleTypeWillChange(ScaleType) and
+        scaleTypeDidChange() are gone. A subclass override that kept the old name and no `override`
+        still compiles and is never called, so add the `override` keyword to every one of them.
   - QCPColorScale, QCPColorMapped and the plottables that carry a data scale: setDataScale(),
         dataScale(), dataScaleChanged() and the `dataScale` property replace the *DataScaleType
         names. A data scale set before the plottable is added to a rect now wins over the rect
