@@ -275,6 +275,7 @@ QCPAxisRect::~QCPAxisRect()
         mColorScale = nullptr;
     }
     delete mTitle.data();
+    removeOwnLayers();
 
     for (const auto& axis : qcp::guarded(axesRaw()))
         if (axis)
@@ -1048,6 +1049,82 @@ void QCPAxisRect::setTitle(const QString& title)
 QString QCPAxisRect::title() const
 {
     return mTitle ? mTitle->text() : QString();
+}
+
+/*!
+  Creates a rect drawn inside this one, as matplotlib's \c inset_axes: its data rect sits at \a
+  axisRatio of this rect's data rect, (0, 0) top left and (1, 1) bottom right, and its tick labels
+  fall outside that rect. It has its own four axes, the plot's theme and an opaque background in
+  the plot's background colour.
+
+  It draws above everything of this rect, plottables added to this rect later included: it gets
+  its own layers right above the plot's "axes" layer, and the plottables and items added to it go
+  to the middle one. Mouse interactions inside it reach it first. It follows this rect when the
+  plot resizes, is listed by QCustomPlot::axisRects after the grid's cells, is not a cell itself,
+  and is deleted with this rect.
+
+  An empty or non-finite \a axisRatio is misuse: nothing is created and the handle is empty.
+*/
+QCPHandle<QCPAxisRect> QCPAxisRect::addInset(const QRectF& axisRatio)
+{
+    QCP_CHECK_OR_RETURN(mParentPlot && !mParentPlot->isBeingDestroyed(),
+                        "an inset needs a rect of a live plot", QCPHandle<QCPAxisRect> { });
+    const bool finite = std::isfinite(axisRatio.x()) && std::isfinite(axisRatio.y())
+        && std::isfinite(axisRatio.width()) && std::isfinite(axisRatio.height());
+    QCP_CHECK_OR_RETURN(finite && axisRatio.width() > 0 && axisRatio.height() > 0,
+                        "an inset needs a ratio rect of positive, finite size",
+                        QCPHandle<QCPAxisRect> { });
+    const QCPEmissionScope scope(mParentPlot);
+    QCPAxisRect* inset = mParentPlot->createAxisRect();
+    inset->makeOwnLayers();
+    inset->setBackground(mParentPlot->backgroundBrush());
+    QCPLayoutInset* layout = mInsetLayout;
+    layout->addElement(inset, axisRatio);
+    layout->setInsetPlacement(layout->elementCount() - 1, QCPLayoutInset::ipInnerRect);
+    return QCPHandle<QCPAxisRect>(inset);
+}
+
+/*! \internal
+
+  Gives an inset three layers right above the plot's "axes" layer (or on top when there is none):
+  its background and grids, its plottables and items, its axes. The rect, its grids and its axes
+  move there now; what is added to it later goes to the middle one.
+*/
+void QCPAxisRect::makeOwnLayers()
+{
+    const QString base = QStringLiteral("inset %1 ").arg(quintptr(this), 0, 16);
+    QCPLayer* below = mParentPlot->layer(QLatin1String("axes")).get();
+    QCPLayer* made[3] = { };
+    const char* names[3] = { "back", "data", "axes" };
+    for (int i = 0; i < 3; ++i)
+    {
+        if (!mParentPlot->addLayer(base + QLatin1String(names[i]), below, QCustomPlot::limAbove))
+            return;
+        made[i] = mParentPlot->layer(base + QLatin1String(names[i])).get();
+        below = made[i];
+    }
+    mOwnLayers = { made[0], made[1], made[2] };
+    setLayer(made[0]);
+    for (QCPAxis* axis : axesRaw())
+    {
+        axis->grid()->setLayer(made[0]);
+        axis->setLayer(made[2]);
+    }
+}
+
+/*! \internal
+
+  Removes an inset's own layers when it goes; whatever the user moved onto them goes to the layer
+  below, as QCustomPlot::removeLayer does.
+*/
+void QCPAxisRect::removeOwnLayers()
+{
+    if (!mParentPlot || mParentPlot->isBeingDestroyed())
+        return;
+    for (QCPLayer* layer : { mOwnLayers.axes.data(), mOwnLayers.data.data(), mOwnLayers.back.data() })
+        if (layer)
+            (void)mParentPlot->removeLayer(layer);
+    mOwnLayers = { };
 }
 
 /*! \internal

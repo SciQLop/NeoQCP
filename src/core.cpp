@@ -882,6 +882,10 @@ void QCustomPlot::applyTheme()
         // The rect's own scale is outside the layout tree: theme its axis here.
         if (rect->mColorScale)
             applyThemeToAxis(rect->mColorScale->axis());
+        // An inset is opaque in the plot's background colour (the rect it sits on shows through
+        // no other way).
+        if (rect->ownDataLayer())
+            rect->setBackground(mBackgroundBrush);
     }
 
     if (legend) {
@@ -1872,6 +1876,10 @@ bool QCustomPlot::adoptPlottable(QCPPlottable* plottable, QCPCoordinateSystem* s
     plottable->setParentLayerable(area);
     if (!registerJoinedPlottable(plottable))
         return false;
+    // An inset draws above its parent: what is added to it goes to its own layer.
+    if (const auto* rect = qobject_cast<QCPAxisRect*>(area))
+        if (QCPLayer* own = rect->ownDataLayer())
+            plottable->setLayer(own);
     return true;
 }
 
@@ -1973,6 +1981,8 @@ bool QCustomPlot::adopt(QCPItem* item, QCPAxisRect* rect)
     }
     if (!registerItem(item))
         return false;
+    if (QCPLayer* own = rect ? rect->ownDataLayer() : nullptr)
+        item->setLayer(own); // an inset draws above its parent, its items included
     item->mRegisteredPlot = this;
     if (rect)
         item->setClipAxisRect(rect); // re-parents the layerable when the item clips

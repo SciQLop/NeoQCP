@@ -623,6 +623,13 @@ Milestone 6e (multi-panel plots). Step 1 of the panel design.
         its top margin (outside the top axes and a colour scale on top), as QGroupBox::setTitle. Its
         font is the top axis' label font at 1.2 times the size, in that axis' label colour; an empty
         title takes no room. It replaces the title row in the plot layout for a per-rect title.
+  - QCPAxisRect::addInset(axisRatio): a rect drawn inside this one, as matplotlib's inset_axes. Its
+        data rect sits at axisRatio of the parent's data rect ((0, 0) top left; the new
+        QCPLayoutInset::ipInnerRect placement measures it in the area's rect, not in the inset
+        layout's margin-reduced one); its tick labels fall outside. It has four axes, the theme, an
+        opaque background in the plot's background colour, and its own three layers right above the
+        plot's "axes" layer, where its plottables and items go: it draws above everything of its
+        parent. It follows the parent and goes with it; axisRects() lists it after the cells.
 
 Milestone 6f (scales). Breaking, in the 3.0 preview line: the scale an axis, a colour scale or a
 colour-mapped plottable shows its data with is a value, not an enum.

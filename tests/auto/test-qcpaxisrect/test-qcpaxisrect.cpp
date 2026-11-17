@@ -407,6 +407,146 @@ void TestQCPAxisRect::titlesInARowAlign()
     QCOMPARE(plot.axisRect(0, 0)->rect().top(), plot.axisRect(0, 1)->rect().top());
 }
 
+namespace
+{
+// The ratio rect of \a parent's inner rect, (0, 0) top left, as addInset places an inset's data rect.
+QRect ratioOf(const QCPAxisRect* parent, const QRectF& ratio)
+{
+    const QRect r = parent->rect();
+    return QRect(int(r.x() + r.width() * ratio.x()), int(r.y() + r.height() * ratio.y()),
+                 int(r.width() * ratio.width()), int(r.height() * ratio.height()));
+}
+
+bool near(const QRect& a, const QRect& b, int tolerance = 1)
+{
+    return std::abs(a.left() - b.left()) <= tolerance && std::abs(a.top() - b.top()) <= tolerance
+        && std::abs(a.right() - b.right()) <= tolerance
+        && std::abs(a.bottom() - b.bottom()) <= tolerance;
+}
+
+QString describe(const QRect& r)
+{
+    return QStringLiteral("%1,%2 %3x%4").arg(r.x()).arg(r.y()).arg(r.width()).arg(r.height());
+}
+} // namespace
+
+void TestQCPAxisRect::anInsetSitsInTheParentsAxisRatio()
+{
+    // On the default rect, whose inset layout keeps 12 px from the frame for the legend: the inset's
+    // data rect is placed in the parent's data rect itself, not in that smaller one.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* parent = plot.axisRect().get();
+    const QRectF ratio(0.5, 0.03, 0.47, 0.47);
+    auto inset = parent->addInset(ratio);
+    QVERIFY(inset);
+    QCOMPARE(inset->axes().size(), 4);
+    plot.replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(near(inset->rect(), ratioOf(parent, ratio)),
+             qPrintable(describe(inset->rect()) + " for " + describe(ratioOf(parent, ratio))));
+    QVERIFY2(inset->outerRect().contains(inset->rect()), "its tick labels sit outside its data rect");
+}
+
+void TestQCPAxisRect::anInsetFollowsItsParent()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.setAxisRectGrid(1, 2);
+    QCPAxisRect* parent = plot.axisRect(0, 0).get();
+    const QRectF ratio(0.1, 0.1, 0.5, 0.5);
+    auto inset = parent->addInset(ratio);
+    plot.replot(QCustomPlot::rpImmediateRefresh);
+    plot.resize(600, 500);
+    plot.replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(near(inset->rect(), ratioOf(parent, ratio)),
+             qPrintable(describe(inset->rect()) + " for " + describe(ratioOf(parent, ratio))));
+    const auto rects = plot.axisRects();
+    QCOMPARE(rects.size(), 3);
+    QCOMPARE(rects.last().get(), inset.get());
+    QCOMPARE(plot.axisRect(0, 0).get(), parent);
+    QCOMPARE(plot.axisRect(0).get(), parent);
+}
+
+void TestQCPAxisRect::anInsetDiesWithItsParent()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.setAxisRectGrid(2, 1);
+    auto inset = plot.axisRect(1, 0)->addInset(QRectF(0.2, 0.2, 0.5, 0.5));
+    auto graph = inset->line(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 });
+    QVERIFY(graph);
+    plot.setAxisRectGrid(1, 1);
+    QVERIFY2(!inset, "the inset goes with its parent");
+    QVERIFY2(!graph, "and so does its plottable");
+    QCOMPARE(plot.axisRectCount(), 1);
+    plot.toPixmap(400, 300);
+}
+
+void TestQCPAxisRect::anInsetTakesTheMouseFirst()
+{
+    mPlot->resize(400, 300);
+    mPlot->setInteractions(QCP::iRangeDrag);
+    QCPAxisRect* parent = mPlot->axisRect().get();
+    auto inset = parent->addInset(QRectF(0.4, 0.1, 0.5, 0.5));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QCPRange parentX = parent->xAxis()->range();
+    const QCPRange insetX = inset->xAxis()->range();
+    const QPoint start = inset->rect().center();
+    QTest::mousePress(mPlot, Qt::LeftButton, Qt::NoModifier, start);
+    QTest::mouseMove(mPlot, start + QPoint(30, 0));
+    QTest::mouseRelease(mPlot, Qt::LeftButton, Qt::NoModifier, start + QPoint(30, 0));
+    QVERIFY2(inset->xAxis()->range() != insetX, "the drag moved the inset");
+    QCOMPARE(parent->xAxis()->range(), parentX);
+}
+
+void TestQCPAxisRect::anInsetDrawsAboveItsParent()
+{
+    // A parent line added after the inset must not ink over the inset's data rect.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* parent = plot.axisRect().get();
+    auto inset = parent->addInset(QRectF(0.25, 0.25, 0.5, 0.5));
+    parent->xAxis()->setRange(0, 1);
+    parent->yAxis()->setRange(0, 1);
+    parent->line(std::vector<double> { 0, 1 }, std::vector<double> { 0.5, 0.5 },
+                 { .pen = QPen(Qt::red, 9) });
+    const QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    const QRect inside = inset->rect().adjusted(3, 3, -3, -3);
+    int red = 0;
+    for (int y = inside.top(); y <= inside.bottom(); ++y)
+        for (int x = inside.left(); x <= inside.right(); ++x)
+        {
+            const QColor c = image.pixelColor(x, y);
+            if (c.red() > 150 && c.green() < 80 && c.blue() < 80)
+                ++red;
+        }
+    QCOMPARE(red, 0);
+    const QColor outside = image.pixelColor(parent->rect().left() + 5, parent->rect().center().y());
+    QVERIFY2(outside.red() > 150 && outside.green() < 80, "the parent line is drawn outside the inset");
+}
+
+void TestQCPAxisRect::anInsetExportsLikeTheScreen()
+{
+    // Review Focus 5: a never-shown plot lays out a grid, titles and an inset as a shown one does.
+    auto build = [](QCustomPlot& plot)
+    {
+        plot.resize(400, 300);
+        plot.setAxisRectGrid(2, 1);
+        plot.axisRect(0, 0)->setTitle(QStringLiteral("top"));
+        plot.axisRect(1, 0)->setTitle(QStringLiteral("bottom"));
+        return plot.axisRect(1, 0)->addInset(QRectF(0.5, 0.1, 0.4, 0.5));
+    };
+    QCustomPlot shownPlot;
+    auto shownInset = build(shownPlot);
+    shownPlot.show();
+    shownPlot.replot(QCustomPlot::rpImmediateRefresh);
+    QCustomPlot hiddenPlot;
+    auto hiddenInset = build(hiddenPlot);
+    hiddenPlot.toPixmap(400, 300);
+    QCOMPARE(hiddenInset->rect(), shownInset->rect());
+    QCOMPARE(hiddenPlot.axisRect(1, 0)->rect(), shownPlot.axisRect(1, 0)->rect());
+}
+
 void TestQCPAxisRect::lineTakesDataAndOptions()
 {
   QCPAxisRect *ar = mPlot->axisRect();

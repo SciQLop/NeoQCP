@@ -238,6 +238,10 @@ public:
     //! title takes no room.
     void setTitle(const QString& title);
     [[nodiscard]] QString title() const;
+    //! A new rect drawn inside this one, its data rect placed at \a axisRatio of this rect's data
+    //! rect ((0, 0) top left), with its own four axes, drawn above everything of this rect. It
+    //! follows this rect and goes with it.
+    QCPHandle<QCPAxisRect> addInset(const QRectF& axisRatio);
 
     // read-only interface imitating a QRect:
     int left() const { return mRect.left(); }
@@ -297,6 +301,12 @@ protected:
     QHash<QCPAxis::AxisType, QList<QCPAxis*>> mAxes;
     QPointer<QCPColorScale> mColorScale;
     QPointer<QCPTextElement> mTitle;
+    // An inset's own layers, right above the plot's axes layer: its background and grids, its
+    // plottables and items, its axes. Empty for a rect that is not an inset.
+    struct OwnLayers
+    {
+        QPointer<QCPLayer> back, data, axes;
+    } mOwnLayers;
 
     // reimplemented virtual methods:
     virtual void layoutChanged() override;
@@ -331,6 +341,11 @@ private:
     int titleExtent() const;
     void styleTitle();
     void placeTitle();
+    // Gives an inset its own layers above the plot's and moves its rect, grids and axes there.
+    void makeOwnLayers();
+    void removeOwnLayers();
+    // Where a plottable or an item added to this rect goes: its own data layer, if it has one.
+    QCPLayer* ownDataLayer() const { return mOwnLayers.data.data(); }
     // The scale gained or lost a user, or changed the side or width it needs: the margin moves.
     void colorScaleUsersChanged();
     // The axes raw, for the rect's own layout and range passes (K8): the public lists hand out

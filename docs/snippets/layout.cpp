@@ -32,6 +32,16 @@ DOC_CODE(layout_rect_title)
     // [/layout_rect_title]
 }
 
+DOC_CODE(layout_inset)
+{
+    // [layout_inset]
+    auto main = customPlot->axisRect();
+    auto inset = main->addInset(QRectF(0.5, 0.03, 0.47, 0.47)); // x, y, width, height of main's data rect
+    inset->line(std::vector<double> { 0, 1, 2 }, std::vector<double> { 1, 3, 2 });
+    inset->xAxis()->setRange(0, 2);
+    // [/layout_inset]
+}
+
 DOC_SNIPPET(layout_legend_inside, 600, 360)
 {
     // [layout_legend_inside]

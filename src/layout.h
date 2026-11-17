@@ -368,6 +368,10 @@ public:
         ,
         ipBorderAligned ///< The element is aligned to one of the layout sides, see \ref
                         ///< setInsetAlignment
+        ,
+        ipInnerRect ///< The element's inner rect (its outer rect less its margins) takes the inset
+                    ///< rect, measured in the rect of the area the layout belongs to, not in this
+                    ///< layout's own (margin-reduced) rect: see QCPAxisRect::addInset
     };
     Q_ENUM(InsetPlacement)
 

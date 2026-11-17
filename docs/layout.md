@@ -144,6 +144,25 @@ Other grid tools:
 Deleting the first axis rect deletes the axes that `xAxis`, `yAxis`, `xAxis2` and `yAxis2` point to; they become `nullptr`.
 The default legend lives in that rect too, and goes with it.
 
+## An inset
+
+An inset is a second axis rect drawn inside a first one, as matplotlib's `inset_axes`:
+
+```{literalinclude} snippets/layout.cpp
+:start-after: // [layout_inset]
+:end-before: // [/layout_inset]
+:language: cpp
+:dedent:
+```
+
+The rect passed to `addInset` is a fraction of the parent's data rect, (0, 0) top left.
+The inset's own data rect lands there; its tick labels fall outside it, inside the parent.
+It has its own four axes and an opaque background in the plot's background colour.
+It draws above everything of the parent, plottables added to the parent later included: it has its own layers above the plot's "axes" layer.
+A drag or a wheel zoom inside it moves the inset, not the parent.
+It follows the parent when the plot resizes and is deleted with it.
+`axisRects()` lists it after the grid's cells; it is not a cell.
+
 ## Align edges with an alignment group
 
 A <a href="api/classQCPAlignmentGroup.html">QCPAlignmentGroup</a> lines up the inner edges of its members.

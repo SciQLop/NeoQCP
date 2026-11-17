@@ -29,6 +29,12 @@ private slots:
   void aTitleTakesTheTopAxisLabelColour();
   void aCentredTextIsHitWhereItIsDrawn();
   void titlesInARowAlign();
+  void anInsetSitsInTheParentsAxisRatio();
+  void anInsetFollowsItsParent();
+  void anInsetDiesWithItsParent();
+  void anInsetTakesTheMouseFirst();
+  void anInsetDrawsAboveItsParent();
+  void anInsetExportsLikeTheScreen();
   void textTakesAPositionAndAStyle();
   void textAppliesEveryStyleField();
   void textItemMathTextIsOnByDefault();

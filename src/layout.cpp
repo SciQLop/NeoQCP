@@ -2204,6 +2204,17 @@ void QCPLayoutInset::layoutChildren()
             if (insetRect.size().height() > finalMaxSize.height())
                 insetRect.setHeight(finalMaxSize.height());
         }
+        else if (mInsetPlacement.at(i) == ipInnerRect)
+        {
+            const auto* area = qobject_cast<const QCPLayoutElement*>(mParentLayerable.data());
+            const QRect base = area ? area->rect() : rect();
+            const QRectF& ratio = mInsetRect.at(i);
+            const QRect inner(int(base.x() + base.width() * ratio.x()),
+                              int(base.y() + base.height() * ratio.y()),
+                              int(base.width() * ratio.width()),
+                              int(base.height() * ratio.height()));
+            insetRect = inner.marginsAdded(el->margins());
+        }
         else if (mInsetPlacement.at(i) == ipBorderAligned)
         {
             insetRect.setSize(finalMinSize);
