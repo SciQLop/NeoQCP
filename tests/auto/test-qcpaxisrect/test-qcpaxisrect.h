@@ -35,6 +35,8 @@ private slots:
   void anInsetTakesTheMouseFirst();
   void anInsetDrawsAboveItsParent();
   void anInsetExportsLikeTheScreen();
+  void gridTitlesPicture();
+  void insetZoomPicture();
   void anInsetGridShowsOnTheGpu();
   void aLegendKeepsItsPixelsOverAnInset();
   void anInsetDrawsAboveItsParentOnTheGpu();

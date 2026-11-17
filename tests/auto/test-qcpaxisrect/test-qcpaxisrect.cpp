@@ -600,6 +600,91 @@ void TestQCPAxisRect::anInsetExportsLikeTheScreen()
     QCOMPARE(hiddenPlot.axisRect(1, 0)->rect(), shownPlot.axisRect(1, 0)->rect());
 }
 
+void TestQCPAxisRect::gridTitlesPicture()
+{
+    // A 2 x 2 grid, a title over each cell and a line in it.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QFont font = qcp::test::referenceFont();
+    font.setPixelSize(10);
+    plot.setFont(font);
+    plot.setAxisRectGrid(2, 2);
+    plot.legend->setVisible(false);
+    const char* titles[2][2] = { { "top left", "top right" },
+                                 { "bottom left", "bottom right" } };
+    const std::vector<std::vector<double>> values { { 0.2, 0.9, 0.4, 0.8, 0.1 },
+                                                     { 0.1, 0.4, 0.9, 0.5, 0.2 },
+                                                     { 0.8, 0.2, 0.6, 0.1, 0.7 },
+                                                     { 0.5, 0.1, 0.8, 0.3, 0.9 } };
+    for (int row = 0; row < 2; ++row)
+        for (int column = 0; column < 2; ++column)
+        {
+            auto rect = plot.axisRect(row, column);
+            for (auto axis : rect->axes())
+            {
+                axis->setTickLabelFont(font);
+                axis->setLabelFont(font);
+            }
+            rect->setTitle(QLatin1String(titles[row][column]));
+            rect->xAxis()->setRange(0, 2);
+            rect->yAxis()->setRange(0, 1);
+            rect->line(std::vector<double> { 0, 0.5, 1, 1.5, 2 }, values[std::size_t(row * 2 + column)],
+                       { .pen = QPen(QColor(31, 119, 180), 2), .name = QStringLiteral("signal") });
+        }
+    plot.replot();
+    const QImage image
+        = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QString why;
+    QVERIFY2(qcp::test::matchesReference(image, QStringLiteral("test-qcpaxisrect"),
+                                         QStringLiteral("grid-titles.png"), &why),
+             qPrintable(why));
+}
+
+void TestQCPAxisRect::insetZoomPicture()
+{
+    // A line over the whole parent, and the same data zoomed in an inset at the top right.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QFont font = qcp::test::referenceFont();
+    font.setPixelSize(10);
+    plot.setFont(font);
+    plot.legend->setVisible(false);
+    QCPAxisRect* parent = plot.axisRect().get();
+    for (auto axis : parent->axes())
+    {
+        axis->setTickLabelFont(font);
+        axis->setLabelFont(font);
+    }
+    parent->xAxis()->setLabel(QStringLiteral("time (s)"));
+    parent->yAxis()->setLabel(QStringLiteral("signal"));
+    std::vector<double> t, v;
+    for (int i = 0; i <= 2000; ++i)
+    {
+        t.push_back(i * 0.01);
+        v.push_back(std::sin(t.back() * 2 * std::numbers::pi) + 0.3 * std::sin(t.back() * 9));
+    }
+    parent->line(t, v, { .pen = QPen(QColor(31, 119, 180), 2), .name = QStringLiteral("signal") });
+    parent->xAxis()->setRange(0, 20);
+    parent->yAxis()->setRange(-1.6, 1.6);
+
+    auto inset = parent->addInset(QRectF(0.55, 0.06, 0.42, 0.42));
+    for (auto axis : inset->axes())
+    {
+        axis->setTickLabelFont(font);
+        axis->setLabelFont(font);
+    }
+    inset->line(t, v, { .pen = QPen(QColor(214, 39, 40), 2), .name = QStringLiteral("zoom") });
+    inset->xAxis()->setRange(3, 5);
+    inset->yAxis()->setRange(-1.6, 1.6);
+    plot.replot();
+    const QImage image
+        = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QString why;
+    QVERIFY2(qcp::test::matchesReference(image, QStringLiteral("test-qcpaxisrect"),
+                                         QStringLiteral("inset-zoom-single-rect.png"), &why),
+             qPrintable(why));
+}
+
 void TestQCPAxisRect::anInsetGridShowsOnTheGpu()
 {
     // An inset's grid is painted on its own background layer: the plot's GPU grid layer draws a
