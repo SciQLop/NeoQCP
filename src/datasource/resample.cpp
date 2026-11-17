@@ -139,6 +139,21 @@ void dispatchValueSpace(ValueSpace space, F&& f)
     }
 }
 
+// The two ends of a log-axis sample's span: geometric midpoints with its neighbours, and at an
+// end the known half mirrored (value^2 / other) instead of collapsing onto the sample itself.
+// \a above receives the upper end, the return value the lower one.
+double geometricHalf(double previous, double value, double next, double* above)
+{
+    const bool hasBelow = previous > 0.0;
+    const bool hasAbove = next > 0.0;
+    double lower = hasBelow ? std::sqrt(previous * value) : 0.0;
+    double upper = hasAbove ? std::sqrt(value * next) : 0.0;
+    if (!hasBelow) lower = hasAbove ? value * value / upper : value;
+    if (!hasAbove) upper = hasBelow ? value * value / lower : value;
+    *above = std::max(lower, upper);
+    return std::min(lower, upper);
+}
+
 int lowerBoundRaw(const double* x, int begin, int end, double value)
 {
     int lo = begin, hi = end;
@@ -266,12 +281,13 @@ void resampleRange(
                 // doesn't invert the range. yAxis (the output grid) is always
                 // ascending, so an inverted [yLo, yHi] yields lo > hi below and
                 // the accumulation loop skips every cell -> empty colormap.
-                double prev = (yj > 0) ? acc.yAt(col, yj - 1) : 0;
-                double next = (yj < ys - 1) ? acc.yAt(col, yj + 1) : 0;
-                double gmPrev = (yj > 0 && prev > 0) ? std::sqrt(prev * yVal) : yVal;
-                double gmNext = (yj < ys - 1 && next > 0) ? std::sqrt(yVal * next) : yVal;
-                yLo = std::min(gmPrev, gmNext);
-                yHi = std::max(gmPrev, gmNext);
+                // The ends mirror the known half (see geometricHalf): a log axis' first and last
+                // row cover a full row, as its middle rows do.
+                const double prev = (yj > 0) ? acc.yAt(col, yj - 1) : 0.0;
+                const double next = (yj < ys - 1) ? acc.yAt(col, yj + 1) : 0.0;
+                double gmNext = 0.0;
+                yLo = geometricHalf(prev, yVal, next, &gmNext);
+                yHi = gmNext;
             }
             else if (ySymlog)
             {
@@ -314,16 +330,6 @@ void resampleRange(
     // A column covers the key span halfway to its neighbours *on screen*, as a row does.
     const bool xLog = xScale.isLog();
     const bool xSymlog = !xLog && xScale.isSymlog();
-    const auto xPosition = [&](double key)
-    {
-        if (xLog) return key > 0.0 ? std::log10(key) : std::numeric_limits<double>::quiet_NaN();
-        return xSymlog ? xScale.toScale(key) : key;
-    };
-    const auto xAtPosition = [&](double pos)
-    {
-        if (xLog) return std::pow(10.0, pos);
-        return xSymlog ? xScale.fromScale(pos) : pos;
-    };
 
     // Seed this chunk's own cursor: for the first chunk this is xBegin (same
     // as the single-threaded scan); for any other chunk, a binary search at
@@ -359,37 +365,28 @@ void resampleRange(
             double fillLo, fillHi;
             if (xLog || xSymlog)
             {
-                const double pos = xPosition(xVal);
-                const double left = (ci > 0 && !gapLeft) ? xPosition(acc.xAt(ctxBegin + ci - 1))
-                                                          : pos;
-                const double right = (ci < ctxCount - 1 && !gapRight)
-                    ? xPosition(acc.xAt(ctxBegin + ci + 1)) : pos;
-                const double lo = std::isfinite(left) ? left : pos;
-                const double hi = std::isfinite(right) ? right : pos;
-                double below, above;
-                if (xLog)
+                const double previous = (ci > 0 && !gapLeft) ? acc.xAt(ctxBegin + ci - 1) : 0.0;
+                const double next = (ci < ctxCount - 1 && !gapRight) ? acc.xAt(ctxBegin + ci + 1)
+                                                                     : 0.0;
+                if (xSymlog)
                 {
-                    // Geometric midpoints with each neighbour, as a log axis' rows are: a missing
-                    // one leaves the column on its own value.
-                    const double previous = ci > 0 ? acc.xAt(ctxBegin + ci - 1) : 0.0;
-                    const double next = ci < ctxCount - 1 ? acc.xAt(ctxBegin + ci + 1) : 0.0;
-                    const double geometricBelow = (ci > 0 && !gapLeft && previous > 0)
-                        ? std::sqrt(previous * xVal) : xVal;
-                    const double geometricAbove = (ci < ctxCount - 1 && !gapRight && next > 0)
-                        ? std::sqrt(xVal * next) : xVal;
-                    below = std::log10(std::min(geometricBelow, geometricAbove));
-                    above = std::log10(std::max(geometricBelow, geometricAbove));
-                }
-                else
-                {
-                    // The scale-space midpoints, mirrored at the ends as the rows are.
-                    below = (pos + lo) * 0.5;
-                    above = (pos + hi) * 0.5;
+                    // Scale-space midpoints, a missing end mirrored in the same space.
+                    const double pos = xScale.toScale(xVal);
+                    const double lo = std::isfinite(previous) && previous != 0.0
+                        ? xScale.toScale(previous) : pos;
+                    const double hi = std::isfinite(next) && next != 0.0 ? xScale.toScale(next)
+                                                                        : pos;
+                    double below = (pos + lo) * 0.5;
+                    double above = (pos + hi) * 0.5;
                     if (ci <= 0 || gapLeft) below = 2.0 * pos - above;
                     if (ci >= ctxCount - 1 || gapRight) above = 2.0 * pos - below;
+                    fillLo = xScale.fromScale(std::min(below, above));
+                    fillHi = xScale.fromScale(std::max(below, above));
                 }
-                fillLo = xAtPosition(std::min(below, above));
-                fillHi = xAtPosition(std::max(below, above));
+                else if (xVal > 0.0)
+                    fillLo = geometricHalf(previous, xVal, next, &fillHi);
+                else
+                    fillLo = fillHi = std::numeric_limits<double>::quiet_NaN();
             }
             else
             {
@@ -615,7 +612,7 @@ QCPColorMapData* resample(
 
     // Reuse cached Y axis when Y parameters haven't changed (avoids pow10 on X-only pans)
     std::vector<double> yAxis;
-    if (cache && cache->ny == ny && cache->yScale == yScale && cache->xScale == xScale
+    if (cache && cache->ny == ny && cache->yScale == yScale
         && cache->yLower == yRange.lower && cache->yUpper == yRange.upper)
     {
         yAxis = cache->yAxis;
@@ -629,7 +626,6 @@ QCPColorMapData* resample(
             cache->yLower = yRange.lower;
             cache->yUpper = yRange.upper;
             cache->ny = ny;
-            cache->xScale = xScale;
             cache->yScale = yScale;
         }
     }

@@ -129,6 +129,57 @@ void QCPGraph::followAxes()
                               [this] { linesChanged(); });
     linesChanged(); // pixels computed for the old axes mean nothing on the new ones
     mL2Dirty = mL1Cache != nullptr; // nor do the bins resampled for the old key range
+    // An axis change inside the cartesian branch keeps the L1 only while the key space is the same
+    // one: a new axis on another scale needs its bins built there.
+    const QCPScale keyScale = keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
+    if (mL1Cache && !(keyScale == mL1Scale))
+        restartL1Cache();
+}
+
+// The L1 job is viewport independent: the key scale it bins in is captured here, so a new axis or
+// a new scale needs a new closure.
+void QCPGraph::bakeL1Transform(const QCPMultiDataSource& src)
+{
+    mL1Scale = keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
+    ensureL1Transform(mPipeline, src.size(), src.columnCount(), mWantOrigin, mL1Scale);
+}
+
+// Bins are equal in one space: a linear bin 100 wide around zero holds the whole symlog band. A new
+// key space makes them meaningless, not stale, so they go and a job of the old space must never be
+// installed -- the accepted generation moves, as dataChanged() moves it.
+void QCPGraph::restartL1Cache()
+{
+    mL1Cache.reset();
+    mL2Result.reset();
+    mL2Dirty = false;
+    if (drawsInDataSpace() || !mDataSource)
+    {
+        linesChanged();
+        return;
+    }
+    if (mPendingSource)
+    {
+        // The staged source needs its own job in the new space; re-staging gives it a fresh
+        // generation, so the result of the old one can never be committed.
+        auto pending = mPendingSource;
+        auto colours = std::move(mPendingColorValues);
+        stagePendingSource(std::move(pending));
+        mPendingColorValues = std::move(colours);
+        linesChanged();
+        return;
+    }
+    mNeedsResampling = isAboveResampleThreshold(*mDataSource);
+    bakeL1Transform(*mDataSource);
+    const QPointer<QCPGraph> alive(this);
+    if (mPipeline.hasTransform())
+        mPipeline.onDataChanged();
+    else if (mParentPlot)
+        mParentPlot->replot();
+    if (!alive)
+        return; // a busyChanged slot deleted this graph
+    mAcceptedGeneration = mPipeline.hasTransform() ? mPipeline.currentGeneration()
+                                                    : mPipeline.currentGeneration() + 1;
+    linesChanged();
 }
 
 void QCPGraph::systemDidChange()
@@ -181,8 +232,7 @@ void QCPGraph::systemDidChange()
     }
     if (mDataSource)
     {
-        ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin,
-                          keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale());
+        bakeL1Transform(*mDataSource);
         const QPointer<QCPGraph> alive(this);
         mPipeline.setSource(mDataSource);
         if (!alive)
@@ -557,8 +607,7 @@ void QCPGraph::applySourceNow(std::shared_ptr<QCPMultiDataSource> source)
         return;
     }
     mPipelineBypassed = false;
-    ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin,
-                      keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale());
+    bakeL1Transform(*mDataSource);
     // The pipeline's busyChanged slot may delete this graph.
     const QPointer<QCPGraph> alive(this);
     mPipeline.setSource(mDataSource);
@@ -593,8 +642,7 @@ void QCPGraph::stagePendingSource(std::shared_ptr<QCPMultiDataSource> source)
         updateEffectiveBusy();
         return;
     }
-    ensureL1Transform(mPipeline, mPendingSource->size(), mPendingSource->columnCount(), mWantOrigin,
-                      keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale());
+    bakeL1Transform(*mPendingSource);
     // The pipeline's busyChanged slot may delete this graph.
     const QPointer<QCPGraph> alive(this);
     mPipeline.setSource(mPendingSource);
@@ -659,8 +707,7 @@ bool QCPGraph::commitPendingData()
         // A source staged on the data-space branch had no job. Now that it is the displayed
         // cartesian source, start one; otherwise the frame has no L1 to draw until something
         // else invalidates the pipeline.
-        ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin,
-                          keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale());
+        bakeL1Transform(*mDataSource);
         const QPointer<QCPGraph> alive(this);
         mPipeline.setSource(mDataSource);
         if (!alive)
@@ -694,8 +741,7 @@ void QCPGraph::dataChanged()
         applyColorSizeRule(mDataSource->size());
         mNeedsResampling = !drawsInDataSpace() && isAboveResampleThreshold(*mDataSource);
         if (!drawsInDataSpace())
-            ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin,
-                              keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale());
+            bakeL1Transform(*mDataSource);
     }
 
     mL1Cache.reset();
@@ -751,21 +797,7 @@ void QCPGraph::rebuildL2(const ViewportParams& vp) const
 // build them again.
 void QCPGraph::onKeyScaleChanged()
 {
-    if (mDataSource && !drawsInDataSpace())
-    {
-        mL1Cache.reset();
-        mL2Result.reset();
-        mL2Dirty = false;
-        mNeedsResampling = isAboveResampleThreshold(*mDataSource);
-        ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin,
-                          keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale());
-        // A job already running holds bins of the old scale: this one supersedes it.
-        const QPointer<QCPGraph> alive(this);
-        mPipeline.onDataChanged();
-        if (!alive)
-            return;
-    }
-    linesChanged();
+    restartL1Cache();
 }
 
 void QCPGraph::onViewportChanged(const QCPRange& newRange, const QCPRange& oldRange)

@@ -1324,3 +1324,68 @@ void TestDataSource2D::colormap2KeyAxisFollowsTheScale()
     QCustomPlot logPlot;
     plateausAreEvenIn(logPlot, QCPScale::log(), { 1.0, 10.0, 100.0, 1000.0 });
 }
+
+// A log axis' first and last column (and row) cover a full one: the missing half is mirrored in
+// log space, so the data spreads half a cell past its own key. The colour map clamps its grid to
+// the data, so this is measured on the resampler itself, which takes the wider range.
+void TestDataSource2D::resampleLogAxisEndsAreFullWidth()
+{
+    const QCPScale logScale = QCPScale::log();
+    const std::vector<double> x { 0.0, 1.0 };
+    const std::vector<double> y { 10.0, 100.0 };
+    std::vector<double> z; // row-major: z[i * 2 + j]
+    for (int i = 0; i < 2; ++i)
+        for (int j = 0; j < 2; ++j)
+            z.push_back(y[j]);
+    QCPSoADataSource2D src(x, y, z);
+
+    std::unique_ptr<QCPColorMapData> rows(qcp::algo2d::resample(
+        src, 0, 2, QCPRange(0, 1), QCPRange(1, 1000), 2, 200, logScale, QCPScale(), 0.0, nullptr,
+        /*forceSerial=*/true));
+    QVERIFY(rows);
+    int firstRow = -1;
+    for (int row = 0; row < rows->valueSize(); ++row)
+        if (!std::isnan(rows->cell(0, row)))
+        {
+            firstRow = row;
+            break;
+        }
+    QVERIFY(firstRow > 0);
+    // log10(1) .. log10(1000) over valueSize rows: the first data row is at 10, its span starts
+    // at 10/sqrt(10) = 3.16 (without the mirror it would start at 10).
+    const double rowsSpan = std::log10(1000.0) - std::log10(1.0);
+    const double firstRowStart = std::pow(10.0,
+        std::log10(1.0) + (firstRow - 0.5) * rowsSpan / rows->valueSize());
+    QVERIFY2(firstRowStart < 5.0,
+             qPrintable(QString("the first row starts at %1, not ~3.2").arg(firstRowStart)));
+
+    std::vector<double> y2 { 0.0, 1.0 };
+    std::vector<double> z2; // z[i * 2 + j], every column's value = its key
+    for (double xi : { 10.0, 100.0 })
+        for (int j = 0; j < 2; ++j)
+            z2.push_back(xi);
+    // The columns' keys, not their index.
+    QCPSoADataSource2D srcX(std::vector<double> { 10.0, 100.0 }, y2, z2);
+    std::unique_ptr<QCPColorMapData> columns(qcp::algo2d::resample(
+        srcX, 0, 2, QCPRange(1, 1000), QCPRange(0, 1), 200, 2, QCPScale(), QCPScale(), 0.0,
+        nullptr, /*forceSerial=*/true, logScale));
+    QVERIFY(columns);
+    int firstColumn = -1, lastColumn = -1;
+    for (int col = 0; col < columns->keySize(); ++col)
+        if (!std::isnan(columns->cell(col, 0)))
+        {
+            if (firstColumn < 0)
+                firstColumn = col;
+            lastColumn = col;
+        }
+    QVERIFY(firstColumn > 0 && lastColumn > firstColumn);
+    const double columnsSpan = std::log10(1000.0) - std::log10(1.0);
+    const auto keyAtColumnEdge = [&](double edge)
+    { return std::pow(10.0, std::log10(1.0) + edge * columnsSpan / columns->keySize()); };
+    QVERIFY2(keyAtColumnEdge(firstColumn - 0.5) < 5.0,
+             qPrintable(QString("the first column starts at %1, not ~3.2")
+                            .arg(keyAtColumnEdge(firstColumn - 0.5))));
+    QVERIFY2(keyAtColumnEdge(lastColumn + 0.5) > 200.0,
+             qPrintable(QString("the last column ends at %1, not ~316")
+                            .arg(keyAtColumnEdge(lastColumn + 0.5))));
+}

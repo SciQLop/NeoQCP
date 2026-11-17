@@ -505,18 +505,10 @@ inline int l2BinCount(const ViewportParams& vp)
 template <typename Source>
 inline bool fewEnoughToDrawRaw(const Source& raw, const ViewportParams& vp)
 {
-    QCPRange scan = lineCacheKeyRange(vp.keyRange, vp.keyScale);
     // The window is widened by its own span so a pan is served from the same bins. On a symlog
-    // axis that widening leaves the data (fromScale of minus a span is enormous), and a source
-    // asked for rows beyond its own range answers none: clamp the probe to the data, or every
-    // symlog viewport would look empty and never build its L2.
-    bool found = false;
-    const QCPRange data = raw.keyRange(found);
-    if (found)
-    {
-        scan.lower = std::max(scan.lower, data.lower);
-        scan.upper = std::min(scan.upper, data.upper);
-    }
+    // axis that widening leaves the data entirely (fromScale of minus a span is enormous): both
+    // searches then answer the source's first and past-the-end rows, which is the whole source.
+    const QCPRange scan = lineCacheKeyRange(vp.keyRange, vp.keyScale);
     return raw.findEnd(scan.upper) - raw.findBegin(scan.lower) <= l2BinCount(vp);
 }
 

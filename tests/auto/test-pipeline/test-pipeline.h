@@ -224,6 +224,8 @@ private slots:
     void contourLevelsOnSymlog();
     void graphBinsASymlogKeyAxisInScaleSpace();
     void aGraphRebinsWhenTheKeyScaleChanges();
+    void aGraphFollowsANewKeyAxisScale();
+    void aGraphRejectsAnOldScaleBinLandingLate();
     void graphThinningFollowsTheScaleWindow();
     void stepCentreOnASymlogAxis();
     void fillThinningOnSymlog();

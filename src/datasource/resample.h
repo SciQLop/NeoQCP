@@ -16,7 +16,6 @@ struct ResampleCache
     std::vector<double> yAxis;
     double yLower = 0, yUpper = 0;
     int ny = 0;
-    QCPScale xScale;
     QCPScale yScale;
 
     // Reusable scratch buffers for the accumulation loop. Reused across jobs

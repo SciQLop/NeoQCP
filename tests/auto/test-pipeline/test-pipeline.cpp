@@ -61,13 +61,14 @@ public:
         found = mN > 0;
         return QCPRange(-1, 1);
     }
+    // Clamp before the cast: a key window widened to a symlog span is far outside int.
     int findBegin(double sortKey, bool) const override
     {
-        return std::clamp(static_cast<int>(sortKey), 0, mN);
+        return static_cast<int>(std::clamp(sortKey, 0.0, static_cast<double>(mN)));
     }
     int findEnd(double sortKey, bool) const override
     {
-        return std::clamp(static_cast<int>(std::ceil(sortKey)) + 1, 0, mN);
+        return static_cast<int>(std::clamp(std::ceil(sortKey) + 1.0, 0.0, static_cast<double>(mN)));
     }
 private:
     int mN;
@@ -95,13 +96,15 @@ public:
         found = mN > 0;
         return QCPRange(-mSpan, mSpan);
     }
+    // Clamp before the cast: a key window widened to a symlog span is far outside int.
     int findBegin(double sortKey, bool) const override
     {
-        return std::clamp(static_cast<int>(std::ceil(tOf(sortKey))), 0, mN);
+        return static_cast<int>(std::clamp(std::ceil(tOf(sortKey)), 0.0, static_cast<double>(mN)));
     }
     int findEnd(double sortKey, bool) const override
     {
-        return std::clamp(static_cast<int>(std::floor(tOf(sortKey))) + 1, 0, mN);
+        return static_cast<int>(
+            std::clamp(std::floor(tOf(sortKey)) + 1.0, 0.0, static_cast<double>(mN)));
     }
 
 private:
@@ -4105,6 +4108,14 @@ void TestPipeline::aGraphRebinsWhenTheKeyScaleChanges()
             QVERIFY2(std::abs((scale.toScale(upper) - scale.toScale(centre)) - 0.5 * binWidth)
                          <= 1e-9 * span,
                      "the L2 keys are not even in the axis' current scale");
+            // value == key: a bin's pair spans its own width only if its L1 bins were built in
+            // this same space, so a stale-scale L1 fails here too.
+            const double min = g->mL2Result->valueAt(0, 2 * b);
+            const double max = g->mL2Result->valueAt(0, 2 * b + 1);
+            if (std::isnan(min) || std::isnan(max))
+                continue;
+            QVERIFY2(std::abs(scale.toScale(max) - scale.toScale(min)) <= 1.5 * binWidth,
+                     "the L1 bins are of another scale");
         }
     };
     keysAreEvenIn(QCPScale());
@@ -4204,19 +4215,29 @@ void TestPipeline::fillThinningOnSymlog()
     mPlot->xAxis->setScale(symlog);
     mPlot->xAxis->setRange(-1e6, 1e6);
     mPlot->yAxis->setRange(-1, 1);
+    // A real pixel width: the binning is a pixel decision, and an unlaid-out rect is 0 px wide.
+    mPlot->resize(400, 300);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const int width = mPlot->axisRect()->rect().width();
+    QVERIFY2(width > 100, qPrintable(QString("axis rect is %1 px wide").arg(width)));
 
     const int n = 4000;
+    const double keysLo = symlog.toScale(-1e6);
+    const double keysHi = symlog.toScale(1e6);
     std::vector<qcp::fill::StripPoint> rows;
     rows.reserve(n);
     for (int i = 0; i < n; ++i)
-        rows.push_back({ -1e6 + 2e6 * i / (n - 1), 0.0, (i % 2) ? 1.0 : -1.0, false, i });
+        rows.push_back({ symlog.fromScale(keysLo + (keysHi - keysLo) * i / (n - 1)), 0.0,
+                         (i % 2) ? 1.0 : -1.0, false, i });
     const auto spans = g->binnedWhenDense(std::move(rows));
     QVERIFY2(spans.size() >= 2, "the fill was binned");
 
-    const int width = mPlot->axisRect()->rect().width();
+    // Four bins per pixel, so a full scan is about 4 * width spans: a 0 px rect would say 4.
+    QVERIFY2(spans.size() > std::size_t(2 * width),
+             qPrintable(QString("%1 spans over %2 px").arg(spans.size()).arg(width)));
     const double lo = symlog.toScale(-1e6);
     const double span = symlog.toScale(1e6) - lo;
-    const double binWidth = span / (4.0 * std::max(1, width));
+    const double binWidth = span / (4.0 * width);
     for (std::size_t i = 1; i < spans.size(); ++i)
         QVERIFY2(std::abs((symlog.toScale(spans[i].key) - symlog.toScale(spans[i - 1].key))
                           - binWidth)
@@ -4294,4 +4315,73 @@ void TestPipeline::histogramsRebinOnASymlogScaleChange()
     mPlot->xAxis->setScale(symlog2);
     QTRY_VERIFY_WITH_TIMEOUT(rebinned(), 5000);
 
+}
+
+void TestPipeline::aGraphFollowsANewKeyAxisScale()
+{
+    // Moving a graph to another key axis is not a branch change, but the new axis' scale is a
+    // different space: the bins of the old one must go.
+    auto* g = mPlot->add<QCPGraph>().get();
+    auto source = std::make_shared<SymmetricLargeMultiSource>(200'000, 1e6);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    mPlot->xAxis->setRange(-1e6, 1e6);
+    mPlot->yAxis->setRange(-1e6, 1e6);
+    g->setDataSource(source);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mL1Cache);
+    QCOMPARE(g->mL1Cache->keyScale, QCPScale());
+
+    const QCPScale symlog = QCPScale::symlog(2);
+    mPlot->xAxis2->setScale(symlog);
+    mPlot->xAxis2->setRange(-1e6, 1e6);
+    const int finishedBefore = spy.count();
+    g->setKeyAxis(mPlot->xAxis2);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() > finishedBefore, 10000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mL1Cache);
+    QVERIFY2(g->mL1Cache->keyScale == symlog, "the L1 bins followed the new key axis' scale");
+
+    const ViewportParams vp = ViewportParams::fromAxes(mPlot->xAxis2, mPlot->yAxis);
+    const int bins = qcp::algo::l2BinCount(vp);
+    const double lo = symlog.toScale(vp.keyRange.lower);
+    const double span = symlog.toScale(vp.keyRange.upper) - lo;
+    const double binWidth = span / bins;
+    for (int b = 0; 2 * b + 1 < g->mL2Result->size(); ++b)
+    {
+        const double min = g->mL2Result->valueAt(0, 2 * b);
+        const double max = g->mL2Result->valueAt(0, 2 * b + 1);
+        if (std::isnan(min) || std::isnan(max))
+            continue;
+        QVERIFY2(std::abs(symlog.toScale(max) - symlog.toScale(min)) <= 1.5 * binWidth,
+                 "an L2 bin spans more than its own width: its L1 bins are of another scale");
+    }
+}
+
+void TestPipeline::aGraphRejectsAnOldScaleBinLandingLate()
+{
+    // The L1 job runs on a pool: one started before the scale change lands after it. Its bins are
+    // meaningless in the new space and must never be installed -- not even for one frame.
+    auto* g = mPlot->add<QCPGraph>().get();
+    auto source = std::make_shared<SymmetricLargeMultiSource>(2'000'000, 1e6);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    mPlot->xAxis->setRange(-1e6, 1e6);
+    mPlot->yAxis->setRange(-1e6, 1e6);
+
+    bool scaleChanged = false;
+    bool sawOldScale = false;
+    // The graph's own slot runs first (it is connected in the constructor), so this one sees what
+    // the graph just installed.
+    QObject::connect(&g->pipeline(), &QCPGraphPipeline::finished, g, [&](uint64_t) {
+        if (scaleChanged && g->mL1Cache && !g->mL1Cache->keyScale.isSymlog())
+            sawOldScale = true;
+    });
+    g->setDataSource(source); // starts an L1 build in the linear space
+    scaleChanged = true;
+    mPlot->xAxis->setScale(QCPScale::symlog(2)); // before it lands
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 60000);
+    QVERIFY2(!sawOldScale, "the linear bins of the superseded job were installed");
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(g->mL1Cache && g->mL1Cache->keyScale.isSymlog(), 60000);
 }
