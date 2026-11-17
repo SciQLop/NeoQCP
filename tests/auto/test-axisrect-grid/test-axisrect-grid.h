@@ -32,6 +32,7 @@ private slots:
     void dragAndZoomMoveTheColumn();
     void aSecondCallReshares();
     void sharingAndAFullAxesBox();
+    void aShareThatWouldBreakAMappedLinkIsRefused();
 
 private:
     void renderOnce(QSize size);

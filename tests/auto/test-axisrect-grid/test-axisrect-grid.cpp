@@ -522,17 +522,17 @@ void TestAxisRectGrid::aSecondCallReshares()
 {
     // P-5, M2: unsharing removes the grid's links and shows the labels the grid hid, never a
     // label the user hid.
-    mPlot->setAxisRectGrid(2, 2, { .shareX = true });
-    QCPAxis* userHidden = mPlot->axisRect(1, 1)->xAxis().get(); // a source: the grid keeps its labels
-    userHidden->setTickLabels(false);
     mPlot->setAxisRectGrid(2, 2);
+    QCPAxis* userHidden = mPlot->axisRect(0, 1)->xAxis().get(); // a follower-to-be the user hid
+    userHidden->setTickLabels(false);
+    mPlot->setAxisRectGrid(2, 2, { .shareX = true });
+    QCOMPARE(userHidden->linkSource(), mPlot->axisRect(1, 1)->xAxis().get());
+    QVERIFY(!mPlot->axisRect(0, 0)->xAxis()->tickLabels());
+    mPlot->setAxisRectGrid(2, 2);
+    QVERIFY(mPlot->axisRect(0, 0)->xAxis()->tickLabels()); // the grid hid it: shown again
     for (int column = 0; column < 2; ++column)
-    {
-        QCPAxis* top = mPlot->axisRect(0, column)->xAxis().get();
-        QCOMPARE(top->linkSource(), nullptr);
-        QVERIFY(top->tickLabels());
-    }
-    QVERIFY(!userHidden->tickLabels());
+        QCOMPARE(mPlot->axisRect(0, column)->xAxis()->linkSource(), nullptr);
+    QVERIFY(!userHidden->tickLabels()); // the user hid it before the share: it stays hidden
     mPlot->axisRect(0, 0)->xAxis()->setRange(3, 7);
     QVERIFY(mPlot->axisRect(1, 0)->xAxis()->range() != QCPRange(3, 7));
     QCOMPARE(gMisuses, 0);
@@ -548,6 +548,22 @@ void TestAxisRectGrid::sharingAndAFullAxesBox()
     top->setupFullAxesBox(true);
     QCOMPARE(top->axis(QCPAxis::atTop)->linkSource(), bottom->xAxis().get());
     QCOMPARE(gMisuses, 0);
+    mPlot->setAxisRectGrid(2, 1);
+    QCOMPARE(top->xAxis()->linkSource(), nullptr);
+    QCOMPARE(gMisuses, 0);
+
+    // An axis handed over while another is shared returns to its own source, not the grid's.
+    QCustomPlot three;
+    three.setAxisRectGrid(3, 1);
+    QCPAxis* r0 = three.axisRect(0, 0)->xAxis().get();
+    QCPAxis* r1 = three.axisRect(1, 0)->xAxis().get();
+    r1->linkTo(r0);
+    three.setAxisRectGrid(3, 1, { .shareX = true });
+    QCOMPARE(r1->linkSource(), three.axisRect(2, 0)->xAxis().get());
+    three.setAxisRectGrid(3, 1);
+    QCOMPARE(r1->linkSource(), r0);
+    QCOMPARE(r0->linkSource(), nullptr);
+    QCOMPARE(gMisuses, 0);
 
     QCustomPlot other;
     other.axisRect()->setupFullAxesBox(true);
@@ -560,4 +576,21 @@ void TestAxisRectGrid::sharingAndAFullAxesBox()
     QCOMPARE(first->xAxis()->linkSource(), nullptr);
     QCOMPARE(first->axis(QCPAxis::atTop)->linkSource(), first->xAxis().get());
     QCOMPARE(gMisuses, 0);
+}
+
+void TestAxisRectGrid::aShareThatWouldBreakAMappedLinkIsRefused()
+{
+    // A top axis in other units follows the bottom axis through functions: sharing that bottom axis
+    // would replace the link. The call is refused whole: one report, nothing changed.
+    mPlot->setAxisRectGrid(2, 1);
+    QCPAxisRect* top = mPlot->axisRect(0, 0).get();
+    QCPAxis* units = top->axis(QCPAxis::atTop).get();
+    units->linkTo(top->xAxis(), [](double v) { return 2 * v; }, [](double v) { return v / 2; });
+    gMisuses = 0;
+    mPlot->setAxisRectGrid(2, 1, { .shareX = true });
+    QCOMPARE(gMisuses, 1);
+    QCOMPARE(top->xAxis()->linkSource(), nullptr);
+    QVERIFY(top->xAxis()->tickLabels());
+    QCOMPARE(units->linkSource(), top->xAxis().get());
+    QCOMPARE(mPlot->axisRectCount(), 2);
 }

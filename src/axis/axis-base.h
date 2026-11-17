@@ -165,6 +165,8 @@ public:
     [[nodiscard]] bool isIdentityFollower() const;
     //! The axes following this one through links with no functions.
     [[nodiscard]] QList<QCPAxisBase*> identityFollowers() const;
+    //! Every axis following this one, through functions or not.
+    [[nodiscard]] QList<QCPAxisBase*> linkedFollowers() const;
     //! The plottables of every system that maps through this axis, in the plot's own order.
     virtual QList<QCPHandle<QCPPlottable>> plottables() const;
 

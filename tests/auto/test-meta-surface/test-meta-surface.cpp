@@ -1206,6 +1206,17 @@ const QVector<Writer>& writers()
           [](QObject* o) { qobject_cast<QCPAxis*>(o)->parentPlot()->xAxis->setScale(QCPScale::log()); },
           { "scale" },
           { } },
+        { "QCustomPlot::setAxisRectGrid hides a shared follower's tick labels",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              plot.setAxisRectGrid(2, 1);
+              return plot.axisRect(0, 0)->xAxis().get();
+          },
+          [](QObject* o)
+          { qobject_cast<QCPAxis*>(o)->parentPlot()->setAxisRectGrid(2, 1, { .shareX = true }); },
+          { "tickLabels" },
+          { },
+          false }, // a repeat call unshares then shares again
         { "QCPAxis::setColor",
           [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
           [](QObject* o) { qobject_cast<QCPAxis*>(o)->setColor(Qt::red); },

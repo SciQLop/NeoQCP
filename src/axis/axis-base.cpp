@@ -524,6 +524,15 @@ QList<QCPAxisBase*> QCPAxisBase::identityFollowers() const
     return result;
 }
 
+QList<QCPAxisBase*> QCPAxisBase::linkedFollowers() const
+{
+    QList<QCPAxisBase*> result;
+    for (const QPointer<QCPAxisBase>& user : mLinkedAxes)
+        if (user)
+            result.append(user.data());
+    return result;
+}
+
 bool QCPAxisBase::isIdentityFollower() const
 {
     return mLink && mLink->identity && mLink->source;

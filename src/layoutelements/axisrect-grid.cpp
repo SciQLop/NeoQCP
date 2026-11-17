@@ -10,6 +10,7 @@
 #include "layoutelement-axisrect.h"
 #include "layoutelement-legend.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace
@@ -175,11 +176,10 @@ QList<QCPLayoutElement*> gridRow(QCPLayoutGrid& layout, int row, int columns)
     return members;
 }
 
-//! Takes the plot's legend out of the dropped rect it sits in, so the plot keeps its legend.
-//! Returns whether it did: a legend the user had taken out of every layout stays out.
 // Undoes the shares a previous call made (P-5): the grid's followers leave their sources, the axes
 // the share handed over return to the source they had (a full axes box's top axis, say), and the
-// tick labels the grid hid show again. A label the user hid stays hidden.
+// tick labels the grid hid show again (even if the user set them while shared: the grid cannot
+// tell). A label the user hid before the share stays hidden.
 void unshare(QList<QCPAxisRectGridState::Share>& shares)
 {
     const QList<QCPAxisRectGridState::Share> records = shares;
@@ -198,45 +198,93 @@ void unshare(QList<QCPAxisRectGridState::Share>& shares)
     }
 }
 
-// Links \a follower to \a source without functions and hides its tick labels (P-2), recording what
-// unsharing restores: the follower's own identity source, and the identity followers it drove,
-// which linkTo hands to \a source (C4).
-void shareAxis(QCPAxis* follower, QCPAxis* source, QList<QCPAxisRectGridState::Share>& shares)
+// The (follower, source) pairs the options ask for, in the cells that hold rects now.
+QList<std::pair<QCPAxis*, QCPAxis*>> plannedShares(QCPLayoutGrid& layout, int rows, int columns,
+                                                   const QCPAxisRectGridOptions& options)
 {
-    if (!follower || !source || follower == source)
-        return;
-    for (QCPAxisBase* user : follower->identityFollowers())
-        if (auto* axis = qobject_cast<QCPAxis*>(user))
-            shares.append({ axis, follower, false });
-    auto* original = follower->isIdentityFollower()
-        ? qobject_cast<QCPAxis*>(follower->linkSource())
-        : nullptr;
-    const bool hide = follower->tickLabels();
-    shares.append({ follower, original, hide });
-    follower->linkTo(source);
-    if (hide)
-        follower->setTickLabels(false);
+    const auto rect = [&](int row, int column) -> QCPAxisRect*
+    {
+        if (row >= layout.rowCount() || column >= layout.columnCount())
+            return nullptr;
+        return qobject_cast<QCPAxisRect*>(layout.element(row, column).get());
+    };
+    QList<std::pair<QCPAxis*, QCPAxis*>> pairs;
+    if (options.shareX)
+        for (int column = 0; column < columns; ++column)
+            if (QCPAxisRect* bottom = rect(rows - 1, column); bottom && bottom->xAxis())
+                for (int row = 0; row < rows - 1; ++row)
+                    if (QCPAxisRect* above = rect(row, column); above && above->xAxis())
+                        pairs.append(std::pair { above->xAxis().get(), bottom->xAxis().get() });
+    if (options.shareY)
+        for (int row = 0; row < rows; ++row)
+            if (QCPAxisRect* left = rect(row, 0); left && left->yAxis())
+                for (int column = 1; column < columns; ++column)
+                    if (QCPAxisRect* right = rect(row, column); right && right->yAxis())
+                        pairs.append(std::pair { right->yAxis().get(), left->yAxis().get() });
+    return pairs;
 }
 
+// Whether every planned share can be an identity link: no axis taking part follows or drives a
+// link through functions (a top axis in other units, say), which a share would break.
+bool sharesAreLinkable(const QList<std::pair<QCPAxis*, QCPAxis*>>& pairs)
+{
+    const auto mapped = [](const QCPAxisBase* axis)
+    { return axis->linkSource() && !axis->isIdentityFollower(); };
+    const auto drivesMapped = [](const QCPAxisBase* axis)
+    {
+        const auto users = axis->linkedFollowers();
+        return std::any_of(users.cbegin(), users.cend(),
+                           [](const QCPAxisBase* user) { return !user->isIdentityFollower(); });
+    };
+    return std::none_of(pairs.cbegin(), pairs.cend(),
+                        [&](const auto& pair)
+                        {
+                            return mapped(pair.first) || drivesMapped(pair.first)
+                                || mapped(pair.second);
+                        });
+}
+
+// Shares the planned pairs (P-2): records what unsharing restores first, for every axis taking part,
+// before any link moves (C4: the identity followers a follower drives are handed to its source),
+// then links and hides the followers' tick labels.
 void shareAxes(QCPLayoutGrid& layout, int rows, int columns, const QCPAxisRectGridOptions& options,
                QList<QCPAxisRectGridState::Share>& shares)
 {
-    const auto rect = [&](int row, int column)
-    { return qobject_cast<QCPAxisRect*>(layout.element(row, column).get()); };
-    if (options.shareX)
-        for (int column = 0; column < columns; ++column)
-            if (QCPAxisRect* bottom = rect(rows - 1, column))
-                for (int row = 0; row < rows - 1; ++row)
-                    if (QCPAxisRect* above = rect(row, column))
-                        shareAxis(above->xAxis().get(), bottom->xAxis().get(), shares);
-    if (options.shareY)
-        for (int row = 0; row < rows; ++row)
-            if (QCPAxisRect* left = rect(row, 0))
-                for (int column = 1; column < columns; ++column)
-                    if (QCPAxisRect* right = rect(row, column))
-                        shareAxis(right->yAxis().get(), left->yAxis().get(), shares);
+    const QList<std::pair<QCPAxis*, QCPAxis*>> pairs = plannedShares(layout, rows, columns, options);
+    const auto recorded = [&](const QCPAxis* axis)
+    {
+        return std::any_of(shares.cbegin(), shares.cend(),
+                           [axis](const QCPAxisRectGridState::Share& s) { return s.follower == axis; });
+    };
+    for (const auto& [follower, source] : pairs)
+    {
+        if (!recorded(follower))
+            shares.append(QCPAxisRectGridState::Share {
+                follower,
+                follower->isIdentityFollower() ? qobject_cast<QCPAxis*>(follower->linkSource())
+                                               : nullptr,
+                false });
+        for (QCPAxisBase* user : follower->identityFollowers())
+            if (auto* axis = qobject_cast<QCPAxis*>(user); axis && !recorded(axis))
+                shares.append(QCPAxisRectGridState::Share { axis, follower, false });
+    }
+    for (const auto& [follower, source] : pairs)
+    {
+        if (follower == source)
+            continue;
+        follower->linkTo(source);
+        auto& record = *std::find_if(shares.begin(), shares.end(),
+                                     [follower](const auto& s) { return s.follower == follower; });
+        if (follower->tickLabels() && !record.hidLabels)
+        {
+            record.hidLabels = true;
+            follower->setTickLabels(false);
+        }
+    }
 }
 
+//! Takes the plot's legend out of the dropped rect it sits in, so the plot keeps its legend.
+//! Returns whether it did: a legend the user had taken out of every layout stays out.
 bool rescueLegend(QCPLayoutGrid& layout, const QPointer<QCPLayoutElement>& legend, int rows,
                   int columns)
 {
@@ -291,6 +339,10 @@ bool qcp::applyAxisRectGrid(QCPLayoutGrid& layout, int rows, int columns,
     QCP_CHECK_OR_RETURN(gridCellsAreRects(layout),
                         "the plot layout holds something that is not an axis rect (a title row, a "
                         "nested layout, a polar area): setAxisRectGrid builds from axis rects only",
+                        false);
+    QCP_CHECK_OR_RETURN(sharesAreLinkable(plannedShares(layout, rows, columns, options)),
+                        "an axis the grid would share follows or drives a link through functions "
+                        "(an axis in other units): unlink it first",
                         false);
 
     // Undo the previous call's groups: their members are about to be regrouped by row and column.
