@@ -195,7 +195,6 @@ protected:
     bool ownDataRange(bool, QCP::SignDomain, QCPRange&) const override { return false; }
 
 public:
-
     double coordToAngleRad(double coord) const
     {
         return mAngleRad

@@ -785,6 +785,14 @@ void TestLinkedAxes::anIdentityLinkSharesTheScale()
     same.xAxis2->setTicker(ticker);
     same.xAxis2->linkTo(same.xAxis);
     QCOMPARE(same.xAxis2->ticker(), QSharedPointer<QCPAxisTicker>(ticker));
+    // A different scale at the link brings its own ticker, as setScale does.
+    QCustomPlot other;
+    other.xAxis->setScale(QCPScale::log());
+    const auto fixed = QSharedPointer<QCPAxisTickerFixed>::create();
+    other.xAxis2->setTicker(fixed);
+    other.xAxis2->linkTo(other.xAxis);
+    QVERIFY(other.xAxis2->ticker() != QSharedPointer<QCPAxisTicker>(fixed));
+    QVERIFY(qSharedPointerDynamicCast<QCPAxisTickerLog>(other.xAxis2->ticker()));
 
     // A link through functions keeps its own scale.
     QCustomPlot mapped;
@@ -822,6 +830,29 @@ void TestLinkedAxes::identityLinksFlatten()
     root->setRange(3, 4);
     QCOMPARE(plot2.xAxis2->range(), QCPRange(3, 4));
     QCOMPARE(gMisuses, 0);
+    plot2.xAxis->unlink(); // the old driver leaving does not take its handed-over follower along
+    QCOMPARE(plot2.xAxis2->linkSource(), root);
+
+    // A re-pointed follower takes the new source's scale.
+    QCustomPlot plot4;
+    QCPAxisRect* fourth = new QCPAxisRect(&plot4);
+    plot4.plotLayout()->addElement(1, 0, fourth);
+    QCPAxis* logRoot = fourth->axis(QCPAxis::atBottom);
+    logRoot->setRange(1, 100);
+    logRoot->setScale(QCPScale::log());
+    plot4.xAxis2->linkTo(plot4.xAxis);
+    plot4.xAxis->linkTo(logRoot);
+    QCOMPARE(plot4.xAxis2->scale(), QCPScale::log());
+
+    // Through functions, an axis that drives identity followers may not follow anything.
+    QCustomPlot plot5;
+    QCPAxisRect* fifth = new QCPAxisRect(&plot5);
+    plot5.plotLayout()->addElement(1, 0, fifth);
+    plot5.xAxis2->linkTo(plot5.xAxis);
+    plot5.xAxis->linkTo(fifth->axis(QCPAxis::atBottom), twice, half);
+    QCOMPARE(gMisuses, 1);
+    QCOMPARE(plot5.xAxis->linkSource(), nullptr);
+    gMisuses = 0;
 
     // A link through functions does not flatten: chaining to a mapped follower is still refused.
     d->linkTo(a, twice, half);

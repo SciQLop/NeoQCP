@@ -100,8 +100,10 @@ void QCPAxisBase::detachLinks()
   \ref scaleChanged, but still installs its ticker. A scale the axis refuses changes nothing, its
   ticker included: see \ref scaleWillChange.
 
-  A linked axis takes its range from its source: a scale change only picks its ticks, it never
-  writes a sanitized range back into the source.
+  An axis linked with no functions shows its source's values, so it shares the source's scale: a
+  different \a scale set on it goes to the source, which hands it back to every such follower. An
+  axis linked through functions keeps its own scale: it takes its range from its source, so a scale
+  change only picks its ticks and never writes a sanitized range back into the source.
 
   \see QCPScale, setRange, setTicker
 */
@@ -144,7 +146,8 @@ void QCPAxisBase::applyScale(const QCPScale& scale)
     }
     scaleDidChange();
     // Taken before the signal: with no scope open a slot runs now and may delete this axis, so
-    // nothing of it is read after the emit.
+    // nothing of it is read after the emit. (A source with followers always defers: they count in
+    // defersEmissions, so its followers get the scale before any slot runs.)
     const QList<QPointer<QCPAxisBase>> users = mLinkedAxes;
     qcpEmitCurrent(this, mParentPlot, &QCPAxisBase::scaleChanged, [this] { return mScale; });
     for (const QPointer<QCPAxisBase>& user : users)
@@ -587,9 +590,13 @@ void QCPAxisBase::rescaleTo(const QCPRange& range, bool haveRange)
   Links this axis to \a source: its range follows the source's through \a forward and \a inverse.
   They default to the identity, which makes the two axes show the same range.
 
-  A source must be on the same plot, must not be linked itself, and must not already drive a link;
-  on a cartesian axis it must have the same orientation. What a subclass refuses else it reports
-  from checkLinkSource.
+  A source must be on the same plot; on a cartesian axis it must have the same orientation. What a
+  subclass refuses else it reports from checkLinkSource.
+
+  Without functions the link also shares the source's scale (see setScale), and links stay a star:
+  linking to an axis that itself follows one without functions links to that one's source, and an
+  axis that drives followers without functions hands them to its new source. Through functions,
+  the source must not be linked itself and this axis must not already drive a link.
 */
 void QCPAxisBase::linkTo(QCPAxisBase* source, QCPAxisFunction forward, QCPAxisFunction inverse)
 {
@@ -603,7 +610,7 @@ void QCPAxisBase::linkTo(QCPAxisBase* source, QCPAxisFunction forward, QCPAxisFu
     // Identity links stay a star (pre-flight C4): one to an identity follower goes to its source.
     if (identity && source->isIdentityFollower())
         source = source->mLink->source.data();
-    QCP_CHECK_OR_RETURN(source != this, "an axis cannot be linked to itself", );
+    QCP_CHECK_OR_RETURN(source != this, "the source already follows this axis", );
     if (!checkLinkSource(source))
         return;
     QCP_CHECK_OR_RETURN(!source->mLink, "the source axis is linked itself", );
@@ -619,6 +626,9 @@ void QCPAxisBase::linkTo(QCPAxisBase* source, QCPAxisFunction forward, QCPAxisFu
         forward = [](double v) { return v; };
         inverse = [](double v) { return v; };
     }
+    // Every signal of the link (the re-pointed followers' and this axis' scale and range) waits for
+    // the end of the call: a slot may delete this axis or the source.
+    const QCPEmissionScope scope(mParentPlot);
     if (mLink)
         unlink();
     auto link = std::make_shared<QCPAxisLink>();
@@ -643,10 +653,6 @@ void QCPAxisBase::linkTo(QCPAxisBase* source, QCPAxisFunction forward, QCPAxisFu
             user->mLinked = false;
             user->linkTo(source);
         }
-    // The systems hear of the link when this returns: a slot may delete the axis.
-    std::optional<QCPEmissionScope> scope;
-    if (defersEmissions())
-        scope.emplace(mParentPlot);
     if (identity && mScale != source->mScale)
         applyScale(source->mScale); // shares the source's scale (P-3); the same scale keeps a ticker
     notifyMappingChanged();

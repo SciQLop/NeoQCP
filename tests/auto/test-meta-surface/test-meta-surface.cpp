@@ -1183,6 +1183,29 @@ struct Writer
 const QVector<Writer>& writers()
 {
     static const QVector<Writer> list {
+        // P-3: an identity link shares its source's scale.
+        { "QCPAxisBase::linkTo takes the source's scale",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              plot.xAxis->setScale(QCPScale::log());
+              return plot.xAxis2;
+          },
+          [](QObject* o)
+          {
+              auto* axis = qobject_cast<QCPAxis*>(o);
+              axis->linkTo(axis->parentPlot()->xAxis);
+          },
+          { "scale" },
+          { } },
+        { "QCPAxisBase::setScale on a source reaches its identity follower",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              plot.xAxis2->linkTo(plot.xAxis);
+              return plot.xAxis2;
+          },
+          [](QObject* o) { qobject_cast<QCPAxis*>(o)->parentPlot()->xAxis->setScale(QCPScale::log()); },
+          { "scale" },
+          { } },
         { "QCPAxis::setColor",
           [](QCustomPlot& plot) -> QObject* { return plot.xAxis; },
           [](QObject* o) { qobject_cast<QCPAxis*>(o)->setColor(Qt::red); },
@@ -1893,6 +1916,14 @@ std::pair<QObject*, const char*> armPendingItem(QCustomPlot& plot)
 const QVector<Deleting>& deletingWriters()
 {
     static const QVector<Deleting> list {
+        // linkTo emits the follower's new scale: a slot deleting the follower must find linkTo
+        // done with it.
+        { "QCPAxisBase::linkTo", [](QCustomPlot& plot)
+          {
+              plot.xAxis->setScale(QCPScale::log());
+              return std::pair<QObject*, const char*>(plot.xAxis2.get(), "scale");
+          },
+          [](QCustomPlot& plot) { plot.xAxis2->linkTo(plot.xAxis); } },
         { "QCustomPlot::setTheme", [](QCustomPlot& plot)
           { return std::pair<QObject*, const char*>(plot.xAxis.get(), "basePen"); },
           [](QCustomPlot& plot)
