@@ -24,6 +24,10 @@ private slots:
   void spectrogramSingleRect();
   void aTitleTakesTheTopMargin();
   void aTitleSitsAboveTheTopAxis();
+  void aHiddenRectHidesItsTitleAndColourScale();
+  void aTitleSitsAboveATopColourScale();
+  void aTitleTakesTheTopAxisLabelColour();
+  void aCentredTextIsHitWhereItIsDrawn();
   void titlesInARowAlign();
   void textTakesAPositionAndAStyle();
   void textAppliesEveryStyleField();

@@ -29,8 +29,8 @@
 
 #include "../Profiling.hpp"
 #include "../axis/axis.h"
-#include "../axis/labelrenderer.h"
 #include "../axis/axisticker.h"
+#include "../axis/labelrenderer.h"
 #include "../coordinate-system.h"
 #include "../core.h"
 #include "../items/item.h"
@@ -935,6 +935,7 @@ QCPColorScaleOps<QCPColorScale> QCPAxisRect::colorScale()
     {
         mColorScale = new QCPColorScale(mParentPlot);
         mColorScale->mOwnerRect = this;
+        mColorScale->setParentLayerable(this); // hidden with the rect, as its axes are
         // Off the data layer: a visible bar there would make every pan repaint that layer instead
         // of shifting it. The axes layer repaints on a pan anyway, for its ticks.
         if (QCPLayer* axesLayer = mParentPlot->layer(QLatin1String("axes")))
@@ -1019,9 +1020,10 @@ void QCPAxisRect::colorScaleUsersChanged()
 }
 
 /*!
-  Sets the line of text centred above the rect, in its top margin, as \ref QGroupBox::setTitle. Its
+  Sets the line of text centred above the rect, in its top margin, as QGroupBox::setTitle. Its
   font is the top axis' label font at 1.2 times its point size, in that axis' label colour, so a
-  theme reaches it through the axis. An empty \a title takes no room.
+  theme reaches it through the axis. An empty \a title takes no room. A title wider than the rect
+  is drawn whole, centred, over its neighbours: it is not elided.
 
   The title is drawn on the "axes" layer and exported with the plot. In a grid of rects (\ref
   QCustomPlot::setAxisRectGrid) the rects of a row keep their data tops aligned, titled or not.
@@ -1033,6 +1035,7 @@ void QCPAxisRect::setTitle(const QString& title)
     if (!mTitle)
     {
         mTitle = new QCPTextElement(mParentPlot);
+        mTitle->setParentLayerable(this); // hidden with the rect, as its axes are
         if (QCPLayer* axesLayer = mParentPlot->layer(QLatin1String("axes")))
             mTitle->setLayer(axesLayer);
     }

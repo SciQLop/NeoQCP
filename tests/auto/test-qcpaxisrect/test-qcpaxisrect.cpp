@@ -305,6 +305,97 @@ void TestQCPAxisRect::aTitleSitsAboveTheTopAxis()
     QVERIFY2(!titleInk.isEmpty(), "the title sits in the band above the axis");
 }
 
+void TestQCPAxisRect::aHiddenRectHidesItsTitleAndColourScale()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* rect = plot.axisRect().get();
+    rect->setTitle(QStringLiteral("Hidden with its rect"));
+    std::vector<double> z(4, 1.0);
+    z[3] = 2.0;
+    rect->colorMap(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 }, z);
+    QImage shown = exported(plot);
+    const QRect band(rect->outerRect().left(), rect->outerRect().top(), rect->outerRect().width(),
+                     rect->rect().top() - 2 - rect->outerRect().top());
+    const QRect bar(rect->rect().right() + 2, rect->rect().top(),
+                    rect->outerRect().right() - rect->rect().right() - 2, rect->rect().height());
+    auto inked = [](const QImage& image, const QRect& area)
+    {
+        for (int y = area.top(); y <= area.bottom(); ++y)
+            for (int x = area.left(); x <= area.right(); ++x)
+                if (image.valid(x, y) && qGray(image.pixel(x, y)) < 200)
+                    return true;
+        return false;
+    };
+    QVERIFY2(inked(shown, band), "the title is drawn while the rect is visible");
+    QVERIFY2(inked(shown, bar), "the colour scale is drawn while the rect is visible");
+
+    rect->setVisible(false);
+    const QImage hidden = exported(plot);
+    QVERIFY2(!inked(hidden, band), "a hidden rect's title is hidden too");
+    QVERIFY2(!inked(hidden, bar), "a hidden rect's colour scale is hidden too");
+}
+
+void TestQCPAxisRect::aTitleSitsAboveATopColourScale()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* rect = plot.axisRect().get();
+    auto map = rect->colorMap(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 },
+                              std::vector<double> { 0, 1, 2, 3 });
+    rect->colorScale().setType(QCPAxis::atTop);
+    exported(plot);
+    const int scaleOnly = rect->rect().top() - rect->outerRect().top();
+    QCPColorScale* scale = map->colorScale().get();
+    QVERIFY(scale);
+
+    rect->setTitle(QStringLiteral("Above the bar"));
+    const QImage titled = exported(plot);
+    const int withTitle = rect->rect().top() - rect->outerRect().top();
+    QVERIFY(withTitle - scaleOnly >= titleTextHeight(rect));
+    QVERIFY2(scale->outerRect().top() >= rect->outerRect().top() + withTitle - scaleOnly,
+             "the bar sits below the title");
+    QVERIFY2(!inkBox(titled, rect, rect->outerRect().top(), scale->outerRect().top()).isEmpty(),
+             "the title is drawn above the bar");
+}
+
+void TestQCPAxisRect::aTitleTakesTheTopAxisLabelColour()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* rect = plot.axisRect().get();
+    rect->setTitle(QStringLiteral("Red"));
+    rect->axis(QCPAxis::atTop)->setLabelColor(Qt::red);
+    const QImage titled = exported(plot);
+    const QRect ink = inkBox(titled, rect, rect->outerRect().top(), rect->rect().top() - 2);
+    QVERIFY(!ink.isEmpty());
+    bool red = false;
+    for (int y = ink.top(); y <= ink.bottom() && !red; ++y)
+        for (int x = ink.left(); x <= ink.right() && !red; ++x)
+        {
+            const QColor c = titled.pixelColor(x, y);
+            red = c.red() > 150 && c.green() < 80 && c.blue() < 80;
+        }
+    QVERIFY2(red, "the title is drawn in the top axis' label colour");
+}
+
+void TestQCPAxisRect::aCentredTextIsHitWhereItIsDrawn()
+{
+    // A text element's hit box is the drawn text, wherever its flags put it in the element's rect.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.plotLayout()->insertRow(0);
+    auto* text = new QCPTextElement(&plot, QStringLiteral("centred"));
+    plot.plotLayout()->addElement(0, 0, text);
+    exported(plot);
+    plot.replot(QCustomPlot::rpImmediateRefresh);
+    const QRect area = text->rect();
+    QVERIFY(area.width() > 200);
+    QVERIFY2(text->selectTest(QPointF(area.center()), false) >= 0, "the text is hit where it is drawn");
+    QVERIFY2(text->selectTest(QPointF(area.left() + 3, area.center().y()), false) < 0,
+             "the empty left of the element is not the text");
+}
+
 void TestQCPAxisRect::titlesInARowAlign()
 {
     QCustomPlot plot;

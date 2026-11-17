@@ -31,6 +31,8 @@
 #include "../misuse.h"
 #include "../painting/painter.h"
 
+#include <QStyle>
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPTextElement
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -397,7 +399,8 @@ void QCPTextElement::draw(QCPPainter* painter)
     }
     // The out-parameter drawText fills is what selectTest hit-tests against, so
     // it has to be kept up to date on this path too.
-    mTextBoundingRect = QRect(mRect.topLeft(), renderer->measure(mainFont(), mText));
+    mTextBoundingRect = QStyle::alignedRect(Qt::LeftToRight, Qt::Alignment(mTextFlags),
+                                            renderer->measure(mainFont(), mText), mRect);
     QCPLabelRenderer::drawWith(renderer, painter, mRect, mainFont(), mainTextColor(), mText,
                                mTextFlags);
 }
