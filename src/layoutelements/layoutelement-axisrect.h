@@ -56,6 +56,7 @@ class QCPItem;
 class QCPItemEllipse;
 class QCPItemText;
 class QCPColorScale;
+class QCPTextElement;
 class QCPColorMap2;
 
 template <typename T, typename Self = void>
@@ -110,6 +111,7 @@ class QCP_LIB_DECL QCPAxisRect : public QCPArea
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(Qt::Orientations rangeDrag READ rangeDrag WRITE setRangeDrag NOTIFY rangeDragChanged)
     Q_PROPERTY(Qt::Orientations rangeZoom READ rangeZoom WRITE setRangeZoom NOTIFY rangeZoomChanged)
+    Q_PROPERTY(QString title READ title WRITE setTitle NOTIFY titleChanged)
     /// \endcond
 
 public:
@@ -232,6 +234,10 @@ public:
     //! exactly while a plottable colours through it. A plottable given its own scale, or none,
     //! with setColorScale() never joins it.
     QCPColorScaleOps<QCPColorScale> colorScale();
+    //! A line of text centred above the rect, in its top margin, as QGroupBox::setTitle. An empty
+    //! title takes no room.
+    void setTitle(const QString& title);
+    [[nodiscard]] QString title() const;
 
     // read-only interface imitating a QRect:
     int left() const { return mRect.left(); }
@@ -265,6 +271,7 @@ public:
 signals:
     void rangeDragChanged(Qt::Orientations rangeDrag);
     void rangeZoomChanged(Qt::Orientations rangeZoom);
+    void titleChanged(const QString& title);
 
 protected:
     // The pair the rect maps, refused as misuse when both axes grow the same way.
@@ -289,6 +296,7 @@ protected:
     QTimer mWheelZoomRestoreTimer;
     QHash<QCPAxis::AxisType, QList<QCPAxis*>> mAxes;
     QPointer<QCPColorScale> mColorScale;
+    QPointer<QCPTextElement> mTitle;
 
     // reimplemented virtual methods:
     virtual void layoutChanged() override;
@@ -319,6 +327,10 @@ private:
     // The width a vertical scale takes in the margin, or the height of a horizontal one.
     int colorScaleExtent() const;
     void placeColorScale();
+    // The height the title takes in the top margin, its own margins included; 0 without one.
+    int titleExtent() const;
+    void styleTitle();
+    void placeTitle();
     // The scale gained or lost a user, or changed the side or width it needs: the margin moves.
     void colorScaleUsersChanged();
     // The axes raw, for the rect's own layout and range passes (K8): the public lists hand out

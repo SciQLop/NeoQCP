@@ -22,6 +22,9 @@ private slots:
   void colorMapWithoutColorBar();
   void colorMapFromAView();
   void spectrogramSingleRect();
+  void aTitleTakesTheTopMargin();
+  void aTitleSitsAboveTheTopAxis();
+  void titlesInARowAlign();
   void textTakesAPositionAndAStyle();
   void textAppliesEveryStyleField();
   void textItemMathTextIsOnByDefault();

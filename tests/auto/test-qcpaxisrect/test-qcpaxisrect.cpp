@@ -219,6 +219,103 @@ void TestQCPAxisRect::cleanup()
   delete mPlot;
 }
 
+namespace
+{
+QImage exported(QCustomPlot& plot)
+{
+    return plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+}
+
+// The ink box of the dark pixels in rows [top, bottom) of image, over the data rect's columns only
+// (the left axis' top tick label pokes above the data rect, beside it); empty when there are none.
+QRect inkBox(const QImage& image, const QCPAxisRect* rect, int top, int bottom)
+{
+    QRect box;
+    for (int y = std::max(0, top); y < std::min(image.height(), bottom); ++y)
+        for (int x = rect->rect().left() + 1; x < rect->rect().right(); ++x)
+            if (qGray(image.pixel(x, y)) < 128)
+                box |= QRect(x, y, 1, 1);
+    return box;
+}
+
+int titleTextHeight(QCPAxisRect* rect)
+{
+    QFont font = rect->axis(QCPAxis::atTop)->labelFont();
+    font.setPointSizeF(font.pointSizeF() * 1.2);
+    return QFontMetrics(font).height();
+}
+} // namespace
+
+void TestQCPAxisRect::aTitleTakesTheTopMargin()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300); // the size exported() draws at: the layout read back is that one
+    QCPAxisRect* rect = plot.axisRect().get();
+    const QImage before = exported(plot);
+    const int topBefore = rect->rect().top();
+    // Up to 2 px above the data rect: the left axis' top tick is antialiased into the row above it.
+    const QRect stray = inkBox(before, rect, rect->outerRect().top(), topBefore - 2);
+    QVERIFY2(stray.isEmpty(), qPrintable(QStringLiteral("ink %1,%2 %3x%4 above a data rect at %5,%6 in %7,%8")
+                                             .arg(stray.x()).arg(stray.y()).arg(stray.width())
+                                             .arg(stray.height()).arg(rect->rect().left())
+                                             .arg(rect->rect().top()).arg(rect->outerRect().left())
+                                             .arg(rect->outerRect().top())));
+
+    QSignalSpy changed(rect, &QCPAxisRect::titleChanged);
+    rect->setTitle(QStringLiteral("interpolation=True"));
+    rect->setTitle(QStringLiteral("interpolation=True"));
+    QCOMPARE(rect->title(), QStringLiteral("interpolation=True"));
+    QCOMPARE(changed.count(), 1);
+    QCOMPARE(changed.first().first().toString(), QStringLiteral("interpolation=True"));
+
+    const QImage titled = exported(plot);
+    QVERIFY2(rect->rect().top() - rect->outerRect().top() >= titleTextHeight(rect),
+             "the top margin holds the whole title");
+    const QRect ink = inkBox(titled, rect, rect->outerRect().top(), rect->rect().top() - 2);
+    QVERIFY2(!ink.isEmpty(), "the title is drawn in the top margin");
+    QVERIFY2(std::abs(ink.center().x() - rect->rect().center().x()) <= 2,
+             "the title is centred over the data rect");
+
+    rect->setTitle({});
+    exported(plot);
+    QCOMPARE(rect->rect().top(), topBefore);
+    QCOMPARE(changed.count(), 2);
+}
+
+void TestQCPAxisRect::aTitleSitsAboveTheTopAxis()
+{
+    // With visible top tick labels the minimum margin no longer hides a small title: the title
+    // adds exactly its own box above the axis.
+    QCustomPlot plot;
+    plot.resize(400, 300); // the size exported() draws at: the layout read back is that one
+    QCPAxisRect* rect = plot.axisRect().get();
+    rect->setupFullAxesBox();
+    rect->axis(QCPAxis::atTop)->setTickLabels(true);
+    exported(plot);
+    const int axisOnly = rect->rect().top() - rect->outerRect().top();
+    QVERIFY2(axisOnly > 15, "the top axis' labels exceed the minimum margin");
+
+    rect->setTitle(QStringLiteral("Title"));
+    const QImage titled = exported(plot);
+    const int withTitle = rect->rect().top() - rect->outerRect().top();
+    QVERIFY(withTitle - axisOnly >= titleTextHeight(rect));
+    QVERIFY(withTitle - axisOnly <= titleTextHeight(rect) + 8);
+    const QRect titleInk
+        = inkBox(titled, rect, rect->outerRect().top(), rect->outerRect().top() + withTitle - axisOnly);
+    QVERIFY2(!titleInk.isEmpty(), "the title sits in the band above the axis");
+}
+
+void TestQCPAxisRect::titlesInARowAlign()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300); // the size exported() draws at: the layout read back is that one
+    plot.setAxisRectGrid(1, 2);
+    plot.axisRect(0, 1)->setTitle(QStringLiteral("right only"));
+    exported(plot);
+    QVERIFY(plot.axisRect(0, 1)->rect().top() > plot.axisRect(0, 1)->outerRect().top() + 15);
+    QCOMPARE(plot.axisRect(0, 0)->rect().top(), plot.axisRect(0, 1)->rect().top());
+}
+
 void TestQCPAxisRect::lineTakesDataAndOptions()
 {
   QCPAxisRect *ar = mPlot->axisRect();

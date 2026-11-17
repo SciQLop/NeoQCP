@@ -23,6 +23,15 @@ DOC_SNIPPET(layout_title, 600, 380)
     // [/layout_title]
 }
 
+DOC_CODE(layout_rect_title)
+{
+    // [layout_rect_title]
+    customPlot->setAxisRectGrid(1, 2);
+    customPlot->axisRect(0, 0)->setTitle("interpolation=False");
+    customPlot->axisRect(0, 1)->setTitle("interpolation=True");
+    // [/layout_rect_title]
+}
+
 DOC_SNIPPET(layout_legend_inside, 600, 360)
 {
     // [layout_legend_inside]

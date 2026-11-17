@@ -29,6 +29,22 @@ Its cells hold the legend entries, and it accepts any other element.
 
 ## Add a title
 
+A title above one axis rect is one call:
+
+```{literalinclude} snippets/layout.cpp
+:start-after: // [layout_rect_title]
+:end-before: // [/layout_rect_title]
+:language: cpp
+:dedent:
+```
+
+The title sits centred above the rect, in its top margin, outside the top axis and a colour scale placed on top.
+Its font is the top axis' label font at 1.2 times the size, in that axis' label colour, so a theme reaches it.
+An empty title takes no room.
+In a grid of rects the rects of a row keep their data tops aligned, titled or not.
+
+A title over the whole plot is a text element in a row of its own:
+
 ```{literalinclude} snippets/layout.cpp
 :start-after: // [layout_title]
 :end-before: // [/layout_title]

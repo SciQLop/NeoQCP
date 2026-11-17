@@ -619,6 +619,10 @@ Milestone 6e (multi-panel plots). Step 1 of the panel design.
         un-parented first, so the plot does not free it a second time (clearItems() and
         clearPlottables() included). A slot that runs while the plot is being destroyed
         (isBeingDestroyed()) must not delete it again: it already is.
+  - QCPAxisRect::setTitle(text), title() and titleChanged: a line of text centred above one rect, in
+        its top margin (outside the top axes and a colour scale on top), as QGroupBox::setTitle. Its
+        font is the top axis' label font at 1.2 times the size, in that axis' label colour; an empty
+        title takes no room. It replaces the title row in the plot layout for a per-rect title.
 
 Milestone 6f (scales). Breaking, in the 3.0 preview line: the scale an axis, a colour scale or a
 colour-mapped plottable shows its data with is a value, not an enum.

@@ -25,9 +25,11 @@
 
 #include "layoutelement-axisrect.h"
 #include "layoutelement-colorscale.h"
+#include "layoutelement-textelement.h"
 
 #include "../Profiling.hpp"
 #include "../axis/axis.h"
+#include "../axis/labelrenderer.h"
 #include "../axis/axisticker.h"
 #include "../coordinate-system.h"
 #include "../core.h"
@@ -272,6 +274,7 @@ QCPAxisRect::~QCPAxisRect()
         delete scale;
         mColorScale = nullptr;
     }
+    delete mTitle.data();
 
     for (const auto& axis : qcp::guarded(axesRaw()))
         if (axis)
@@ -994,7 +997,8 @@ void QCPAxisRect::placeColorScale()
                 = QRect(rect().left(), outerRect().bottom() - extent + 1, rect().width(), extent);
             break;
         case QCPAxis::atTop:
-            scaleOuterRect = QRect(rect().left(), outerRect().top(), rect().width(), extent);
+            scaleOuterRect
+                = QRect(rect().left(), outerRect().top() + titleExtent(), rect().width(), extent);
             break;
         default:
             scaleOuterRect
@@ -1015,6 +1019,77 @@ void QCPAxisRect::colorScaleUsersChanged()
 }
 
 /*!
+  Sets the line of text centred above the rect, in its top margin, as \ref QGroupBox::setTitle. Its
+  font is the top axis' label font at 1.2 times its point size, in that axis' label colour, so a
+  theme reaches it through the axis. An empty \a title takes no room.
+
+  The title is drawn on the "axes" layer and exported with the plot. In a grid of rects (\ref
+  QCustomPlot::setAxisRectGrid) the rects of a row keep their data tops aligned, titled or not.
+*/
+void QCPAxisRect::setTitle(const QString& title)
+{
+    if (title == this->title() || !mParentPlot)
+        return;
+    if (!mTitle)
+    {
+        mTitle = new QCPTextElement(mParentPlot);
+        if (QCPLayer* axesLayer = mParentPlot->layer(QLatin1String("axes")))
+            mTitle->setLayer(axesLayer);
+    }
+    mTitle->setText(title);
+    mTitle->setVisible(!title.isEmpty());
+    markLayoutAppearanceDirty();
+    qcpEmitCurrent(this, mParentPlot, &QCPAxisRect::titleChanged, [this] { return this->title(); });
+}
+
+QString QCPAxisRect::title() const
+{
+    return mTitle ? mTitle->text() : QString();
+}
+
+/*! \internal
+
+  The height the title takes in the top margin, its own margins included; 0 without one.
+*/
+int QCPAxisRect::titleExtent() const
+{
+    if (!mTitle || mTitle->text().isEmpty())
+        return 0;
+    const QSize text = QCPLabelRenderer::measureWith(QCPLabelRenderer::defaultRenderer(),
+                                                     mTitle->font(), mTitle->text());
+    return text.height() + mTitle->margins().top() + mTitle->margins().bottom();
+}
+
+/*! \internal
+
+  Gives the title the top axis' label font, 1.2 times larger, and its label colour.
+*/
+void QCPAxisRect::styleTitle()
+{
+    const QCPAxis* top = mAxes.value(QCPAxis::atTop).value(0);
+    QFont font = top ? top->labelFont() : mParentPlot->font();
+    if (font.pointSizeF() > 0)
+        font.setPointSizeF(font.pointSizeF() * 1.2);
+    else
+        font.setPixelSize(qRound(font.pixelSize() * 1.2));
+    const QColor color = top ? top->labelColor() : QColor(Qt::black);
+    if (mTitle->font() != font)
+        mTitle->setFont(font);
+    if (mTitle->textColor() != color)
+        mTitle->setTextColor(color);
+}
+
+/*! \internal
+
+  Puts the title at the top of the margin, outside the top axes and a colour scale above them,
+  as wide as the data rect.
+*/
+void QCPAxisRect::placeTitle()
+{
+    mTitle->setOuterRect(QRect(rect().left(), outerRect().top(), rect().width(), titleExtent()));
+}
+
+/*!
   This method is called automatically upon replot and doesn't need to be called by users of
   QCPAxisRect.
 
@@ -1031,12 +1106,17 @@ void QCPAxisRect::updateLayout(UpdatePhase phase)
     // A hidden scale is not touched at all: no layout pass, no draw, no cost per replot.
     if (scale && phase == upMargins)
         scale->updateLayout(phase); // its minimum size is the margin this rect has to add
+    if (mTitle && phase == upMargins)
+        styleTitle(); // its font is the top margin it adds
 
     QCPArea::updateLayout(phase);
 
     if (phase == upPreparation)
         for (QCPAxis* axis : axesRaw())
             axis->setupTickVectors();
+
+    if (mTitle && phase == upLayout)
+        placeTitle();
 
     if (scale)
     {
@@ -1492,6 +1572,8 @@ int QCPAxisRect::calculateAutoMargin(QCP::MarginSide side)
     if (const QCPColorScale* scale = usedColorScale())
         if (QCPAxis::marginSideToAxisType(side) == scale->type())
             margin += colorScaleExtent();
+    if (side == QCP::msTop)
+        margin += titleExtent();
     return margin;
 }
 
