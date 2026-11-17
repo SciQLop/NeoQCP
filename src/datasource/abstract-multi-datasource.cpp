@@ -40,7 +40,7 @@ std::vector<QPointF> QCPMultiDataSource::linesInData(
 {
     if (end <= begin) { if (sourceIndices) sourceIndices->clear(); return {}; }
     ColumnWindow w(*this, column, begin, end);
-    const auto gaps = qcp::algo::detectKeyGaps(w.keys, 0, end - begin, gapThreshold());
+    const auto gaps = qcp::algo::detectKeyGaps(w.keys, 0, end - begin, gapThreshold(), keyScale);
     auto pts = qcp::algo::linesInData(w.keys, w.values, 0, end - begin, pixelsPerKey,
                                       sourceIndices, gapThreshold(), &gaps, keyScale);
     if (sourceIndices) shiftIndices(*sourceIndices, begin);

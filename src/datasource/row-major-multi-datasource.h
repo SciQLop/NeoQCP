@@ -148,21 +148,22 @@ public:
         qcp::detail::StridedColumnView<V> colView(mValues + column, mRows, mStride);
         if (cacheGaps)
         {
-            ensureGapCache(begin, end);
+            ensureGapCache(begin, end, keyScale);
             return qcp::algo::linesInData(mKeys, colView, begin, end, pixelsPerKey, sourceIndices,
                                           gapThreshold(), &mGapCache.gaps, keyScale);
         }
         // Per-call gaps: the data-space read never writes the shared cache.
-        const auto gaps = qcp::algo::detectKeyGaps(mKeys, begin, end, gapThreshold());
+        const auto gaps = qcp::algo::detectKeyGaps(mKeys, begin, end, gapThreshold(), keyScale);
         return qcp::algo::linesInData(mKeys, colView, begin, end, pixelsPerKey, sourceIndices,
                                       gapThreshold(), &gaps, keyScale);
     }
 
-    qcp::algo::GapVector gapsBefore(int begin, int end, bool cacheGaps = true) const override
+    qcp::algo::GapVector gapsBefore(int begin, int end, bool cacheGaps = true,
+                                    const QCPScale& keyScale = QCPScale()) const override
     {
         if (!cacheGaps)
-            return qcp::algo::detectKeyGaps(mKeys, begin, end, gapThreshold());
-        ensureGapCache(begin, end);
+            return qcp::algo::detectKeyGaps(mKeys, begin, end, gapThreshold(), keyScale);
+        ensureGapCache(begin, end, keyScale);
         return mGapCache.gaps;
     }
 
@@ -182,9 +183,9 @@ public:
     }
 
 private:
-    void ensureGapCache(int begin, int end) const
+    void ensureGapCache(int begin, int end, const QCPScale& keyScale) const
     {
-        mGapCache.update(mKeys, begin, end, gapThreshold());
+        mGapCache.update(mKeys, begin, end, gapThreshold(), keyScale);
     }
 
     std::span<const K> mKeys;

@@ -19,18 +19,27 @@ struct GapVector {
     int size() const { return static_cast<int>(data.size()); }
 };
 
+// A step is a gap relative to the screen it takes, not to the key units it spans: a symlog axis
+// spreads keys evenly to a very different degree along its linear band and its logarithmic ones, so
+// a step even in key units is not even on the axis. Measure the steps in the space \a keyScale
+// shows. Key units are that space for a linear axis, and a log axis keeps them as it always has: it
+// has no bounded band to compare against.
 template <IndexableNumericRange KC>
 GapVector detectKeyGaps(const KC& keys, int begin, int end,
-                                 double threshold = kDefaultGapThreshold)
+                                 double threshold = kDefaultGapThreshold,
+                                 const QCPScale& keyScale = QCPScale())
 {
     const int count = end - begin;
     GapVector gapBefore(count);
     if (count < 3 || threshold <= 0) return gapBefore;
 
-    constexpr double noReference = std::numeric_limits<double>::max();
-    const auto step = [&](int i) {
-        return static_cast<double>(keys[begin + i + 1]) - static_cast<double>(keys[begin + i]);
+    const bool scaled = keyScale.isSymlog();
+    const auto measure = [&](int i) {
+        const double key = static_cast<double>(keys[i]);
+        return scaled ? keyScale.toScale(key) : key;
     };
+    constexpr double noReference = std::numeric_limits<double>::max();
+    const auto step = [&](int i) { return measure(begin + i + 1) - measure(begin + i); };
     // A repeated key (zero step) draws a vertical edge: it says nothing about the sampling.
     const auto reference = [&](int i) { return step(i) > 0 ? step(i) : noReference; };
 
@@ -48,18 +57,23 @@ GapVector detectKeyGaps(const KC& keys, int begin, int end,
 }
 
 // How many times wider the step into key i is than the narrower of its neighbouring steps in
-// [begin, end): the measure detectKeyGaps holds against its threshold. 0 when there is nothing
-// to compare it to.
+// [begin, end), in the space \a keyScale shows (see detectKeyGaps): the measure detectKeyGaps
+// holds against its threshold. 0 when there is nothing to compare it to.
 template <typename KeyAt>
-double keyStepRatio(KeyAt key, int begin, int end, int i)
+double keyStepRatio(KeyAt key, int begin, int end, int i, const QCPScale& keyScale = QCPScale())
 {
     if (i <= begin || i >= end) return 0;
-    const double step = key(i) - key(i - 1);
+    const bool scaled = keyScale.isSymlog();
+    const auto at = [&](int j) {
+        const double k = key(j);
+        return scaled ? keyScale.toScale(k) : k;
+    };
+    const double step = at(i) - at(i - 1);
     double ref = std::numeric_limits<double>::max();
-    if (i - 1 > begin && key(i - 1) - key(i - 2) > 0)
-        ref = std::min(ref, key(i - 1) - key(i - 2));
-    if (i + 1 < end && key(i + 1) - key(i) > 0)
-        ref = std::min(ref, key(i + 1) - key(i));
+    if (i - 1 > begin && at(i - 1) - at(i - 2) > 0)
+        ref = std::min(ref, at(i - 1) - at(i - 2));
+    if (i + 1 < end && at(i + 1) - at(i) > 0)
+        ref = std::min(ref, at(i + 1) - at(i));
     return step > 0 && ref < std::numeric_limits<double>::max() ? step / ref : 0;
 }
 
@@ -77,22 +91,27 @@ inline GapVector gapsFromStepRatios(const std::vector<float>& ratios, int begin,
     return gaps;
 }
 
-// The gaps of keys[begin, end), recomputed only when the range or the threshold changes.
+// The gaps of keys[begin, end), recomputed only when the range, the threshold or the key space
+// changes.
 struct GapCache {
     int begin = -1;
     int end = -1;
     double threshold = -1;
+    QCPScale keyScale;
     GapVector gaps;
 
     template <IndexableNumericRange KC>
-    void update(const KC& keys, int newBegin, int newEnd, double newThreshold)
+    void update(const KC& keys, int newBegin, int newEnd, double newThreshold,
+                const QCPScale& newKeyScale = QCPScale())
     {
-        if (begin == newBegin && end == newEnd && threshold == newThreshold)
+        if (begin == newBegin && end == newEnd && threshold == newThreshold
+            && keyScale == newKeyScale)
             return;
         begin = newBegin;
         end = newEnd;
         threshold = newThreshold;
-        gaps = detectKeyGaps(keys, begin, end, threshold);
+        keyScale = newKeyScale;
+        gaps = detectKeyGaps(keys, begin, end, threshold, keyScale);
     }
 
     void updateFromRatios(const std::vector<float>& ratios, int newBegin, int newEnd,
@@ -245,8 +264,8 @@ namespace detail {
 template <typename Out, typename Idx, IndexableNumericRange KC, IndexableNumericRange VC,
           typename MapPoint>
 void linePointsInto(const KC& keys, const VC& values, int begin, int end, double gapThreshold,
-                    const GapVector* precomputedGaps, Out& result, Idx* indices,
-                    const MapPoint& mapPoint)
+                    const GapVector* precomputedGaps, const QCPScale& keyScale, Out& result,
+                    Idx* indices, const MapPoint& mapPoint)
 {
     using V = std::ranges::range_value_t<VC>;
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(keys)));
@@ -258,7 +277,7 @@ void linePointsInto(const KC& keys, const VC& values, int begin, int end, double
 
     GapVector computedGaps;
     if (!precomputedGaps)
-        computedGaps = detectKeyGaps(keys, begin, end, gapThreshold);
+        computedGaps = detectKeyGaps(keys, begin, end, gapThreshold, keyScale);
     const auto& gaps = precomputedGaps ? *precomputedGaps : computedGaps;
 
     result.reserve(count + count / 10);
@@ -350,13 +369,13 @@ struct ScaleBucketGrid
 template <typename Out, typename Idx, IndexableNumericRange KC, IndexableNumericRange VC,
           typename Grid, typename MapPoint>
 void envelopeInto(const KC& keys, const VC& values, int begin, int end, int reserveHint,
-                  double gapThreshold, const GapVector* precomputedGaps, Out& result,
-                  Idx* indices, const Grid& grid, const MapPoint& mapPoint)
+                  double gapThreshold, const GapVector* precomputedGaps, const QCPScale& keyScale,
+                  Out& result, Idx* indices, const Grid& grid, const MapPoint& mapPoint)
 {
     PROFILE_HERE_N("envelopeInto");
     GapVector computedGaps;
     if (!precomputedGaps)
-        computedGaps = detectKeyGaps(keys, begin, end, gapThreshold);
+        computedGaps = detectKeyGaps(keys, begin, end, gapThreshold, keyScale);
     const auto& gaps = precomputedGaps ? *precomputedGaps : computedGaps;
     const auto nanPt = QPointF(qQNaN(), qQNaN());
 
@@ -531,24 +550,27 @@ std::vector<QPointF> linesInDataImpl(const KC& keys, const VC& values, int begin
     // A NaN end key makes the span NaN: the envelope's reserve size would overflow, draw raw.
     if (pixelsPerKey <= 0 || !std::isfinite(keySpan) || static_cast<double>(dataCount) < 2 * keySpan + 2)
     {
-        linePointsInto(keys, values, begin, end, gapThreshold, precomputedGaps, pts, idx,
-                       DataPointMap {});
+        linePointsInto(keys, values, begin, end, gapThreshold, precomputedGaps, keyScale, pts,
+                       idx, DataPointMap {});
     }
     else
     {
         const int reserveHint = static_cast<int>(2 * keySpan + 2) + 4;
         if (decades)
-            envelopeInto(keys, values, begin, end, reserveHint, gapThreshold, precomputedGaps, pts,
-                         idx, LogKeyBucketGrid { std::log10(firstKey), 1.0 / pixelsPerKey },
+            envelopeInto(keys, values, begin, end, reserveHint, gapThreshold, precomputedGaps,
+                         keyScale, pts, idx,
+                         LogKeyBucketGrid { std::log10(firstKey), 1.0 / pixelsPerKey },
                          DataPointMap {});
         else if (keyScale.isSymlog())
-            envelopeInto(keys, values, begin, end, reserveHint, gapThreshold, precomputedGaps, pts,
-                         idx, ScaleBucketGrid { keyScale, keyScale.toScale(firstKey),
-                                                1.0 / pixelsPerKey },
+            envelopeInto(keys, values, begin, end, reserveHint, gapThreshold, precomputedGaps,
+                         keyScale, pts, idx,
+                         ScaleBucketGrid { keyScale, keyScale.toScale(firstKey),
+                                           1.0 / pixelsPerKey },
                          DataPointMap {});
         else
-            envelopeInto(keys, values, begin, end, reserveHint, gapThreshold, precomputedGaps, pts,
-                         idx, KeyBucketGrid { firstKey, 1.0 / pixelsPerKey }, DataPointMap {});
+            envelopeInto(keys, values, begin, end, reserveHint, gapThreshold, precomputedGaps,
+                         keyScale, pts, idx, KeyBucketGrid { firstKey, 1.0 / pixelsPerKey },
+                         DataPointMap {});
     }
 
     if constexpr (WithIndices) *sourceIndices = std::move(indices);

@@ -248,6 +248,44 @@ void TestDataSource::algoGapsIgnoreRepeatedKeys()
     QCOMPARE(gapIndices(qcp::algo::detectKeyGaps(gapAfterEdge, 0, 6)), std::vector<int>{4});
 }
 
+void TestDataSource::algoGapsFollowTheSymlogSpace()
+{
+    const QCPScale symlog = QCPScale::symlog(2);
+    std::vector<double> keys(600);
+    std::vector<double> values(600);
+    for (int i = 0; i < 600; ++i)
+    {
+        keys[static_cast<std::size_t>(i)] = symlog.fromScale(-3.0 + 6.0 * i / 599.0);
+        values[static_cast<std::size_t>(i)] = std::cos(i * 0.01);
+    }
+
+    // Keys even in symlog space jump by e^2 at every threshold crossing in key units, which the
+    // data-space measure reads as a hole in the middle of an even curve. In the space the axis
+    // shows, the steps are equal and the curve is whole.
+    QVERIFY(!gapIndices(qcp::algo::detectKeyGaps(keys, 0, 600)).empty());
+    QCOMPARE(gapIndices(qcp::algo::detectKeyGaps(keys, 0, 600, qcp::algo::kDefaultGapThreshold,
+                                                 symlog)),
+             std::vector<int> {});
+
+    // A step far wider than its neighbours is still a hole when it is measured in that space.
+    std::vector<double> holed(600);
+    double position = -3.0;
+    for (int i = 0; i < 600; ++i)
+    {
+        holed[static_cast<std::size_t>(i)] = symlog.fromScale(position);
+        position += i == 300 ? 0.5 : 6.0 / 599.0;
+    }
+    QCOMPARE(gapIndices(qcp::algo::detectKeyGaps(holed, 0, 600, qcp::algo::kDefaultGapThreshold,
+                                                 symlog)),
+             std::vector<int> { 301 });
+
+    // A datasource drawn through that measure breaks its line nowhere.
+    const QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> source(keys,
+                                                                               oneColumn(values));
+    QCOMPARE(nanBreaks(source.linesInData(0, 0, 600, 0.0, nullptr, symlog)), 0);
+    QVERIFY(nanBreaks(source.linesInData(0, 0, 600, 0.0)) > 0);
+}
+
 void TestDataSource::soaOwningVector()
 {
     std::vector<double> keys = {1.0, 2.0, 3.0};

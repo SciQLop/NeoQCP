@@ -262,15 +262,17 @@ inline void binRowsMinMax(const QCPMultiDataSource& src, int first,
 // binRatio[b]: the largest keyStepRatio of the rows of bin b (see binRowsMinMax for bins),
 // left at -1 for a bin without rows.
 inline void foldRowStepRatios(const QCPMultiDataSource& src, int first,
-                              const std::vector<int>& bins, float* binRatio)
+                              const std::vector<int>& bins, float* binRatio,
+                              const QCPScale& keyScale)
 {
     const double* rawKeys = src.rawKeyData();
     const auto key = [&](int i) { return rawKeys ? rawKeys[i] : src.keyAt(i); };
     const int size = src.size();
     for (int i = 0; i < static_cast<int>(bins.size()); ++i)
         if (bins[i] >= 0)
-            binRatio[bins[i]] = std::max(binRatio[bins[i]],
-                                         static_cast<float>(keyStepRatio(key, 0, size, first + i)));
+            binRatio[bins[i]]
+                = std::max(binRatio[bins[i]],
+                           static_cast<float>(keyStepRatio(key, 0, size, first + i, keyScale)));
 }
 
 // A bin with rows but no value in any column holds NaN only: +inf, see DroppedBins. One column NaN
@@ -331,7 +333,7 @@ inline MultiColumnBinResult binMinMaxMultiImpl(
     if (validCount == 0) return out;
 
     std::vector<float> binRatio(numBins, -1.f);
-    foldRowStepRatios(src, begin, bins, binRatio.data());
+    foldRowStepRatios(src, begin, bins, binRatio.data(), keyScale);
     binRowsMinMax<WithOrigin>(src, begin, bins, out.values.data(),
                               WithOrigin ? out.origin.data() : nullptr, s);
     setGapRatios(out, binRatio);
@@ -387,7 +389,7 @@ inline MultiColumnBinResult binMinMaxMultiParallelImpl(
             bins[i] = std::clamp(binning.index(k), binBegin, binEnd - 1);
         }
 
-        foldRowStepRatios(src, srcBegin, bins, binRatio.data());
+        foldRowStepRatios(src, srcBegin, bins, binRatio.data(), keyScale);
         binRowsMinMax<WithOrigin>(src, srcBegin, bins, out.values.data(),
                                   WithOrigin ? out.origin.data() : nullptr, s);
     };

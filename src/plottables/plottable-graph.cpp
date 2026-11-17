@@ -2507,7 +2507,8 @@ std::vector<qcp::fill::StripPoint> QCPGraph::fillRows(const Fill& fill,
                                                            const QCPMultiDataSource& ds,
                                                            int begin, int end) const
 {
-    const auto gaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace());
+    const QCPScale keyScale = keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
+    const auto gaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace(), keyScale);
     const auto* targetColumn = std::get_if<int>(&fill.target);
     const auto edge = [this](double value)
     {
@@ -2566,7 +2567,10 @@ std::vector<qcp::fill::StripPoint> QCPGraph::fillToGraphRows(
 
     std::vector<qcp::fill::SeriesRow> ownerRows;
     ownerRows.reserve(std::size_t(std::max(0, end - begin)));
-    const auto ownerGaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace());
+    const QCPScale partnerScale
+        = partner->keyAxisRaw() ? partner->keyAxisRaw()->scale() : QCPScale();
+    const QCPScale keyScale = keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
+    const auto ownerGaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace(), keyScale);
     for (int i = begin; i < end; ++i)
         ownerRows.push_back({ ds.keyAt(i), ds.valueAt(fill.owner, i),
                               ownerGaps[i - begin] != 0, i });
@@ -2580,7 +2584,8 @@ std::vector<qcp::fill::StripPoint> QCPGraph::fillToGraphRows(
     const int partnerBegin = std::max(0, partnerSource->findBegin(lower) - 1);
     const int partnerEnd = std::min(partnerSource->size(), partnerSource->findEnd(upper) + 1);
     const auto partnerGaps = partnerSource->gapsBefore(partnerBegin, partnerEnd,
-                                                       /*cacheGaps=*/!drawsInDataSpace());
+                                                       /*cacheGaps=*/!drawsInDataSpace(),
+                                                       partnerScale);
     // Across value axes the partner's value goes through its pixel onto this graph's value axis,
     // before the crop and the interpolation: the band is drawn in this graph's frame.
     const bool across = fillsAcrossValueAxes(*partner);
@@ -2822,7 +2827,8 @@ std::vector<qcp::fill::StripPoint> QCPGraph::errorBandRows(
     const ErrorBars& spec, const QCPMultiDataSource& ds, int begin, int end) const
 {
     const auto bars = errorBarRows(spec, ds, begin, end);
-    const auto gaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace());
+    const QCPScale keyScale = keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
+    const auto gaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace(), keyScale);
     Q_ASSERT(gaps.size() == int(bars.size())); // gapsBefore() holds one entry per row
     std::vector<qcp::fill::StripPoint> rows;
     rows.reserve(bars.size());

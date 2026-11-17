@@ -118,7 +118,10 @@ public:
         return lines;
     }
 
-    qcp::algo::GapVector gapsBefore(int begin, int end, bool cacheGaps = true) const override
+    // The ratios were measured in the space the bins were built in, so the key scale adds nothing
+    // here: it is named to keep the interface, and unused on purpose.
+    qcp::algo::GapVector gapsBefore(int begin, int end, bool cacheGaps = true,
+                                    const QCPScale& = QCPScale()) const override
     {
         if (!cacheGaps)
             return qcp::algo::gapsFromStepRatios(mBins.gapRatio, begin, end, gapThreshold());

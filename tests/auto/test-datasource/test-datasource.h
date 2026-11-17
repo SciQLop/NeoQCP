@@ -17,6 +17,7 @@ private slots:
     void algoValueRange();
     void algoValueRangeRestrictionMatchesBruteForce();
     void algoGapsIgnoreRepeatedKeys();
+    void algoGapsFollowTheSymlogSpace();
 
     // SoA data source tests
     void soaOwningVector();

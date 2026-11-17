@@ -35,13 +35,15 @@ public:
     // Element i is set when the step into row begin + i is a key gap under
     // gapThreshold(), exactly what linesInData breaks on. Generic and slow here. cacheGaps = false
     // computes the gaps for this call only: what a reader a worker may run beside uses.
-    virtual qcp::algo::GapVector gapsBefore(int begin, int end, bool cacheGaps = true) const
+    virtual qcp::algo::GapVector gapsBefore(int begin, int end, bool cacheGaps = true,
+                                            const QCPScale& keyScale = QCPScale()) const
     {
         (void)cacheGaps;
         std::vector<double> keys(std::max(0, end - begin));
         for (int i = begin; i < end; ++i)
             keys[i - begin] = keyAt(i);
-        return qcp::algo::detectKeyGaps(keys, 0, static_cast<int>(keys.size()), gapThreshold());
+        return qcp::algo::detectKeyGaps(keys, 0, static_cast<int>(keys.size()), gapThreshold(),
+                                        keyScale);
     }
 
     virtual const double* rawKeyData() const { return nullptr; }

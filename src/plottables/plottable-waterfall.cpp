@@ -76,7 +76,7 @@ std::vector<QPointF> QCPWaterfallDataAdapter::linesInData(int column, int begin,
         return {};
     }
     const auto w = transformedWindow(column, begin, end);
-    const auto gaps = qcp::algo::detectKeyGaps(w.keys, 0, end - begin, gapThreshold());
+    const auto gaps = qcp::algo::detectKeyGaps(w.keys, 0, end - begin, gapThreshold(), keyScale);
     auto pts = qcp::algo::linesInData(w.keys, w.values, 0, end - begin, pixelsPerKey,
                                       sourceIndices, gapThreshold(), &gaps, keyScale);
     if (sourceIndices)
