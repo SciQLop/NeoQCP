@@ -16,7 +16,11 @@ class ColorScalarMapper
 public:
     static constexpr int kGap = -1;
 
-    ColorScalarMapper() : mGradient(QCPColorGradient::gpJet) { rebuildLut(); }
+    ColorScalarMapper() : mGradient(QCPColorGradient::gpJet)
+    {
+        updateScaleWindow();
+        rebuildLut();
+    }
 
     [[nodiscard]] bool hasValues() const { return mValues && !mValues->empty(); }
     [[nodiscard]] int size() const { return mValues ? static_cast<int>(mValues->size()) : 0; }
@@ -30,9 +34,19 @@ public:
 
     void setGradient(const QCPColorGradient& gradient) { mGradient = gradient; rebuildLut(); ++mGeneration; }
     [[nodiscard]] const QCPColorGradient& gradient() const { return mGradient; }
-    void setRange(const QCPRange& range) { mRange = range; ++mGeneration; }
+    void setRange(const QCPRange& range)
+    {
+        mRange = range;
+        updateScaleWindow();
+        ++mGeneration;
+    }
     [[nodiscard]] QCPRange range() const { return mRange; }
-    void setScale(const QCPScale& scale) { mScale = scale; ++mGeneration; }
+    void setScale(const QCPScale& scale)
+    {
+        mScale = scale;
+        updateScaleWindow();
+        ++mGeneration;
+    }
     [[nodiscard]] const QCPScale& scale() const { return mScale; }
     [[nodiscard]] const std::shared_ptr<const std::vector<double>>& values() const
     {
@@ -47,12 +61,16 @@ public:
         const double v = (*mValues)[dataIndex];
         if (!std::isfinite(v))
             return kGap;
-        const bool log = mScale.isLog();
-        if (log && v <= 0)
-            return kGap;
-        if (mScale.isSymlog())
-            return toBucket(scalePosition(v));
-        return toBucket(log ? logPosition(v) : linearPosition(v));
+        switch (mMapping)
+        {
+            case Mapping::Log:
+                return v > 0 ? toBucket(logPosition(v)) : kGap;
+            case Mapping::Symlog:
+                return toBucket(scalePosition(v));
+            case Mapping::Linear:
+                break;
+        }
+        return toBucket(linearPosition(v));
     }
 
     [[nodiscard]] QRgb color(int bucket) const
@@ -73,11 +91,22 @@ private:
             return 0.0;
         return std::log(v / mRange.lower) / std::log(mRange.upper / mRange.lower);
     }
+    // The scale-space window depends only on the range and the scale, so it is taken once
+    // when either is set: per point, a symlog mapping only has to scale the value.
+    void updateScaleWindow()
+    {
+        if (mScale.isSymlog())
+            mMapping = Mapping::Symlog;
+        else if (mScale.isLog())
+            mMapping = Mapping::Log;
+        else
+            mMapping = Mapping::Linear;
+        mScaleLower = mScale.toScale(mRange.lower);
+        mScaleSpan = mScale.toScale(mRange.upper) - mScaleLower;
+    }
     double scalePosition(double v) const
     {
-        const double lower = mScale.toScale(mRange.lower);
-        const double span = mScale.toScale(mRange.upper) - lower;
-        return span > 0 ? (mScale.toScale(v) - lower) / span : 0.0;
+        return mScaleSpan > 0 ? (mScale.toScale(v) - mScaleLower) / mScaleSpan : 0.0;
     }
     static int toBucket(double t)
     {
@@ -97,10 +126,19 @@ private:
         g.colorize(positions.data(), QCPRange(0, 1), mLut.data(), 256);
     }
 
+    enum class Mapping
+    {
+        Linear,
+        Log,
+        Symlog
+    };
     std::shared_ptr<const std::vector<double>> mValues;
     QCPColorGradient mGradient;
     QCPRange mRange {0, 1};
     QCPScale mScale;
+    Mapping mMapping = Mapping::Linear;
+    double mScaleLower = 0.0;
+    double mScaleSpan = 0.0;
     std::array<QRgb, 256> mLut {};
     quint64 mGeneration = 0;
 };

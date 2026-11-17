@@ -198,18 +198,36 @@ void TestColorScale::aSecondMapTakesTheRectsGradient()
                             .arg(c.blue())));
 }
 
-// Two stacked rects share their right margin through a group; only the top one shows a scale. Both
-// must stop short of it, so their right edges line up left of the bar.
+namespace
+{
+// The channels of two colours are within a tolerance of each other: the renderer rounds.
+bool sameColour(const QColor& a, const QColor& b, int tolerance)
+{
+    return qAbs(a.red() - b.red()) <= tolerance && qAbs(a.green() - b.green()) <= tolerance
+        && qAbs(a.blue() - b.blue()) <= tolerance;
+}
+} // namespace
+
 // A colour bar's axis takes the data scale, so the bar's pixel for z = 1 is the entry the lookup
-// gives z = 1, the scale-space fraction 0.60870 rather than the linear 0.50005.
+// gives z = 1, the scale-space fraction 0.60870 rather than the linear 0.50005. A map drawn through
+// the same scale gives a diverging gradient's mirror colours for z and -z and the middle at zero.
 void TestColorScale::theColourBarFollowsTheDataScale()
 {
+    std::vector<double> keys;
+    std::vector<double> zs; // one value per key and row, the key moving fastest
+    for (const double z : { -1e4, -1e4, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, 1e4, 1e4 })
+    {
+        keys.push_back(double(keys.size()));
+        zs.insert(zs.end(), { z, z });
+    }
     auto* map = mPlot->add<QCPColorMap2>().get();
-    map->setData(std::vector<double> { 0, 1 }, std::vector<double> { 0 },
-                 std::vector<double> { -1e4, 1e4 });
-    map->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
+    map->setData(keys, std::vector<double> { 0, 1 }, zs);
+    map->setGradient(QCPColorGradient(QCPColorGradient::gpCoolwarm));
     map->setDataScale(QCPScale::symlog(1));
     map->setDataRange(QCPRange(-1e4, 1e4));
+    const QCPRange dataRange(-1e4, 1e4);
+    mPlot->xAxis->setRange(0, keys.back());
+    mPlot->yAxis->setRange(0, 1);
     settle(mPlot, map);
 
     const auto scale = mPlot->axisRect()->colorScale();
@@ -218,17 +236,100 @@ void TestColorScale::theColourBarFollowsTheDataScale()
     QCOMPARE(scale->axis()->scale(), QCPScale::symlog(1));
 
     const QImage img = mPlot->toPixmap(400, 300).toImage();
-    const int x = scale->axis()->axisRect()->rect().center().x();
-    const int y = qRound(scale->axis()->coordToPixel(1.0));
-    const QColor pixel = img.pixelColor(x, y);
-    const QColor lookup = QColor::fromRgba(
-        scale->gradient().color(1.0, QCPRange(-1e4, 1e4), scale->dataScale()));
-    QVERIFY2(qAbs(pixel.red() - lookup.red()) <= 3,
-             qPrintable(QStringLiteral("the bar pixel for z = 1 is grey %1, the lookup gives %2")
-                            .arg(pixel.red())
-                            .arg(lookup.red())));
+    auto lookup = [&](double z) {
+        return QColor::fromRgba(scale->gradient().color(z, dataRange, scale->dataScale()));
+    };
+    const int barX = scale->axis()->axisRect()->rect().center().x();
+    const QColor barPixel = img.pixelColor(barX, qRound(scale->axis()->coordToPixel(1.0)));
+    QVERIFY2(sameColour(barPixel, lookup(1.0), 3),
+             qPrintable(QStringLiteral("the bar pixel for z = 1 is (%1,%2,%3), the lookup gives "
+                                       "(%4,%5,%6)")
+                            .arg(barPixel.red())
+                            .arg(barPixel.green())
+                            .arg(barPixel.blue())
+                            .arg(lookup(1.0).red())
+                            .arg(lookup(1.0).green())
+                            .arg(lookup(1.0).blue())));
+
+    // Each flat run of the map is probed at its centre, so no interpolation is in the sample.
+    const int row2 = qRound(mPlot->yAxis->coordToPixel(0.5));
+    auto cell = [&](double key) {
+        return img.pixelColor(qRound(mPlot->xAxis->coordToPixel(key)), row2);
+    };
+    const QColor low = lookup(-1e4);
+    const QColor middle = lookup(0.0);
+    const QColor high = lookup(1e4);
+    QVERIFY2(!sameColour(middle, low, 3) && !sameColour(middle, high, 3),
+             "zero is the middle of the diverging gradient, not one of its ends");
+    struct Column
+    {
+        double key;
+        QColor want;
+        const char* name;
+    };
+    const QColor nearMiddle = cell(4.5);
+    const QColor justAbove = cell(6.5);
+    for (const Column& column : { Column { 0.5, low, "z = -1e4" },
+                                  Column { 2.5, lookup(-1.0), "z = -1" },
+                                  Column { 4.5, middle, "z = 0" },
+                                  Column { 6.5, lookup(1.0), "z = 1" },
+                                  Column { 8.5, high, "z = 1e4" } })
+    {
+        const QColor got = cell(column.key);
+        QVERIFY2(sameColour(got, column.want, 3),
+                 qPrintable(QStringLiteral("the map's %1 column is %2, the lookup gives %3")
+                                .arg(column.name, got.name(), column.want.name())));
+    }
+    // z = 1 sits at the scale-space fraction 0.60870, so it is clearly off the middle colour: a
+    // linear renderer would paint the middle here.
+    QVERIFY2(!sameColour(justAbove, nearMiddle, 10),
+             "z = 1 is drawn through the scale, not at the linear middle");
 }
 
+// A constant map leaves rescaleDataRange() with no data width; on a symlog scale that width is kept
+// in the scale's own space and centred on the constant through toScale, at c = 0 and either side.
+void TestColorScale::aConstantMapRescalesInScaleSpace()
+{
+    auto* map = mapWithRange(mPlot->xAxis, mPlot->yAxis, 0, 0);
+    const auto scale = mPlot->axisRect()->colorScale();
+    scale->setDataScale(QCPScale::symlog(1));
+    scale->setDataRange(QCPRange(1, 1000));
+    mPlot->replot();
+
+    for (const double constant : { 0.0, -5.0, 5.0 })
+    {
+        map->data()->setCell(0, 0, constant);
+        map->data()->setCell(1, 0, constant);
+        map->data()->setCell(0, 1, constant);
+        map->data()->setCell(1, 1, constant);
+        map->data()->recalculateDataBounds();
+
+        const QCPScale& zs = scale->dataScale();
+        const QCPRange before = scale->dataRange();
+        const double oldWidth = zs.toScale(before.upper) - zs.toScale(before.lower);
+
+        scale->rescaleDataRange(true);
+        const QCPRange got = scale->dataRange();
+        const double newWidth = zs.toScale(got.upper) - zs.toScale(got.lower);
+        QVERIFY2(qAbs(newWidth - oldWidth) < 1e-9,
+                 qPrintable(QStringLiteral("constant %1: scale-space width %2, expected %3")
+                                .arg(constant)
+                                .arg(newWidth)
+                                .arg(oldWidth)));
+        QVERIFY2(qAbs(zs.toScale(got.lower) + zs.toScale(got.upper) - 2.0 * zs.toScale(constant))
+                     < 1e-9,
+                 qPrintable(QStringLiteral("constant %1: not centred on it in scale space")
+                                .arg(constant)));
+        QVERIFY2(got.lower < constant && constant < got.upper,
+                 qPrintable(QStringLiteral("constant %1 is outside (%2, %3)")
+                                .arg(constant)
+                                .arg(got.lower)
+                                .arg(got.upper)));
+    }
+}
+
+// Two stacked rects share their right margin through a group; only the top one shows a scale. Both
+// must stop short of it, so their right edges line up left of the bar.
 void TestColorScale::groupedRectsLeaveRoomForTheScale()
 {
     auto* bottom = new QCPAxisRect(mPlot);

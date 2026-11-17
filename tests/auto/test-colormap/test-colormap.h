@@ -69,6 +69,7 @@ private slots:
   void noColourMapLayerIsCreated();
   void verticalKeyAxisMapMatchesTheExport();
   void tightBoundaryCropsHalfACell();
+  void aSymlogKeyAxisGrowsTheCornersInScaleSpace();
   void aPanDoesNotRebuildTheImage();
   void exportMatchesTheOldCode();
   void theHotCellLandsInItsCornerOnEveryAxisLayout();

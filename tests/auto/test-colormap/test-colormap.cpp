@@ -1581,6 +1581,41 @@ void TestColorMap::colourMapIsOneImageCommand()
            "b is the bottom-right texel, half a cell below the value range");
 }
 
+// A symlog key axis spaces its cells evenly in the scale's own space, so the picture grows by half
+// a scale-space step at each edge. Half a data-space cell would be 0.5556 here and would squash
+// the outer bands; the scale-space rule gives 0.1056.
+void TestColorMap::aSymlogKeyAxisGrowsTheCornersInScaleSpace()
+{
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setScale(QCPScale::symlog(1));
+  mPlot->xAxis->setRange(-1e4, 1e4);
+  auto* map = classicColorMap(mPlot, 10);
+  map->setInterpolate(false);
+  mPlot->replot();
+
+  QCOMPARE(map->mCore.recordingCount(), 1);
+  const auto& commands = map->mCore.recordedList().commands;
+  QCOMPARE(int(commands.size()), 1);
+  const auto* image = std::get_if<qcp::ImageCmd>(&commands.front());
+  QVERIFY(image);
+  const auto* a = std::get_if<QCP::Data>(&image->a);
+  const auto* b = std::get_if<QCP::Data>(&image->b);
+  QVERIFY(a && b);
+
+  const QCPScale& keyScale = mPlot->xAxis->scale();
+  const double half = 0.5 * qAbs(keyScale.toScale(10.0) - keyScale.toScale(0.0)) / 9.0;
+  const double left = keyScale.fromScale(keyScale.toScale(0.0) - half);
+  const double right = keyScale.fromScale(keyScale.toScale(10.0) + half);
+  QVERIFY2(qAbs(a->x - left) < 1e-12,
+           qPrintable(QStringLiteral("a->x is %1, the scale-space edge is %2").arg(a->x).arg(left)));
+  QVERIFY2(qAbs(b->x - right) < 1e-12,
+           qPrintable(QStringLiteral("b->x is %1, the scale-space edge is %2").arg(b->x).arg(right)));
+  QVERIFY2(a->x > -0.5, "the corner is half a scale step out, not half a data cell (-0.5556)");
+  // The value axis is linear and keeps the data-space rule.
+  QVERIFY2(qAbs(a->y - (10.0 + 0.5 * 10.0 / 9.0)) < 1e-12,
+           "a linear value axis is unchanged");
+}
+
 // With a vertical key axis the image is transposed; the GPU frame and the
 // painter export must agree on where every cell lands.
 void TestColorMap::verticalKeyAxisMapMatchesTheExport()

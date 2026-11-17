@@ -473,7 +473,6 @@ void TestScale::colorizeOverloadsAgreeOnALogScale()
     }
 }
 
-// A data scale chosen before the add is not the joined colour scale's to overwrite.
 // The colour lookup follows a symlog data scale: each z maps through the scale, so z = 1 sits at
 // the scale-space fraction 0.60870 where the linear path gives 0.50005, and the two sides mirror.
 void TestScale::aSymlogColourScaleIsSymmetric()
@@ -513,6 +512,7 @@ void TestScale::aSymlogColourScaleIsSymmetric()
     }
 }
 
+// A data scale chosen before the add is not the joined colour scale's to overwrite.
 void TestScale::aDataScaleSetBeforeTheAddWins()
 {
     QCustomPlot plot;

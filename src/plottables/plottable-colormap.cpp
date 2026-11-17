@@ -330,7 +330,8 @@ void QCPColorMapData::setValueRange(const QCPRange& valueRange)
   z.
 
   \note The QCPColorMap always displays the data at equal key/value intervals, even if the key or
-  value axis is set to a logarithmic scaling. If you want to use QCPColorMap with logarithmic axes,
+  value axis is set to a logarithmic or symlog scaling. If you want to use QCPColorMap with log
+  or symlog axes,
   you shouldn't use the \ref QCPColorMapData::setData method as it uses a linear transformation to
   determine the cell index. Rather directly access the cell index with \ref
   QCPColorMapData::setCell.
@@ -528,7 +529,8 @@ void QCPColorMapData::fillAlpha(unsigned char alpha)
   \a keyIndex.
 
   \note The QCPColorMap always displays the data at equal key/value intervals, even if the key or
-  value axis is set to a logarithmic scaling. If you want to use QCPColorMap with logarithmic axes,
+  value axis is set to a logarithmic or symlog scaling. If you want to use QCPColorMap with log
+  or symlog axes,
   you shouldn't use the \ref QCPColorMapData::coordToCell method as it uses a linear transformation
   to determine the cell index.
 
@@ -554,7 +556,8 @@ void QCPColorMapData::coordToCell(double key, double value, int* keyIndex, int* 
   value.
 
   \note The QCPColorMap always displays the data at equal key/value intervals, even if the key or
-  value axis is set to a logarithmic scaling. If you want to use QCPColorMap with logarithmic axes,
+  value axis is set to a logarithmic or symlog scaling. If you want to use QCPColorMap with log
+  or symlog axes,
   you shouldn't use the \ref QCPColorMapData::cellToCoord method as it uses a linear transformation
   to determine the cell index.
 
@@ -696,7 +699,8 @@ bool QCPColorMapData::createAlpha(bool initializeOpaque)
   \snippet documentation/doc-code-snippets/mainwindow.cpp qcpcolormap-creation-2
 
   \note The QCPColorMap always displays the data at equal key/value intervals, even if the key or
-  value axis is set to a logarithmic scaling. If you want to use QCPColorMap with logarithmic axes,
+  value axis is set to a logarithmic or symlog scaling. If you want to use QCPColorMap with log
+  or symlog axes,
   you shouldn't use the \ref QCPColorMapData::setData method as it uses a linear transformation to
   determine the cell index. Rather directly access the cell index with \ref
   QCPColorMapData::setCell.
