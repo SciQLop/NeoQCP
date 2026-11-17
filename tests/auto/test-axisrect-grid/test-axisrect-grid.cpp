@@ -227,8 +227,6 @@ void TestAxisRectGrid::aDeferredSlotThatDeletesThePlotIsSafe()
     connect(mPlot->plotLayout().get(), &QCPLayoutGrid::rowStretchFactorsChanged, mPlot,
             [this, &delivered](const QList<double>&)
             {
-                if (!mPlot) // the layout's own teardown emits once more
-                    return;
                 ++delivered;
                 QCustomPlot* const doomed = mPlot;
                 mPlot = nullptr;
@@ -256,8 +254,6 @@ void TestAxisRectGrid::aDeferredSlotReenteringIsDeferred()
 
     // The signal came after the walk: the grid it built is the one the slot then shrinks. A
     // delivery in the middle of the walk would be refilled by the walk's own remaining steps.
-    disconnect(mPlot->plotLayout().get(), &QCPLayoutGrid::rowStretchFactorsChanged, mPlot,
-               nullptr);
     QVERIFY(calls >= 1);
     QCOMPARE(mPlot->axisRectCount(), 1);
     QVERIFY(mPlot->axisRect(0, 0));

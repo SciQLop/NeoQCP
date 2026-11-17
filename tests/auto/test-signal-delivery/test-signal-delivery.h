@@ -36,7 +36,7 @@ private slots:
     void wheelSlotIgnoringAndDeletingThePlotIsSafe();
     void releaseSlotIgnoringAndDeletingThePlotIsSafe();
     void nestedEventKeepsOuterEntriesQueued();
-    void deleteLaterDeliversTeardownSignalsLikeDelete();
+    void deleteLaterAndDeleteDeliverNoTeardownSignals();
 
     void qcpEmitHoldsUntilTheScopeCloses();
     void noPlotEmitsAtOnce();
@@ -47,6 +47,7 @@ private slots:
     void slotReenteringTheSetterDeliversInOrder();
     void slotDeletingThePlotDropsTheRestOfTheChain();
     void teardownOpensNoDelivery();
+    void aDestroyedPlotDeliversNothing();
     void oneArgumentRangeSlotConnects();
     void slotReenteringAScopedSetterLeavesTheLastSignalCurrent();
     void linkedAxisLastRangeSignalIsItsRange();

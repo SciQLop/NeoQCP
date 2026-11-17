@@ -609,6 +609,8 @@ Milestone 6e (multi-panel plots). Step 1 of the panel design.
   - Refused as misuse, with nothing changed: fewer than one row or column, more stretch factors than
         rows or columns, a stretch factor that is not finite and greater than zero, and a plot-layout
         cell that does not hold an axis rect (a title row, a nested layout, a polar area).
+  - A plot being destroyed delivers nothing through qcpEmit: the layout's teardown signals and the
+        last layerChanged(nullptr) included. Plain QObject::destroyed still arrives.
 
 Milestone 6f (scales). Breaking, in the 3.0 preview line: the scale an axis, a colour scale or a
 colour-mapped plottable shows its data with is a value, not an enum.

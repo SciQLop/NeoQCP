@@ -334,8 +334,8 @@ public:
     void setThemeLegendBorder(const QColor& color);
     // True from the first line of ~QCustomPlot's body (a subclass destructor has already run by
     // then). It is what mutators called from children's destroyed() slots see: they refuse, and
-    // the getters make nothing. Children's own signals can still reach user slots during teardown
-    // (for example layerChanged(nullptr) as the layers are deleted); a slot should check this first.
+    // the getters make nothing. qcpEmit* delivers nothing while it is set, so a slot is never
+    // handed half a plot; Qt's own QObject::destroyed still arrives.
     [[nodiscard]] bool isBeingDestroyed() const { return mBeingDestroyed; }
     [[nodiscard]] bool isReplotting() const { return mReplotting; }
     // Schedules one queued replot for the next event-loop turn; requests and layer marks coalesce
@@ -916,6 +916,14 @@ auto holdForDelivery(Args&&... args)
 {
     return std::make_tuple(held(std::decay_t<Args>(std::forward<Args>(args)))...);
 }
+
+// A plot being destroyed delivers nothing: a slot would be handed half a plot. Its layout's
+// teardown emits the stretch changes and its last layers a layerChanged(nullptr), for one. Qt's
+// own destroyed() is not sent through qcpEmit and still arrives.
+inline bool plotIsBeingDestroyed(const QCustomPlot* plot)
+{
+    return plot && plot->isBeingDestroyed();
+}
 } // namespace qcp::detail
 
 /*!
@@ -927,6 +935,8 @@ template <typename Sender, typename... SignalArgs, typename... Args>
 void qcpEmitHeard(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
                   Args&&... args)
 {
+    if (qcp::detail::plotIsBeingDestroyed(plot))
+        return;
     // Nothing is deferred, so the tuple and the std::function (a heap allocation per emit) would be
     // pure overhead. Every range setter of a drag or a pan lands here.
     if (!plot || !plot->mEmissions.isOpen())
@@ -972,6 +982,8 @@ template <typename Sender, typename Arg, typename Current>
 void qcpEmitCurrent(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(Arg),
                     Current current)
 {
+    if (qcp::detail::plotIsBeingDestroyed(plot))
+        return;
     if (!plot || !plot->mEmissions.isOpen())
         return (sender->*signal)(current());
     plot->deliver(sender, [sender, signal, current]() { (sender->*signal)(current()); });
@@ -986,6 +998,8 @@ template <typename Sender, typename... SignalArgs, typename StillValid, typename
 void qcpEmitIf(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
                StillValid stillValid, Args&&... args)
 {
+    if (qcp::detail::plotIsBeingDestroyed(plot))
+        return;
     if (!plot || !plot->mEmissions.isOpen())
         return (sender->*signal)(std::forward<Args>(args)...);
     auto copied = qcp::detail::holdForDelivery(std::forward<Args>(args)...);

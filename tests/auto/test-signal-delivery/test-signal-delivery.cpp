@@ -3,6 +3,7 @@
 #include <QTemporaryDir>
 #include <QtTest/qtestspontaneevent.h>
 #include <memory>
+#include <utility>
 
 namespace
 {
@@ -532,12 +533,17 @@ void TestSignalDelivery::nestedEventKeepsOuterEntriesQueued()
     QVERIFY(ranA);
 }
 
-void TestSignalDelivery::deleteLaterDeliversTeardownSignalsLikeDelete()
+void TestSignalDelivery::deleteLaterAndDeleteDeliverNoTeardownSignals()
 {
-    const auto layerChangesDuringTeardown = [](bool later) {
+    const auto teardownOf = [](bool later)
+    {
         auto* plot = new QCustomPlot;
-        int changes = 0;
-        connect(plot->selectionRect(), &QCPLayerable::layerChanged, [&changes] { ++changes; });
+        QObject collector;
+        int layerChanges = 0;
+        int destroyed = 0;
+        connect(plot, &QObject::destroyed, &collector, [&destroyed] { ++destroyed; });
+        connect(plot->selectionRect(), &QCPLayerable::layerChanged, &collector,
+                [&layerChanges] { ++layerChanges; });
         if (later)
         {
             plot->deleteLater();
@@ -545,11 +551,16 @@ void TestSignalDelivery::deleteLaterDeliversTeardownSignalsLikeDelete()
         }
         else
             delete plot;
-        return changes;
+        return std::pair{ layerChanges, destroyed };
     };
-    const int byDelete = layerChangesDuringTeardown(false);
-    QVERIFY(byDelete > 0);
-    QCOMPARE(layerChangesDuringTeardown(true), byDelete);
+    // Teardown delivers nothing through qcpEmit, whichever way the plot goes: a slot would see a
+    // plot and a layer that are partly gone. Qt's destroyed() arrives once in both cases.
+    const auto byDelete = teardownOf(false);
+    const auto byDeleteLater = teardownOf(true);
+    QCOMPARE(byDelete.first, 0);
+    QCOMPARE(byDeleteLater.first, 0);
+    QCOMPARE(byDelete.second, 1);
+    QCOMPARE(byDeleteLater.second, 1);
 }
 
 void TestSignalDelivery::qcpEmitHoldsUntilTheScopeCloses()
@@ -712,6 +723,35 @@ void TestSignalDelivery::teardownOpensNoDelivery()
     }
     delete plot;
     QCOMPARE(received, 0);
+}
+
+void TestSignalDelivery::aDestroyedPlotDeliversNothing()
+{
+    auto* plot = new QCustomPlot;
+    plot->resize(400, 300);
+    plot->setAxisRectGrid(2, 1, { .rowStretch = { 1.0, 2.0 } });
+    QObject collector;
+    int destroyed = 0;
+    int rowStretchChanges = 0;
+    int columnStretchChanges = 0;
+    int layerChanges = 0;
+    connect(plot, &QObject::destroyed, &collector, [&destroyed] { ++destroyed; });
+    connect(plot->plotLayout(), &QCPLayoutGrid::rowStretchFactorsChanged, &collector,
+            [&rowStretchChanges](const QList<double>&) { ++rowStretchChanges; });
+    connect(plot->plotLayout(), &QCPLayoutGrid::columnStretchFactorsChanged, &collector,
+            [&columnStretchChanges](const QList<double>&) { ++columnStretchChanges; });
+    connect(plot->selectionRect(), &QCPLayerable::layerChanged, &collector,
+            [&layerChanges](QCPLayer*) { ++layerChanges; });
+
+    delete plot;
+
+    // A slot of a plot being destroyed would see half of a plot: qcpEmit* drops those deliveries,
+    // the layout's teardown signals and the last layer's layerChanged(nullptr) included. Qt's own
+    // destroyed() is not one of ours and still arrives.
+    QCOMPARE(destroyed, 1);
+    QCOMPARE(rowStretchChanges, 0);
+    QCOMPARE(columnStretchChanges, 0);
+    QCOMPARE(layerChanges, 0);
 }
 
 void TestSignalDelivery::oneArgumentRangeSlotConnects()
