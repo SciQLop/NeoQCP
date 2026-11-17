@@ -1,8 +1,10 @@
 #include <QtTest/QtTest>
 
 #include <algorithm>
+#include <any>
 #include <cmath>
 #include <coords.h>
+#include <datasource/graph-resampler.h>
 #include <datasource/resample.h>
 #include <datasource/soa-datasource-2d.h>
 #include <drawable.h>
@@ -120,6 +122,7 @@ private slots:
 
     void QCPCoords_CoordToPixel1M();
     void QCPCoords_SymlogCoordToPixel1M();
+    void QCPGraph_BuildL1Cache1M();
     void QCPTransform_Map1M();
     void QCPDrawContext_ReplayData1M();
     void QCPDrawContext_ReplayMarkers100k();
@@ -2431,6 +2434,29 @@ void Benchmark::QCPCoords_SymlogCoordToPixel1M()
             out[i] = QPointF(key->coordToPixel(keys[i]), value->coordToPixel(values[i]));
     }
     QCOMPARE(int(out.size()), 1000000);
+}
+
+void Benchmark::QCPGraph_BuildL1Cache1M()
+{
+    // The L1 build of a 1M-point column folds one gap ratio per source row, so a pass that repeats
+    // that work there - as a linear or log axis did - shows up in this row.
+    std::vector<double> keys, values;
+    millionPoints(keys, values);
+    using Src = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
+    auto src = std::make_shared<Src>(std::move(keys), std::vector<std::vector<double>> { std::move(values) });
+    ViewportParams vp;
+    vp.keyRange = QCPRange(0, 1000);
+    vp.valueRange = QCPRange(-1, 1);
+    vp.plotWidthPx = 800;
+    vp.plotHeightPx = 600;
+    int bins = 0;
+    QBENCHMARK
+    {
+        std::any cache;
+        qcp::algo::buildL1Cache(*src, vp, cache, false);
+        bins = std::any_cast<qcp::algo::GraphResamplerCache>(&cache)->level1.stride();
+    }
+    QVERIFY(bins > 0);
 }
 
 void Benchmark::QCPTransform_Map1M()

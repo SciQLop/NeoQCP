@@ -88,7 +88,10 @@ double keyStepRatio(KeyAt key, int begin, int end, int i, const QCPScale& keySca
         return step > 0 && ref < std::numeric_limits<double>::max() ? step / ref : 0.0;
     };
     const auto keyUnits = [&](int j) { return static_cast<double>(key(j)); };
-    return std::min(ratio(keyUnits), ratio(shown));
+    const double keyRatio = ratio(keyUnits);
+    // A linear or log axis shows the key units themselves, so asking it twice would repeat this
+    // exactly - once per source row, on the L1 build path.
+    return scaled ? std::min(keyRatio, ratio(shown)) : keyRatio;
 }
 
 // Binned points say nothing about gaps through their keys: an empty bin is the binning, not a
