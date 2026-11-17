@@ -8,6 +8,9 @@
 #ifndef QCP_LAYOUTELEMENT_AXISRECT_SHORTCUTS_H
 #define QCP_LAYOUTELEMENT_AXISRECT_SHORTCUTS_H
 
+#include <utility>
+#include <vector>
+
 #include "../items/item-ellipse.h"
 #include "../items/item-text.h"
 #include "../plottables/plottable-graph.h"
@@ -38,22 +41,35 @@ QCPHandle<QCPGraph> QCPAxisRect::line(const K& keys, const V& values, const QCPL
 /*!
   A colour map of \a z over the grid of \a x and \a y, styled by \a options. The ranges go through
   qcp::toDoubles into vectors the map takes over, and flat \a z is x-major, as QCPColorMap2::setData
-  reads it.
+  reads it: z[i * y.size() + j] belongs to x[i], y[j].
+
+  The shapes are checked here rather than in the map, which would drop a grid it cannot read with a
+  bare warning and leave an empty map behind: \a x and \a y need a value each, and flat \a z needs
+  x.size() * y.size() values. Anything else is misuse, reported once, and gives an empty handle.
+
+  An empty handle also comes from add<QCPColorMap2>() itself, when the rect has no axis pair to draw
+  on.
 
   The map joins the rect's colour scale at the add, which is what makes the bar appear; the options
   then go through the map's own setters, which forward to that scale, so the gradient, the data scale
   and the range are the ones asked for. A map with \a options.colorBar false is detached from the
   scale first: it must not restyle a bar it does not show.
-
-  Returns an empty handle when the rect has no such axis pair or the map refuses the shapes, as
-  add<QCPColorMap2>() does.
 */
 template <QCPNumberRange X, QCPNumberRange Y, QCPNumbersOnly Z>
 QCPHandle<QCPColorMap2> QCPAxisRect::colorMap(const X& x, const Y& y, const Z& z,
                                               const QCPColorMapOptions& options)
 {
+    std::vector<double> keys = qcp::toDoubles(x);
+    std::vector<double> values = qcp::toDoubles(y);
+    std::vector<double> numbers = qcp::toDoubles(z);
+    QCP_CHECK_OR_RETURN(!keys.empty() && !values.empty(),
+                        "x and y need at least one value each: a colour map is a grid",
+                        QCPHandle<QCPColorMap2> { });
+    QCP_CHECK_OR_RETURN(numbers.size() == keys.size() * values.size(),
+                        "z needs one value per grid point: x.size() * y.size() values",
+                        QCPHandle<QCPColorMap2> { });
     const QCPHandle<QCPColorMap2> map
-        = add<QCPColorMap2>(qcp::toDoubles(x), qcp::toDoubles(y), qcp::toDoubles(z));
+        = add<QCPColorMap2>(std::move(keys), std::move(values), std::move(numbers));
     if (!map)
         return map;
     if (!options.colorBar)
@@ -70,16 +86,17 @@ QCPHandle<QCPColorMap2> QCPAxisRect::colorMap(const X& x, const Y& y, const Z& z
 
 /*!
   The columns form of colorMap(): one column of \a z per \a x value, each of y.size() values,
-  flattened x-major so that a column is a column of the map. Ragged columns and a column count other
-  than x.size() are misuse, reported once, and give an empty handle: the flattening is the only place
-  that knows which of the two shapes is wrong.
+  flattened x-major so that a column is a column of the map. The flattening is the only place that
+  knows which shape is wrong, so each mismatch is named on its own: ragged columns, a column length
+  other than y.size(), a column count other than x.size(). Each is misuse, reported once, and gives
+  an empty handle.
 */
 template <QCPNumberRange X, QCPNumberRange Y, QCPColumns Z>
 QCPHandle<QCPColorMap2> QCPAxisRect::colorMap(const X& x, const Y& y, const Z& z,
                                               const QCPColorMapOptions& options)
 {
-    const std::vector<double> keys = qcp::toDoubles(x);
-    const std::vector<double> values = qcp::toDoubles(y);
+    std::vector<double> keys = qcp::toDoubles(x);
+    std::vector<double> values = qcp::toDoubles(y);
     std::vector<double> flat;
     std::size_t rows = 0;
     bool first = true;
@@ -92,6 +109,9 @@ QCPHandle<QCPColorMap2> QCPAxisRect::colorMap(const X& x, const Y& y, const Z& z
                             QCPHandle<QCPColorMap2> { });
         rows = first ? numbers.size() : rows;
         first = false;
+        QCP_CHECK_OR_RETURN(numbers.size() == values.size(),
+                            "each column of z needs one value per y value",
+                            QCPHandle<QCPColorMap2> { });
         flat.insert(flat.end(), numbers.begin(), numbers.end());
     }
     QCP_CHECK_OR_RETURN(flat.size() == keys.size() * rows,

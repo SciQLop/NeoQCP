@@ -17,6 +17,8 @@ private slots:
   void colorMapInOneCall();
   void colorMapFromColumns();
   void raggedColumnsAreRefused();
+  void flatDataOfTheWrongSizeIsRefused();
+  void columnsOfTheWrongLengthAreRefused();
   void colorMapWithoutColorBar();
   void colorMapFromAView();
   void spectrogramSingleRect();

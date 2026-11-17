@@ -101,7 +101,9 @@ Also give each log axis a `QCPAxisTickerLog`. Changing the scale does not change
 
 `QCPAxisRect::colorMap(x, y, z, options)` is `add<QCPColorMap2>()` with the styling a caller would
 apply right after, the way a one-call `ax->line()` is a graph with its pen. Flat `z` is x-major,
-`z[i * ny + j]`, as `setData()` reads it.
+`z[i * ny + j]`, as `setData()` reads it. `x` and `y` need a value each and `z` exactly
+`x.size() * y.size()` values: a grid that does not fit is refused with a warning, and no map is made
+rather than an empty one.
 
 ```{literalinclude} snippets/colormaps.cpp
 :start-after: // [colormaps_one_call]
@@ -122,8 +124,9 @@ The options are named after the setter each one feeds:
 - `name`: the name a legend shows.
 
 One column of z per x value works too: give `z` as a range of ranges, `z[i]` the column at `x[i]`,
-each of `y.size()` values. The columns are flattened x-major for you. Ragged columns, or a column
-count other than `x.size()`, are refused with a warning, and no map is made.
+each of `y.size()` values. The columns are flattened x-major for you. Ragged columns, a column
+length other than `y.size()`, or a column count other than `x.size()`, are refused with a warning,
+and no map is made.
 
 The bar belongs to the rect, not to the map: a second `colorMap()` on the same rect re-styles the
 same bar, so the first map changes with it. Give the second map a colour scale of its own with

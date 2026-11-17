@@ -202,13 +202,14 @@ public:
     // qcp::toDoubles into the map's own storage, and \a options feeds its gradient, data scale,
     // name, colour bar and data range. Flat \a z is x-major: z[i * y.size() + j] belongs to
     // x[i], y[j] (x.size() * y.size() values), which is the layout QCPColorMap2::setData takes.
-    // Defined in axisrect-shortcuts.h, after the map exists.
+    // x and y need a value each and z exactly that many, or the call is misuse: one report and an
+    // empty handle. Defined in axisrect-shortcuts.h, after the map exists.
     template <QCPNumberRange X, QCPNumberRange Y, QCPNumbersOnly Z>
     QCPHandle<QCPColorMap2> colorMap(const X& x, const Y& y, const Z& z,
                                      const QCPColorMapOptions& options = { });
     // The columns form of colorMap(): one column of \a z per \a x value, each of y.size() values,
-    // flattened x-major. Ragged columns, or a count other than x.size(), are misuse: one report and
-    // an empty handle.
+    // flattened x-major. Ragged columns, a column length other than y.size(), or a count other than
+    // x.size(), are misuse: one report and an empty handle.
     template <QCPNumberRange X, QCPNumberRange Y, QCPColumns Z>
     QCPHandle<QCPColorMap2> colorMap(const X& x, const Y& y, const Z& z,
                                      const QCPColorMapOptions& options = { });

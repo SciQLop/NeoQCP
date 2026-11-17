@@ -32,6 +32,12 @@ namespace
 {
 int gMisuses = 0;
 void countMisuse(const char*, const char*) { ++gMisuses; }
+QByteArray gLastMisuse;
+void recordMisuse(const char*, const char* what)
+{
+    ++gMisuses;
+    gLastMisuse = what;
+}
 
 // Plain drawText, counting how often the axis asks it to lay the label out.
 struct CountingLabelRenderer final : QCPLabelRenderer
@@ -1256,21 +1262,23 @@ void TestQCPAxisRect::raggedColumnsAreRefused()
     const std::vector<double> y { 10, 20 };
 
     gMisuses = 0;
-    const auto previous = qcp::setMisuseHandler(countMisuse);
+    const auto previous = qcp::setMisuseHandler(recordMisuse);
     const QCPHandle<QCPColorMap2> ragged =
         ar->colorMap(std::vector<double> { 0, 1 }, y, std::vector<std::vector<double>> { { 1, 2 }, { 3 } });
     qcp::setMisuseHandler(previous);
     QVERIFY2(!ragged, "ragged columns make no map");
     QCOMPARE(gMisuses, 1); // one report says why
+    QVERIFY2(gLastMisuse.contains("ragged"), gLastMisuse.constData());
 
-    // Two whole columns for three x values: the count is what is wrong.
+    // Two whole columns for three x values: the count is what is wrong, not a column.
     gMisuses = 0;
-    const auto again = qcp::setMisuseHandler(countMisuse);
+    const auto again = qcp::setMisuseHandler(recordMisuse);
     const QCPHandle<QCPColorMap2> tooFew = ar->colorMap(
         std::vector<double> { 0, 1, 2 }, y, std::vector<std::vector<double>> { { 1, 2 }, { 3, 4 } });
     qcp::setMisuseHandler(again);
     QVERIFY2(!tooFew, "one column per x value, or no map");
     QCOMPARE(gMisuses, 1);
+    QVERIFY2(gLastMisuse.contains("one per x value"), gLastMisuse.constData());
 }
 
 void TestQCPAxisRect::colorMapWithoutColorBar()
@@ -1329,4 +1337,57 @@ void TestQCPAxisRect::spectrogramSingleRect()
     QVERIFY2(qcp::test::matchesReference(image, QStringLiteral("test-qcpaxisrect"),
                                          QStringLiteral("spectrogram-single-rect.png"), &why),
              qPrintable(why));
+}
+
+void TestQCPAxisRect::flatDataOfTheWrongSizeIsRefused()
+{
+    QCPAxisRect *ar = mPlot->axisRect();
+    const std::vector<double> x { 0, 1 };
+    const std::vector<double> y { 10, 20 };
+
+    // Five values for a 2 x 2 grid. The map alone would drop them with a bare warning and stay
+    // empty, so the shortcut refuses the shapes and says why.
+    gMisuses = 0;
+    const auto previous = qcp::setMisuseHandler(recordMisuse);
+    const QCPHandle<QCPColorMap2> mismatched
+        = ar->colorMap(x, y, std::vector<double> { 1, 2, 3, 4, 5 });
+    qcp::setMisuseHandler(previous);
+    QVERIFY2(!mismatched, "a z that is not one value per grid point makes no map");
+    QCOMPARE(gMisuses, 1);
+    QVERIFY2(gLastMisuse.contains("one value per grid point"), gLastMisuse.constData());
+
+    // A grid needs both axes: no x value or no y value is refused the same way.
+    gMisuses = 0;
+    const auto noKeysHandler = qcp::setMisuseHandler(recordMisuse);
+    const QCPHandle<QCPColorMap2> noKeys
+        = ar->colorMap(std::vector<double> { }, y, std::vector<double> { });
+    qcp::setMisuseHandler(noKeysHandler);
+    QVERIFY2(!noKeys, "no x values, no grid, no map");
+    QCOMPARE(gMisuses, 1);
+    QVERIFY2(gLastMisuse.contains("at least one value"), gLastMisuse.constData());
+
+    gMisuses = 0;
+    const auto noValuesHandler = qcp::setMisuseHandler(recordMisuse);
+    const QCPHandle<QCPColorMap2> noValues
+        = ar->colorMap(x, std::vector<double> { }, std::vector<double> { });
+    qcp::setMisuseHandler(noValuesHandler);
+    QVERIFY2(!noValues, "no y values, no grid, no map");
+    QCOMPARE(gMisuses, 1);
+    QVERIFY2(gLastMisuse.contains("at least one value"), gLastMisuse.constData());
+}
+
+void TestQCPAxisRect::columnsOfTheWrongLengthAreRefused()
+{
+    QCPAxisRect *ar = mPlot->axisRect();
+    // Three whole columns of five for four y values: the columns agree with each other, so neither
+    // the ragged check nor the count check has anything to say; the grid is the mismatch.
+    const std::vector<std::vector<double>> columns(3, std::vector<double> { 1, 2, 3, 4, 5 });
+    gMisuses = 0;
+    const auto previous = qcp::setMisuseHandler(recordMisuse);
+    const QCPHandle<QCPColorMap2> map = ar->colorMap(std::vector<double> { 0, 1, 2 },
+                                                    std::vector<double> { 10, 20, 30, 40 }, columns);
+    qcp::setMisuseHandler(previous);
+    QVERIFY2(!map, "a column needs one value per y value");
+    QCOMPARE(gMisuses, 1);
+    QVERIFY2(gLastMisuse.contains("one value per y value"), gLastMisuse.constData());
 }
