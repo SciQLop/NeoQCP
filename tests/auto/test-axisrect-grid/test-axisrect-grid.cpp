@@ -593,4 +593,17 @@ void TestAxisRectGrid::aShareThatWouldBreakAMappedLinkIsRefused()
     QVERIFY(top->xAxis()->tickLabels());
     QCOMPARE(units->linkSource(), top->xAxis().get());
     QCOMPARE(mPlot->axisRectCount(), 2);
+
+    // A bottom axis the user linked to the top one: sharing would turn the link round.
+    QCustomPlot reversed;
+    reversed.setAxisRectGrid(2, 1);
+    QCPAxis* upper = reversed.axisRect(0, 0)->xAxis().get();
+    QCPAxis* lower = reversed.axisRect(1, 0)->xAxis().get();
+    lower->linkTo(upper);
+    gMisuses = 0;
+    reversed.setAxisRectGrid(2, 1, { .shareX = true });
+    QCOMPARE(gMisuses, 1);
+    QVERIFY(upper->tickLabels());
+    QCOMPARE(upper->linkSource(), nullptr);
+    QCOMPARE(lower->linkSource(), upper);
 }

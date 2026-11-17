@@ -225,7 +225,8 @@ QList<std::pair<QCPAxis*, QCPAxis*>> plannedShares(QCPLayoutGrid& layout, int ro
 }
 
 // Whether every planned share can be an identity link: no axis taking part follows or drives a
-// link through functions (a top axis in other units, say), which a share would break.
+// link through functions (a top axis in other units, say), which a share would break, and no source
+// already follows the axis that would follow it.
 bool sharesAreLinkable(const QList<std::pair<QCPAxis*, QCPAxis*>>& pairs)
 {
     const auto mapped = [](const QCPAxisBase* axis)
@@ -239,8 +240,11 @@ bool sharesAreLinkable(const QList<std::pair<QCPAxis*, QCPAxis*>>& pairs)
     return std::none_of(pairs.cbegin(), pairs.cend(),
                         [&](const auto& pair)
                         {
+                            // A source that follows its own follower would turn the link round.
+                            const bool reversed = pair.second->isIdentityFollower()
+                                && pair.second->linkSource() == pair.first;
                             return mapped(pair.first) || drivesMapped(pair.first)
-                                || mapped(pair.second);
+                                || mapped(pair.second) || reversed;
                         });
 }
 
@@ -273,6 +277,8 @@ void shareAxes(QCPLayoutGrid& layout, int rows, int columns, const QCPAxisRectGr
         if (follower == source)
             continue;
         follower->linkTo(source);
+        if (!follower->isIdentityFollower()) // refused (checked up front: a guard only)
+            continue;
         auto& record = *std::find_if(shares.begin(), shares.end(),
                                      [follower](const auto& s) { return s.follower == follower; });
         if (follower->tickLabels() && !record.hidLabels)
@@ -342,7 +348,8 @@ bool qcp::applyAxisRectGrid(QCPLayoutGrid& layout, int rows, int columns,
                         false);
     QCP_CHECK_OR_RETURN(sharesAreLinkable(plannedShares(layout, rows, columns, options)),
                         "an axis the grid would share follows or drives a link through functions "
-                        "(an axis in other units): unlink it first",
+                        "(an axis in other units), or a source already follows the axis that would "
+                        "follow it: unlink it first",
                         false);
 
     // Undo the previous call's groups: their members are about to be regrouped by row and column.
