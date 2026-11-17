@@ -157,9 +157,12 @@ public:
     void scaleRange(double factor, double center);
 
     // Changes the range so what the plottables of the systems using this axis draw is visible: their
-    // drawn data ranges, in this axis' own dimension. A cartesian axis refines this with the data
-    // ranges it always used, and the angular axis keeps its full turn.
-    Q_INVOKABLE virtual void rescale(bool onlyVisiblePlottables = false);
+    // data ranges, in this axis' own dimension. Axes sharing a range through identity links fit the
+    // union of all their data, set on the source once (decision 13).
+    Q_INVOKABLE void rescale(bool onlyVisiblePlottables = false);
+    //! Whether this axis follows a source through a link with no functions: the two show the same
+    //! range in the same units.
+    [[nodiscard]] bool isIdentityFollower() const;
     //! The plottables of every system that maps through this axis, in the plot's own order.
     virtual QList<QCPHandle<QCPPlottable>> plottables() const;
 
@@ -269,6 +272,11 @@ protected:
     // The tail of rescale(): stores \a range, or, when it is not usable (a constant plottable has a
     // zero-size range), recentres the current range on it. Shared with subclasses that rescale.
     void rescaleTo(const QCPRange& range, bool haveRange);
+    // This axis' own data range under signDomain, from its plottables; false when it has none. The
+    // drawn data ranges here; a cartesian axis uses its plottables' key and value ranges, and the
+    // angular axis has none (it keeps its full turn).
+    virtual bool ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signDomain,
+                              QCPRange& range) const;
 
     // Takes the source's range, its direction included, through the link's forward function.
     void refreshFromLink();
@@ -296,6 +304,8 @@ struct QCP_LIB_DECL QCPAxisLink
     QCPAxisFunction forward;
     QCPAxisFunction inverse;
     bool decreasing = false;
+    // Made with no functions: the follower shows the source's range in the same units.
+    bool identity = false;
 };
 
 

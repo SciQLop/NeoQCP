@@ -586,3 +586,6 @@ that no section above lists, and the behaviour changes of 5f.
 - The range-taking calls are the plottables' data constructors, `ax->line(keys, values)` and
   `QCPGraph::setData(keys, values)` (also through the graph's handle); the other plottables' `setData()` and
   `addData()` keep taking `QVector<double>` and `std::vector<double>`.
+- 6e rescale union: `QCPAxisBase::rescale()` is no longer virtual (the hook is `ownDataRange()`), and identity-linked
+  axes rescale as one. SciQLopPlots wraps `QCPAxis::rescale()` (`SciQLopPlotAxis::rescale`, `ColorScaleController`)
+  without overriding it and makes no identity link: nothing to change.

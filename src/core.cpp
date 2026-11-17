@@ -3498,8 +3498,9 @@ void QCustomPlot::rescaleAxes(bool onlyVisiblePlottables)
     for (QCPArea* area : areasRaw())
         allAxes << guarded(qcp::pointers(area->allAxes()));
 
+    // An identity follower is fitted with its source, once per link (decision 13).
     for (const auto& axis : allAxes)
-        if (axis) // a rangeChanged slot may delete the others
+        if (axis && !axis->isIdentityFollower()) // a rangeChanged slot may delete the others
             axis->rescale(onlyVisiblePlottables);
 }
 

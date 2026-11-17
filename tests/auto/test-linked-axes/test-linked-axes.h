@@ -31,4 +31,7 @@ private slots:
     void aSpanOnALinkedAxisLandsAtItsCoordToPixel();
     void aLinkedAxisGridLineLandsAtItsTick();
     void aVerticalLinkFollowsALogReversedSource();
+    void rescaleFitsTheUnion();
+    void aUnionUnderTheSharedScale();
+    void aMappedFollowerDoesNotWiden();
 };

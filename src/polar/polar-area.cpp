@@ -268,8 +268,8 @@ void QCPPolarArea::setRangeZoomFactor(double factor)
 
 /*!
   Rescales the radial axis of every graph drawn on this area, so that the graphs' radii are fully
-  visible. The angular axis keeps its full turn: see \ref QCPPolarAxisAngular::rescale, the one rule
-  for it, whether the fit comes from here or from \ref QCustomPlot::rescaleAxes.
+  visible. The angular axis keeps its full turn: it has no data range of its own (one rule
+  for it, whether the fit comes from here or from \ref QCustomPlot::rescaleAxes).
 */
 void QCPPolarArea::rescale(bool onlyVisiblePlottables)
 {

@@ -462,10 +462,44 @@ QList<QCPPlottable*> QCPAxisBase::plottablesRaw() const
 */
 void QCPAxisBase::rescale(bool onlyVisiblePlottables)
 {
-    QCPRange newRange;
+    QCPAxisBase* target = isIdentityFollower() ? mLink->source.data() : this;
+    const QCP::SignDomain signDomain = target->mScale.isLog()
+        ? (target->mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive)
+        : QCP::sdBoth;
+    QCPRange unionRange;
     bool haveRange = false;
-    const QCP::SignDomain signDomain =
-        mScale.isLog() ? (mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive) : QCP::sdBoth;
+    const auto include = [&](const QCPAxisBase* axis)
+    {
+        QCPRange range;
+        if (!axis->ownDataRange(onlyVisiblePlottables, signDomain, range))
+            return;
+        if (haveRange)
+            unionRange.expand(range);
+        else
+            unionRange = range;
+        haveRange = true;
+    };
+    include(target);
+    for (const QPointer<QCPAxisBase>& user : target->mLinkedAxes)
+        if (user && user->isIdentityFollower())
+            include(user.data());
+    target->rescaleTo(unionRange, haveRange);
+}
+
+bool QCPAxisBase::isIdentityFollower() const
+{
+    return mLink && mLink->identity && mLink->source;
+}
+
+/*! \internal
+
+  The drawn data ranges of the plottables of every system that maps through this axis, in this axis'
+  own dimension.
+*/
+bool QCPAxisBase::ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signDomain,
+                               QCPRange& range) const
+{
+    bool haveRange = false;
     // Through the virtual list: a user axis that drops a plottable must be honoured (M1).
     for (const QCPHandle<QCPPlottable>& plottable : plottables())
     {
@@ -479,16 +513,16 @@ void QCPAxisBase::rescale(bool onlyVisiblePlottables)
         const QCPDrawnSide side =
             system->keyAxis().get() == this ? QCPDrawnSide::Key : QCPDrawnSide::Value;
         bool foundRange = false;
-        const QCPRange range = qcpDrawnRange(plottable->drawnDataRange(), side, foundRange, signDomain);
+        const QCPRange found = qcpDrawnRange(plottable->drawnDataRange(), side, foundRange, signDomain);
         if (!foundRange)
             continue;
-        if (!haveRange)
-            newRange = range;
+        if (haveRange)
+            range.expand(found);
         else
-            newRange.expand(range);
+            range = found;
         haveRange = true;
     }
-    rescaleTo(newRange, haveRange);
+    return haveRange;
 }
 
 /*! \internal
@@ -546,6 +580,7 @@ void QCPAxisBase::linkTo(QCPAxisBase* source, QCPAxisFunction forward, QCPAxisFu
     QCP_CHECK_OR_RETURN(!drivesALink, "the axis already drives a link of its own", );
     QCP_CHECK_OR_RETURN(static_cast<bool>(forward) == static_cast<bool>(inverse),
                         "a link needs both its forward and its inverse function", );
+    const bool identity = !forward;
     if (!forward)
     {
         forward = [](double v) { return v; };
@@ -560,6 +595,7 @@ void QCPAxisBase::linkTo(QCPAxisBase* source, QCPAxisFunction forward, QCPAxisFu
     if (!std::isfinite(forwardLower) || !std::isfinite(forwardUpper))
         qDebug() << Q_FUNC_INFO << "the forward function is not finite at the source's range";
     link->decreasing = forwardUpper < forwardLower;
+    link->identity = identity;
     link->forward = std::move(forward);
     link->inverse = std::move(inverse);
     mLink = link;

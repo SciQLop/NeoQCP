@@ -1649,33 +1649,27 @@ void QCPAxis::setScaleRatio(const QCPAxis* otherAxis, double ratio)
 
   \see QCPPlottable::rescaleAxes, QCustomPlot::rescaleAxes
 */
-void QCPAxis::rescale(bool onlyVisiblePlottables)
+bool QCPAxis::ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signDomain,
+                           QCPRange& range) const
 {
-    QCPRange newRange;
     bool haveRange = false;
     for (QCPPlottable* plottable : plottablesRaw())
     {
         if (!plottable->realVisibility() && onlyVisiblePlottables)
             continue;
-        QCPRange plottableRange;
-        bool currentFoundRange;
-        QCP::SignDomain signDomain = QCP::sdBoth;
-        if (mScale.isLog())
-            signDomain = (mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive);
-        if (plottable->keyAxisBase().get() == this)
-            plottableRange = plottable->getKeyRange(currentFoundRange, signDomain);
+        bool foundRange = false;
+        const QCPRange found = plottable->keyAxisBase().get() == this
+            ? plottable->getKeyRange(foundRange, signDomain)
+            : plottable->getValueRange(foundRange, signDomain);
+        if (!foundRange)
+            continue;
+        if (haveRange)
+            range.expand(found);
         else
-            plottableRange = plottable->getValueRange(currentFoundRange, signDomain);
-        if (currentFoundRange)
-        {
-            if (!haveRange)
-                newRange = plottableRange;
-            else
-                newRange.expand(plottableRange);
-            haveRange = true;
-        }
+            range = found;
+        haveRange = true;
     }
-    rescaleTo(newRange, haveRange);
+    return haveRange;
 }
 
 /*!

@@ -630,6 +630,13 @@ Milestone 6e (multi-panel plots). Step 1 of the panel design.
         opaque background in the plot's background colour, and its own three layers right above the
         plot's "axes" layer, where its plottables and items go: it draws above everything of its
         parent. It follows the parent and goes with it; axisRects() lists it after the cells.
+  - Rescale fits the union of a link (decision 13): QCPAxisBase::rescale() on an axis linked with no
+        functions, or on its source, fits the data of the source and of every such follower, and
+        sets the range once on the source; QCustomPlot::rescaleAxes() rescales each link once.
+        Upstream the last axis rescaled won. A link through functions does not widen its source.
+        rescale() is no longer virtual: the per-axis data range is the virtual ownDataRange()
+        (cartesian axes keep their key/value ranges, the polar angular axis has none). QCPAxisLink
+        records whether it was made without functions (identity).
 
 Milestone 6f (scales). Breaking, in the 3.0 preview line: the scale an axis, a colour scale or a
 colour-mapped plottable shows its data with is a value, not an enum.

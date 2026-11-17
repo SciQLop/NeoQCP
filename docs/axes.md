@@ -279,3 +279,4 @@ The linked axis keeps its own ticks and label, so it shows the same range in oth
 - Both axes must be on the same plot and have the same orientation. Links do not chain: a source cannot be linked itself.
 - The linked axis follows the source's direction: reverse the source, not the linked axis.
 - `unlink()` ends the link.
+- Without functions, `rescale()` on either axis fits the data of both, and sets the range once on the source. With functions, each side keeps its own data.

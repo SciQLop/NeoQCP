@@ -666,3 +666,84 @@ void TestLinkedAxes::aVerticalLinkFollowsALogReversedSource()
                  "a vertical link must keep the source's fraction along its own height");
     }
 }
+
+namespace
+{
+// Two rects stacked, the top one's bottom axis an identity follower of the bottom one's (the
+// shared-x target's layout, without the grid's options).
+struct Stacked
+{
+    QCustomPlot plot;
+    QCPAxisRect* top = nullptr;
+    QCPAxisRect* bottom = nullptr;
+    Stacked()
+    {
+        plot.setAxisRectGrid(2, 1);
+        top = plot.axisRect(0, 0).get();
+        bottom = plot.axisRect(1, 0).get();
+        top->xAxis()->linkTo(bottom->xAxis());
+    }
+};
+
+std::vector<double> ramp(double from, double to, int n = 9)
+{
+    std::vector<double> v;
+    for (int i = 0; i < n; ++i)
+        v.push_back(from + (to - from) * i / (n - 1));
+    return v;
+}
+} // namespace
+
+void TestLinkedAxes::rescaleFitsTheUnion()
+{
+    // Decision 13: a shared axis fits the union of its panels' data, whichever panel is rescaled.
+    Stacked s;
+    s.top->line(ramp(0, 8), ramp(0, 1));
+    s.bottom->line(ramp(2, 10), ramp(0, 1));
+    s.plot.rescaleAxes();
+    QCOMPARE(s.bottom->xAxis()->range(), QCPRange(0, 10));
+    QCOMPARE(s.top->xAxis()->range(), QCPRange(0, 10));
+
+    s.bottom->xAxis()->setRange(3, 4);
+    s.top->xAxis()->rescale();
+    QCOMPARE(s.bottom->xAxis()->range(), QCPRange(0, 10));
+    s.bottom->xAxis()->setRange(3, 4);
+    s.bottom->xAxis()->rescale();
+    QCOMPARE(s.top->xAxis()->range(), QCPRange(0, 10));
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestLinkedAxes::aUnionUnderTheSharedScale()
+{
+    // The union is taken in the source's sign domain: a log shared axis ignores data <= 0.
+    Stacked s;
+    s.bottom->xAxis()->setScale(QCPScale::log());
+    s.bottom->xAxis()->setRange(1, 10);
+    s.top->line(std::vector<double> { -1, 0, 1, 10 }, std::vector<double> { 0, 1, 2, 3 });
+    s.bottom->line(std::vector<double> { 100, 1000 }, std::vector<double> { 0, 1 });
+    s.plot.rescaleAxes();
+    QCOMPARE(s.bottom->xAxis()->range(), QCPRange(1, 1000));
+
+    // A panel with no data and one with constant data still give a valid, finite range.
+    Stacked t;
+    t.bottom->line(std::vector<double> { 5, 5 }, std::vector<double> { 0, 1 });
+    t.plot.rescaleAxes();
+    const QCPRange r = t.bottom->xAxis()->range();
+    QVERIFY(std::isfinite(r.lower) && std::isfinite(r.upper) && r.lower < 5 && r.upper > 5);
+    QCOMPARE(t.top->xAxis()->range(), r);
+}
+
+void TestLinkedAxes::aMappedFollowerDoesNotWiden()
+{
+    // A follower through functions shows other units: its data says nothing about the source's.
+    QCustomPlot plot;
+    plot.setAxisRectGrid(2, 1);
+    QCPAxisRect* top = plot.axisRect(0, 0).get();
+    QCPAxisRect* bottom = plot.axisRect(1, 0).get();
+    top->xAxis()->linkTo(bottom->xAxis(), twice, half);
+    top->line(ramp(0, 100), ramp(0, 1));
+    bottom->line(ramp(2, 10), ramp(0, 1));
+    plot.rescaleAxes();
+    QCOMPARE(bottom->xAxis()->range(), QCPRange(2, 10));
+    QCOMPARE(top->xAxis()->range(), QCPRange(4, 20));
+}
