@@ -63,6 +63,15 @@ bool QCPGraph::drawsInDataSpace() const
     return mSystem && mSystem->kind() != QCPTransform::Kind::Cartesian;
 }
 
+// The axis the frame draws in is the system's own: on a cartesian system that is the key axis the
+// graph was given, and on a user system it is the axis its reader sees, which is the space a step
+// has to be measured in - keyAxisRaw() resolves no axis there.
+QCPScale QCPGraph::shownKeyScale() const
+{
+    const QCPAxisBase* axis = keyAxisBase();
+    return axis ? axis->scale() : QCPScale();
+}
+
 bool QCPGraph::areaIsAxisRect() const
 {
     return mSystem && qobject_cast<QCPAxisRect*>(mSystem->area());
@@ -2213,11 +2222,7 @@ void QCPGraph::drawInDataSpace(QCPDrawContext& context) const
         return;
 
     const double baseline = dataSpaceBaseline();
-    const QCPScale keyScale = [this]
-    {
-        const QCPAxis* axis = qobject_cast<const QCPAxis*>(keyAxisBase());
-        return axis ? axis->scale() : QCPScale();
-    }();
+    const QCPScale keyScale = shownKeyScale();
     const bool logValueAxis = [this]
     {
         const QCPAxis* axis = qobject_cast<const QCPAxis*>(valueAxisBase());
@@ -2249,7 +2254,7 @@ void QCPGraph::drawInDataSpace(QCPDrawContext& context) const
         std::vector<int> sourceIndices;
         std::vector<QPointF> line
             = ds.linesInData(c, begin, end, /*pixelsPerKey=*/0.0,
-                             wantsRows ? &sourceIndices : nullptr, /*keyScale=*/QCPScale(),
+                             wantsRows ? &sourceIndices : nullptr, /*keyScale=*/keyScale,
                              /*cacheGaps=*/false);
         if (line.empty())
             continue;
@@ -2507,7 +2512,7 @@ std::vector<qcp::fill::StripPoint> QCPGraph::fillRows(const Fill& fill,
                                                            const QCPMultiDataSource& ds,
                                                            int begin, int end) const
 {
-    const QCPScale keyScale = keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
+    const QCPScale keyScale = shownKeyScale();
     const auto gaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace(), keyScale);
     const auto* targetColumn = std::get_if<int>(&fill.target);
     const auto edge = [this](double value)
@@ -2546,10 +2551,8 @@ std::vector<qcp::fill::StripPoint> QCPGraph::shapeFillRows(
     // row (the simplify note in drawInDataSpace names the ceiling).
     if (!drawsInDataSpace())
         rows = binnedWhenDense(std::move(rows));
-    // The system's key axis is the one a straight-segment frame draws in log space.
-    const QCPAxis* keyAxis = drawsInDataSpace() ? qobject_cast<const QCPAxis*>(keyAxisBase())
-                                                : keyAxisRaw();
-    const QCPScale keyScale = keyAxis ? keyAxis->scale() : QCPScale();
+    // A straight-segment frame spaces its corners in the space its reader sees.
+    const QCPScale keyScale = shownKeyScale();
     return steppedOnScreen(std::move(rows), ownerStep(mComponents[fill.owner]), keyScale);
 }
 
@@ -2567,9 +2570,8 @@ std::vector<qcp::fill::StripPoint> QCPGraph::fillToGraphRows(
 
     std::vector<qcp::fill::SeriesRow> ownerRows;
     ownerRows.reserve(std::size_t(std::max(0, end - begin)));
-    const QCPScale partnerScale
-        = partner->keyAxisRaw() ? partner->keyAxisRaw()->scale() : QCPScale();
-    const QCPScale keyScale = keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
+    const QCPScale partnerScale = partner->shownKeyScale();
+    const QCPScale keyScale = shownKeyScale();
     const auto ownerGaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace(), keyScale);
     for (int i = begin; i < end; ++i)
         ownerRows.push_back({ ds.keyAt(i), ds.valueAt(fill.owner, i),
@@ -2827,7 +2829,7 @@ std::vector<qcp::fill::StripPoint> QCPGraph::errorBandRows(
     const ErrorBars& spec, const QCPMultiDataSource& ds, int begin, int end) const
 {
     const auto bars = errorBarRows(spec, ds, begin, end);
-    const QCPScale keyScale = keyAxisRaw() ? keyAxisRaw()->scale() : QCPScale();
+    const QCPScale keyScale = shownKeyScale();
     const auto gaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace(), keyScale);
     Q_ASSERT(gaps.size() == int(bars.size())); // gapsBefore() holds one entry per row
     std::vector<qcp::fill::StripPoint> rows;

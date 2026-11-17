@@ -43,6 +43,7 @@ private slots:
     void bracedListsSetOneColumn();
     void addDataSinglePointOnAMultiColumnGraphIsAMisuse();
     void addDataOnAUserSystemRedrawsWithoutPipeline();
+    void theDataSpaceLineMeasuresItsGapsInTheFrameItDrawsIn();
     void aSourceStagedInDataSpaceGetsAPipelineJobAfterReturningToCartesian();
     void componentCountMatchesDataSource();
     void componentValueAt();

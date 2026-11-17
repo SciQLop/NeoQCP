@@ -329,6 +329,8 @@ protected:
 
     //! B5: the graph draws through its system's transform when that system is not cartesian.
     [[nodiscard]] bool drawsInDataSpace() const;
+    //! The key scale the frame draws in: the system's own key axis, whatever its kind.
+    [[nodiscard]] QCPScale shownKeyScale() const;
     void drawInDataSpace(QCPDrawContext& context) const;
     [[nodiscard]] std::optional<double> nearestMappedPoint(const QPointF& pos,
                                                            QVariant* details) const;

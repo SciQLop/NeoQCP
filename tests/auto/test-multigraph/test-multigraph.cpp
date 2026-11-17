@@ -434,6 +434,61 @@ void TestMultiGraph::addDataOnAUserSystemRedrawsWithoutPipeline()
     QVERIFY2(red, "the appended point is not drawn on the user system");
 }
 
+// A user-system frame resolves no cartesian key axis, so the scale it draws in is the system's own
+// axis, which is what its reader sees and where a step looks like a step. The line, its fill and its
+// error band all measure their gaps there.
+void TestMultiGraph::theDataSpaceLineMeasuresItsGapsInTheFrameItDrawsIn()
+{
+    mPlot->setBackground(QBrush(Qt::white));
+    mPlot->plotLayout()->clear();
+    auto* rect = new SkewRect(mPlot);
+    mPlot->plotLayout()->addElement(0, 0, rect);
+    QCPAxis* keyAxis = rect->axis(QCPAxis::atBottom);
+    QCPAxis* valueAxis = rect->axis(QCPAxis::atLeft);
+    const QCPScale scale = QCPScale::symlog(2);
+    keyAxis->setScale(scale);
+    valueAxis->setRange(-1.5, 1.5);
+
+    // Keys even on screen and a run of rows dropped in the middle: one real hole, and the key-unit
+    // step that jumps at each band edge, which is the sampling rather than a hole.
+    std::vector<double> keys;
+    std::vector<double> values;
+    for (int i = 0; i < 201; ++i)
+    {
+        keys.push_back(scale.fromScale(-3.0 + 6.0 * i / 200.0));
+        values.push_back(std::sin(0.05 * i));
+    }
+    keys.erase(keys.begin() + 100, keys.begin() + 105);
+    values.erase(values.begin() + 100, values.begin() + 105);
+    keyAxis->setRange(keys.front(), keys.back());
+    mPlot->replot();
+
+    auto* mg = rect->axis(QCPAxis::atBottom)->axisRect()->add<QCPGraph>(keyAxis, valueAxis).get();
+    QVERIFY2(mg->drawsInDataSpace(), "the graph is not drawn on the user system");
+    mg->setData(QVector<double>(keys.begin(), keys.end()),
+                QVector<double>(values.begin(), values.end()));
+    mg->setComponentPens({QPen(Qt::black, 1)});
+    mg->setComponentFill(0, 0.0, QBrush(Qt::red));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    int lineBreaks = 0;
+    int fillJoins = 0;
+    for (const qcp::QCPDrawCommand& command : mg->mCore.recordedList().commands)
+    {
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+            for (const QPointF& point : *line->points)
+                lineBreaks += std::isnan(point.y()) ? 1 : 0;
+        if (const auto* fill = std::get_if<qcp::FillBetweenCmd>(&command))
+            for (std::size_t i = 1; i < fill->upper->size(); ++i)
+                fillJoins += (*fill->upper)[i].x() == (*fill->upper)[i - 1].x() ? 1 : 0;
+    }
+
+    QVERIFY2(lineBreaks == 1,
+             qPrintable(QString("%1 breaks on the line for one dropped run").arg(lineBreaks)));
+    QVERIFY2(fillJoins == 2,
+             qPrintable(QString("%1 pinches in the fill for one dropped run").arg(fillJoins)));
+}
+
 void TestMultiGraph::aSourceStagedInDataSpaceGetsAPipelineJobAfterReturningToCartesian()
 {
     // Task 2a's carry: a source staged while the graph was drawing in data space has no L1 job.
