@@ -1,4 +1,6 @@
 #include "axis-base.h"
+#include "axistickerlog.h"
+#include "axistickersymlog.h"
 
 #include <optional>
 #include "../coordinate-system.h"
@@ -13,6 +15,23 @@
 #include <algorithm>
 #include <cmath>
 #include <utility>
+
+namespace
+{
+//! The ticker a scale brings: the linear one, the log one with the scale's base, the symlog one.
+QSharedPointer<QCPAxisTicker> tickerFor(const QCPScale& scale)
+{
+    if (scale.isSymlog())
+        return QSharedPointer<QCPAxisTickerSymlog>::create(scale);
+    if (scale.isLog())
+    {
+        const auto ticker = QSharedPointer<QCPAxisTickerLog>::create();
+        ticker->setLogBase(scale.base());
+        return ticker;
+    }
+    return QSharedPointer<QCPAxisTicker>::create();
+}
+} // namespace
 
 /*! \fn void QCPAxisBase::rangeReversedChanged(bool rangeReversed)
 
@@ -92,19 +111,24 @@ void QCPAxisBase::detachLinks()
   Sets the scale this axis shows its range with to \a scale. A logarithmic scale has no pixel for a
   non-positive coordinate, so the range is sanitized: only the part on one side of zero survives.
 
-  A linked axis takes its range from its source: a scale change only picks its ticks, it never
-  writes a sanitized range back into the source. A scale equal to the current one changes nothing
-  and emits nothing.
+  The scale also installs the ticker that suits it (\ref QCPAxisTicker, QCPAxisTickerLog,
+  QCPAxisTickerSymlog), on every call, so a ticker set before the scale is replaced. A ticker set
+  after it stays. A scale equal to the current one leaves the range alone and emits no
+  \ref scaleChanged, but still installs its ticker.
 
-  \see QCPScale, setRange
+  A linked axis takes its range from its source: a scale change only picks its ticks, it never
+  writes a sanitized range back into the source.
+
+  \see QCPScale, setRange, setTicker
 */
 void QCPAxisBase::setScale(const QCPScale& scale)
 {
-    if (mScale == scale)
-        return;
     std::optional<QCPEmissionScope> scope;
     if (defersEmissions())
         scope.emplace(mParentPlot);
+    setTicker(tickerFor(scale));
+    if (mScale == scale)
+        return;
     if (!scaleWillChange(scale))
         return;
     mScale = scale;

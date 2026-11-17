@@ -37,6 +37,7 @@
 #include "axis/axistickerfixed.h"
 #include "axis/axistickerlog.h"
 #include "axis/axistickerpi.h"
+#include "axis/axistickersymlog.h"
 #include "axis/axistickertext.h"
 #include "axis/axistickertime.h"
 #include "axis/range.h"

@@ -44,6 +44,7 @@ set(NEOQCP_SOURCES
     src/axis/axistickerfixed.cpp
     src/axis/axistickerlog.cpp
     src/axis/axistickerpi.cpp
+    src/axis/axistickersymlog.cpp
     src/axis/axistickertext.cpp
     src/axis/axistickertime.cpp
     src/axis/range.cpp
@@ -113,6 +114,7 @@ set(NEOQCP_MOC_HEADERS
     src/axis/axistickerfixed.h
     src/axis/axistickerlog.h
     src/axis/axistickerpi.h
+    src/axis/axistickersymlog.h
     src/axis/axistickertext.h
     src/axis/axistickertime.h
     src/axis/range.h

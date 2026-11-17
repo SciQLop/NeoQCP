@@ -72,8 +72,10 @@ Tick marks and tick labels have their own switches:
 `setScale(QCPScale::log())` makes the axis logarithmic.
 A log axis cannot reach or cross zero. When asked for a range that does, the axis keeps the wider side of zero and replaces zero with a small value.
 
-The scale type only changes the mapping. It does not change where ticks go.
-So give a log axis a `QCPAxisTickerLog`, as above.
+A log axis brings a `QCPAxisTickerLog` with it: `setScale()` installs the ticker of its
+scale, so the log ticks above are the axis' own. The example sets one explicitly anyway,
+which is how to change its settings: a `setTicker()` after `setScale()` replaces the
+scale's ticker, and one made before it is replaced by the scale.
 
 The log ticker puts ticks on whole powers of ten.
 On a range shorter than about 1.6 decades there are too few of those. It then uses round mantissas instead: 1, 2 and 5 × 10ⁿ, then denser sets if needed.
@@ -98,6 +100,11 @@ symlog data scale maps its colours through the same space: z and -z are mirror c
 the middle, and the colour bar's axis takes the scale, so a bar pixel is the colour the map gives
 that value.
 
+`setScale()` also installs the default ticker of its scale, every time it is called: a
+`QCPAxisTicker` for a linear scale, a `QCPAxisTickerLog(base)` for a log one and a
+`QCPAxisTickerSymlog` for a symlog one. A scale equal to the current one gets that ticker
+again but emits no `scaleChanged`. Call `setTicker()` after `setScale()` to choose your own.
+
 `scaleChanged` reports the new scale.
 
 ## Tickers
@@ -119,6 +126,7 @@ Tickers are shared pointers: several axes can share one, and changing it changes
 - <a href="api/classQCPAxisTickerDateTime.html">QCPAxisTickerDateTime</a> reads coordinates as seconds since 1970-01-01 UTC. Its ticks fall on round dates and times. `setDateTimeFormat()` takes a `QDateTime::toString()` format. Labels use local time unless you call `setTimeZone()`. `dateTimeToKey()` and `keyToDateTime()` convert between coordinates and `QDateTime`.
 - <a href="api/classQCPAxisTickerTime.html">QCPAxisTickerTime</a> shows durations, in seconds. The format uses `%d`, `%h`, `%m`, `%s` and `%z` for days, hours, minutes, seconds and milliseconds. `setFieldWidth()` sets the zero padding of each.
 - <a href="api/classQCPAxisTickerLog.html">QCPAxisTickerLog</a> is for logarithmic axes, see above. `setSubTickCount()` sets the sub ticks per decade.
+- <a href="api/classQCPAxisTickerSymlog.html">QCPAxisTickerSymlog</a> is the symlog axis' own ticker: decades outward from the linear band plus zero, thinned by the tick count, with the sub ticks on the mantissas outside the band and on a linear grid inside it. Decade labels are abbreviated as on a log axis. `scale()` returns the scale it draws.
 - <a href="api/classQCPAxisTickerText.html">QCPAxisTickerText</a> puts your own labels at your own positions, and nothing else. `addTick(position, label)` adds one; `setTicks()` replaces them all.
 - <a href="api/classQCPAxisTickerFixed.html">QCPAxisTickerFixed</a> uses the step you give with `setTickStep()`. With `setScaleStrategy(QCPAxisTickerFixed::ssMultiples)` it may use multiples of it when zoomed out, instead of crowding the axis.
 - <a href="api/classQCPAxisTickerPi.html">QCPAxisTickerPi</a> labels multiples of π as fractions. `setPiValue(180)` makes it work on degrees. `setPiSymbol()` and `setFractionStyle()` change the look.

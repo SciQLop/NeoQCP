@@ -593,6 +593,16 @@ colour-mapped plottable shows its data with is a value, not an enum.
         panning, zooming, drags, the grid, the kept line geometry and a polar radial axis all follow
         that space. A symlog colour mapping follows it too: the gradient lookup, the colour-map
         renderer, the colour bar's axis and a coloured line's scalars all map through toScale.
+  - Each scale brings its ticker: setScale installs a QCPAxisTicker (linear), a QCPAxisTickerLog
+        (log) or the new QCPAxisTickerSymlog (symlog) every time it is called, an equal scale
+        included (which still emits no scaleChanged), and a setTicker after it wins. A colour
+        scale's axis gets the same through setDataScale. Behaviour change: a ticker set before
+        setScale is replaced.
+  - QCPAxisTickerSymlog (axis/axistickersymlog.h) follows matplotlib's SymmetricalLogLocator:
+        decades outward from the threshold on both sides plus 0, thinned to the tick count, the
+        mantissas 2 to 9 x base^k outside the linear band, a linear sub grid at base^floor(
+        log_base(threshold)) / (subTickCount + 1) inside it, and a fallback to even steps when no
+        decade falls in the range. Symlog decade labels are abbreviated like log ones.
   - QCPColorScale, QCPColorMapped and the plottables that carry a data scale: setDataScale(),
         dataScale(), dataScaleChanged() and the `dataScale` property replace the *DataScaleType
         names. A data scale set before the plottable is added to a rect now wins over the rect

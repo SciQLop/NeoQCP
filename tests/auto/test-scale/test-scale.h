@@ -20,6 +20,7 @@ private slots:
     void hashMatchesEquality();
 
     void anAxisTakesAScale();
+    void setScaleBringsItsTicker();
     void aLogAxisMapsAsBefore();
     void symlogMapsBothSides();
     void dragAndZoomWorkInScaleSpace();

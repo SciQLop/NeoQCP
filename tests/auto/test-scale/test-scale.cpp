@@ -214,6 +214,38 @@ void TestScale::anAxisTakesAScale()
     QCOMPARE(changes, 1);
 }
 
+// A scale brings the ticker that suits it, on every setScale; a ticker set after it wins, one set
+// before it is replaced.
+void TestScale::setScaleBringsItsTicker()
+{
+    QCustomPlot plot;
+
+    plot.xAxis->setScale(QCPScale::log(2));
+    const auto logTicker = dynamic_cast<QCPAxisTickerLog*>(plot.xAxis->ticker().data());
+    QVERIFY(logTicker != nullptr);
+    QCOMPARE(logTicker->logBase(), 2.0);
+
+    plot.yAxis->setScale(QCPScale::symlog(0.5, 4));
+    const auto symlogTicker = dynamic_cast<QCPAxisTickerSymlog*>(plot.yAxis->ticker().data());
+    QVERIFY(symlogTicker != nullptr);
+    QVERIFY(symlogTicker->scale() == QCPScale::symlog(0.5, 4));
+
+    plot.yAxis->setScale(QCPScale::linear());
+    QVERIFY(dynamic_cast<QCPAxisTickerLog*>(plot.yAxis->ticker().data()) == nullptr);
+    QVERIFY(dynamic_cast<QCPAxisTickerSymlog*>(plot.yAxis->ticker().data()) == nullptr);
+
+    // a ticker set after the scale wins
+    const auto dateTime = QSharedPointer<QCPAxisTickerDateTime>::create();
+    plot.xAxis->setScale(QCPScale::log());
+    plot.xAxis->setTicker(dateTime);
+    QCOMPARE(plot.xAxis->ticker(), dateTime);
+
+    // one set before it is replaced, also when the scale does not change
+    plot.yAxis->setTicker(dateTime);
+    plot.yAxis->setScale(QCPScale::linear());
+    QVERIFY(plot.yAxis->ticker() != dateTime);
+}
+
 // A log axis puts the same values on the same pixels as the scale enum did.
 void TestScale::aLogAxisMapsAsBefore()
 {

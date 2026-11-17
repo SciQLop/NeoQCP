@@ -679,6 +679,31 @@ QImage userSystemSkewScene()
         });
 }
 
+// The symlog gallery's third panel (examples/user-code/symlog): a wave, both axes symlog, the
+// band of the value axis visible around zero and the sub grids on.
+QImage symlogScene()
+{
+    return render(
+        [](QCustomPlot& plot)
+        {
+            plot.xAxis->setScale(QCPScale::symlog());
+            plot.yAxis->setScale(QCPScale::symlog(0.015));
+            plot.xAxis->setRange(-50, 50);
+            plot.yAxis->setRange(-1, 1);
+            for (QCPAxis* axis : plot.axisRect()->axes())
+                axis->grid()->setSubGridVisible(true);
+            QVector<double> x, wave;
+            for (int i = 0; i < 1000; ++i)
+            {
+                x.append(-50.0 + 0.1 * i);
+                wave.append(std::sin(x.back() / 3.0));
+            }
+            auto* graph = plot.axisRect()->add<QCPGraph>(plot.xAxis, plot.yAxis).get();
+            graph->setData(x, wave);
+            graph->setPen(QPen(QColor(31, 119, 180), 1.5));
+        });
+}
+
 } // namespace
 
 QImage polarItemsScene()
@@ -989,4 +1014,9 @@ void TestReferenceM4e::userSystemMultiGraph()
 void TestReferenceM4e::polarItems()
 {
     check(polarItemsScene(), "polar-items.png");
+}
+
+void TestReferenceM4e::symlogSingleRect()
+{
+    check(symlogScene(), "symlog-single-rect.png");
 }

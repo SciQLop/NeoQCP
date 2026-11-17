@@ -134,8 +134,10 @@ void TestGridRhi::aGpuGridOnSymlogMatchesThePainterGrid()
     QVERIFY2(!inked(exported, columnOf(5.0)), "a grid line at a value that is no tick (export)");
 
     // The grid cache keys on the whole scale: a wider band moves x = 2 and the line follows.
+    // setScale installs the scale's own ticker, so the text ticker goes back on after it.
     const int oldColumn = columnOf(2.0);
     mPlot->xAxis->setScale(QCPScale::symlog(3));
+    mPlot->xAxis->setTicker(ticker);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QCoreApplication::processEvents();
     const QImage moved = mPlot->grabFramebuffer();

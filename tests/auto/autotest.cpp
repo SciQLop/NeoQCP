@@ -1,6 +1,7 @@
 #include "test-alignment-group/test-alignment-group.h"
 #include "test-axis-base/test-axis-base.h"
 #include "test-axis-ticker-log/test-axis-ticker-log.h"
+#include "test-axis-ticker-symlog/test-axis-ticker-symlog.h"
 #include "test-builder/test-builder.h"
 #include "test-busy-indicator/test-busy-indicator.h"
 #include "test-color-by-scalar/test-color-by-scalar.h"
@@ -211,6 +212,7 @@ QCPTEST(TestPlottableWithoutAxes);
     QCPTEST(TestColorByScalar);
     QCPTEST(TestGradientPresets);
     QCPTEST(TestAxisTickerLog);
+    QCPTEST(TestAxisTickerSymlog);
     QCPTEST(TestIntervals);
     QCPTEST(TestPlottableGroup);
     QCPTEST(TestMisuse);

@@ -66,6 +66,8 @@ private slots:
 
     void userSystemSkew();
     void userSystemMultiGraph();
+
+    void symlogSingleRect();
 };
 
 #endif // TEST_REFERENCE_M4E_H

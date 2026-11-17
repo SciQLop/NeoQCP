@@ -2379,7 +2379,7 @@ int QCPAxis::calculateMargin()
 void QCPAxis::applyTickLabelFormat()
 {
     mAxisPainter->substituteExponent = mNumberBeautifulPowers;
-    mAxisPainter->abbreviateDecimalPowers = mScale.isLog();
+    mAxisPainter->abbreviateDecimalPowers = !mScale.isLinear();
 }
 
 /* inherits documentation from base class */
