@@ -304,6 +304,29 @@ void TestColorScale::theColourBarFollowsTheDataScale()
              "z = 1 is drawn through the scale, not at the linear middle");
 }
 
+// setType moves the range, the label and the ticker to the new axis, and the scale with them: the
+// bar used to stay linear under a symlog ticker, so its pixels no longer matched its own lookup.
+void TestColorScale::setTypeCarriesTheDataScale()
+{
+    mapWithRange(mPlot->xAxis, mPlot->yAxis, -1e4, 1e4);
+    const auto scale = mPlot->axisRect()->colorScale();
+    scale->setDataScale(QCPScale::symlog(1));
+    scale->setDataRange(QCPRange(-1e4, 1e4));
+    scale->setType(QCPAxis::atBottom);
+    QCOMPARE(scale->axis()->scale(), QCPScale::symlog(1));
+    mPlot->replot();
+
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+    auto lookup = [&](double z) {
+        return QColor::fromRgba(scale->gradient().color(z, scale->dataRange(), scale->dataScale()));
+    };
+    const int barY = scale->axis()->axisRect()->rect().center().y();
+    const QColor barPixel = img.pixelColor(qRound(scale->axis()->coordToPixel(1.0)), barY);
+    QVERIFY2(sameColour(barPixel, lookup(1.0), 3),
+             qPrintable(QStringLiteral("the bar pixel for z = 1 is %1, the lookup gives %2")
+                            .arg(barPixel.name(), lookup(1.0).name())));
+}
+
 // A constant map leaves rescaleDataRange() with no data width; on a symlog scale that width is kept
 // in the scale's own space and centred on the constant through toScale, at c = 0 and either side.
 void TestColorScale::aConstantMapRescalesInScaleSpace()

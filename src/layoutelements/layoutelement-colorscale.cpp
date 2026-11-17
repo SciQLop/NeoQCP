@@ -310,6 +310,9 @@ void QCPColorScale::setType(QCPAxis::AxisType type)
                                 // horizontal or vice versa (axes with same orientation are
                                 // synchronized via signals)
             mColorAxis.data()->setLabel(labelTransfer);
+            // The scale before the ticker: setScale installs the scale's own ticker, which the
+            // transferred one then replaces, and the bar draws through the scale it was given.
+            mColorAxis.data()->setScale(mDataScale);
             mColorAxis.data()->setTicker(tickerTransfer);
         }
         connect(mColorAxis.data(), &QCPAxis::rangeChanged, this, &QCPColorScale::setDataRange);
