@@ -327,9 +327,10 @@ void TestColorScale::setTypeCarriesTheDataScale()
                             .arg(barPixel.name(), lookup(1.0).name())));
 }
 
-// A constant map leaves rescaleDataRange() with no data width; on a symlog scale that width is kept
-// in the scale's own space and centred on the constant through toScale, at c = 0 and either side.
-void TestColorScale::aConstantMapRescalesInScaleSpace()
+// A constant map leaves rescaleDataRange() with no data width; the flat-range rule is the linear one
+// on every scale but a log one, symlog included: the width is a distance in key units, and it is
+// centred on the constant. Pinned at c = 0 and either side.
+void TestColorScale::aConstantMapRescalesWithTheLinearRule()
 {
     auto* map = mapWithRange(mPlot->xAxis, mPlot->yAxis, 0, 0);
     const auto scale = mPlot->axisRect()->colorScale();
@@ -345,21 +346,18 @@ void TestColorScale::aConstantMapRescalesInScaleSpace()
         map->data()->setCell(1, 1, constant);
         map->data()->recalculateDataBounds();
 
-        const QCPScale& zs = scale->dataScale();
         const QCPRange before = scale->dataRange();
-        const double oldWidth = zs.toScale(before.upper) - zs.toScale(before.lower);
+        const double oldWidth = before.size();
 
         scale->rescaleDataRange(true);
         const QCPRange got = scale->dataRange();
-        const double newWidth = zs.toScale(got.upper) - zs.toScale(got.lower);
-        QVERIFY2(qAbs(newWidth - oldWidth) < 1e-9,
-                 qPrintable(QStringLiteral("constant %1: scale-space width %2, expected %3")
+        QVERIFY2(qAbs(got.size() - oldWidth) < 1e-9,
+                 qPrintable(QStringLiteral("constant %1: width %2, expected %3")
                                 .arg(constant)
-                                .arg(newWidth)
+                                .arg(got.size())
                                 .arg(oldWidth)));
-        QVERIFY2(qAbs(zs.toScale(got.lower) + zs.toScale(got.upper) - 2.0 * zs.toScale(constant))
-                     < 1e-9,
-                 qPrintable(QStringLiteral("constant %1: not centred on it in scale space")
+        QVERIFY2(qAbs(got.lower + got.upper - 2.0 * constant) < 1e-9,
+                 qPrintable(QStringLiteral("constant %1: not centred on it in key units")
                                 .arg(constant)));
         QVERIFY2(got.lower < constant && constant < got.upper,
                  qPrintable(QStringLiteral("constant %1 is outside (%2, %3)")
