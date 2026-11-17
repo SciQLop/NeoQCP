@@ -27,6 +27,9 @@
 #define QCPVECTOR2D_H
 
 #include "global.h"
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 class QCP_LIB_DECL QCPVector2D
 {
@@ -57,7 +60,19 @@ public:
 
     [[nodiscard]] double angle() const { return qAtan2(mY, mX); }
 
-    [[nodiscard]] QPoint toPoint() const { return QPoint(int(mX), int(mY)); }
+    //! This vector as a pixel. A position far off the screen is past any integer, so it is clamped
+    //! into the range rather than cast into it, which is undefined.
+    [[nodiscard]] QPoint toPoint() const
+    {
+        const auto pixel = [](double value)
+        {
+            if (std::isnan(value))
+                return 0;
+            return int(std::clamp(value, double(std::numeric_limits<int>::min()),
+                                  double(std::numeric_limits<int>::max())));
+        };
+        return QPoint(pixel(mX), pixel(mY));
+    }
 
     [[nodiscard]] QPointF toPointF() const { return QPointF(mX, mY); }
 

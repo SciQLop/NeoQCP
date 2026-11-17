@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <vector>
 
+#include <limits>
 using namespace QCP::Literals;
 
 namespace
@@ -851,6 +852,16 @@ void TestCoords::mixedImageCornersAreClassifiedOnce()
     QVERIFY2(kind.gpu == qcp::isGpuCommand(command),
              "the GPU and the painter pass must agree on who draws the image");
     QVERIFY2(kind.gpu, "an image of data corners belongs to the GPU pass, once");
+}
+
+// A pixel position is a double: an item far off screen has one past any int, and turning it into a
+// pixel clamps to the range instead of casting it, which is undefined.
+void TestCoords::vector2dToPointStaysInThePixelRange()
+{
+    const QPoint far = QCPVector2D(1e30, -1e30).toPoint();
+    QCOMPARE(far.x(), std::numeric_limits<int>::max());
+    QCOMPARE(far.y(), std::numeric_limits<int>::min());
+    QCOMPARE(QCPVector2D(3.7, -2.7).toPoint(), QPoint(3, -2));
 }
 
 void TestCoords::aPointThatMapsNowhereLandsAtTheOrigin()

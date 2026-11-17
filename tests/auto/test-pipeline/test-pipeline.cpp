@@ -640,6 +640,20 @@ void TestPipeline::multiGraphPipelinePassthrough()
 
 // A scale change on a graph with no bins to rebuild only dirties its pixels. It used to replot
 // at once, so one setScale() on a shared axis replotted once per graph on it, all inside the call.
+// A key billions of bins past the range still lands in the last bin: the slot is clamped as a double,
+// never cast to an integer first.
+void TestPipeline::keyBinningKeepsAFarKeyInItsEndBin()
+{
+    const qcp::algo::KeyBinning binning(QCPRange(0.0, 1.0), 100, QCPScale());
+    QCOMPARE(binning.index(-1e30), 0);
+    QCOMPARE(binning.index(1e30), 99);
+    QCOMPARE(binning.indexWithReciprocal(-1e30), 0);
+    QCOMPARE(binning.indexWithReciprocal(1e30), 99);
+    const qcp::algo::KeyBinning scaled(QCPRange(-1.0, 1.0), 100, QCPScale::symlog(2));
+    QCOMPARE(scaled.index(1e30), 99);
+    QCOMPARE(scaled.index(-1e30), 0);
+}
+
 void TestPipeline::aScaleChangeOnASmallGraphDoesNotReplotPerGraph()
 {
     for (int i = 0; i < 20; ++i)

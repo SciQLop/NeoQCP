@@ -29,4 +29,5 @@ private slots:
     void aDataScaleSetBeforeTheAddWins();
     void colorizeOverloadsAgreeOnALogScale();
     void aSymlogColourScaleIsSymmetric();
+    void anInfiniteColourPositionTakesAnEndLevel();
 };

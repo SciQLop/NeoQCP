@@ -25,6 +25,8 @@
 
 #include "colorgradient.h"
 #include "colorgradient-tables.h"
+#include <algorithm>
+#include <limits>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPColorGradient
@@ -279,6 +281,25 @@ ScalePosition scalePosition(int levelCount, const QCPRange& range, const QCPScal
     return { scale, lower, finiteFactor((levelCount - 1) / (scale.toScale(range.upper) - lower)) };
 }
 
+//! The gradient level a position names, for any double a position map can produce.
+//
+// A log or a symlog map sends a value at or across zero to an infinity, and an integer cast of one
+// is undefined. The ends stand in for it: an infinite position takes the level it points past. A
+// finite position past the integer range is clamped the same way before the cast, and a periodic
+// gradient wraps it in double first, where the remainder still exists.
+inline qint64 gradientIndex(double position, int levelCount, bool periodic)
+{
+    if (!std::isfinite(position))
+        return position > 0.0 ? qint64(levelCount - 1) : qint64(0);
+    constexpr double kIntLimit = double(std::numeric_limits<int>::max());
+    if (std::fabs(position) < kIntLimit)
+        return qint64(position);
+    if (!periodic)
+        return position > 0.0 ? qint64(levelCount - 1) : qint64(0);
+    const double wrapped = position - std::floor(position / levelCount) * levelCount;
+    return qint64(std::clamp(wrapped, 0.0, double(levelCount - 1)));
+}
+
 //! Runs \a f with the position map of \a scale's value space, built once.
 template <typename F>
 void dispatchPosition(const QCPScale& scale, int levelCount, const QCPRange& range, F&& f)
@@ -308,7 +329,7 @@ void QCPColorGradient::colorizeRow(const Position& position, const double* data,
         const double value = data[dataIndexFactor * i];
         if (skipNanCheck || !std::isnan(value))
         {
-            qint64 index = qint64(position(value));
+            qint64 index = gradientIndex(position(value), mLevelCount, mPeriodic);
             if (!mPeriodic)
             {
                 index = qBound(qint64(0), index, qint64(mLevelCount - 1));
@@ -463,7 +484,8 @@ QRgb QCPColorGradient::color(double position, const QCPRange& range, const QCPSc
 
     int index = 0;
     dispatchPosition(scale, mLevelCount, range,
-                     [&](const auto& map) { index = int(map(position)); });
+                     [&](const auto& map)
+                     { index = int(gradientIndex(map(position), mLevelCount, mPeriodic)); });
     if (!mPeriodic)
     {
         index = qBound(0, index, mLevelCount - 1);

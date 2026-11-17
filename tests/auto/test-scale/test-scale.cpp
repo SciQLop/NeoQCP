@@ -4,6 +4,7 @@
 #include "qcustomplot.h"
 #include <array>
 #include <cmath>
+#include <limits>
 #include <memory>
 
 namespace
@@ -507,6 +508,29 @@ void TestScale::colorizeOverloadsAgreeOnALogScale()
 
 // The colour lookup follows a symlog data scale: each z maps through the scale, so z = 1 sits at
 // the scale-space fraction 0.60870 where the linear path gives 0.50005, and the two sides mirror.
+// A log or symlog map sends a value at or across zero to an infinity. A colour lookup has to answer
+// with the end level that infinity points past, never with an integer cast of it.
+void TestScale::anInfiniteColourPositionTakesAnEndLevel()
+{
+    QCPColorGradient gradient(QCPColorGradient::gpGrayscale);
+    const QCPRange range(1.0, 1000.0);
+    const QCPScale log = QCPScale::log();
+    const QRgb bottom = gradient.color(1.0, range, log);
+    const QRgb top = gradient.color(1000.0, range, log);
+
+    QCOMPARE(gradient.color(std::numeric_limits<double>::infinity(), range, log), top);
+    QCOMPARE(gradient.color(0.0, range, log), bottom);
+    QCOMPARE(gradient.color(-5.0, range, log), bottom);
+
+    const double row[] = { 1000.0, 1.0, 0.0, -5.0 };
+    QRgb line[4] = {};
+    gradient.colorize(row, range, line, 4, 1, log);
+    QCOMPARE(line[0], top);
+    QCOMPARE(line[1], bottom);
+    QCOMPARE(line[2], bottom);
+    QCOMPARE(line[3], bottom);
+}
+
 void TestScale::aSymlogColourScaleIsSymmetric()
 {
     QCPColorGradient gradient(QCPColorGradient::gpGrayscale);

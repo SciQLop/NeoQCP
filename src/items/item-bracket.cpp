@@ -180,12 +180,14 @@ void QCPItemBracket::draw(QCPDrawContext& context) const
     const QCPTransform& transform = context.transform();
     Q_UNUSED(transform)
 
-    QPolygon boundingPoly;
-    boundingPoly << leftVec.toPoint() << rightVec.toPoint() << (rightVec - lengthVec).toPoint()
-                 << (leftVec - lengthVec).toPoint();
+    // The culling question is a floating point one: a bracket far off the screen has pixel
+    // coordinates past any integer rectangle, and its own rectangle would overflow.
+    QPolygonF boundingPoly;
+    boundingPoly << leftVec.toPointF() << rightVec.toPointF() << (rightVec - lengthVec).toPointF()
+                 << (leftVec - lengthVec).toPointF();
     const int clipEnlarge = qCeil(mainPen().widthF());
     const QRect clip = clipRect().adjusted(-clipEnlarge, -clipEnlarge, clipEnlarge, clipEnlarge);
-    if (!clip.intersects(boundingPoly.boundingRect()))
+    if (!QRectF(clip).intersects(boundingPoly.boundingRect()))
         return;
 
     QPen pen = mainPen();

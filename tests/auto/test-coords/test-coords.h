@@ -25,6 +25,7 @@ private slots:
     void offsetOnlyChangeRepaintsTheItem();
     void mixedImageCornersAreClassifiedOnce();
     void aPointThatMapsNowhereLandsAtTheOrigin();
+    void vector2dToPointStaysInThePixelRange();
     void ratioTransformMatchesPixels();
     void mixingSpacesDoesNotCompile();
 };

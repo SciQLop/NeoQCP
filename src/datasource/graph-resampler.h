@@ -176,16 +176,10 @@ public:
     int binCount() const { return mBins; }
 
     // Bin index of \a key, clamped into [0, binCount).
-    int index(double key) const
-    {
-        return std::clamp(static_cast<int>((position(key) - mLo) / mWidth), 0, mBins - 1);
-    }
+    int index(double key) const { return clampSlot((position(key) - mLo) / mWidth); }
     // The same index by the reciprocal, as the L2 pass has always computed it: dividing and
     // multiplying round differently, and a kept bin's edges must not move for one ulp.
-    int indexWithReciprocal(double key) const
-    {
-        return std::clamp(static_cast<int>((position(key) - mLo) * mInvWidth), 0, mBins - 1);
-    }
+    int indexWithReciprocal(double key) const { return clampSlot((position(key) - mLo) * mInvWidth); }
     // Lower edge of a bin, in key units.
     double lowerKey(int bin) const { return keyAt(mLo + bin * mWidth); }
     double centreKey(int bin) const { return keyAt(mLo + (bin + 0.5) * mWidth); }
@@ -196,6 +190,16 @@ public:
     }
 
 private:
+    //! \a slot into [0, binCount), clamped before the cast: a key billions of bins away would
+    //! overflow the integer one, and a key too far out to compare lands in the last bin.
+    int clampSlot(double slot) const
+    {
+        if (!(slot >= 0.0)) // the comparison keeps NaN out too
+            return 0;
+        if (slot >= double(mBins - 1))
+            return mBins - 1;
+        return int(slot);
+    }
     double position(double key) const { return mScaled ? mScale.toScale(key) : key; }
     double keyAt(double position) const { return mScaled ? mScale.fromScale(position) : position; }
 
