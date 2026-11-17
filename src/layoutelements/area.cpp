@@ -350,6 +350,7 @@ void QCPArea::draw(QCPPainter* painter)
 */
 void QCPArea::setBackground(const QPixmap& pm)
 {
+    mBackgroundSetByUser = true; // a background of its own, themed or not
     if (pm.cacheKey() == mBackgroundPixmap.cacheKey())
         return;
     mBackgroundPixmap = pm;
@@ -370,6 +371,22 @@ void QCPArea::setBackground(const QPixmap& pm)
   \see setBackground(const QPixmap &pm)
 */
 void QCPArea::setBackground(const QBrush& brush)
+{
+    // The user named one: a theme does not overwrite it any more, even when the colour is the
+    // theme's own.
+    mBackgroundSetByUser = true;
+    if (brush == mBackgroundBrush)
+        return;
+    mBackgroundBrush = brush;
+    update();
+}
+
+/*! \internal
+
+  Sets the brush a theme gives the area. It does not count as the user's choice, so the next theme
+  change still reaches the area.
+*/
+void QCPArea::setThemedBackground(const QBrush& brush)
 {
     if (brush == mBackgroundBrush)
         return;

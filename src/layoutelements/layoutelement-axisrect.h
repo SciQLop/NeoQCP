@@ -242,6 +242,8 @@ public:
     //! rect ((0, 0) top left), with its own four axes, drawn above everything of this rect. It
     //! follows this rect and goes with it.
     QCPHandle<QCPAxisRect> addInset(const QRectF& axisRatio);
+    //! Whether addInset() made this rect (it has layers of its own and is not a cell of a grid).
+    [[nodiscard]] bool isInset() const { return mIsInset; }
 
     // read-only interface imitating a QRect:
     int left() const { return mRect.left(); }
@@ -301,6 +303,9 @@ protected:
     QHash<QCPAxis::AxisType, QList<QCPAxis*>> mAxes;
     QPointer<QCPColorScale> mColorScale;
     QPointer<QCPTextElement> mTitle;
+    // Kept apart from mOwnLayers, which a user's removeLayer() empties: whether a rect is an inset
+    // stays true while its layers can still be made again or its background still follows the plot.
+    bool mIsInset = false;
     // An inset's own layers, right above the plot's axes layer: its background and grids, its
     // plottables and items, its axes. Empty for a rect that is not an inset.
     struct OwnLayers
@@ -342,10 +347,13 @@ private:
     void styleTitle();
     void placeTitle();
     // Gives an inset its own layers above \a container's own (an inset of an inset) or above every
-    // inset's, and moves its rect, grids and axes there.
-    void makeOwnLayers(const QCPAxisRect* container);
+    // inset's, and moves its rect, grids and axes there. False, with nothing left behind, when a
+    // layer of that name already exists.
+    bool makeOwnLayers(const QCPAxisRect* container);
     // The topmost of an inset's own layers.
     QCPLayer* ownTopLayer() const { return mOwnLayers.axes.data(); }
+    // Where a rect's own title and colour scale go: an inset's axes layer, the plot's otherwise.
+    QCPLayer* decorationLayer() const;
     void removeOwnLayers();
     // Where a plottable or an item added to this rect goes: its own data layer, if it has one.
     QCPLayer* ownDataLayer() const { return mOwnLayers.data.data(); }

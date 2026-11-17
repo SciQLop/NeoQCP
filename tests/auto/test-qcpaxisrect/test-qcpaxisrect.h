@@ -41,6 +41,12 @@ private slots:
   void theNewestInsetIsOnTop();
   void aPlottableMovedOntoAnInsetIsDrawn();
   void anItemFollowsTheAreaItIsIn();
+  void thePlotBackgroundReachesAnInset();
+  void aUserBackgroundSurvivesTheTheme();
+  void anInsetsTitleAndScaleGoOnItsAxesLayer();
+  void anInsetLayerNamesAreStable();
+  void addInsetRefusesBadRatios();
+  void aBrokenInsetLayerLeavesNothingBehind();
   void textTakesAPositionAndAStyle();
   void textAppliesEveryStyleField();
   void textItemMathTextIsOnByDefault();

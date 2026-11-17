@@ -883,9 +883,9 @@ void QCustomPlot::applyTheme()
         if (rect->mColorScale)
             applyThemeToAxis(rect->mColorScale->axis());
         // An inset is opaque in the plot's background colour (the rect it sits on shows through
-        // no other way).
-        if (rect->ownDataLayer())
-            rect->setBackground(mBackgroundBrush);
+        // no other way), until the user names a background of its own.
+        if (rect->isInset() && !rect->backgroundSetByUser())
+            rect->setThemedBackground(mBackgroundBrush);
     }
 
     if (legend) {
@@ -1006,7 +1006,7 @@ bool QCustomPlot::gridLayerDraws(const QCPAxis* axis)
         // the grid layer draws far below the inset's opaque background, where the grid never shows.
         mGridLayerRects.clear();
         for (QCPAxisRect* rect : axisRectsRaw())
-            if (!rect->ownDataLayer())
+            if (!rect->isInset())
                 mGridLayerRects.append(rect);
         mGridLayerRectsEpoch = mFrameEpoch;
     }
@@ -1645,6 +1645,11 @@ void QCustomPlot::setBackground(const QPixmap& pm)
 void QCustomPlot::setBackground(const QBrush& brush)
 {
     mBackgroundBrush = brush;
+    // An inset that follows the theme is opaque in the plot's colour: it takes the new brush, or
+    // the rect it sits on would show through it.
+    for (QCPAxisRect* rect : axisRectsRaw())
+        if (rect->isInset() && !rect->backgroundSetByUser())
+            rect->setThemedBackground(brush);
 }
 
 /*! \overload
@@ -4056,7 +4061,7 @@ void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QS
         {
             for (auto* ar : axisRectsRaw())
             {
-                if (ar->ownDataLayer())
+                if (ar->isInset())
                     continue; // an inset paints its grid itself, on its background layer
                 for (auto* axis : ar->axesRaw())
                     grl->registerAxis(axis);

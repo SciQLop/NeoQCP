@@ -62,6 +62,9 @@ public:
 
     QBrush backgroundBrush() const { return mBackgroundBrush; }
 
+    //! Whether the user named the background (brush or pixmap) itself, so a theme leaves it alone.
+    bool backgroundSetByUser() const { return mBackgroundSetByUser; }
+
     bool backgroundScaled() const { return mBackgroundScaled; }
 
     Qt::AspectRatioMode backgroundScaledMode() const { return mBackgroundScaledMode; }
@@ -74,6 +77,9 @@ public:
                        Qt::AspectRatioMode mode = Qt::KeepAspectRatioByExpanding);
     void setBackground(const QBrush& brush);
     void setBackgroundScaled(bool scaled);
+    //! \internal The background a theme (or the plot's own) gives an area: not the user's choice,
+    //! so a later theme still reaches it.
+    void setThemedBackground(const QBrush& brush);
     void setBackgroundScaledMode(Qt::AspectRatioMode mode);
 
     // reimplemented virtual methods:
@@ -119,6 +125,7 @@ signals:
 protected:
     // property members:
     QBrush mBackgroundBrush;
+    bool mBackgroundSetByUser = false;
     QPixmap mBackgroundPixmap;
     QPixmap mScaledBackgroundPixmap;
     bool mBackgroundScaled;

@@ -468,6 +468,19 @@ bool isBlue(const QColor& c)
     return c.blue() > 150 && c.red() < 120 && c.green() < 120;
 }
 
+// The layers an inset made, in plot order.
+QStringList insetLayerNames(QCustomPlot& plot)
+{
+    QStringList names;
+    for (int i = 0; i < plot.layerCount(); ++i)
+    {
+        const QString name = plot.layer(i)->name();
+        if (name.startsWith(QLatin1String("inset ")))
+            names.append(name);
+    }
+    return names;
+}
+
 } // namespace
 
 void TestQCPAxisRect::anInsetSitsInTheParentsAxisRatio()
@@ -787,6 +800,149 @@ void TestQCPAxisRect::anItemFollowsTheAreaItIsIn()
     image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
     QCOMPARE(countColour(image, inset->rect().adjusted(4, 4, -4, -4), isRed), 0);
     QCOMPARE(item->layer(), plot.layer(QStringLiteral("annotations")).get());
+}
+
+
+void TestQCPAxisRect::thePlotBackgroundReachesAnInset()
+{
+    // An inset that follows the theme follows a later setBackground() too.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto inset = plot.axisRect()->addInset(QRectF(0.25, 0.25, 0.5, 0.5));
+    plot.setBackground(QBrush(QColor(255, 255, 0)));
+    QCOMPARE(inset->backgroundBrush().color(), QColor(255, 255, 0));
+    plot.replot();
+    const QImage image
+        = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    const QColor inside = image.pixelColor(inset->rect().center());
+    QVERIFY2(inside.red() > 200 && inside.green() > 200 && inside.blue() < 80,
+             qPrintable(QStringLiteral("the inset follows the plot's background, found %1,%2,%3")
+                            .arg(inside.red())
+                            .arg(inside.green())
+                            .arg(inside.blue())));
+}
+
+
+void TestQCPAxisRect::aUserBackgroundSurvivesTheTheme()
+{
+    // The theme colours an inset that never chose a background; one that did keeps it.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto plain = plot.axisRect()->addInset(QRectF(0.05, 0.05, 0.3, 0.3));
+    auto chosen = plot.axisRect()->addInset(QRectF(0.5, 0.5, 0.3, 0.3));
+    chosen->setBackground(QBrush(QColor(0, 200, 0)));
+    auto* theme = QCPTheme::dark();
+    plot.setTheme(theme);
+    QCOMPARE(plain->backgroundBrush().color(), QColor(QStringLiteral("#1e1e1e")));
+    QCOMPARE(chosen->backgroundBrush().color(), QColor(0, 200, 0));
+    delete theme;
+}
+
+
+void TestQCPAxisRect::anInsetsTitleAndScaleGoOnItsAxesLayer()
+{
+    // An inset's own title and colour scale draw on its axes layer, above its data and above its
+    // parent inset's opaque background.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto inset = plot.axisRect()->addInset(QRectF(0.1, 0.1, 0.5, 0.5));
+    auto nested = inset->addInset(QRectF(0.3, 0.3, 0.6, 0.6));
+    nested->axis(QCPAxis::atTop)->setLabelColor(QColor(Qt::magenta));
+    nested->setTitle(QStringLiteral("nested"));
+    nested->colorMap(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 },
+                     std::vector<double> { 0, 1, 2, 3 });
+    plot.replot();
+
+    QCOMPARE(nested->colorScale()->layer(), nested->xAxis()->layer());
+    const QImage image
+        = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    const QRect band(nested->rect().left(), nested->rect().top() - 22, nested->rect().width(), 22);
+    const int title = countColour(image, band.intersected(image.rect()),
+                                  [](const QColor& c)
+                                  { return c.red() > 150 && c.blue() > 150 && c.green() < 120; });
+    QVERIFY2(title > 0, "the nested inset's title is drawn above its parent's background");
+}
+
+
+void TestQCPAxisRect::anInsetLayerNamesAreStable()
+{
+    // A layer name counts the plot's insets instead of naming where the rect landed in memory.
+    QCustomPlot first;
+    first.resize(400, 300);
+    auto older = first.axisRect()->addInset(QRectF(0.1, 0.1, 0.3, 0.3));
+    first.axisRect()->addInset(QRectF(0.2, 0.2, 0.3, 0.3));
+    const QStringList expected { QStringLiteral("inset 1 back"), QStringLiteral("inset 1 data"),
+                                 QStringLiteral("inset 1 axes"), QStringLiteral("inset 2 back"),
+                                 QStringLiteral("inset 2 data"), QStringLiteral("inset 2 axes") };
+    QCOMPARE(insetLayerNames(first), expected);
+
+    QCustomPlot second;
+    second.resize(400, 300);
+    second.axisRect()->addInset(QRectF(0.1, 0.1, 0.3, 0.3));
+    QCOMPARE(insetLayerNames(second), expected.mid(0, 3));
+
+    older.remove();
+    QCOMPARE(insetLayerNames(first), expected.mid(3));
+}
+
+
+void TestQCPAxisRect::addInsetRefusesBadRatios()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    const int before = plot.axisRects().size();
+    const auto previous = qcp::setMisuseHandler(recordMisuse);
+    const QList<QRectF> bad { QRectF(0, 0, 0, 0.5), QRectF(0, 0, -0.2, 0.5),
+                              QRectF(0, 0, 0.5, -1), QRectF(qQNaN(), 0, 0.5, 0.5),
+                              QRectF(0, 0, 0.5, qInf()) };
+    for (const QRectF& ratio : bad)
+    {
+        gMisuses = 0;
+        const auto inset = plot.axisRect()->addInset(ratio);
+        QVERIFY2(!inset, "a ratio rect of no positive, finite size makes no inset");
+        QCOMPARE(gMisuses, 1);
+    }
+    QCOMPARE(plot.axisRects().size(), before);
+
+    // A rect whose plot is being torn down makes nothing either.
+    auto* doomed = new QCustomPlot;
+    doomed->resize(400, 300);
+    QCPAxisRect* rect = doomed->axisRect().get();
+    QCPAxis* axis = rect->xAxis();
+    QObject collector;
+    bool refused = false;
+    int reported = 0;
+    QObject::connect(axis, &QObject::destroyed, &collector,
+                     [&]
+                     {
+                         gMisuses = 0;
+                         refused = !rect->addInset(QRectF(0.1, 0.1, 0.2, 0.2));
+                         reported = gMisuses;
+                     });
+    delete doomed;
+    qcp::setMisuseHandler(previous);
+    QVERIFY2(refused, "an inset needs a live plot");
+    QCOMPARE(reported, 1);
+}
+
+
+void TestQCPAxisRect::aBrokenInsetLayerLeavesNothingBehind()
+{
+    // A layer already named like the inset's: the layers made before the failure go too, and so
+    // does the rect.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QVERIFY(plot.addLayer(QStringLiteral("inset 1 data")));
+    const auto previous = qcp::setMisuseHandler(recordMisuse);
+    gMisuses = 0;
+    const auto inset = plot.axisRect()->addInset(QRectF(0.1, 0.1, 0.3, 0.3));
+    qcp::setMisuseHandler(previous);
+    QVERIFY2(!inset, "the inset is not made when its layers cannot be");
+    QCOMPARE(gMisuses, 1);
+    QVERIFY2(!plot.layer(QStringLiteral("inset 1 back")),
+             "the layers made before the failure are removed");
+    QCOMPARE(insetLayerNames(plot), QStringList { QStringLiteral("inset 1 data") });
+    QCOMPARE(plot.axisRects().size(), 1);
 }
 
 

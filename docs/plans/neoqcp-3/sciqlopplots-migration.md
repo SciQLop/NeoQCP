@@ -567,6 +567,9 @@ that no section above lists, and the behaviour changes of 5f.
   removed with everything it owns, as `QCPHandle::remove()` would.
 - The grid's alignment groups take the rects' left/right and top/bottom sides from any group they
   were in, so a `VPlotsAlign` over the same plots no longer aligns those sides.
+- 6e insets (`QCPAxisRect::addInset`) draw in their own layers, named `inset N back/data/axes` (N
+  counting the plot's insets): what is added to an inset lands on its data layer, and its background
+  follows the plot's until the inset's own `setBackground()` names one.
 
 ## From n11 (range data calls, C++23)
 

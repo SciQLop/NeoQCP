@@ -938,9 +938,10 @@ QCPColorScaleOps<QCPColorScale> QCPAxisRect::colorScale()
         mColorScale->mOwnerRect = this;
         mColorScale->setParentLayerable(this); // hidden with the rect, as its axes are
         // Off the data layer: a visible bar there would make every pan repaint that layer instead
-        // of shifting it. The axes layer repaints on a pan anyway, for its ticks.
-        if (QCPLayer* axesLayer = mParentPlot->layer(QLatin1String("axes")))
-            mColorScale->setLayer(axesLayer);
+        // of shifting it. The axes layer repaints on a pan anyway, for its ticks. An inset's own
+        // scale goes on its own axes layer, above its data, like its title.
+        if (QCPLayer* layer = decorationLayer())
+            mColorScale->setLayer(layer);
         // A theme set before this scale existed must reach it like any other axis.
         if (mParentPlot->mTheme)
             mParentPlot->applyThemeToAxis(mColorScale->axis());
@@ -1037,8 +1038,8 @@ void QCPAxisRect::setTitle(const QString& title)
     {
         mTitle = new QCPTextElement(mParentPlot);
         mTitle->setParentLayerable(this); // hidden with the rect, as its axes are
-        if (QCPLayer* axesLayer = mParentPlot->layer(QLatin1String("axes")))
-            mTitle->setLayer(axesLayer);
+        if (QCPLayer* layer = decorationLayer())
+            mTitle->setLayer(layer);
     }
     mTitle->setText(title);
     mTitle->setVisible(!title.isEmpty());
@@ -1076,8 +1077,12 @@ QCPHandle<QCPAxisRect> QCPAxisRect::addInset(const QRectF& axisRatio)
                         QCPHandle<QCPAxisRect> { });
     const QCPEmissionScope scope(mParentPlot);
     QCPAxisRect* inset = mParentPlot->createAxisRect();
-    inset->makeOwnLayers(this);
-    inset->setBackground(mParentPlot->backgroundBrush());
+    if (!inset->makeOwnLayers(this))
+    {
+        delete inset; // no element yet: the rect is the only thing that was made
+        return { };
+    }
+    inset->setThemedBackground(mParentPlot->backgroundBrush());
     QCPLayoutInset* layout = mInsetLayout;
     layout->addElement(inset, axisRatio);
     layout->setInsetPlacement(layout->elementCount() - 1, QCPLayoutInset::ipInnerRect);
@@ -1094,8 +1099,9 @@ QCPHandle<QCPAxisRect> QCPAxisRect::addInset(const QRectF& axisRatio)
   background. The rect, its grids and its axes move there now; what is added to it later goes to
   the middle one.
 */
-void QCPAxisRect::makeOwnLayers(const QCPAxisRect* container)
+bool QCPAxisRect::makeOwnLayers(const QCPAxisRect* container)
 {
+    QCP_CHECK_OR_RETURN(mParentPlot, "an inset needs a plot for its layers", false);
     QCPLayer* below = container ? container->ownTopLayer() : nullptr;
     if (!below)
         for (QCPAxisRect* rect : mParentPlot->axisRectsRaw())
@@ -1105,25 +1111,50 @@ void QCPAxisRect::makeOwnLayers(const QCPAxisRect* container)
         below = mParentPlot->layer(QLatin1String("axes")).get();
     if (!below && !mParentPlot->mLayers.isEmpty())
         below = mParentPlot->mLayers.last();
-    const QString base = QStringLiteral("inset %1 ").arg(quintptr(this), 0, 16);
-    QCPLayer* made[3] = { };
+    // A name counts the plot's insets, so it does not depend on where the rect landed in memory.
+    const QString base = QStringLiteral("inset %1 ").arg(++mParentPlot->mInsetLayerOrdinal);
+    const QCPLayer::LayerMode modes[3]
+        = { QCPLayer::lmBuffered, QCPLayer::lmBuffered, QCPLayer::lmLogical };
     const char* names[3] = { "back", "data", "axes" };
+    QCPLayer* made[3] = { };
     for (int i = 0; i < 3; ++i)
     {
-        if (!mParentPlot->addLayer(base + QLatin1String(names[i]), below, QCustomPlot::limAbove))
-            return;
-        made[i] = mParentPlot->layer(base + QLatin1String(names[i])).get();
-        if (i < 2)
-            made[i]->setMode(QCPLayer::lmBuffered);
+        const QString name = base + QLatin1String(names[i]);
+        if (!mParentPlot->addLayer(name, below, QCustomPlot::limAbove))
+        {
+            // Half an inset is worse than none: the layers made before the failure go too.
+            for (QCPLayer* layer : made)
+                if (layer)
+                    (void)mParentPlot->removeLayer(layer);
+            qcp::reportMisuse(Q_FUNC_INFO,
+                              "an inset cannot make its own layers: a layer of that name exists");
+            return false;
+        }
+        made[i] = mParentPlot->layer(name).get();
+        made[i]->setMode(modes[i]);
         below = made[i];
     }
     mOwnLayers = { made[0], made[1], made[2] };
+    mIsInset = true;
     setLayer(made[0]);
     for (QCPAxis* axis : axesRaw())
     {
         axis->grid()->setLayer(made[0]);
         axis->setLayer(made[2]);
     }
+    return true;
+}
+
+/*! \internal
+
+  The layer a rect's own title and colour scale draw on: an inset's axes layer, above its data, or
+  the plot's "axes" layer when the rect is not an inset (or lost its own layers).
+*/
+QCPLayer* QCPAxisRect::decorationLayer() const
+{
+    if (mIsInset && mOwnLayers.axes)
+        return mOwnLayers.axes.data();
+    return mParentPlot ? mParentPlot->layer(QLatin1String("axes")).get() : nullptr;
 }
 
 /*! \internal

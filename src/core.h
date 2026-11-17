@@ -717,6 +717,9 @@ protected:
     // per frame instead of one per axis draw.
     QList<QCPAxisRect*> mGridLayerRects;
     quint64 mGridLayerRectsEpoch = 0;
+    // The count the next inset's layers are named with: one per plot, so a name does not depend on
+    // where the rect landed in memory.
+    int mInsetLayerOrdinal = 0;
     QCPPipelineScheduler* mPipelineScheduler = nullptr;
     QPointer<QCPOverlay> mOverlay;
     ItemCreator mItemCreator;
