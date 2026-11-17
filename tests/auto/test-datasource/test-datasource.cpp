@@ -267,6 +267,15 @@ void TestDataSource::algoGapsFollowTheSymlogSpace()
                                                  symlog)),
              std::vector<int> {});
 
+    // The converse is the sampling, not a hole: keys even in key units are uneven on the axis at
+    // every threshold crossing, so a step counts as a hole only when it is one in both spaces.
+    std::vector<double> even(1001);
+    for (int i = 0; i < 1001; ++i)
+        even[static_cast<std::size_t>(i)] = -50.0 + 0.1 * i;
+    QCOMPARE(gapIndices(qcp::algo::detectKeyGaps(even, 0, 1001, qcp::algo::kDefaultGapThreshold,
+                                                 symlog)),
+             std::vector<int> {});
+
     // A step far wider than its neighbours is still a hole when it is measured in that space.
     std::vector<double> holed(600);
     double position = -3.0;

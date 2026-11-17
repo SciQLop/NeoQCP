@@ -19,11 +19,11 @@ struct GapVector {
     int size() const { return static_cast<int>(data.size()); }
 };
 
-// A step is a gap relative to the screen it takes, not to the key units it spans: a symlog axis
-// spreads keys evenly to a very different degree along its linear band and its logarithmic ones, so
-// a step even in key units is not even on the axis. Measure the steps in the space \a keyScale
-// shows. Key units are that space for a linear axis, and a log axis keeps them as it always has: it
-// has no bounded band to compare against.
+// A step is a gap only when it is wider than its neighbours both in key units and in the space the
+// axis shows: a symlog axis spreads keys evenly to a very different degree along its linear band and
+// its logarithmic ones, so a sampling even in one space is uneven in the other, and a step measured
+// in one space alone calls every band edge a hole. The two spaces are the same for a linear axis,
+// and a log axis keeps key units as it always has: it has no bounded band to compare against.
 template <IndexableNumericRange KC>
 GapVector detectKeyGaps(const KC& keys, int begin, int end,
                                  double threshold = kDefaultGapThreshold,
@@ -34,47 +34,61 @@ GapVector detectKeyGaps(const KC& keys, int begin, int end,
     if (count < 3 || threshold <= 0) return gapBefore;
 
     const bool scaled = keyScale.isSymlog();
-    const auto measure = [&](int i) {
+    const auto shown = [&](int i) {
         const double key = static_cast<double>(keys[i]);
         return scaled ? keyScale.toScale(key) : key;
     };
+    const auto keyUnits = [&](int i) { return static_cast<double>(keys[i]); };
     constexpr double noReference = std::numeric_limits<double>::max();
-    const auto step = [&](int i) { return measure(begin + i + 1) - measure(begin + i); };
-    // A repeated key (zero step) draws a vertical edge: it says nothing about the sampling.
-    const auto reference = [&](int i) { return step(i) > 0 ? step(i) : noReference; };
+    const auto step = [&](const auto& measure, int i) { return measure(begin + i + 1) - measure(begin + i); };
 
     for (int i = 0; i < count - 1; ++i)
     {
-        double refDx = noReference;
-        if (i > 0)
-            refDx = std::min(refDx, reference(i - 1));
-        if (i + 2 < count)
-            refDx = std::min(refDx, reference(i + 1));
-        if (refDx < noReference && step(i) > threshold * refDx)
+        // The narrower of the neighbouring steps in each space. A repeated key (zero step) draws a
+        // vertical edge and says nothing about the sampling, so it is no reference.
+        const auto narrower = [&](const auto& measure)
+        {
+            double ref = noReference;
+            if (i > 0 && step(measure, i - 1) > 0.0)
+                ref = std::min(ref, step(measure, i - 1));
+            if (i + 2 < count && step(measure, i + 1) > 0.0)
+                ref = std::min(ref, step(measure, i + 1));
+            return ref;
+        };
+        const double refDx = narrower(keyUnits);
+        const double refShown = scaled ? narrower(shown) : refDx;
+        if (refDx < noReference && step(keyUnits, i) > threshold * refDx
+            && step(shown, i) > threshold * refShown)
             gapBefore.setGap(i + 1);
     }
     return gapBefore;
 }
 
 // How many times wider the step into key i is than the narrower of its neighbouring steps in
-// [begin, end), in the space \a keyScale shows (see detectKeyGaps): the measure detectKeyGaps
-// holds against its threshold. 0 when there is nothing to compare it to.
+// [begin, end), counted in key units and in the space \a keyScale shows and keeping the smaller of
+// the two counts (see detectKeyGaps): the measure detectKeyGaps holds against its threshold. 0 when
+// there is nothing to compare it to.
 template <typename KeyAt>
 double keyStepRatio(KeyAt key, int begin, int end, int i, const QCPScale& keyScale = QCPScale())
 {
     if (i <= begin || i >= end) return 0;
     const bool scaled = keyScale.isSymlog();
-    const auto at = [&](int j) {
+    const auto shown = [&](int j) {
         const double k = key(j);
         return scaled ? keyScale.toScale(k) : k;
     };
-    const double step = at(i) - at(i - 1);
-    double ref = std::numeric_limits<double>::max();
-    if (i - 1 > begin && at(i - 1) - at(i - 2) > 0)
-        ref = std::min(ref, at(i - 1) - at(i - 2));
-    if (i + 1 < end && at(i + 1) - at(i) > 0)
-        ref = std::min(ref, at(i + 1) - at(i));
-    return step > 0 && ref < std::numeric_limits<double>::max() ? step / ref : 0;
+    const auto ratio = [&](const auto& measure)
+    {
+        const double step = measure(i) - measure(i - 1);
+        double ref = std::numeric_limits<double>::max();
+        if (i - 1 > begin && measure(i - 1) - measure(i - 2) > 0)
+            ref = std::min(ref, measure(i - 1) - measure(i - 2));
+        if (i + 1 < end && measure(i + 1) - measure(i) > 0)
+            ref = std::min(ref, measure(i + 1) - measure(i));
+        return step > 0 && ref < std::numeric_limits<double>::max() ? step / ref : 0.0;
+    };
+    const auto keyUnits = [&](int j) { return static_cast<double>(key(j)); };
+    return std::min(ratio(keyUnits), ratio(shown));
 }
 
 // Binned points say nothing about gaps through their keys: an empty bin is the binning, not a
