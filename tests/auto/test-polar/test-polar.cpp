@@ -8,6 +8,7 @@
 #include "polar/polargrid.h"
 #include "polar/radialaxis.h"
 #include <QPointer>
+#include <QSignalSpy>
 #include <cmath>
 #include <numbers>
 #include <vector>
@@ -1336,14 +1337,19 @@ void TestPolar::theAngularAxisRefusesALogScale()
     QCustomPlot plot;
     auto* area = polarArea(plot);
     QCPPolarAxisAngular* angular = area->angularAxis();
+    QSignalSpy installs(angular, &QCPAxis::tickerChanged);
+
     angular->setScale(QCPScale::log());
     QCOMPARE(angular->scale(), QCPScale::linear());
+    // A refused scale changes nothing, its ticker included: nothing is installed for it.
+    QCOMPARE(installs.count(), 0);
     QCOMPARE(int(test_misuse::calls.size()), 1);
     test_misuse::calls.clear();
 
     // A refused scale must leave the ring's 30° ticker alone, and so must a scale equal to the
     // current one: the scale's own default ticker is a plain linear one, which would put the ring
-    // back on auto ticks.
+    // back on auto ticks. The equal scale does install its ticker, which for this axis is the
+    // ring's own 30° one.
     for (const QCPScale& scale : { QCPScale::log(), QCPScale::linear() })
     {
         angular->setScale(scale);
@@ -1351,6 +1357,7 @@ void TestPolar::theAngularAxisRefusesALogScale()
         QVERIFY(ticker != nullptr);
         QCOMPARE(ticker->tickStep(), 30.0);
     }
+    QCOMPARE(installs.count(), 1);
     QCOMPARE(int(test_misuse::calls.size()), 1);
     test_misuse::calls.clear();
 }

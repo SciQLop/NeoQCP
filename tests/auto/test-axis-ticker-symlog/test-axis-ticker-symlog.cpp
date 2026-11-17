@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace
 {
@@ -190,6 +191,27 @@ void TestAxisTickerSymlog::subTicksInTheFallback()
 // A legal scale may be extreme: a base of 1e6, of 2^40, or barely above 1 turns every decade
 // count into millions, and a threshold far below one makes the band's sub grid huge. None of that
 // may be materialised: the work per replot is bounded by the ticks that can be shown.
+void TestAxisTickerSymlog::subTicksMeasureTheShownDecades()
+{
+    // The band's own decade is 1e-15 here, twenty-two decades below the drawn ones; measuring the
+    // span from it would take the linear branch and lose the mantissas of 1e5, 1e6 and 1e7.
+    const Ticks ticks = generate(QCPScale::symlog(1e-15), QCPRange(1e5, 1e7));
+    QCOMPARE(printed(ticks.major), QStringLiteral("100000, 1000000, 10000000"));
+    for (const double mantissa : { 2e5, 5e5, 9e5, 2e6, 5e6, 9e6 })
+        QVERIFY2(contains(ticks.sub, mantissa), qPrintable(printed(ticks.sub)));
+}
+
+void TestAxisTickerSymlog::aMeetTickCountRangeShowsNoOutOfBandDecade()
+{
+    // Five to five holds no decade past the threshold, so the thinning divides by a zero count
+    // there: a NaN that the readability mode casts to an int, which is undefined behaviour.
+    QCPAxisTickerSymlog ticker(QCPScale::symlog(2));
+    ticker.setTickStepStrategy(QCPAxisTicker::tssMeetTickCount);
+    const Ticks ticks = generate(ticker, QCPRange(-5, 5));
+    QCOMPARE(printed(ticks.major), QStringLiteral("-1, 0, 1"));
+    QVERIFY2(totalTicks(ticks) < 40, qPrintable(printed(ticks.sub)));
+}
+
 void TestAxisTickerSymlog::extremeScalesStayBounded_data()
 {
     QTest::addColumn<QString>("kind");
@@ -207,6 +229,17 @@ void TestAxisTickerSymlog::extremeScalesStayBounded_data()
         << QStringLiteral("log") << 0.0 << 1e6 << QCPRange(1e-250, 1e250);
     QTest::newRow("log base 1.0001")
         << QStringLiteral("log") << 0.0 << 1.0001 << QCPRange(1e-250, 1e250);
+    // A base 1e-13 above one walks exponents past the limit where the powers saturate: they must
+    // be clamped before they are counted, or the axis draws thousands of copies of one tick.
+    QTest::newRow("symlog base 1 + 1e-13")
+        << QStringLiteral("symlog") << 2.0 << 1.0 + 1e-13 << QCPRange(-1e250, 1e250);
+    // The threshold's decade is then far below the drawn ones: the shown decades decide the grid.
+    QTest::newRow("symlog threshold 1e-300, base 1.0001")
+        << QStringLiteral("symlog") << 1e-300 << 1.0001 << QCPRange(-1e250, 1e250);
+    // A threshold whose decade underflows to zero leaves no band grid to divide up.
+    QTest::newRow("symlog threshold denorm_min")
+        << QStringLiteral("symlog") << std::numeric_limits<double>::denorm_min() << 10.0
+        << QCPRange(-1, 1);
 }
 
 void TestAxisTickerSymlog::extremeScalesStayBounded()
@@ -242,6 +275,9 @@ void TestAxisTickerSymlog::extremeScalesStayBounded()
     for (double tick : ticks.major)
         QVERIFY2(std::isfinite(tick) && (symlog || tick > 0),
                  qPrintable(QString::number(tick, 'g', 9)));
+    for (int i = 1; i < ticks.major.size(); ++i)
+        QVERIFY2(ticks.major.at(i) > ticks.major.at(i - 1),
+                 qPrintable(printed(ticks.major)));
     for (double tick : ticks.sub)
         QVERIFY2(std::isfinite(tick), qPrintable(QString::number(tick, 'g', 9)));
 }

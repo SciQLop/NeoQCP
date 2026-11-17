@@ -198,19 +198,6 @@ void TestColorScale::aSecondMapTakesTheRectsGradient()
                             .arg(c.blue())));
 }
 
-namespace
-{
-// The channels of two colours are within a tolerance of each other: the renderer rounds.
-bool sameColour(const QColor& a, const QColor& b, int tolerance)
-{
-    return qAbs(a.red() - b.red()) <= tolerance && qAbs(a.green() - b.green()) <= tolerance
-        && qAbs(a.blue() - b.blue()) <= tolerance;
-}
-} // namespace
-
-// A colour bar's axis takes the data scale, so the bar's pixel for z = 1 is the entry the lookup
-// gives z = 1, the scale-space fraction 0.60870 rather than the linear 0.50005. A map drawn through
-// the same scale gives a diverging gradient's mirror colours for z and -z and the middle at zero.
 void TestColorScale::aBarScaleChangeInstallsItsTickerOnce()
 {
     const auto scale = mPlot->add<QCPColorScale>(0, 1);
@@ -229,6 +216,19 @@ void TestColorScale::aBarScaleChangeInstallsItsTickerOnce()
     QCOMPARE(installs.count(), 2);
 }
 
+namespace
+{
+// The channels of two colours are within a tolerance of each other: the renderer rounds.
+bool sameColour(const QColor& a, const QColor& b, int tolerance)
+{
+    return qAbs(a.red() - b.red()) <= tolerance && qAbs(a.green() - b.green()) <= tolerance
+        && qAbs(a.blue() - b.blue()) <= tolerance;
+}
+} // namespace
+
+// A colour bar's axis takes the data scale, so the bar's pixel for z = 1 is the entry the lookup
+// gives z = 1, the scale-space fraction 0.60870 rather than the linear 0.50005. A map drawn through
+// the same scale gives a diverging gradient's mirror colours for z and -z and the middle at zero.
 void TestColorScale::theColourBarFollowsTheDataScale()
 {
     std::vector<double> keys;

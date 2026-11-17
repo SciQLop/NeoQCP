@@ -15,6 +15,8 @@ private slots:
     void aBaseOtherThanTenKeepsItsMantissas();
     void thinnedDecadesBecomeSubTicks();
     void subTicksInTheFallback();
+    void subTicksMeasureTheShownDecades();
+    void aMeetTickCountRangeShowsNoOutOfBandDecade();
     void extremeScalesStayBounded_data();
     void extremeScalesStayBounded();
 };

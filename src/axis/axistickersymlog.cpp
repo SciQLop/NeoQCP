@@ -71,9 +71,9 @@ bool hasMantissaDecades(double base)
   Outside the band the mapping is logarithmic, and the sub ticks are the decades' mantissas
   (2...9 x base^k) when the base is a small integer; a base barely above one has no integer
   mantissa to show, so each gap between ticks is subdivided linearly there instead. Inside the band
-  it is linear, so the sub ticks are the multiples of a fifth of the threshold's decade, the sub
-  grid a linear axis draws over one decade. Both ends of the band are marked: they are where the
-  mapping bends.
+  it is linear, so the sub ticks split the threshold's decade into as many parts as that decade's
+  sub tick count asks for (fifths in base 10, thirds in base 3), the sub grid a linear axis draws
+  over one decade. Both ends of the band are marked: they are where the mapping bends.
 
   The ticker reads the threshold and the base of the scale it was built with. QCPAxisBase::setScale
   installs it for a symlog scale, and a later QCPAxisBase::setTicker wins.
@@ -157,23 +157,29 @@ QVector<double> QCPAxisTickerSymlog::symlogDecades(const QCPRange& range) const
     const bool zero = (negativeSide && range.upper > -threshold)
         || (positiveSide && range.lower < threshold);
 
-    // matplotlib's exponent bounds, exclusive at the upper end as arange's end is.
-    const double negativeFirst = decadeFloor(base, std::max(threshold, -range.upper));
-    const double negativeLast = decadeCeil(base, -range.lower);
-    const double positiveFirst = decadeFloor(base, std::max(threshold, range.lower));
-    const double positiveLast = decadeCeil(base, range.upper);
+    // matplotlib's exponent bounds, exclusive at the upper end as arange's end is. A base barely
+    // above one puts them far past the exponent limit, where the powers saturate, so they are
+    // clamped before they are counted or walked.
+    const double negativeFirst
+        = clampedExponent(decadeFloor(base, std::max(threshold, -range.upper)));
+    const double negativeLast = clampedExponent(decadeCeil(base, -range.lower));
+    const double positiveFirst = clampedExponent(decadeFloor(base, std::max(threshold, range.lower)));
+    const double positiveLast = clampedExponent(decadeCeil(base, range.upper));
 
     // Only the decades past the threshold are counted for the thinning: the one holding the
     // threshold sits in the band and is always shown.
-    const double firstOutOfBand = decadeFloor(base, threshold) + 1.0;
+    const double firstOutOfBand = clampedExponent(decadeFloor(base, threshold) + 1.0);
     double outOfBandCount = 0;
     if (negativeSide)
         outOfBandCount += std::max(0.0, negativeLast - std::max(negativeFirst, firstOutOfBand));
     if (positiveSide)
         outOfBandCount += std::max(0.0, positiveLast - std::max(positiveFirst, firstOutOfBand));
+    // A range that shows no out-of-band decade at all, five to five say, still needs a stride:
+    // cleanMantissa(0) is NaN and casts to int as undefined behaviour.
+    const double counted = std::max(outOfBandCount, 1.0);
     const double stride = std::max(
-        1.0, std::floor(std::min(cleanMantissa(outOfBandCount / double(mTickCount)),
-                                 kExponentLimit)));
+        1.0,
+        std::floor(std::min(cleanMantissa(counted / double(mTickCount)), kExponentLimit)));
 
     QVector<double> ticks;
     const auto appendSide = [&ticks, base, stride](double first, double last, bool mirrored)
@@ -187,6 +193,8 @@ QVector<double> QCPAxisTickerSymlog::symlogDecades(const QCPRange& range) const
             if (std::isfinite(value) && value > 0)
                 values.push_back(value);
         }
+        // Clamping collapses the exponents past the limit onto one power.
+        values.erase(std::unique(values.begin(), values.end()), values.end());
         if (mirrored)
             std::reverse(values.begin(), values.end());
         for (double value : values)
@@ -211,22 +219,27 @@ void QCPAxisTickerSymlog::addBandSubTicks(QVector<double>& candidates, int subTi
 {
     const double threshold = mScale.threshold();
     const double maxCells = 4.0 * double(subTickCount + 1);
+    // A threshold so small that its decade underflows to zero leaves no band grid to divide up:
+    // fall back to the coarsest grid the band allows, and draw no cell when even that is zero.
     double bandStep = decadeStep() / double(subTickCount + 1);
-    if (threshold / bandStep > maxCells)
+    if (!(bandStep > 0.0) || threshold / bandStep > maxCells)
         bandStep = threshold / maxCells;
-    const int bandCells = int(std::floor(threshold / bandStep + 1e-9));
-    for (int k = -bandCells; k <= bandCells; ++k)
-        candidates.append(double(k) * bandStep);
     candidates.append(threshold);
     candidates.append(-threshold);
+    if (!(bandStep > 0.0))
+        return;
+    const int bandCells = int(std::floor(qMin(threshold / bandStep, maxCells) + 1e-9));
+    for (int k = -bandCells; k <= bandCells; ++k)
+        candidates.append(double(k) * bandStep);
 }
 
 /*! \internal
 
   Appends the sub ticks outside the band to \a candidates, both signs. When the base has integer
-  mantissas they are those, plus the decades the thinning skipped; otherwise the gaps between the
-  adjacent \a ticks are subdivided \a subTickCount times, as a thinned log axis does. Both branches
-  generate a bounded number of values.
+  mantissas and the drawn decades are few, the sub ticks are those mantissas, plus the decades the
+  thinning skipped; otherwise the gaps between adjacent \a ticks are subdivided \a subTickCount
+  times, as a thinned log axis does, and a skipped decade inside a short gap still gets its own
+  sub tick. Both branches generate a bounded number of values.
 */
 void QCPAxisTickerSymlog::addOutsideSubTicks(std::vector<double>& candidates, int subTickCount,
                                              const QVector<double>& ticks) const
@@ -234,7 +247,17 @@ void QCPAxisTickerSymlog::addOutsideSubTicks(std::vector<double>& candidates, in
     const double base = mScale.base();
     const double threshold = mScale.threshold();
     const double outerMagnitude = std::max(std::abs(ticks.front()), std::abs(ticks.back()));
-    const double firstExponent = decadeFloor(base, threshold);
+    // The span is measured over the decades that are drawn, down to the one below the first
+    // tick (its mantissas are visible too), not from the band's decade: a threshold of 1e-15 on a
+    // range of 1e5 to 1e7 shows three decades and takes their mantissas, where the band's own
+    // decade would push the span past the cap.
+    double shownMagnitude = outerMagnitude;
+    for (double tick : ticks)
+        if (const double magnitude = std::abs(tick); magnitude > threshold && magnitude < shownMagnitude)
+            shownMagnitude = magnitude;
+    const double firstShownDecade = decadeFloor(base, shownMagnitude);
+    const double firstExponent
+        = std::max(decadeFloor(base, threshold), firstShownDecade - 1.0);
     const double lastExponent = decadeCeil(base, outerMagnitude);
 
     if (hasMantissaDecades(base) && lastExponent - firstExponent <= 20.0)
@@ -270,6 +293,21 @@ void QCPAxisTickerSymlog::addOutsideSubTicks(std::vector<double>& candidates, in
         const double to = ticks.at(i);
         if ((from < 0) != (to < 0) || qFuzzyIsNull(from) || qFuzzyIsNull(to))
             continue;
+        // A gap the thinning made one, two or a few decades wide keeps its decade marks, the way
+        // the mantissa branch does; a wider one is subdivided instead.
+        const double skipped = std::round(logBase(base, std::abs(to / from))) - 1.0;
+        if (skipped >= 1.0 && skipped <= double(subTickCount))
+        {
+            const double sign = to < 0 ? -1.0 : 1.0;
+            const double first = decadeFloor(base, std::abs(from)) + 1.0;
+            for (double step = 0; step < skipped; step += 1.0)
+            {
+                const double decade = qPow(base, clampedExponent(first + step));
+                if (std::isfinite(decade) && decade > 0)
+                    candidates.push_back(sign * decade);
+            }
+            continue;
+        }
         const double step = (to - from) / double(subTickCount + 1);
         for (int k = 1; k <= subTickCount; ++k)
             candidates.push_back(from + double(k) * step);
@@ -293,7 +331,12 @@ QVector<double> QCPAxisTickerSymlog::createSubTickVector(int subTickCount,
     // The band is one decade wide, so it takes a decade's sub grid, not the grid of the (wider)
     // tick step the axis is on.
     QVector<double> candidates;
-    addBandSubTicks(candidates, QCPAxisTicker::getSubTickCount(decadeStep()));
+    const double decade = decadeStep();
+    // A base near one can underflow that decade to zero, where the base class's mantissa
+    // arithmetic is undefined: the band then takes the count a decade of ten asks for.
+    const int bandSubTicks
+        = decade > 0 && std::isfinite(decade) ? QCPAxisTicker::getSubTickCount(decade) : 4;
+    addBandSubTicks(candidates, bandSubTicks);
 
     std::vector<double> outside;
     addOutsideSubTicks(outside, subTickCount, ticks);
