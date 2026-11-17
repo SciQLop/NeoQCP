@@ -107,6 +107,23 @@ void QCPAxisBase::detachLinks()
 */
 void QCPAxisBase::setScale(const QCPScale& scale)
 {
+    // An identity follower shows its source's values: the scale belongs to the source (P-3), which
+    // hands it back to every identity follower.
+    if (isIdentityFollower() && scale != mScale)
+    {
+        mLink->source->setScale(scale);
+        return;
+    }
+    applyScale(scale);
+}
+
+/*! \internal
+
+  setScale without the identity-link redirection: the source hands its new scale to its identity
+  followers through it.
+*/
+void QCPAxisBase::applyScale(const QCPScale& scale)
+{
     std::optional<QCPEmissionScope> scope;
     if (defersEmissions())
         scope.emplace(mParentPlot);
@@ -126,7 +143,13 @@ void QCPAxisBase::setScale(const QCPScale& scale)
             setRange(mRange.sanitizedForLogScale());
     }
     scaleDidChange();
+    // Taken before the signal: with no scope open a slot runs now and may delete this axis, so
+    // nothing of it is read after the emit.
+    const QList<QPointer<QCPAxisBase>> users = mLinkedAxes;
     qcpEmitCurrent(this, mParentPlot, &QCPAxisBase::scaleChanged, [this] { return mScale; });
+    for (const QPointer<QCPAxisBase>& user : users)
+        if (user && user->isIdentityFollower() && user->mScale != scale)
+            user->applyScale(scale);
 }
 
 /*! \internal
@@ -454,9 +477,12 @@ QList<QCPPlottable*> QCPAxisBase::plottablesRaw() const
 }
 
 /*!
-  Changes the range so what the plottables of the systems using this axis draw is visible: their
-  drawn data ranges, in this axis' dimension. A constant plottable leaves a zero-size range, which
-  recentres the current range instead (see rescaleTo).
+  Changes the range so what the plottables of the systems using this axis draw is visible, in this
+  axis' dimension (each axis kind collects its own range: see ownDataRange). Axes linked with no
+  functions show one range, so they fit the union of all their data, set once on the source, as
+  matplotlib's shared axes do; \ref QCPAxisRect::setupFullAxesBox "setupFullAxesBox(true)" makes such
+  links. A constant plottable leaves a zero-size range, which recentres the current range instead
+  (see rescaleTo).
 
   \see QCPPlottable::rescaleAxes, QCustomPlot::rescaleAxes
 */
@@ -527,7 +553,7 @@ bool QCPAxisBase::ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signD
 
 /*! \internal
 
-  The tail every rescale() shares: stores \a range when one was found. A range that is not usable
+  The tail of rescale(): stores \a range when one was found. A range that is not usable
   (the plottables are constant in this dimension) recentres the current range on it, in the axis'
   own scale.
 */
@@ -571,16 +597,23 @@ void QCPAxisBase::linkTo(QCPAxisBase* source, QCPAxisFunction forward, QCPAxisFu
     QCP_CHECK_OR_RETURN(source != this, "an axis cannot be linked to itself", );
     QCP_CHECK_OR_RETURN(mParentPlot && source->mParentPlot == mParentPlot,
                         "the linked axes must belong to the same plot", );
-    if (!checkLinkSource(source))
-        return;
-    QCP_CHECK_OR_RETURN(!source->mLink, "the source axis is linked itself", );
-    const bool drivesALink
-        = std::any_of(mLinkedAxes.cbegin(), mLinkedAxes.cend(),
-                      [](const QPointer<QCPAxisBase>& user) { return !user.isNull(); });
-    QCP_CHECK_OR_RETURN(!drivesALink, "the axis already drives a link of its own", );
     QCP_CHECK_OR_RETURN(static_cast<bool>(forward) == static_cast<bool>(inverse),
                         "a link needs both its forward and its inverse function", );
     const bool identity = !forward;
+    // Identity links stay a star (pre-flight C4): one to an identity follower goes to its source.
+    if (identity && source->isIdentityFollower())
+        source = source->mLink->source.data();
+    QCP_CHECK_OR_RETURN(source != this, "an axis cannot be linked to itself", );
+    if (!checkLinkSource(source))
+        return;
+    QCP_CHECK_OR_RETURN(!source->mLink, "the source axis is linked itself", );
+    const QList<QPointer<QCPAxisBase>> followers = mLinkedAxes;
+    const bool drivesAMappedLink = std::any_of(followers.cbegin(), followers.cend(),
+        [](const QPointer<QCPAxisBase>& user) { return user && !user->isIdentityFollower(); });
+    const bool drivesALink = std::any_of(followers.cbegin(), followers.cend(),
+        [](const QPointer<QCPAxisBase>& user) { return !user.isNull(); });
+    QCP_CHECK_OR_RETURN(!drivesALink || (identity && !drivesAMappedLink),
+                        "the axis already drives a link of its own", );
     if (!forward)
     {
         forward = [](double v) { return v; };
@@ -601,10 +634,21 @@ void QCPAxisBase::linkTo(QCPAxisBase* source, QCPAxisFunction forward, QCPAxisFu
     mLink = link;
     source->mLinkedAxes.append(this);
     mLinked = true;
+    // The identity followers this axis drove follow its new source now: still one star.
+    mLinkedAxes.clear();
+    for (const QPointer<QCPAxisBase>& user : followers)
+        if (user)
+        {
+            user->mLink.reset();
+            user->mLinked = false;
+            user->linkTo(source);
+        }
     // The systems hear of the link when this returns: a slot may delete the axis.
     std::optional<QCPEmissionScope> scope;
     if (defersEmissions())
         scope.emplace(mParentPlot);
+    if (identity && mScale != source->mScale)
+        applyScale(source->mScale); // shares the source's scale (P-3); the same scale keeps a ticker
     notifyMappingChanged();
     refreshFromLink();
     markAppearanceDirty();

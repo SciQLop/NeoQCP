@@ -190,10 +190,11 @@ public:
     void setSelectedSubTickPen(const QPen& pen);
 
     // non-property methods:
-    // The turn an angular axis shows is the whole circle: rescaling would cut it, so it keeps its
-    // range.
+protected:
     // The angular axis keeps its full turn: it has no data range to fit.
     bool ownDataRange(bool, QCP::SignDomain, QCPRange&) const override { return false; }
+
+public:
 
     double coordToAngleRad(double coord) const
     {

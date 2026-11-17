@@ -3498,10 +3498,16 @@ void QCustomPlot::rescaleAxes(bool onlyVisiblePlottables)
     for (QCPArea* area : areasRaw())
         allAxes << guarded(qcp::pointers(area->allAxes()));
 
-    // An identity follower is fitted with its source, once per link (decision 13).
+    // An identity follower is fitted with its source, once per link (decision 13), unless the source
+    // is outside the layout (a rect taken out and still held): then the follower fits the link.
+    const auto walked = [&](const QCPAxisBase* source)
+    {
+        return std::any_of(allAxes.cbegin(), allAxes.cend(),
+                           [source](const QPointer<QCPAxisBase>& a) { return a.data() == source; });
+    };
     for (const auto& axis : allAxes)
-        if (axis && !axis->isIdentityFollower()) // a rangeChanged slot may delete the others
-            axis->rescale(onlyVisiblePlottables);
+        if (axis && !(axis->isIdentityFollower() && walked(axis->linkSource())))
+            axis->rescale(onlyVisiblePlottables); // a rangeChanged slot may delete the others
 }
 
 /*!

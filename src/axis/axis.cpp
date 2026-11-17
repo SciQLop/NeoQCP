@@ -1643,11 +1643,10 @@ void QCPAxis::setScaleRatio(const QCPAxis* otherAxis, double ratio)
     setRange(range().center(), newRangeSize, Qt::AlignCenter);
 }
 
-/*!
-  Changes the axis range such that all plottables associated with this axis are fully visible in
-  that dimension.
+/*! \internal
 
-  \see QCPPlottable::rescaleAxes, QCustomPlot::rescaleAxes
+  The data range of this axis' plottables in its dimension: their key or value ranges, the ranges a
+  cartesian axis always fitted (see QCPAxisBase::rescale).
 */
 bool QCPAxis::ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signDomain,
                            QCPRange& range) const

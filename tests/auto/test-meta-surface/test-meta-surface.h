@@ -69,7 +69,7 @@ private slots:
     void invokablesAreFound();
     void metatypesKeepTheirNames_data();
     void metatypesKeepTheirNames();
-    void invokableOnAVirtualReachesTheOverride();
+    void invokableOnABaseIsFoundThroughADerivedClass();
 };
 
 // Runs its action when a signal it is connected to through QMetaMethod fires.

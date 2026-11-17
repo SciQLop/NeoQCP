@@ -354,8 +354,11 @@ public:
     }
 
     void setScaleRatio(const QCPAxis* otherAxis, double ratio = 1.0);
+protected:
     bool ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signDomain,
                       QCPRange& range) const override;
+
+public:
     double pixelToCoord(double value) const;
     double coordToPixel(double value) const;
 

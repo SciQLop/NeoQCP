@@ -275,8 +275,10 @@ The linked axis keeps its own ticks and label, so it shows the same range in oth
 ![Temperature in Celsius on the left, Fahrenheit on the right](images/axes-secondary-units.png)
 
 - The two functions must undo each other. Give both, or neither: without them the axes show the same range.
+- Without functions the two axes also share their scale: the follower takes the source's at the link, follows its changes, and a `setScale()` on the follower is written to the source. With functions each axis keeps its own scale.
+- Links without functions stay a star: linking to an axis that itself follows one that way links to its source, and an axis that drives such followers hands them to its new source when it is linked.
 - Pan or zoom either axis, the other follows. A range set on the linked axis goes back through `inverse`.
-- Both axes must be on the same plot and have the same orientation. Links do not chain: a source cannot be linked itself.
+- Both axes must be on the same plot and have the same orientation. Links through functions do not chain: their source cannot be linked itself.
 - The linked axis follows the source's direction: reverse the source, not the linked axis.
 - `unlink()` ends the link.
 - Without functions, `rescale()` on either axis fits the data of both, and sets the range once on the source. With functions, each side keeps its own data.

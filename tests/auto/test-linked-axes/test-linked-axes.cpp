@@ -359,9 +359,11 @@ void TestLinkedAxes::aLinksSourceCanBeLinkedAgain()
 
 void TestLinkedAxes::scaleTypeOnALinkedAxisLeavesTheSourceAlone()
 {
+    // A link through functions keeps its own scale (an identity link shares the source's: see
+    // anIdentityLinkSharesTheScale). The functions here are the identity, spelled out.
     QCustomPlot plot;
     plot.xAxis->setRange(-5, 5);
-    plot.xAxis2->linkTo(plot.xAxis);
+    plot.xAxis2->linkTo(plot.xAxis, [](double v) { return v; }, [](double v) { return v; });
     QCOMPARE(plot.xAxis2->range(), QCPRange(-5, 5));
 
     plot.xAxis2->setScale(QCPScale::log());
@@ -711,6 +713,17 @@ void TestLinkedAxes::rescaleFitsTheUnion()
     s.bottom->xAxis()->rescale();
     QCOMPARE(s.top->xAxis()->range(), QCPRange(0, 10));
     QCOMPARE(gMisuses, 0);
+
+    // A source on a rect taken out of the layout is not walked: its follower fits the link.
+    QCustomPlot plot;
+    plot.setAxisRectGrid(2, 1);
+    QCPAxisRect* held = plot.axisRect(1, 0).get();
+    QVERIFY(plot.plotLayout()->take(held));
+    plot.axisRect(0, 0)->xAxis()->linkTo(held->xAxis());
+    plot.axisRect(0, 0)->line(ramp(0, 8), ramp(0, 1));
+    plot.rescaleAxes();
+    QCOMPARE(held->xAxis()->range(), QCPRange(0, 8));
+    delete held;
 }
 
 void TestLinkedAxes::aUnionUnderTheSharedScale()
@@ -746,4 +759,78 @@ void TestLinkedAxes::aMappedFollowerDoesNotWiden()
     plot.rescaleAxes();
     QCOMPARE(bottom->xAxis()->range(), QCPRange(2, 10));
     QCOMPARE(top->xAxis()->range(), QCPRange(4, 20));
+}
+
+void TestLinkedAxes::anIdentityLinkSharesTheScale()
+{
+    // P-3: an identity link shows the source's range in the same units, so it shares the scale.
+    QCustomPlot plot;
+    plot.xAxis->setRange(1, 10);
+    plot.xAxis->setScale(QCPScale::log());
+    plot.xAxis2->linkTo(plot.xAxis);
+    QCOMPARE(plot.xAxis2->scale(), QCPScale::log()); // taken at link time
+
+    QSignalSpy followerScale(plot.xAxis2, &QCPAxis::scaleChanged);
+    plot.xAxis->setScale(QCPScale::symlog(2));
+    QCOMPARE(plot.xAxis2->scale(), QCPScale::symlog(2)); // a source's change reaches it
+    QCOMPARE(followerScale.count(), 1);
+
+    plot.xAxis2->setScale(QCPScale::linear());
+    QCOMPARE(plot.xAxis->scale(), QCPScale::linear()); // written to the source
+    QCOMPARE(plot.xAxis2->scale(), QCPScale::linear());
+
+    // A custom ticker on the follower survives a link to a source of the same scale.
+    QCustomPlot same;
+    const auto ticker = QSharedPointer<QCPAxisTickerFixed>::create();
+    same.xAxis2->setTicker(ticker);
+    same.xAxis2->linkTo(same.xAxis);
+    QCOMPARE(same.xAxis2->ticker(), QSharedPointer<QCPAxisTicker>(ticker));
+
+    // A link through functions keeps its own scale.
+    QCustomPlot mapped;
+    mapped.yAxis2->linkTo(mapped.yAxis, twice, half);
+    mapped.yAxis->setScale(QCPScale::log());
+    QCOMPARE(mapped.yAxis2->scale(), QCPScale::linear());
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestLinkedAxes::identityLinksFlatten()
+{
+    // C4: identity links stay a star. Linking to an identity follower links to its source; an axis
+    // that drives identity followers hands them to its new source.
+    QCustomPlot plot;
+    QCPAxisRect* second = new QCPAxisRect(&plot);
+    plot.plotLayout()->addElement(1, 0, second);
+    QCPAxis* a = plot.xAxis;
+    QCPAxis* b = plot.xAxis2;
+    QCPAxis* c = second->axis(QCPAxis::atBottom);
+    QCPAxis* d = second->axis(QCPAxis::atTop);
+
+    b->linkTo(a);
+    c->linkTo(b); // b follows a: c follows a
+    QCOMPARE(c->linkSource(), a);
+    QCOMPARE(gMisuses, 0);
+
+    QCustomPlot plot2;
+    QCPAxisRect* other = new QCPAxisRect(&plot2);
+    plot2.plotLayout()->addElement(1, 0, other);
+    QCPAxis* root = other->axis(QCPAxis::atBottom);
+    plot2.xAxis2->linkTo(plot2.xAxis); // xAxis drives an identity follower
+    plot2.xAxis->linkTo(root);         // xAxis follows root: its follower moves to root too
+    QCOMPARE(plot2.xAxis->linkSource(), root);
+    QCOMPARE(plot2.xAxis2->linkSource(), root);
+    root->setRange(3, 4);
+    QCOMPARE(plot2.xAxis2->range(), QCPRange(3, 4));
+    QCOMPARE(gMisuses, 0);
+
+    // A link through functions does not flatten: chaining to a mapped follower is still refused.
+    d->linkTo(a, twice, half);
+    QCOMPARE(gMisuses, 0);
+    QCustomPlot plot3;
+    plot3.xAxis2->linkTo(plot3.xAxis, twice, half);
+    QCPAxisRect* third = new QCPAxisRect(&plot3);
+    plot3.plotLayout()->addElement(1, 0, third);
+    third->axis(QCPAxis::atBottom)->linkTo(plot3.xAxis2);
+    QCOMPARE(gMisuses, 1);
+    QCOMPARE(third->axis(QCPAxis::atBottom)->linkSource(), nullptr);
 }

@@ -3014,9 +3014,9 @@ void TestMetaSurface::metatypesKeepTheirNames()
     QCOMPARE(QMetaType::fromName(r.registeredAs), r.type);
 }
 
-// An invokable declared on a base is found through a derived class's meta-object, and a virtual one
-// reaches the override.
-void TestMetaSurface::invokableOnAVirtualReachesTheOverride()
+// An invokable declared on a base is found through a derived class's meta-object, and runs the
+// derived class' behaviour (the cartesian data range, through the virtual ownDataRange).
+void TestMetaSurface::invokableOnABaseIsFoundThroughADerivedClass()
 {
     auto plot = newPlot();
     graphOn(*plot);

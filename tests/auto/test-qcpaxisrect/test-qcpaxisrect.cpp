@@ -1507,7 +1507,9 @@ void TestQCPAxisRect::aLinkedScaledAxisDragMovesItsSourceLinearly()
     mPlot->resize(400, 300);
     mPlot->setInteractions(QCP::iRangeDrag);
     QCPAxis* linked = mPlot->axisRect()->addAxis(QCPAxis::atTop);
-    linked->linkTo(mPlot->xAxis); // identity: the linked axis shows the source's values
+    // Identity functions spelled out: a link through functions keeps its own scale, so the log
+    // follower of a linear source (what this test drags) exists. An identity link shares the scale.
+    linked->linkTo(mPlot->xAxis, [](double v) { return v; }, [](double v) { return v; });
     mPlot->xAxis->setRange(1, 10);
     linked->setScale(QCPScale::log());
     mPlot->axisRect()->setRangeDragAxes(linked, nullptr);

@@ -251,6 +251,8 @@ protected:
     virtual QSharedPointer<QCPAxisTicker> defaultTicker(const QCPScale& scale);
 
     virtual void scaleDidChange();
+    // setScale without the identity-link redirection: the source applies it to its followers.
+    void applyScale(const QCPScale& scale);
     // Dirties what a look change moves. The default dirties the axis alone; a cartesian axis also
     // dirties the rect's layers.
     virtual void markAppearanceDirty();
@@ -270,7 +272,7 @@ protected:
     QList<QCPPlottable*> plottablesRaw() const;
 
     // The tail of rescale(): stores \a range, or, when it is not usable (a constant plottable has a
-    // zero-size range), recentres the current range on it. Shared with subclasses that rescale.
+    // zero-size range), recentres the current range on it.
     void rescaleTo(const QCPRange& range, bool haveRange);
     // This axis' own data range under signDomain, from its plottables; false when it has none. The
     // drawn data ranges here; a cartesian axis uses its plottables' key and value ranges, and the

@@ -34,4 +34,6 @@ private slots:
     void rescaleFitsTheUnion();
     void aUnionUnderTheSharedScale();
     void aMappedFollowerDoesNotWiden();
+    void anIdentityLinkSharesTheScale();
+    void identityLinksFlatten();
 };
