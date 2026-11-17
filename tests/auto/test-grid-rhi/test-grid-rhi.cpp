@@ -532,6 +532,88 @@ void TestGridRhi::gridLinesStayAlignedWithTicksAtEpochScale()
     QVERIFY(qAbs(shaderPixel - expectedPixel) < 1.0f);
 }
 
+// A symlog axis zoomed far from zero works in a scale space of a few units, where the whole range
+// is a handful of float32 steps: a vertex baked on the absolute scale-space coordinate collapses
+// onto those steps and the grid lands tens of pixels off its ticks unless the range is the origin.
+void TestGridRhi::aZoomedSymlogGridKeepsTheTicksAligned()
+{
+    if (!showAndHasRhiGrid(mPlot))
+        QSKIP("No QRhi available — the grid RHI layer needs a real backend");
+
+    mPlot->xAxis->setScale(QCPScale::symlog(2));
+    mPlot->xAxis->setRange(1000.0, 1000.01);
+    mPlot->xAxis->grid()->setSubGridVisible(false);
+    mPlot->yAxis->grid()->setVisible(false);
+    auto ticker = QSharedPointer<QCPAxisTickerText>::create();
+    const QVector<double> ticks { 1000.0025, 1000.005, 1000.0075 };
+    for (const double tick : ticks)
+        ticker->addTick(tick, QString::number(tick, 'f', 4));
+    mPlot->xAxis->setTicker(ticker);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+
+    auto* grl = mPlot->gridRhiLayer();
+    QVERIFY(grl);
+    QRhiResourceUpdateBatch* batch = mPlot->rhi()->nextResourceUpdateBatch();
+    grl->uploadResources(batch, mPlot->rhiOutputSize(), float(mPlot->bufferDevicePixelRatio()),
+                         mPlot->rhi()->isYUpInNDC());
+    batch->release();
+
+    int gridGroup = -1;
+    for (int i = 0; i < grl->drawGroups().size(); ++i)
+        if (grl->drawGroups()[i].isGridLines)
+        {
+            gridGroup = i;
+            break;
+        }
+    QVERIFY(gridGroup >= 0);
+    const auto& group = grl->drawGroups()[gridGroup];
+    const auto* params = grl->lastUboParams(group.axisRect);
+    QVERIFY(params);
+    QCOMPARE(mPlot->xAxis->tickVector(), ticks);
+
+    // The default grid pen is dotted, so one line is many quads: collect where every vertex the
+    // shader will draw lands, and check it against the pixels the painter puts the same ticks on.
+    const auto& buf = grl->stagingVertices();
+    const auto shaderPixel = [&](float vx)
+    {
+        const float t
+            = (vx - params->keyRangeLower) / (params->keyRangeUpper - params->keyRangeLower);
+        return t * params->keyAxisLength + params->keyAxisOffset;
+    };
+    const auto expectedPixel = [&](double tick) { return float(mPlot->xAxis->coordToPixel(tick)); };
+    QVector<float> drawn;
+    for (int v = 0; v < group.vertexCount; ++v)
+        drawn.append(shaderPixel(buf[(group.vertexOffset + v) * 11]));
+
+    for (const double tick : ticks)
+    {
+        const float expected = expectedPixel(tick);
+        bool found = false;
+        for (const float pixel : drawn)
+            if (qAbs(pixel - expected) < 1.0f)
+                found = true;
+        QVERIFY2(found,
+                 qPrintable(QStringLiteral("no grid line on the GPU at tick %1 (%2 px)")
+                                .arg(tick, 0, 'f', 4)
+                                .arg(expected)));
+    }
+    // No vertex lands between the ticks either: snapping moves the line, it does not add one. The
+    // vertical axes of the rect draw on its edges, which no tick sits on.
+    const QRect rect = mPlot->axisRect()->rect();
+    for (const float pixel : drawn)
+    {
+        if (pixel < rect.left() + 2.0f || pixel > rect.right() - 2.0f)
+            continue;
+        bool onATick = false;
+        for (const double tick : ticks)
+            if (qAbs(pixel - expectedPixel(tick)) < 1.0f)
+                onATick = true;
+        QVERIFY2(onATick,
+                 qPrintable(QStringLiteral("a grid line at %1 px, which is no tick").arg(pixel)));
+    }
+}
+
 void TestGridRhi::noGpuLayerIsOfferedWhileExporting()
 {
     if (!showAndHasRhiGrid(mPlot))

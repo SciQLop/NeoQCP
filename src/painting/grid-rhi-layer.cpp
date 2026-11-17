@@ -40,7 +40,10 @@ void QCPGridRhiLayer::markGeometryDirty() { mGeometryDirty = true; }
 
 double QCPGridRhiLayer::axisOrigin(QCPAxis* axis) const
 {
-    return axis->scale().isLinear() ? axis->range().lower : 0.0;
+    // The shader adds the origin back to a coordinate it interpolates linearly: a linear axis's
+    // value, or a symlog axis's scale-space one. A log axis is the exception, because the shader
+    // takes its raw values and applies the log itself.
+    return axis->scale().isLog() ? 0.0 : axis->range().lower;
 }
 
 void QCPGridRhiLayer::registerAxis(QCPAxis* axis)

@@ -17,6 +17,7 @@ private slots:
     void zeroLineIsNotOverdrawnOnScreen();
     void colorScaleTicksAreDrawnOnScreen();
     void aGpuGridOnSymlogMatchesThePainterGrid();
+    void aZoomedSymlogGridKeepsTheTicksAligned();
     void thinLinesAreOneLogicalPixelOnScreen();
     void replotDoesNotCrash();
     void replotWithSubGridDoesNotCrash();
