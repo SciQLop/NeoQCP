@@ -219,6 +219,7 @@ A cursor that follows the mouse should not repaint a million-point graph. Put it
 - The `"main"` and `"overlay"` layers are buffered by default.
 - If the layer order or a layerable's layer changed since the last full replot, `QCPLayer::replot()` falls back to a full `replot()`.
 - Use it for things that change often and are cheap to draw: a cursor, items, text, a selection rectangle.
+- Each inset adds three full-viewport paint buffers: its background layer, its data layer, and the buffer its logical axes layer draws into. At 1080p with a device pixel ratio of 2 that is about 33 MB each, near 100 MB for one inset.
 
 ### Skip work while hidden
 
