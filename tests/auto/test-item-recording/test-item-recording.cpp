@@ -57,6 +57,44 @@ public:
     }
 };
 
+// An item that owns an anchor, so a follower can hang from it: the walk that a changed() slot
+// must not run inside.
+class SourceItem : public QCPItem
+{
+public:
+    QCPItemAnchor* const at
+        = createAnchor(QStringLiteral("at"), []() -> QCP::Position { return QCP::Data { 2, 3 }; });
+
+    void draw(QCPDrawContext& context) const override
+    {
+        context.rect(QCP::Data { 1, 2 }, QCP::Data { 3, 4 }, QPen(Qt::red), QBrush(Qt::red));
+    }
+};
+
+// The callout's recording: a text at its data tip and a box hung off it by a pixel offset, so the
+// recording's data range is the tip and the box's data corners, not the pixels they land on.
+class CalloutShapeItem : public QCPItem
+{
+public:
+    void draw(QCPDrawContext& context) const override
+    {
+        const QCP::Data tip { 2, 3 };
+        context.rect(tip + QCP::PixelOffset { 30, -110 }, QCP::Data { 5, 7 } + QCP::PixelOffset { 200, -50 },
+                     QPen(Qt::black), QBrush(Qt::yellow));
+        context.text(tip, QStringLiteral("a callout"), {});
+    }
+};
+
+// A box that starts at key 1, which the log rule would drop: dataRect() must not.
+class LogBoxItem : public QCPItem
+{
+public:
+    void draw(QCPDrawContext& context) const override
+    {
+        context.rect(QCP::Data { 1, 36 }, QCP::Data { 100, 39 }, QPen(Qt::black), QBrush(Qt::yellow));
+    }
+};
+
 void preparePlot(QCustomPlot& plot)
 {
     plot.resize(400, 300);
@@ -1172,4 +1210,61 @@ void TestItemRecording::dataRectOfAPositionlessItem()
     pixel->bottomRight->setCoords(80, 60);
     plot.replot();
     QVERIFY(pixel->dataRect().isEmpty());
+}
+
+
+
+void TestItemRecording::aFollowerSlotDeletingTheSourceOnChanged()
+{
+    // A slot on the follower's changed() deletes the item the walk is walking: no slot may run
+    // while markFollowersDirty() reads that item's anchors.
+    QCustomPlot plot;
+    preparePlot(plot);
+    const QCPHandle<SourceItem> source = plot.add<SourceItem>();
+    const QCPHandle<QCPItemText> follower = plot.add<QCPItemText>();
+    QVERIFY(follower->position->setParentAnchor(source->at));
+    QObject::connect(follower.get(), &QCPItem::changed, &plot, [&] { source.remove(); });
+
+    source->update();
+    QVERIFY(!source);
+    QVERIFY(static_cast<bool>(follower));
+    QCOMPARE(plot.itemCount(), 1);
+    plot.replot();
+}
+
+void TestItemRecording::aFollowerSlotDeletingThePlotOnChanged()
+{
+    auto plot = std::make_unique<QCustomPlot>();
+    preparePlot(*plot);
+    const QCPHandle<SourceItem> source = plot->add<SourceItem>();
+    const QCPHandle<QCPItemText> follower = plot->add<QCPItemText>();
+    QVERIFY(follower->position->setParentAnchor(source->at));
+    QCustomPlot* raw = plot.get();
+    QObject::connect(follower.get(), &QCPItem::changed, plot.get(), [raw] { delete raw; });
+
+    source->update();
+    plot.release();
+    QVERIFY(!source);
+    QVERIFY(!follower);
+}
+
+void TestItemRecording::aFollowerSlotDeletingAnotherFollowerOnChanged()
+{
+    // The walk has two followers: the first one's slot deletes the second, which the walk has not
+    // reached yet.
+    QCustomPlot plot;
+    preparePlot(plot);
+    const QCPHandle<SourceItem> source = plot.add<SourceItem>();
+    const QCPHandle<QCPItemText> first = plot.add<QCPItemText>();
+    const QCPHandle<QCPItemText> second = plot.add<QCPItemText>();
+    QVERIFY(first->position->setParentAnchor(source->at));
+    QVERIFY(second->position->setParentAnchor(source->at));
+    QObject::connect(first.get(), &QCPItem::changed, &plot, [&] { second.remove(); });
+
+    source->update();
+    QVERIFY(static_cast<bool>(source));
+    QVERIFY(static_cast<bool>(first));
+    QVERIFY(!second);
+    QCOMPARE(plot.itemCount(), 2);
+    plot.replot();
 }

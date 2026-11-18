@@ -2072,7 +2072,11 @@ void QCPItem::update()
     // reports): that recording is being made, and marking it now would never settle.
     if (!mCore.newGeneration())
         return;
-    const QPointer<QCPItem> alive(this);
+    // No changed() is delivered while this runs: a follower's update() emits one, and a slot that
+    // deletes this item would leave the walk reading anchors that went with it. The scope delivers
+    // every emission once the rollback has run and the walk is over; a slot may still delete the
+    // item or the plot there, and the queue drops what it can no longer deliver.
+    const QCPEmissionScope scope(mParentPlot);
     {
         QScopedValueRollback<bool> marking(mMarking, true);
         QCPLayerable::update();
@@ -2082,10 +2086,8 @@ void QCPItem::update()
             mLayer->noteItemExtentChanged(this);
         markFollowersDirty();
     }
-    // Last, once, and outside the marking scope: a slot may delete this item or the plot, and the
-    // scope's closing write would then land in freed memory. An item being torn down has nothing
-    // left to report to.
-    if (alive && !mDetachingAnchors)
+    // Last and once: an item being torn down has nothing left to report to.
+    if (!mDetachingAnchors)
         qcpEmit(this, mParentPlot, &QCPItem::changed);
 }
 
@@ -2094,20 +2096,15 @@ void QCPItem::markFollowersDirty()
     // A position that follows one of this item's anchors moves with it, whatever layer it is on.
     // A follower may belong to this very item: update() returns at once when it is already
     // marking, which is what ends the walk.
-    // A follower's own update() emits changed(), and a slot there may delete this item: the walk
-    // stops at once instead of reading anchors that went with it.
-    const QPointer<QCPItem> alive(this);
+    // A follower's own update() emits changed(), but update() holds that emission to the end of its
+    // scope, so no slot runs while this walk reads the anchors.
     for (const QCPItemAnchor* anchor : std::as_const(mAnchors))
     {
         for (QCPItemPosition* follower : anchor->mChildrenX)
             follower->mParentItem->update();
-        if (!alive)
-            return;
         for (QCPItemPosition* follower : anchor->mChildrenY)
             if (!anchor->mChildrenX.contains(follower))
                 follower->mParentItem->update();
-        if (!alive)
-            return;
     }
 }
 

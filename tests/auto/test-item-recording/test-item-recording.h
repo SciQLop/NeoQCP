@@ -49,4 +49,7 @@ private slots:
     void dataRectIsTheRecordedBox();
     void dataRectBeforeTheFirstReplot();
     void dataRectOfAPositionlessItem();
+    void aFollowerSlotDeletingTheSourceOnChanged();
+    void aFollowerSlotDeletingThePlotOnChanged();
+    void aFollowerSlotDeletingAnotherFollowerOnChanged();
 };

@@ -5959,7 +5959,13 @@ void QCustomPlot::toPainter(QCPPainter* painter, int width, int height)
 namespace qcp::detail
 {
 void removeObject(QCPPlottable& plottable) { delete &plottable; }
-void removeObject(QCPItem& item) { delete &item; }
+void removeObject(QCPItem& item)
+{
+    // Torn down inside a scope, as creation is made: detaching the anchors makes the followers
+    // report themselves, and a slot that removes this item again must find it gone, not dying.
+    const QCPEmissionScope scope(item.parentPlot().get());
+    delete &item;
+}
 void removeObject(QCPBarsGroup& group) { delete &group; }
 void removeObject(QCPPlottableGroup& group) { delete &group; }
 
