@@ -352,6 +352,8 @@ private:
     bool makeOwnLayers(const QCPAxisRect* container);
     // The topmost of an inset's own layers.
     QCPLayer* ownTopLayer() const { return mOwnLayers.axes.data(); }
+    // The topmost layer of this rect's inset subtree: its own, and those of the insets nested in it.
+    QCPLayer* subtreeTopLayer() const;
     // Where a rect's own title and colour scale go: an inset's axes layer, the plot's otherwise.
     QCPLayer* decorationLayer() const;
     void removeOwnLayers();

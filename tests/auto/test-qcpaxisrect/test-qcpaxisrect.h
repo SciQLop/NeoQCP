@@ -41,6 +41,7 @@ private slots:
   void aLegendKeepsItsPixelsOverAnInset();
   void anInsetDrawsAboveItsParentOnTheGpu();
   void theNewestInsetIsOnTop();
+  void aSecondNestedInsetIsOnTop();
   void aPlottableMovedOntoAnInsetIsDrawn();
   void anItemFollowsTheAreaItIsIn();
   void thePlotBackgroundReachesAnInset();

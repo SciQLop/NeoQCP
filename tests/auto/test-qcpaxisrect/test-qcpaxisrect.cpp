@@ -859,6 +859,30 @@ void TestQCPAxisRect::theNewestInsetIsOnTop()
 }
 
 
+void TestQCPAxisRect::aSecondNestedInsetIsOnTop()
+{
+    // Two insets made in one inset: each takes its layers above its container's whole subtree, so
+    // the newer one draws above the older instead of under it.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto container = plot.axisRect()->addInset(QRectF(0.05, 0.05, 0.9, 0.9));
+    auto first = container->addInset(QRectF(0.1, 0.1, 0.6, 0.6));
+    auto second = container->addInset(QRectF(0.35, 0.35, 0.6, 0.6));
+    first->setBackground(QBrush(Qt::red));
+    second->setBackground(QBrush(Qt::green));
+    const QImage image
+        = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+
+    const QRect overlap = first->rect().intersected(second->rect());
+    QVERIFY2(!overlap.isEmpty(), "the two nested insets overlap");
+    const QColor top = image.pixelColor(overlap.center());
+    QVERIFY2(top.green() > 150 && top.red() < 100,
+             qPrintable(QStringLiteral("the newer nested inset must be on top, found %1,%2,%3")
+                            .arg(top.red())
+                            .arg(top.green())
+                            .arg(top.blue())));
+}
+
 void TestQCPAxisRect::aPlottableMovedOntoAnInsetIsDrawn()
 {
     // A plottable moved onto an inset's axes joins the inset's layer, so its opaque background does

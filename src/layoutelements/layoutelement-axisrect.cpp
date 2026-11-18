@@ -1091,10 +1091,27 @@ QCPHandle<QCPAxisRect> QCPAxisRect::addInset(const QRectF& axisRatio)
 
 /*! \internal
 
+  The topmost layer of this rect's inset subtree: its own axes layer, or those of the insets nested
+  in it. An inset made after a nested one goes above it, not under it.
+*/
+QCPLayer* QCPAxisRect::subtreeTopLayer() const
+{
+    QCPLayer* top = ownTopLayer();
+    if (!mInsetLayout)
+        return top;
+    for (const QCPHandle<QCPLayoutElement>& child : mInsetLayout->elements(false))
+        if (const auto* rect = qobject_cast<const QCPAxisRect*>(child.get()))
+            if (QCPLayer* nested = rect->subtreeTopLayer(); nested && (!top || nested->index() > top->index()))
+                top = nested;
+    return top;
+}
+
+/*! \internal
+
   Gives an inset three layers: its background and grids, its plottables and items, its axes. They
   sit above every inset's layers, so a newer inset draws on top of the older ones; an inset of an
-  inset takes its layers above its parent's only, so it stays inside the parent's stack instead of
-  jumping over the insets made after that parent. The background and data layers are buffered, so
+  inset takes its layers above its parent's whole subtree, so it stays inside the parent's stack
+  instead of jumping over the insets made after that parent. The background and data layers are buffered, so
   the render loop composites each one where it lands: the inset's GPU lines stay above its
   background. The rect, its grids and its axes move there now; what is added to it later goes to
   the middle one.
@@ -1102,10 +1119,10 @@ QCPHandle<QCPAxisRect> QCPAxisRect::addInset(const QRectF& axisRatio)
 bool QCPAxisRect::makeOwnLayers(const QCPAxisRect* container)
 {
     QCP_CHECK_OR_RETURN(mParentPlot, "an inset needs a plot for its layers", false);
-    QCPLayer* below = container ? container->ownTopLayer() : nullptr;
+    QCPLayer* below = container ? container->subtreeTopLayer() : nullptr;
     if (!below)
         for (QCPAxisRect* rect : mParentPlot->axisRectsRaw())
-            if (QCPLayer* top = rect->ownTopLayer(); top && (!below || top->index() > below->index()))
+            if (QCPLayer* top = rect->subtreeTopLayer(); top && (!below || top->index() > below->index()))
                 below = top;
     if (!below)
         below = mParentPlot->layer(QLatin1String("axes")).get();
