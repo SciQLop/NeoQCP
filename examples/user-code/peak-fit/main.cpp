@@ -1,6 +1,7 @@
 // Target program (milestone 6): a peak-fit editor over two panels sharing x.
 
 #include <qcustomplot.h>
+
 #include <QApplication>
 
 #include <algorithm>

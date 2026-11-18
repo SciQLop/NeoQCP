@@ -610,8 +610,9 @@ that no section above lists, and the behaviour changes of 5f.
 
 ### Behaviour changes
 
-- Keys arrive as the plot's signals before any built-in handling, and the plot ignores what it offers: a slot that
-  accepts decides whether `Delete` reaches the selected items and whether the key goes on to the parent widget.
+- Keys arrive as the plot's signals before the plot's own Delete handling (a rubber band or item creation in
+  progress takes Escape first), and the plot ignores what it offers: a slot that accepts decides whether `Delete`
+  reaches the selected items and whether the key goes on to the parent widget.
   The default focus policy is `Qt::StrongFocus`, so the plot takes focus on Tab as well as on a click.
 - An `item->changed()` that a slot sees may come from a delete: an item anchored to a deleted item emits it before
   that delete returns.

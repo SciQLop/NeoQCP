@@ -25,6 +25,7 @@ private slots:
   void keysReachASlot();
   void theFocusPolicyIsStrong();
   void anAcceptedKeyStopsTheDeleteRequest();
+  void anIgnoredKeyReachesTheParentWidget();
   void aSlotDeletingThePlotOnKeyPress();
   void moveSlotReplacingTheSelectionRectIsSafe();
   void cancelSlotReplacingTheSelectionRectIsSafe();

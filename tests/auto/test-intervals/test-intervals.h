@@ -116,6 +116,7 @@ private slots:
     void escapeCancelsTheGesture();
     void keysAreNotConsumedWhenNotEditable();
     void keysFollowThePlottableToAnotherPlot();
+    void aTakenPlottableTakesNoKeysFromThePlotItLeft();
 
     void setDataDropsSelectionOfVanishedIds();
     void setDataSelectionFollowsTheId();

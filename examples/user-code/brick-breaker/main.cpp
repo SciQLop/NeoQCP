@@ -1,9 +1,10 @@
 // Target program (milestone 6): a brick breaker, collisions in data units.
 
+#include <qcustomplot.h>
+
 #include <QApplication>
 #include <QKeyEvent>
 #include <QTimer>
-#include <qcustomplot.h>
 
 #include <algorithm>
 #include <cmath>

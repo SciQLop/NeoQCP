@@ -1162,6 +1162,30 @@ void TestIntervals::keysFollowThePlottableToAnotherPlot()
     QVERIFY(fresh.isAccepted());
 }
 
+// A plottable taken out of a plot and kept aside hears none of its keys any more: its selection
+// and edit modes survive the take, but the plot's Delete is for what is still in the plot.
+void TestIntervals::aTakenPlottableTakesNoKeysFromThePlotItLeft()
+{
+    qRegisterMetaType<QVector<qint64>>();
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emDelete);
+    iv->setSelectedRows({ 1 });
+    QSignalSpy taken(iv, &QCPIntervals::deleteRequested);
+    auto line = mPlot->add<QCPItemLine>();
+    line->setSelected(true);
+    QSignalSpy item(line.get(), &QCPItem::deleteRequested);
+
+    auto keep = mPlot->take(QCPHandle<QCPIntervals>(iv));
+    QVERIFY(keep != nullptr);
+    QVERIFY(iv->selected());
+
+    QKeyEvent del(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
+    QApplication::sendEvent(mPlot, &del);
+    QCOMPARE(taken.count(), 0);
+    QCOMPARE(item.count(), 1);
+    QVERIFY(!del.isAccepted());
+}
+
 void TestIntervals::keysAreNotConsumedWhenNotEditable()
 {
     QCPLaneLayout layout;

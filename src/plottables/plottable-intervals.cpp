@@ -836,7 +836,9 @@ void QCPIntervals::emitEdits(const std::vector<qcp::intervals::Edit>& edits)
 
 void QCPIntervals::handleKeyPress(QKeyEvent* event)
 {
-    if (!realVisibility())
+    // A plottable taken out of its plot stays connected to it until it arrives in another one: the
+    // keys of a plot it is no longer in are not its own.
+    if (!mParentPlot || !realVisibility())
         return;
     if (event->key() == Qt::Key_Escape && (mGesture || mRubberBand))
     {

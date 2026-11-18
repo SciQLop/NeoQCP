@@ -407,6 +407,45 @@ void TestQCustomPlot::anAcceptedKeyStopsTheDeleteRequest()
 }
 
 namespace {
+class KeyCountingWidget : public QWidget
+{
+public:
+  int presses = 0;
+
+protected:
+  void keyPressEvent(QKeyEvent* event) override
+  {
+    ++presses;
+    QWidget::keyPressEvent(event);
+  }
+};
+} // namespace
+
+// The docs promise the plot leaves a key it does not take to its parent widget.
+void TestQCustomPlot::anIgnoredKeyReachesTheParentWidget()
+{
+  KeyCountingWidget parent;
+  auto* plot = new QCustomPlot(&parent);
+  layOut(plot, QCP::Interactions());
+  bool consuming = true;
+  connect(plot, &QCustomPlot::keyPress, plot, [&consuming](QKeyEvent* event)
+          {
+            if (consuming)
+              event->accept();
+          });
+
+  QKeyEvent taken(QEvent::KeyPress, Qt::Key_A, Qt::NoModifier);
+  QCoreApplication::sendEvent(plot, &taken);
+  QCOMPARE(parent.presses, 0);
+
+  consuming = false;
+  QKeyEvent left(QEvent::KeyPress, Qt::Key_A, Qt::NoModifier);
+  QCoreApplication::sendEvent(plot, &left);
+  QCOMPARE(parent.presses, 1);
+  QVERIFY(!left.isAccepted());
+}
+
+namespace {
 void startRubberBand(QCustomPlot* plot)
 {
   layOut(plot, QCP::Interactions());

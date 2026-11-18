@@ -40,5 +40,5 @@ matplotlib count is the gallery code that draws the same picture, its imports in
 | `fill-between/` | 29 | 29 | 14 | the frame; 7 lines for the Up/Down keys that show the fill following (not in matplotlib) |
 | `spectrogram/` | 71 | 33 | 20 | 27 lines are the DFT that matplotlib's `specgram` computes; the plot itself is 15 lines |
 | `annotations/` | 66 | 51 | 35 | a 14-row table, one line per style; the spare cell's text annotation (8 lines, not in matplotlib); hiding the four axes' grid |
-| `brick-breaker/` | 157 | 105 | — | no matplotlib program draws this; against the sketch, the 46 extra lines are the three item classes with their `draw()` calls, and the 72 bricks in one loop |
+| `brick-breaker/` | 150 | 105 | — | no matplotlib program draws this; against the sketch, the 45 extra lines are the three item classes with their `draw()` calls, and the 72 bricks in one loop |
 | `asteroids/` | 212 | 135 | — | no matplotlib program draws this; against the sketch, `Sprites` and `Hud` are the typed classes, and held keys need the plot's `keyPress`/`keyRelease` signals |

@@ -1147,64 +1147,7 @@ QImage peakFitScene()
 
 namespace
 {
-// The brick-breaker target's own rules and items, copied: the picture is the example's first frame.
-struct Breakout
-{
-    QPointF ball { 50, 6 };
-    QPointF velocity;
-    double radius = 1.0;
-    int lives = 3;
-    int score = 0;
-    bool waiting = true;
-
-    QRectF ballRect() const
-    {
-        return { ball - QPointF(radius, radius), QSizeF(2 * radius, 2 * radius) };
-    }
-
-    void launch()
-    {
-        if (!waiting || lives == 0)
-            return;
-        velocity = { 18, 40 };
-        waiting = false;
-    }
-
-    void step(double dt, double paddleCentre)
-    {
-        if (waiting)
-        {
-            ball = { paddleCentre, 6 };
-            return;
-        }
-        ball += dt * velocity;
-        if (ball.x() < radius || ball.x() > 100 - radius)
-            velocity.setX(-velocity.x());
-        if (ball.y() > 60 - radius)
-            velocity.setY(-std::abs(velocity.y()));
-        if (ball.y() < 0)
-        {
-            --lives;
-            waiting = true;
-        }
-    }
-
-    void bounceOff(const QRectF& box)
-    {
-        const QRectF overlap = ballRect().intersected(box);
-        const QPointF away = ball - box.center();
-        if (overlap.width() < overlap.height())
-            velocity.setX(std::copysign(velocity.x(), away.x()));
-        else
-            velocity.setY(std::copysign(velocity.y(), away.y()));
-    }
-
-    void bounceOffPaddle(const QRectF& paddle)
-    {
-        velocity = { 4 * (ball.x() - paddle.center().x()), std::abs(velocity.y()) };
-    }
-};
-
+// The brick-breaker target's items, copied: the picture is the example's first frame.
 class Brick : public QCPItem
 {
 public:
@@ -1245,25 +1188,11 @@ private:
 
 class Paddle : public QCPItem
 {
-public:
-    double centre() const { return mCentre; }
-
 protected:
     void draw(QCPDrawContext& context) const override
     {
-        context.rect(QRectF(mCentre - 7, 2, 14, 1.5), Qt::NoPen, QColor(90, 200, 255));
+        context.rect(QRectF(43, 2, 14, 1.5), Qt::NoPen, QColor(90, 200, 255));
     }
-
-    void mousePressEvent(QCPMouseEvent* event) override { event->accept(); }
-
-    void mouseMoveEvent(QCPMouseEvent* event) override
-    {
-        mCentre = std::clamp(event->data().x, 7.0, 93.0);
-        update();
-    }
-
-private:
-    double mCentre = 50;
 };
 
 QImage brickBreakerScene()
@@ -1272,7 +1201,6 @@ QImage brickBreakerScene()
     targetPlot(plot, 800, 520);
     plot.setBackground(QColor(20, 20, 30));
 
-    Breakout game;
     auto ax = plot.axisRect();
     ax->xAxis()->setRange(0, 100);
     ax->yAxis()->setRange(0, 60);
@@ -1283,7 +1211,7 @@ QImage brickBreakerScene()
             ax->add<Brick>(QRectF(column * 100.0 / 12, 36 + row * 3, 100.0 / 12, 3),
                            QColor::fromHsv(row * 50, 160, 230));
     ax->add<Paddle>();
-    ax->add<Ball>(game.radius)->setCentre(game.ball);
+    ax->add<Ball>(1.0)->setCentre(QPointF(50, 6));
 
     plot.replot();
     return plot.toPixmap(800, 520).toImage().convertToFormat(QImage::Format_ARGB32);

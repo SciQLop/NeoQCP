@@ -5000,14 +5000,8 @@ void QCustomPlot::keyPressEvent(QKeyEvent* event)
         return;
     }
 
-    event->ignore(); // the plot hands the key to its parent, unless a slot takes it
-    const QPointer<QCustomPlot> alive(this);
-    {
-        // Delivered before the built-in handling below, so that a slot accepting the key stops it.
-        const QCPEmissionScope scope(this, QCPEmissionScope::Kind::Event);
-        deliver(this, [this, event] { emit keyPress(event); });
-    }
-    if (!alive)
+    // Delivered before the built-in handling below, so that a slot accepting the key stops it.
+    if (!offerKey(event, &QCustomPlot::keyPress))
         return;
     if (event->isAccepted())
         return;
@@ -5030,15 +5024,26 @@ void QCustomPlot::keyPressEvent(QKeyEvent* event)
 */
 void QCustomPlot::keyReleaseEvent(QKeyEvent* event)
 {
-    event->ignore();
+    if (!offerKey(event, &QCustomPlot::keyRelease))
+        return;
+    QRhiWidget::keyReleaseEvent(event);
+}
+
+/*! \internal
+
+  Offers \a event to the slots of one of the key signals, \a signal. The scope flushes as it closes,
+  so the slot runs before the caller goes on and its accept() is already known. Returns false when a
+  slot deleted the plot: the event is accepted on the dead widget's behalf by the outer scope.
+*/
+bool QCustomPlot::offerKey(QKeyEvent* event, void (QCustomPlot::*signal)(QKeyEvent*))
+{
+    event->ignore(); // the plot hands the key to its parent, unless a slot takes it
     const QPointer<QCustomPlot> alive(this);
     {
         const QCPEmissionScope scope(this, QCPEmissionScope::Kind::Event);
-        deliver(this, [this, event] { emit keyRelease(event); });
+        deliver(this, [this, event, signal] { (this->*signal)(event); });
     }
-    if (!alive)
-        return;
-    QRhiWidget::keyReleaseEvent(event);
+    return bool(alive);
 }
 
 /*! \internal

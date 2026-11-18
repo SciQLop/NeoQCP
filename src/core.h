@@ -762,6 +762,7 @@ protected:
     virtual bool event(QEvent* event) override;
     bool handleInScope(QEvent* event);
     bool handleEvent(QEvent* event);
+    bool offerKey(QKeyEvent* event, void (QCustomPlot::*signal)(QKeyEvent*));
 
     // introduced methods:
     struct AntialiasingState
