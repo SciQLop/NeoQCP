@@ -36,6 +36,8 @@ private slots:
   void aClickSelectsTheBarUnderTheCursor();
   void barsOnTheKeyBoundEdgeAreHit_data();
   void barsOnTheKeyBoundEdgeAreHit();
+  void aBarFitKeepsTheBaselineOnTheAxis();
+  void aNegativeBarFitKeepsZeroOnTheAxis();
   
 private:
   QCustomPlot *mPlot;

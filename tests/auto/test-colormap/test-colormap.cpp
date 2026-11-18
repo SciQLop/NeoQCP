@@ -2108,3 +2108,39 @@ void TestColorMap::QCPColorMap2_aChosenGradientSurvivesTheRectsScale()
   QVERIFY(plain);
   QVERIFY(plain->gradient() == QCPColorGradient(QCPColorGradient::gpGrayscale));
 }
+void TestColorMap::aColourMapFitLeavesNoMarginOnAnySide()
+{
+    // An image's edges are sticky, as matplotlib has them: the fit must not leave a blank band
+    // around the map, which would show as an empty stripe above and below the image.
+    mColorMap->data()->setSize(2, 2);
+    mColorMap->data()->setCell(0, 0, 1);
+    mColorMap->data()->setCell(1, 1, 4);
+    mColorMap->data()->recalculateDataBounds();
+    mColorMap->data()->setRange(QCPRange(2, 8), QCPRange(100, 200));
+
+    mPlot->xAxis->rescale();
+    mPlot->yAxis->rescale();
+
+    QCOMPARE(mPlot->xAxis->range(), QCPRange(2, 8));
+    QCOMPARE(mPlot->yAxis->range(), QCPRange(100, 200));
+}
+
+void TestColorMap::aColourMapFitLeavesTheMarginOnTheSideAGraphReaches()
+{
+    // The map's edges stay on the axis, but a graph sticking out past them still gets its margin:
+    // the fit is not pinned to the map on that side.
+    mColorMap->data()->setSize(2, 2);
+    mColorMap->data()->setCell(0, 0, 1);
+    mColorMap->data()->setCell(1, 1, 4);
+    mColorMap->data()->recalculateDataBounds();
+    mColorMap->data()->setRange(QCPRange(2, 8), QCPRange(100, 200));
+
+    QCPGraph* graph = mPlot->addGraph();
+    graph->setData({ 2.0, 8.0 }, { 150.0, 300.0 });
+
+    mPlot->yAxis->rescale();
+
+    // 5 % of the fitted span (100..300) above the graph, and the map's bottom edge on the axis.
+    QCOMPARE(mPlot->yAxis->range().lower, 100.0);
+    QCOMPARE(mPlot->yAxis->range().upper, 310.0);
+}

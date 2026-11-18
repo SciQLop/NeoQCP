@@ -956,3 +956,27 @@ void TestQCPBars::aClickSelectsTheBarUnderTheCursor()
     QCOMPARE(bars->selection().dataRangeCount(), 1);
     QCOMPARE(bars->selection().dataRange(0), QCPDataRange(3, 4));
 }
+
+void TestQCPBars::aBarFitKeepsTheBaselineOnTheAxis()
+{
+  // Bars start on the axis, as in matplotlib: the fit leaves the margin above the tallest bar and
+  // none below the baseline.
+  mBars->setData({1.0, 2.0, 3.0}, {2.0, 5.0, 10.0});
+
+  mPlot->yAxis->rescale();
+
+  QCOMPARE(mPlot->yAxis->range().lower, 0.0);
+  QCOMPARE(mPlot->yAxis->range().upper, 10.5);
+}
+
+void TestQCPBars::aNegativeBarFitKeepsZeroOnTheAxis()
+{
+  // A negative bar chart hangs from the baseline: no margin above zero, the margin below the
+  // lowest bar.
+  mBars->setData({1.0, 2.0, 3.0}, {-2.0, -5.0, -10.0});
+
+  mPlot->yAxis->rescale();
+
+  QCOMPARE(mPlot->yAxis->range().upper, 0.0);
+  QCOMPARE(mPlot->yAxis->range().lower, -10.5);
+}

@@ -192,7 +192,10 @@ public:
     // non-property methods:
 protected:
     // The angular axis keeps its full turn: it has no data range to fit.
-    bool ownDataRange(bool, QCP::SignDomain, QCPRange&) const override { return false; }
+    bool ownDataRange(bool, QCP::SignDomain, QCPRange&, std::optional<QCPRange>&) const override
+    {
+        return false;
+    }
 
 public:
     double coordToAngleRad(double coord) const

@@ -1206,7 +1206,8 @@ void QCPPlottable::rescaleKeyAxis(bool onlyEnlarge) const
     const QCPRange newRange = getKeyRange(foundRange, signDomain);
     if (foundRange)
         keyAxis->setRange(qcp::fittedRange(keyAxis->scale(), newRange, keyAxis->range(),
-                                           keyAxis->rescaleMargin(), onlyEnlarge));
+                                           keyAxis->rescaleMargin(), onlyEnlarge,
+                                           stickyValues(QCPDrawnSide::Key)));
 }
 
 /*!
@@ -1237,7 +1238,22 @@ void QCPPlottable::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) const
                                             inKeyRange && keyAxis ? keyAxis->range() : QCPRange());
     if (foundRange)
         valueAxis->setRange(qcp::fittedRange(valueAxis->scale(), newRange, valueAxis->range(),
-                                             valueAxis->rescaleMargin(), onlyEnlarge));
+                                             valueAxis->rescaleMargin(), onlyEnlarge,
+                                             stickyValues(QCPDrawnSide::Value)));
+}
+
+std::optional<QCPRange> QCPPlottable::stickyValues(QCPDrawnSide side) const
+{
+    Q_UNUSED(side);
+    return std::nullopt;
+}
+
+std::optional<QCPRange> QCPPlottable::stickyDataRange(QCPDrawnSide side) const
+{
+    bool foundRange = false;
+    const QCPRange range = side == QCPDrawnSide::Key ? getKeyRange(foundRange)
+                                                     : getValueRange(foundRange);
+    return foundRange ? std::optional<QCPRange>(range) : std::nullopt;
 }
 
 /*! \overload

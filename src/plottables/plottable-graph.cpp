@@ -1495,7 +1495,21 @@ QCPRange QCPGraph::getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
             foundRange = true;
         }
     }
+    if (foundRange && mLineStyle == lsImpulse) {
+        // An impulse stem is drawn from the baseline, so the fit has to hold the baseline too.
+        const double impulseBaseline = dataSpaceBaseline();
+        lower = qMin(lower, impulseBaseline);
+        upper = qMax(upper, impulseBaseline);
+    }
     return foundRange ? QCPRange(lower, upper) : QCPRange();
+}
+
+std::optional<QCPRange> QCPGraph::stickyValues(QCPDrawnSide side) const
+{
+    // The stem of an impulse starts on the baseline, so the fit keeps the baseline on the axis.
+    if (side != QCPDrawnSide::Value || mLineStyle != lsImpulse) return std::nullopt;
+    const double impulseBaseline = dataSpaceBaseline();
+    return QCPRange(impulseBaseline, impulseBaseline);
 }
 
 // --- Selection ---

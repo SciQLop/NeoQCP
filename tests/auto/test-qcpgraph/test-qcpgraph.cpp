@@ -178,3 +178,20 @@ void TestQCPGraph::aTangentBracketPrintsNothing()
   QVERIFY(!picture.boundingRect().isEmpty());
   QCOMPARE(gDebugMessages, 0);
 }
+
+void TestQCPGraph::anImpulseGraphFitsItsBaseline()
+{
+  // A stem is drawn from value zero, so the fit has to include zero: the stems start on the axis,
+  // as a bar chart does, and the margin goes above the tallest stem.
+  mGraph->setLineStyle(QCPGraph::lsImpulse);
+  mGraph->setData({1.0, 2.0, 3.0}, {2.0, 6.0, 10.0});
+
+  mPlot->yAxis->rescale();
+  QCOMPARE(mPlot->yAxis->range().lower, 0.0);
+  QCOMPARE(mPlot->yAxis->range().upper, 10.5);
+
+  mPlot->yAxis->setRange(0, 20);
+  mGraph->rescaleValueAxis();
+  QCOMPARE(mPlot->yAxis->range().lower, 0.0);
+  QCOMPARE(mPlot->yAxis->range().upper, 10.5);
+}

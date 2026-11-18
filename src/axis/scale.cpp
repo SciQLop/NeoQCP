@@ -155,10 +155,29 @@ QCPRange QCPScale::widened(const QCPRange& range, double fraction) const
     return QCPRange(sign * fromScale(lower - delta), sign * fromScale(upper + delta));
 }
 
+namespace
+{
+//! matplotlib's sticky edges: a bound the widening pushed past a sticky value goes back to it.
+QCPRange clampedToSticky(const QCPRange& range, const QCPRange& fitted, const QCPRange& sticky)
+{
+    QCPRange clamped = range;
+    for (const double value : {sticky.lower, sticky.upper})
+    {
+        if (clamped.lower < value && value <= fitted.lower)
+            clamped.lower = value;
+        if (clamped.upper > value && value >= fitted.upper)
+            clamped.upper = value;
+    }
+    return clamped;
+}
+} // namespace
+
 QCPRange qcp::fittedRange(const QCPScale& scale, const QCPRange& fitted, const QCPRange& current,
-                          double margin, bool onlyEnlarge)
+                          double margin, bool onlyEnlarge, const std::optional<QCPRange>& sticky)
 {
     QCPRange range = scale.widened(fitted, margin);
+    if (sticky)
+        range = clampedToSticky(range, fitted, *sticky);
     if (onlyEnlarge)
         range.expand(current);
     if (QCPRange::validRange(range))
@@ -170,4 +189,14 @@ QCPRange qcp::fittedRange(const QCPScale& scale, const QCPRange& fitted, const Q
     // Log: the same ratio on both sides of the centre, so the range keeps its sign.
     return QCPRange(center / qSqrt(current.upper / current.lower),
                     center * qSqrt(current.upper / current.lower));
+}
+
+std::optional<QCPRange> qcp::stickyUnion(std::optional<QCPRange> sticky,
+                                         const std::optional<QCPRange>& more)
+{
+    if (!sticky)
+        return more;
+    if (more)
+        sticky->expand(*more);
+    return sticky;
 }

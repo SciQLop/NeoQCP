@@ -132,6 +132,11 @@ public Q_SLOTS:
     QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
     QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override;
+    //! An image's four edges are sticky: a fit of the map alone leaves no blank band around it.
+    std::optional<QCPRange> stickyValues(QCPDrawnSide side) const override
+    {
+        return stickyDataRange(side);
+    }
 
 signals:
     void gapThresholdChanged(double gapThreshold);

@@ -3,6 +3,7 @@
 
 #include "../global.h"
 #include "range.h"
+#include <optional>
 
 /*!
   The mapping an axis, a colour scale or a plottable's data applies: linear, log or symlog.
@@ -116,14 +117,23 @@ namespace qcp
 {
 /*!
   The range an axis shows after a fit of \a fitted: widened by \a margin of its span in \a scale's
-  own space, unioned with \a current when \a onlyEnlarge, and, when the fit is not usable (constant
-  data leaves a zero span), \a current recentred on it instead.
+  own space, clamped to the \a sticky values the plottables of the fit report, unioned with \a
+  current when \a onlyEnlarge, and, when the fit is not usable (constant data leaves a zero span),
+  \a current recentred on it instead.
+
+  A sticky value takes no margin: a bound the widening pushed past one goes back to it, so a colour
+  map keeps its edges on the axis and a bar its baseline (matplotlib's sticky edges).
 
   The one place a fit that is not exact is computed: QCPAxisBase::rescaleTo and the plottable
   rescale functions both end here.
 */
 QCP_LIB_DECL QCPRange fittedRange(const QCPScale& scale, const QCPRange& fitted,
-                                  const QCPRange& current, double margin, bool onlyEnlarge = false);
+                                  const QCPRange& current, double margin, bool onlyEnlarge = false,
+                                  const std::optional<QCPRange>& sticky = std::nullopt);
+
+//! \a sticky and \a more together, either possibly empty: the sticky values of one fit.
+QCP_LIB_DECL std::optional<QCPRange> stickyUnion(std::optional<QCPRange> sticky,
+                                                 const std::optional<QCPRange>& more);
 } // namespace qcp
 
 #endif // QCP_SCALE_H

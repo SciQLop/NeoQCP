@@ -291,6 +291,8 @@ public:
     QCPRange getValueRange(bool& foundRange,
                            QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override;
+    //! An impulse graph's stems stand on its baseline: the fit pushes no margin past it.
+    std::optional<QCPRange> stickyValues(QCPDrawnSide side) const override;
 
     // Legend
     using QCPPlottable::addToLegend;

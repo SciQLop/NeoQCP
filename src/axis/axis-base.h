@@ -36,6 +36,7 @@
 #include <QSharedPointer>
 #include <functional>
 #include <memory>
+#include <optional>
 
 class QCPPlottable;
 class QCPArea;
@@ -288,14 +289,17 @@ protected:
     // The plottables raw: rescale() walks them per axis, so it reads this one (K8).
     QList<QCPPlottable*> plottablesRaw() const;
 
-    // The tail of rescale(): stores the fitted \a range widened by \a margin, or, when it is not
-    // usable (a constant plottable has a zero-size range), recentres the current range on it.
-    void rescaleTo(const QCPRange& range, bool haveRange, double margin);
+    // The tail of rescale(): stores the fitted \a range widened by \a margin and clamped to the
+    // \a sticky values of the fit, or, when it is not usable (a constant plottable has a zero-size
+    // range), recentres the current range on it.
+    void rescaleTo(const QCPRange& range, bool haveRange, double margin,
+                   const std::optional<QCPRange>& sticky = std::nullopt);
     // This axis' own data range under signDomain, from its plottables; false when it has none. The
     // drawn data ranges here; a cartesian axis uses its plottables' key and value ranges, and the
-    // angular axis has none (it keeps its full turn).
+    // angular axis has none (it keeps its full turn). \a sticky collects the values of the fitted
+    // plottables that take no margin on this side.
     virtual bool ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signDomain,
-                              QCPRange& range) const;
+                              QCPRange& range, std::optional<QCPRange>& sticky) const;
 
     // Takes the source's range, its direction included, through the link's forward function.
     void refreshFromLink();

@@ -74,6 +74,8 @@ private slots:
   void aPanDoesNotRebuildTheImage();
   void exportMatchesTheOldCode();
   void theHotCellLandsInItsCornerOnEveryAxisLayout();
+  void aColourMapFitLeavesNoMarginOnAnySide();
+  void aColourMapFitLeavesTheMarginOnTheSideAGraphReaches();
 
 private:
   QCustomPlot *mPlot;

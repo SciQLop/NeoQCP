@@ -534,11 +534,12 @@ void QCPAxisBase::rescale(bool onlyVisiblePlottables, double margin)
         ? (target->mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive)
         : QCP::sdBoth;
     QCPRange unionRange;
+    std::optional<QCPRange> sticky;
     bool haveRange = false;
     const auto include = [&](const QCPAxisBase* axis)
     {
         QCPRange range;
-        if (!axis->ownDataRange(onlyVisiblePlottables, signDomain, range))
+        if (!axis->ownDataRange(onlyVisiblePlottables, signDomain, range, sticky))
             return;
         if (haveRange)
             unionRange.expand(range);
@@ -550,7 +551,7 @@ void QCPAxisBase::rescale(bool onlyVisiblePlottables, double margin)
     for (const QPointer<QCPAxisBase>& user : target->mLinkedAxes)
         if (user && user->isIdentityFollower())
             include(user.data());
-    target->rescaleTo(unionRange, haveRange, margin);
+    target->rescaleTo(unionRange, haveRange, margin, sticky);
 }
 
 QList<QCPAxisBase*> QCPAxisBase::identityFollowers() const
@@ -582,7 +583,7 @@ bool QCPAxisBase::isIdentityFollower() const
   own dimension.
 */
 bool QCPAxisBase::ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signDomain,
-                               QCPRange& range) const
+                               QCPRange& range, std::optional<QCPRange>& sticky) const
 {
     bool haveRange = false;
     // Through the virtual list: a user axis that drops a plottable must be honoured (M1).
@@ -606,21 +607,24 @@ bool QCPAxisBase::ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signD
         else
             range = found;
         haveRange = true;
+        sticky = qcp::stickyUnion(sticky, plottable->stickyValues(side));
     }
     return haveRange;
 }
 
 /*! \internal
 
-  The tail of rescale(): stores the fitted \a range, widened by \a margin on each side (see
-  qcp::fittedRange). A range that is not usable (the plottables are constant in this dimension)
-  recentres the current range on it instead, in the axis' own scale.
+  The tail of rescale(): stores the fitted \a range, widened by \a margin on each side and clamped
+  to the \a sticky values of the fit (see qcp::fittedRange). A range that is not usable (the
+  plottables are constant in this dimension) recentres the current range on it instead, in the
+  axis' own scale.
 */
-void QCPAxisBase::rescaleTo(const QCPRange& range, bool haveRange, double margin)
+void QCPAxisBase::rescaleTo(const QCPRange& range, bool haveRange, double margin,
+                            const std::optional<QCPRange>& sticky)
 {
     if (!haveRange)
         return;
-    setRange(qcp::fittedRange(mScale, range, mRange, margin));
+    setRange(qcp::fittedRange(mScale, range, mRange, margin, false, sticky));
 }
 
 /*!
