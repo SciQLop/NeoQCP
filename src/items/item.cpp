@@ -1671,6 +1671,10 @@ void QCPItem::mousePressEvent(QMouseEvent* event, const QVariant& details)
 
   A move of a drag the item accepted. The part is the press's: what the mouse passes over during a
   drag changes nothing. \a startPos is the plot's press position, kept for the 2.x signature.
+
+  lastPixels() is the previous event of the drag (the press for the first move), not the press: a
+  handler that moves something must anchor it to the pixels it saw at the press, so that several
+  moves land on the whole offset and not on the last step.
 */
 void QCPItem::mouseMoveEvent(QMouseEvent* event, [[maybe_unused]] const QPointF& startPos)
 {
