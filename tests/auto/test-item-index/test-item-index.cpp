@@ -619,7 +619,7 @@ void TestItemIndex::aDataExtentDoesNotBuildATransform()
     item->end->setCoords(3, 4);
 
     system.mCalls = 0;
-    item->indexExtent();
+    static_cast<const QCPItem*>(item)->indexExtent();
     QCOMPARE(system.mCalls, 0);
 }
 

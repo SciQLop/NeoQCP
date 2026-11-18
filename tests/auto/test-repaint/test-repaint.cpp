@@ -2245,7 +2245,7 @@ void TestRepaint::itemExtentContainsDrawing()
     };
 
     waitUntilSettled(*plot);
-    const std::optional<QCPItemExtent> extent = subject->indexExtent();
+    const std::optional<QCPItemExtent> extent = static_cast<const QCPItem*>(subject)->indexExtent();
     QVERIFY2(extent.has_value(), "the item reports no data extent");
     const QRectF bounds = extentPixelRect(*extent);
     const QImage painted = screenOf(plot.get());
@@ -2270,7 +2270,7 @@ void TestRepaint::itemExtentContainsDrawing()
     subject->setVisible(true);
     subject->setSelected(true);
     waitUntilSettled(*plot);
-    const std::optional<QCPItemExtent> selectedExtent = subject->indexExtent();
+    const std::optional<QCPItemExtent> selectedExtent = static_cast<const QCPItem*>(subject)->indexExtent();
     QVERIFY2(selectedExtent.has_value(), "the selected item reports no data extent");
     const QRectF selectedBounds = extentPixelRect(*selectedExtent);
     const QImage selected = screenOf(plot.get());
@@ -2437,7 +2437,7 @@ void TestRepaint::userItemWithoutBoundsIsNeverCulled()
     plain->mCentre = QPointF(plot->xAxis->coordToPixel(4), plot->yAxis->coordToPixel(4));
     waitUntilSettled(*plot);
     QVERIFY2(plain->mDrawCalls > 0, "the item was never drawn");
-    QVERIFY(!plain->indexExtent().has_value());
+    QVERIFY(!static_cast<const QCPItem*>(plain)->indexExtent().has_value());
 
     plot->layerableListAt(plain->mCentre, true);
     QVERIFY2(plain->mSelectCalls > 0, "an item without a data extent was culled from hit testing");

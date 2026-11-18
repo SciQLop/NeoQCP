@@ -72,8 +72,6 @@ public:
     // reimplemented virtual methods:
     void draw(QCPDrawContext& context) const override;
 
-    // what the layer's index needs; see QCPItem::indexExtent()
-    [[nodiscard]] std::optional<QCPItemExtent> indexExtent() const override;
 
     QCPItemPosition* const topLeft;
     QCPItemPosition* const bottomRight;
@@ -91,6 +89,8 @@ signals:
     void selectedBrushChanged(const QBrush& selectedBrush);
 
 protected:
+    // The layer's spatial index asks this; where the data itself is, dataRect() answers.
+    [[nodiscard]] std::optional<QCPItemExtent> indexExtent() const override;
     // property members:
     QPen mPen, mSelectedPen;
     QBrush mBrush, mSelectedBrush;

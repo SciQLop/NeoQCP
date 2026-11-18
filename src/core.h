@@ -369,7 +369,7 @@ public:
     // Whether a layer culls its items through its spatial index (default true). Off: every item is
     // drawn and hit tested, which is what the randomized tests compare against. Items opt out
     // themselves by returning no data extent.
-    /*! Sets whether layers use the item index (see QCPItem::dataExtent()).
+    /*! Sets whether layers use the item index (see QCPItem::indexExtent()).
 
   On (the default) each layer keeps a packed R-tree of its items' data boxes and skips the ones whose
   extents miss the queried pixel area, for drawing and for hit testing. Off, every item is drawn and

@@ -71,8 +71,6 @@ public:
     // reimplemented virtual methods:
     void draw(QCPDrawContext& context) const override;
 
-    // what the layer's index needs; see QCPItem::indexExtent()
-    [[nodiscard]] std::optional<QCPItemExtent> indexExtent() const override;
 
     QCPItemPosition* const start;
     QCPItemPosition* const end;
@@ -84,6 +82,8 @@ signals:
     void tailChanged(const QCPLineEnding& tail);
 
 protected:
+    // The layer's spatial index asks this; where the data itself is, dataRect() answers.
+    [[nodiscard]] std::optional<QCPItemExtent> indexExtent() const override;
     // property members:
     QPen mPen, mSelectedPen;
     QCPLineEnding mHead, mTail;

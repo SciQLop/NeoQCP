@@ -163,7 +163,7 @@ public:
     //! A new generation. False, and one misuse report, when called from inside draw().
     bool newGeneration();
 
-    //! What the object occupies, from the recording: QCPItem::dataExtent's two rules.
+    //! What the object occupies, from the recording: QCPItem::indexExtent's two rules.
     //! With \a applyLogRule false, a log axis does not drop a side that reaches zero: a plottable's
     //! range is data, not an item index.
     std::optional<QCPDataBox> dataRange(const QCPDrawable& object, const QCPDrawnView& view,
@@ -172,7 +172,7 @@ public:
     //! The pixels the recording's widest stroke reaches around its geometry.
     [[nodiscard]] double pixelPad() const;
 
-    //! The recording's box as an item extent: QCPItem::dataExtent's two rules.
+    //! The recording's box as an item extent: QCPItem::indexExtent's two rules.
     std::optional<QCPItemExtent> dataExtent(const QCPDrawable& object, const QCPDrawnView& view);
 
     //! The pixel distance from \a at to the recording, or none when it missed.

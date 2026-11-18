@@ -248,10 +248,6 @@ private:
     friend class QCPAxis;
     friend class QCPAxisRect;
     friend class QCPLayer;
-    // The index box is protected on purpose; the suites that check it read it here.
-    friend class TestItemIndex;
-    friend class TestItemPosition;
-    friend class TestRepaint;
     friend QCPDrawnView qcpDrawnViewOf(const QCPItem& item, QRect clip);
 
     // True when the pixel dependency graph above  parent comes back here: a position depends on its
@@ -364,18 +360,6 @@ public:
     //! The legend icon: the recording, unless the class records its own.
     void drawLegendIcon(QCPDrawContext& icon) const override { draw(icon); }
 
-    /*! Returns what this item occupies, in data coordinates, or none when a box cannot describe it.
-
-      The layer's spatial index skips the item in a frame or a hit test that cannot touch it. The
-      box must contain everything draw() paints and every point selectTest() can return a distance
-      below the selection tolerance for; \a pixelPad is the slack around it that pens, line endings
-      and other pixel-space growth need.
-
-      An item that records answers from its recording, once it has one: the box of what draw()
-      appended, made of data positions only. An item that does not record keeps the positions-based
-      answer of its subclass; the default here returns none, so a user item is drawn and tested
-      exactly as before. */
-    [[nodiscard]] virtual std::optional<QCPItemExtent> indexExtent() const;
 
     // Child slot in the owning layer, written when that layer rebuilds its index (QCPLayer).
     mutable int mItemSlot = -1;
@@ -408,6 +392,11 @@ protected:
     QList<QCPItemAnchor*> mAnchors;
     bool mSelectable, mSelected;
 
+    // The index box is protected on purpose; the suites that check it read it here.
+    friend class TestItemIndex;
+    friend class TestItemPosition;
+    friend class TestRepaint;
+
     // reimplemented virtual methods:
     virtual QCP::Interaction selectionCategory() const override;
     virtual QRect clipRect() const override;
@@ -415,6 +404,20 @@ protected:
     //! Replays the recording. Every item records, so this is final: draw(QCPDrawContext&) is the
     //! one an item overrides.
     void draw(QCPPainter* painter) final;
+
+    /*! Returns the box the layer's spatial index uses, in data coordinates, or none when a box
+      cannot describe it.
+
+      The layer's spatial index skips the item in a frame or a hit test that cannot touch it. The
+      box must contain everything draw() paints and every point selectTest() can return a distance
+      below the selection tolerance for; \a pixelPad is the slack around it that pens, line endings
+      and other pixel-space growth need.
+
+      An item that records answers from its recording, once it has one: the box of what draw()
+      appended, made of data positions only. An item that does not record keeps the positions-based
+      answer of its subclass; the default here returns none, so a user item is drawn and tested
+      exactly as before. */
+    [[nodiscard]] virtual std::optional<QCPItemExtent> indexExtent() const;
 
     // The mouse handlers, as QCPLayerable knows them: final, because an item handles the mouse with
     // the value event below. This is where the press part is remembered and the drag is kept.
