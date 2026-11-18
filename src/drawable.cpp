@@ -568,6 +568,21 @@ QCPDrawnView qcpDrawnViewOf(const QCPItem& item, QRect clip)
     view.axisRect = item.clipAxisRectRaw();
     if (!view.axisRect && view.keyAxis)
         view.axisRect = view.keyAxis->axisRectRaw();
+    // An item with no position at all still measures in the rect it lives in: the callout hangs
+    // its anchors from plot coordinates and has none to read a pair from. A position that has had
+    // its axes taken away names none on purpose, and keeps being reported as such.
+    if (!view.keyAxis && !first)
+    {
+        const QCPAxisRect* rect = view.axisRect;
+        if (!rect && item.parentPlotRaw())
+            rect = item.parentPlotRaw()->axisRect();
+        if (rect)
+        {
+            view.axisRect = rect;
+            view.keyAxis = rect->axis(QCPAxis::atBottom).get();
+            view.valueAxis = rect->axis(QCPAxis::atLeft).get();
+        }
+    }
     // An area that has not been laid out yet, or that was taken out of the layout, has no frame to
     // place anything in: the item is inert, and the missing-axis refusal says so once.
     if (view.area && view.area->rect().isEmpty())

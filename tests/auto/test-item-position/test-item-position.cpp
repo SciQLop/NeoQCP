@@ -15,6 +15,8 @@ public:
 };
 
 //! An item whose anchor is a function: it may be built before it has a plot.
+// The callout's shape: no position of its own, one anchor that names a place in whatever terms
+// the item likes.
 class AnchorItem : public QCPItem
 {
 public:
@@ -22,8 +24,17 @@ public:
     explicit AnchorItem(QCP::Position where) : where(std::move(where)) { }
 
     QCP::Position where;
-    QCPItemPosition* const framePosition = createPosition(QStringLiteral("frame"));
     QCPItemAnchor* const at = createAnchor(QStringLiteral("at"), [this] { return where; });
+
+    quint64 generation() const { return mCore.generation(); }
+
+    void draw(QCPDrawContext&) const override { }
+};
+
+class FollowerItem : public QCPItem
+{
+public:
+    QCPItemPosition* const position = createPosition(QStringLiteral("position"));
 
     quint64 generation() const { return mCore.generation(); }
 
@@ -578,16 +589,16 @@ void TestItemPosition::anAnchorMadeBeforeThePlot()
     const QPointF expected(mPlot->xAxis->coordToPixel(2), mPlot->yAxis->coordToPixel(3));
     QCOMPARE(item->at->pixelPosition(), expected);
 
-    auto follower = mPlot->add<AnchorItem>();
-    follower->framePosition->setParentAnchor(item->at);
-    QCOMPARE(follower->framePosition->pixelPosition(), expected);
+    auto follower = mPlot->add<FollowerItem>();
+    QVERIFY(follower->position->setParentAnchor(item->at));
+    QCOMPARE(follower->position->pixelPosition(), expected);
 }
 
 void TestItemPosition::aPositionHangingFromAFunctionAnchorRepaintsWhenItMoves()
 {
     auto source = mPlot->add<AnchorItem>(QCP::Data { 2, 3 });
-    auto follower = mPlot->add<AnchorItem>();
-    follower->framePosition->setParentAnchor(source->at);
+    auto follower = mPlot->add<FollowerItem>();
+    QVERIFY(follower->position->setParentAnchor(source->at));
 
     const quint64 quiet = follower->generation();
     mPlot->replot();
