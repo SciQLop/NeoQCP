@@ -47,6 +47,15 @@ public:
     void draw(QCPDrawContext& context) const override
     {
         const QPen outline(Qt::black, 3);
+        if (pixelBoxes)
+        {
+            // Drawn where the test puts it, whatever frame the positions name.
+            context.setPart(0);
+            context.rect(QCP::Pixels { box.left(), box.top() },
+                         QCP::Pixels { box.right(), box.bottom() }, outline,
+                         QBrush(QColor(220, 200, 40)));
+            return;
+        }
         if (shape == twoBoxes)
         {
             context.setPart(1);
@@ -58,7 +67,8 @@ public:
             return;
         }
         context.setPart(0);
-        context.rect(QCP::AxisRatio { 0.25, 0.25 }, QCP::AxisRatio { 0.75, 0.75 }, outline,
+        context.rect(QCP::AxisRatio { box.left(), box.top() },
+                     QCP::AxisRatio { box.right(), box.bottom() }, outline,
                      QBrush(QColor(220, 200, 40)));
     }
 
@@ -106,6 +116,9 @@ public:
     }
 
     QCPItemPosition* const mFrame;
+    //! Where the oneBox shape (or the pixel box) is drawn, in ratio units or in pixels.
+    QRectF box { 0.25, 0.25, 0.5, 0.5 };
+    bool pixelBoxes = false;
     Shape shape = oneBox;
     bool acceptPress = true;
     std::function<void(Probe&)> onPress;
@@ -223,7 +236,7 @@ void TestItemEvents::dataFollowsTheItemsOwnAxes_data()
 {
     QTest::addColumn<bool>("secondRect");
     QTest::newRow("a reversed log key axis") << false;
-    QTest::newRow("an item measuring in the second rect") << true;
+    QTest::newRow("an item drawn over the first rect, measuring in the second") << true;
 }
 
 void TestItemEvents::dataFollowsTheItemsOwnAxes()
@@ -244,12 +257,12 @@ void TestItemEvents::dataFollowsTheItemsOwnAxes()
         keyAxis->setRange(100, 200);
         valueAxis->setRange(-5, 5);
         probe->mFrame->setAxes(keyAxis, valueAxis);
-        // The probe measures ratios against its own rect, so clipping it there puts its boxes
-        // where the click lands as well as naming the axes it reports in.
-        probe->setClipToAxisRect(true);
-        probe->setClipAxisRect(second);
+        // Plot-coordinate boxes over the first rect: the press lands there, while the frame the
+        // event reports in can only come from the axes the positions name.
+        probe->pixelBoxes = true;
+        probe->box = QRectF(mPlot->axisRect()->rect().adjusted(6, 6, -6, -6));
         mPlot->replot();
-        from = second->rect().center();
+        from = mPlot->axisRect()->rect().center();
     }
     else
     {
