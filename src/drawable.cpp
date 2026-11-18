@@ -474,6 +474,17 @@ FrameMemo& frameMemo()
     return memo;
 }
 
+//! The frame \a view draws through, built from nothing else: the system's, or the axes' pair.
+//! Whoever must keep its own frame while something else resolves another one calls this, never
+//! memoFrame: that one owns a single slot and rewrites it in place.
+QCPDrawFrame makeFrame(const QCPDrawnView& view, const QRect& clip)
+{
+    if (view.system)
+        return { view.system->transform(),
+                 view.area ? view.area->ratioTransform() : QCPRatioTransform(), QRectF(clip) };
+    return qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(clip));
+}
+
 //! The frame for \a view and \a clip, rebuilt only when the plot, the frame epoch or one of the
 //! axes, the rect and the clip changed: a layer paints all its children through one frame, and a
 //! click pass asks every candidate for the same one.
@@ -495,11 +506,7 @@ const QCPDrawFrame& memoFrame(const QCPDrawnView& view, const QRect& clip)
         || memo.area != view.area || memo.keyRange != keyRange || memo.valueRange != valueRange
         || memo.clip != clip)
     {
-        memo.frame = view.system
-            ? QCPDrawFrame { view.system->transform(),
-                             view.area ? view.area->ratioTransform() : QCPRatioTransform(),
-                             QRectF(clip) }
-            : qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(clip));
+        memo.frame = makeFrame(view, clip);
         memo.plot = view.plot;
         memo.epoch = epoch;
         memo.system = view.system;
@@ -932,20 +939,28 @@ double QCPDrawnCore::pixelPad() const
 
   The data position of \a at in the frame the object's recording replays in. A mouse event asks it
   through the item's own view, so a log or reversed axis answers what it draws, not what a default
-  pair would.
+  pair would. The frame is built here rather than memoised: a mouse event cannot be raised while a
+  paint or a hit test is replaying, but a frame of one's own costs nothing next to the trap.
+*/
+QCP::Data QCPDrawnCore::dataAt(QCP::Pixels at, const QCPDrawnView& view) const
+{
+    const QCPDrawFrame frame = makeFrame(view, view.clip.translated(0, -1));
+    return frame.transform.inverse(QPointF(at.x, at.y));
+}
+
+/*! \internal
+
+  The pixels of \a position in the frame the object's recording replays in: what an anchor resolves
+  through. The frame is built here, never taken from the memo: an anchor resolves while the outer
+  paint or hit test still replays through the frame it took, and an anchor placed on another axis
+  pair would rewrite that one shared slot under it.
 */
 QCP::Pixels QCPDrawnCore::pixelsOf(const QCP::Position& position,
                                    const QCPDrawnView& view) const
 {
-    const QCPDrawFrame& frame = memoFrame(view, view.clip.translated(0, -1));
+    const QCPDrawFrame frame = makeFrame(view, view.clip.translated(0, -1));
     const QPointF pixels = qcpResolvePosition(frame, position, false);
     return { pixels.x(), pixels.y() };
-}
-
-QCP::Data QCPDrawnCore::dataAt(QCP::Pixels at, const QCPDrawnView& view) const
-{
-    const QCPDrawFrame& frame = memoFrame(view, view.clip.translated(0, -1));
-    return frame.transform.inverse(QPointF(at.x, at.y));
 }
 
 std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixels at,

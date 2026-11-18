@@ -28,6 +28,7 @@ private slots:
 
     void aFunctionAnchorFollowsData();
     void aFunctionAnchorWithAPixelOffset();
+    void anAnchorResolvedDuringAPaintKeepsTheOuterFrame();
     void anAnchorMadeBeforeThePlot();
     void aPositionHangingFromAFunctionAnchorRepaintsWhenItMoves();
 

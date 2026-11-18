@@ -532,6 +532,36 @@ void TestItemPosition::aFunctionAnchorFollowsData()
     QCOMPARE(item->at->pixelPosition(), expected());
 }
 
+void TestItemPosition::anAnchorResolvedDuringAPaintKeepsTheOuterFrame()
+{
+    mPlot->yAxis2->setVisible(true);
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(0, 10);
+    mPlot->yAxis2->setRange(0, 100);
+
+    auto rect = mPlot->add<QCPItemRect>();
+    rect->topLeft->setCoords(1, 1);
+    rect->bottomRight->setCoords(2, 3);
+
+    // The line replays through the second axis pair, and its start names an anchor of the rect,
+    // which measures through the first: resolving it must not move the line's own frame.
+    auto line = mPlot->add<QCPItemLine>();
+    line->start->setAxes(mPlot->xAxis, mPlot->yAxis2);
+    line->end->setAxes(mPlot->xAxis, mPlot->yAxis2);
+    QVERIFY(line->start->setParentAnchor(rect->bottom));
+    line->end->setCoords(2, 4);
+    mPlot->replot();
+
+    const QPointF onTheSecondAxis(mPlot->xAxis->coordToPixel(2), mPlot->yAxis2->coordToPixel(4));
+    const QPointF onTheFirstAxis(mPlot->xAxis->coordToPixel(2), mPlot->yAxis->coordToPixel(4));
+    QVERIFY2(qAbs(onTheSecondAxis.y() - onTheFirstAxis.y()) > 20,
+             "the two value axes must map 4 far apart");
+    const double distance = line->selectTest(onTheSecondAxis, false, nullptr);
+    QVERIFY2(distance >= 0.0 && distance < 1.0,
+             qPrintable(QStringLiteral("the line must reach the second axis' mapping, not the "
+                                       "first: a miss answers -1 (distance %1)").arg(distance)));
+}
+
 void TestItemPosition::aFunctionAnchorWithAPixelOffset()
 {
     auto item = mPlot->add<AnchorItem>(QCP::Data { 2, 3 } + QCP::PixelOffset { 10, -5 });
