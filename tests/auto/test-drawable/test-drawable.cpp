@@ -375,6 +375,59 @@ public:
             std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
 };
 
+//! A user plottable that names the datum and the part of every command it records.
+class TestTaggedShape : public QCPPlottable1D<QCPGraphData>
+{
+public:
+    enum Mode
+    {
+        Discs, //!< one disc per data point, each naming its own row
+        Parts, //!< a filled body (part 0) with an edge line recorded over it (part 1)
+        DiscsThenBars //!< a tagged disc, then bars recorded with no tag at all
+    };
+
+    TestTaggedShape() : QCPPlottable1D<QCPGraphData>() { }
+
+    void setPoints(const QVector<double>& keys, const QVector<double>& values)
+    {
+        mDataContainer->clear();
+        for (int i = 0; i < qMin(int(keys.size()), int(values.size())); ++i)
+            mDataContainer->add(QCPGraphData(keys.at(i), values.at(i)));
+        update();
+    }
+
+    void draw(QCPDrawContext& context) const override
+    {
+        if (mode == Parts)
+        {
+            context.setPart(0);
+            context.rect(QCP::Data { 2, 2 }, QCP::Data { 6, 6 }, QPen(Qt::black),
+                         QBrush(Qt::lightGray));
+            context.setPart(1);
+            context.line(QCP::Data { 2, 2 }, QCP::Data { 2, 6 }, QPen(Qt::black, 2));
+            return;
+        }
+        for (int i = 0; i < dataCount(); ++i)
+        {
+            context.setDataIndex(i);
+            context.circle(QCP::Data { dataMainKey(i), dataMainValue(i) }, 0.3, QPen(Qt::black),
+                           QBrush(Qt::yellow));
+        }
+        if (mode != DiscsThenBars)
+            return;
+        context.setDataIndex(-1);
+        context.setPart(-1);
+        for (int i = 0; i < 10; ++i)
+        {
+            const double key = 1.0 + 0.8 * i;
+            context.rect(QCP::Data { key, 5.0 }, QCP::Data { key + 0.8, 7.0 }, QPen(Qt::black),
+                         QBrush(Qt::green));
+        }
+    }
+
+    Mode mode = Discs;
+};
+
 //! A drawn plottable whose legend icon calls a setter: a misuse, like update() in draw().
 class TestIconSetter : public QCPPlottable
 {
@@ -1335,6 +1388,125 @@ void TestDrawable::batchHitTestNamesTheRect()
 
     // A miss is still a miss, and it leaves the details alone.
     QVERIFY(!shape->hitTest(at(20.0, 2.0), &details).has_value());
+}
+
+void TestDrawable::aTaggedCommandNamesItsDataIndex()
+{
+    // A recorder that names the datum of each command: a click says which row it landed on, and
+    // the plottable hands a one-point selection instead of the whole range.
+    Fixture f;
+    auto shape = f.plot->add<TestTaggedShape>();
+    shape->setPoints({ 1, 2, 3 }, { 1, 1, 1 });
+    f.plot->replot();
+    const auto at = [&](double key, double value)
+    {
+        return QCP::Pixels { f.plot->xAxis->coordToPixel(key), f.plot->yAxis->coordToPixel(value) };
+    };
+
+    QVariant details;
+    const double hit = shape->selectTest(QPointF(at(2.0, 1.0).x, at(2.0, 1.0).y), false, &details);
+    QVERIFY2(hit >= 0, "a click on the second disc must hit");
+    const auto index = qcp::hitDataIndex(details);
+    QVERIFY2(index.has_value(), "a tagged hit names its datum");
+    QCOMPARE(*index, 1);
+    QCOMPARE(details.value<QCPDataSelection>(), QCPDataSelection(QCPDataRange(1, 2)));
+    QCOMPARE(qcpHitPart(details), -1);
+
+    // The index names a datum of the container: that is what the API hands out.
+    QCOMPARE(shape->at(1).key, 2.0);
+}
+
+void TestDrawable::theTopmostTaggedCommandWins()
+{
+    // The body is hit inside and its edge line is not, but the line is recorded last: a click
+    // within the tolerance of it names the line's part, and the distance stays the nearest one.
+    Fixture f;
+    auto shape = f.plot->add<TestTaggedShape>();
+    shape->mode = TestTaggedShape::Parts;
+    f.plot->replot();
+    const double left = f.plot->xAxis->coordToPixel(2);
+    const double middle = f.plot->yAxis->coordToPixel(4);
+
+    QVariant nearEdge;
+    const double edgeHit = shape->selectTest(QPointF(left + 3, middle), false, &nearEdge);
+    QVERIFY2(edgeHit >= 0, "3 px inside the body is still within the line's tolerance");
+    QCOMPARE(edgeHit, 0.0); // the body is nearer: the distance is the nearest command's
+    QCOMPARE(qcpHitPart(nearEdge), 1);
+
+    QVariant inBody;
+    QVERIFY(shape->selectTest(QPointF(f.plot->xAxis->coordToPixel(4), middle), false, &inBody) >= 0);
+    QCOMPARE(qcpHitPart(inBody), 0);
+    QVERIFY2(!qcp::hitDataIndex(inBody).has_value(), "a part names no datum");
+}
+
+void TestDrawable::aRecordingWithFewerPointsForgetsTheOldTags()
+{
+    // The tags belong to the recording that made them: one made from one point cannot answer for
+    // the disc that is gone.
+    Fixture f;
+    auto shape = f.plot->add<TestTaggedShape>();
+    shape->setPoints({ 1, 2, 3 }, { 1, 1, 1 });
+    f.plot->replot();
+    const auto at = [&](double key)
+    {
+        return QCP::Pixels { f.plot->xAxis->coordToPixel(key), f.plot->yAxis->coordToPixel(1) };
+    };
+    QVERIFY(shape->hitTest(at(3.0), nullptr).has_value());
+
+    shape->setPoints({ 1 }, { 1 });
+    f.plot->replot();
+    QVERIFY2(!shape->hitTest(at(3.0), nullptr).has_value(),
+             "the disc the new recording does not hold must miss");
+
+    QVariant details;
+    QVERIFY(shape->hitTest(at(1.0), &details).has_value());
+    QCOMPARE(qcp::hitDataIndex(details).value_or(-1), 0);
+}
+
+void TestDrawable::untaggedCommandsKeepTheBatchDetails()
+{
+    // Bars name a rect of their batch, not a datum: a recording that tagged something earlier
+    // still reports the batch index for them.
+    Fixture f;
+    auto shape = f.plot->add<TestTaggedShape>();
+    shape->mode = TestTaggedShape::DiscsThenBars;
+    shape->setPoints({ 0.5 }, { 0.5 });
+    f.plot->replot();
+    const auto at = [&](double key, double value)
+    {
+        return QCP::Pixels { f.plot->xAxis->coordToPixel(key), f.plot->yAxis->coordToPixel(value) };
+    };
+
+    QVariant details;
+    QVERIFY2(shape->hitTest(at(7.0, 6.0), &details).has_value(),
+             "a click inside the seventh bar must hit");
+    QCOMPARE(details.userType(), int(QMetaType::Int));
+    QCOMPARE(details.toInt(), 7);
+    QVERIFY(!qcp::hitDataIndex(details).has_value());
+    QCOMPARE(qcpHitPart(details), -1);
+}
+
+void TestDrawable::aUserPlottableIsNotRestyledWhenSelected()
+{
+    // A user type records the pen it was given, so selecting it must not repaint it in another
+    // one: the recording replays exactly what draw() recorded.
+    Fixture f;
+    auto line = f.plot->add<TestLine>();
+    line->setPen(QPen(QColor(200, 0, 0), 3));
+    f.plot->setInteractions(QCP::iSelectPlottables);
+    f.plot->replot();
+
+    const QImage before = f.plot->toPixmap(300, 200).toImage();
+    const QPointF middle(f.plot->xAxis->coordToPixel(5), f.plot->yAxis->coordToPixel(5));
+    const QColor drawn = before.pixelColor(int(middle.x()), int(middle.y()));
+    QVERIFY2(drawn.red() > 150 && drawn.green() < 100, qPrintable(drawn.name()));
+
+    line->setSelection(QCPDataSelection(QCPDataRange(0, 1)));
+    QVERIFY(line->selected());
+    const QImage after = f.plot->toPixmap(300, 200).toImage();
+
+    QCOMPARE(after, before);
+    QCOMPARE(after.pixelColor(int(middle.x()), int(middle.y())), drawn);
 }
 
 void TestDrawable::hitTestWithAVerticalKeyAxis()

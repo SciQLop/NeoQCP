@@ -225,3 +225,17 @@ void TestSelectionModel::userSelectionStillAnnounced()
     QVERIFY2(graph->selected(), "the click selects the graph");
     QCOMPARE(order, (QStringList { QStringLiteral("graph"), QStringLiteral("user") }));
 }
+
+void TestSelectionModel::containsOneIndex()
+{
+    const QCPDataSelection selection(QCPDataRange(2, 5));
+    QVERIFY2(selection.contains(4), "an index inside the range is in the selection");
+    QVERIFY2(!selection.contains(5), "the range's end is not in it");
+    QVERIFY2(!selection.contains(1), "an index below it is not in it");
+
+    QCPDataSelection twoRanges(QCPDataRange(2, 3));
+    twoRanges += QCPDataRange(6, 7);
+    QVERIFY(twoRanges.contains(2));
+    QVERIFY(twoRanges.contains(6));
+    QVERIFY2(!twoRanges.contains(4), "the gap between the ranges is not in the selection");
+}

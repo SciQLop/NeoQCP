@@ -524,12 +524,26 @@ struct QCP_LIB_DECL QCPDrawList
         }
     };
 
+    /*!
+      A run of commands that name the same datum and part: what the object's draw() told the context
+      with \ref QCPDrawContext::setDataIndex and \ref QCPDrawContext::setPart, from
+      \a firstCommand on and until the tag changes again. A run holding neither (-1, -1) closes a
+      tagged one; a recording that tags nothing records none.
+    */
+    struct Tag
+    {
+        int firstCommand = 0;
+        int dataIndex = -1;
+        int part = -1;
+    };
+
     //! A copy is a new recording: it can never be matched by an image of the one it came from.
     QCPDrawList(const QCPDrawList& other) { *this = other; }
 
     QCPDrawList& operator=(const QCPDrawList& other)
     {
         commands = other.commands;
+        tags = other.tags;
         data = other.data;
         index = other.index;
         viewDependent = other.viewDependent;
@@ -546,6 +560,8 @@ struct QCP_LIB_DECL QCPDrawList
     }
 
     std::vector<qcp::QCPDrawCommand> commands;
+    //! The tags, in draw order, one run per tag change (see \ref Tag).
+    std::vector<Tag> tags;
     //! What the recording covers in data: its key/value ranges and its legend-icon fit.
     Box data;
     //! The box for the item index and for culling, as it always was: a text, a path or a painter
@@ -581,6 +597,25 @@ struct QCP_LIB_DECL QCPDrawList
     //! it lives one layer above). Painter-only content after one has to land over it.
     bool hasGpuContent = false;
     quint64 id = qcpNextDrawListId(); //!< unique: with a command's index it is a cache key
+    //! The tag the next recorded command carries: what \ref QCPDrawContext::setDataIndex and
+    //! \ref QCPDrawContext::setPart set, and what recording() turns into a run.
+    int nextDataIndex = -1;
+    int nextPart = -1;
+
+    //! The tag the command at \a commandIndex carries, or null when it carries none: the run that
+    //! starts at or before it holds while the tag does not change.
+    [[nodiscard]] const Tag* tagAt(int commandIndex) const
+    {
+        if (tags.empty() || commandIndex < 0)
+            return nullptr;
+        const auto after = std::upper_bound(
+            tags.begin(), tags.end(), commandIndex,
+            [](int index, const Tag& tag) { return index < tag.firstCommand; });
+        if (after == tags.begin())
+            return nullptr;
+        const Tag& run = *(after - 1);
+        return run.dataIndex >= 0 || run.part >= 0 ? &run : nullptr;
+    }
 };
 
 //! True when any command of \a list needs a key and a value axis (see qcpCommandNeedsAxes): the

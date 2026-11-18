@@ -414,6 +414,13 @@ private:
 };
 } // namespace
 
+int qcpHitPart(const QVariant& details)
+{
+    const QVariantMap map = details.toMap();
+    const auto part = map.constFind(QStringLiteral("part"));
+    return part == map.constEnd() ? -1 : part->toInt();
+}
+
 QCPRange qcpDrawnRange(const std::optional<QCPDataBox>& box, QCPDrawnSide side, bool& foundRange,
                        QCP::SignDomain inSignDomain)
 {
@@ -962,23 +969,43 @@ std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixe
             return std::nullopt;
     }
     double best = kInfinity;
-    int hit = -1; //!< the rect of a batch the click came nearest: what \a details reports
-    for (const qcp::QCPDrawCommand& command : mState->recording.commands)
+    // The topmost command within the tolerance names what was hit (decision P-2): a peak's edge
+    // recorded over its body is grabbed anywhere within the tolerance of it, also from inside the
+    // body, while the distance stays the nearest command's.
+    int named = -1;
+    int namedIndex = -1;
+    for (int i = 0; i < int(mState->recording.commands.size()); ++i)
     {
         int index = -1;
-        const double distance = distanceTo(command, frame, point, &index);
+        const double distance = distanceTo(mState->recording.commands[size_t(i)], frame, point,
+                                           &index);
         if (distance < best)
-        {
             best = distance;
-            hit = index;
+        if (distance <= tolerance)
+        {
+            named = i;
+            namedIndex = index;
         }
     }
     if (!(best <= tolerance))
         return std::nullopt;
-    // A batch names the rect that was hit, so the caller can act on one bar without scanning the
-    // geometry again. Commands of a single shape say nothing, as they always did.
-    if (details && hit >= 0)
-        *details = QVariant(hit);
+    // A tagged command names the datum and the part it draws; anything else keeps what it always
+    // reported, a batch's rect index, so a bar click still says which bar.
+    if (details)
+    {
+        const QCPDrawList::Tag* tag = mState->recording.tagAt(named);
+        if (tag)
+        {
+            QVariantMap map;
+            if (tag->dataIndex >= 0)
+                map.insert(QStringLiteral("dataIndex"), tag->dataIndex);
+            if (tag->part >= 0)
+                map.insert(QStringLiteral("part"), tag->part);
+            *details = map;
+        }
+        else if (namedIndex >= 0)
+            *details = QVariant(namedIndex);
+    }
     // A distance is never negative: distanceTo() subtracts the stroke's half width, so a click
     // inside the stroke came out below zero, and the callers (the layerable selectTest contract)
     // reject a negative distance as a miss.

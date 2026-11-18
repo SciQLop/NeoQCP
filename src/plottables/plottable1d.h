@@ -95,6 +95,20 @@ public:
 
     virtual QCPPlottableInterface1D* interface1D() override { return this; }
 
+    /*!
+      The datum at \a index, in key order. An index the container does not have asks its nearest
+      datum, and one on a plottable holding no data at all answers a default one: a hit names an
+      index the recording had, so neither happens on that path, and neither can read outside the
+      container.
+    */
+    [[nodiscard]] const DataType& at(int index) const
+    {
+        static const DataType none { };
+        if (mDataContainer->isEmpty())
+            return none;
+        return *(mDataContainer->constBegin() + qBound(0, index, mDataContainer->size() - 1));
+    }
+
 protected:
     // property members:
     QSharedPointer<QCPDataContainer<DataType>> mDataContainer;

@@ -615,6 +615,17 @@ double QCPPlottable::selectTest(const QPointF& pos, bool onlySelectable,
         return hit;
     if (details->isValid() && !details->value<QCPDataSelection>().isEmpty())
         return hit;
+    // A tagged hit names one datum of this plottable: the caller gets a one-point selection, so a
+    // click selects the row it landed on rather than everything the plottable holds.
+    if (const auto index = qcp::hitDataIndex(*details); index && *index >= 0)
+    {
+        *details = QVariant::fromValue(QCPDataSelection(QCPDataRange(*index, *index + 1)));
+        return hit;
+    }
+    // A hit that names only a part keeps its details map, where the caller reads the part with
+    // qcpHitPart: replacing it with a whole-plottable selection would lose which piece was clicked.
+    if (qcpHitPart(*details) >= 0)
+        return hit;
     const QCPPlottableInterface1D* iface = const_cast<QCPPlottable*>(this)->interface1D();
     const int count = iface ? iface->dataCount() : 1;
     *details = QVariant::fromValue(QCPDataSelection(QCPDataRange(0, count)));

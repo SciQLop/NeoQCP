@@ -14,6 +14,7 @@ private slots:
     void selectableChangeIsOneSignal();
     void itemRefusesAPartialSelectionType();
     void userSelectionStillAnnounced();
+    void containsOneIndex();
 
 private:
     QCustomPlot* mPlot = nullptr;

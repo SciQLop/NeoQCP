@@ -52,6 +52,11 @@ private slots:
     void frameEpochsAreNeverShared();
     void twoRectsOneLayerDrawInTheirOwnFrames();
     void batchHitTestNamesTheRect();
+    void aTaggedCommandNamesItsDataIndex();
+    void theTopmostTaggedCommandWins();
+    void aRecordingWithFewerPointsForgetsTheOldTags();
+    void untaggedCommandsKeepTheBatchDetails();
+    void aUserPlottableIsNotRestyledWhenSelected();
     void defaultDataRangeFollowsTheExtentRules();
     void defaultLegendIconIsTheRecordingFitted();
     void flatLineHasALegendIcon();

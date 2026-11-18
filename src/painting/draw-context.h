@@ -190,6 +190,20 @@ public:
     */
     [[nodiscard]] bool exporting() const { return mExporting; }
 
+    /*!
+      Names the datum every command recorded after this draws: an index into the object's own data,
+      -1 (the default) for none. A hit on such a command reports the index beside the distance, so a
+      click lands on one datum instead of the whole object, and a plottable can hand a one-point
+      \ref QCPDataSelection to its caller.
+    */
+    void setDataIndex(int index);
+    /*!
+      Names the part every command recorded after this draws: a number the object gives its own
+      pieces, -1 (the default) for none. A hit on such a command reports it (see
+      \ref qcpHitPart), so a shape made of a body and an edge tells the caller which one was hit.
+    */
+    void setPart(int part);
+
     //! A polyline whose vertices are data coordinates (keys, values).
     void polyline(std::shared_ptr<const std::vector<QPointF>> data, const QPen& pen);
     /*!

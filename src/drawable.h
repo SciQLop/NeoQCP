@@ -138,6 +138,13 @@ inline quint64 qcpDependencyKey(const QCPDrawable* source)
 }
 
 /*!
+  The part a hit's \a details name, -1 when they name none: what a command recorded with
+  \ref QCPDrawContext::setPart reports beside its datum. A hit that names no part (a bar batch, a
+  graph row) answers -1, as an object that draws in one piece always did.
+*/
+[[nodiscard]] QCP_LIB_DECL int qcpHitPart(const QVariant& details);
+
+/*!
   \brief Everything a plottable or an item keeps between frames: the recording, its keys and the
   caches.
 

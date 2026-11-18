@@ -127,6 +127,8 @@ public:
     void simplify();
     void enforceType(QCP::SelectionType type);
     [[nodiscard]] bool contains(const QCPDataSelection& other) const;
+    //! Whether the datum at \a dataIndex is in one of the ranges.
+    [[nodiscard]] bool contains(int dataIndex) const;
     [[nodiscard]] QCPDataSelection intersection(const QCPDataRange& other) const;
     [[nodiscard]] QCPDataSelection intersection(const QCPDataSelection& other) const;
     [[nodiscard]] QCPDataSelection inverse(const QCPDataRange& outerRange) const;

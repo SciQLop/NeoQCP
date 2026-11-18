@@ -242,6 +242,13 @@ void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& data,
         list.anchorDependent = true;
     if (list.commands.empty())
         list.id = qcpNextDrawListId(); // a re-recorded list is a new recording
+    // A run opens where the tag changes, an untagged command included: a later tagged command must
+    // not inherit the run that came before an untagged stretch. A recording that never tags a
+    // command keeps no run at all.
+    const auto open = list.tags.empty() ? QCPDrawList::Tag { } : list.tags.back();
+    if (open.dataIndex != list.nextDataIndex || open.part != list.nextPart)
+        list.tags.push_back(QCPDrawList::Tag { int(list.commands.size()), list.nextDataIndex,
+                                               list.nextPart });
     mergeExtent(list.data, data);
     mergeExtent(list.index, index);
     if (qcp::needsRaster(command))
@@ -338,6 +345,13 @@ bool appendShape(QCPDrawList& list, const QPointF& a, const QPointF& b, const QP
                  const QBrush& brush, const Extent& extent)
 {
     if (list.commands.empty())
+        return false;
+    // A batch carries one datum and one part for all its boxes, so a tag change starts a command of
+    // its own: without this, a scatter recording its rows would keep only the first row's identity.
+    const QCPDrawList::Tag* previousTag = list.tagAt(int(list.commands.size()) - 1);
+    const int previousDataIndex = previousTag ? previousTag->dataIndex : -1;
+    const int previousPart = previousTag ? previousTag->part : -1;
+    if (previousDataIndex != list.nextDataIndex || previousPart != list.nextPart)
         return false;
     qcp::QCPDrawCommand& previous = list.commands.back();
     if (auto* batch = std::get_if<Batch>(&previous))
@@ -519,6 +533,16 @@ QCPDrawContext::QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
 }
 
 QCPDrawContext::~QCPDrawContext() = default;
+
+void QCPDrawContext::setDataIndex(int index)
+{
+    mList->nextDataIndex = index;
+}
+
+void QCPDrawContext::setPart(int part)
+{
+    mList->nextPart = part;
+}
 
 QCPDrawFrame QCPDrawContext::frame() const
 {

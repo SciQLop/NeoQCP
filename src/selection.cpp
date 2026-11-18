@@ -25,6 +25,8 @@
 
 #include "selection.h"
 
+#include <algorithm>
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPDataRange
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -565,6 +567,18 @@ bool QCPDataSelection::contains(const QCPDataSelection& other) const
     return thisIndex
         < mDataRanges.size(); // if thisIndex ran all the way to the end to find a containing range
                               // for the current otherIndex, other is not contained in this
+}
+
+/*!
+  Returns true if the data point at \a dataIndex is one of the points in this data selection.
+
+  \see QCPDataRange::contains
+*/
+bool QCPDataSelection::contains(int dataIndex) const
+{
+    return std::any_of(mDataRanges.cbegin(), mDataRanges.cend(),
+                       [dataIndex](const QCPDataRange& range)
+                       { return dataIndex >= range.begin() && dataIndex < range.end(); });
 }
 
 /*!
