@@ -1583,7 +1583,9 @@ QCPItem::~QCPItem()
         // follower or the plot. Nothing is delivered while the loop reads mAnchors: the scope
         // collects the emissions and hands them over once the anchors have let go. A slot that
         // removes this item again finds it dying and leaves it alone (removeObject asks).
-        const QCPEmissionScope scope(mParentPlot);
+        // Through the tracked handle, not mParentPlot: a slot may have deleted the plot while a
+        // list of items was being walked, and the raw pointer dangles by now.
+        const QCPEmissionScope scope(mRegisteredPlot.get());
         for (QCPItemAnchor* anchor : mAnchors)
             anchor->detachChildren(true);
     }

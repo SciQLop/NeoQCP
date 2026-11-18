@@ -31,6 +31,9 @@ QCPEmissionScope::~QCPEmissionScope()
 // to it must not be made then.
 QCustomPlot* QCPEmissionScope::openOn(QCustomPlot* plot, Kind kind)
 {
+    // qobject_cast dereferences its argument: a null plot must be answered before it, not by it.
+    if (!plot)
+        return nullptr;
     auto* live = qobject_cast<QCustomPlot*>(plot);
     if (!live || live->isBeingDestroyed())
         return nullptr;
