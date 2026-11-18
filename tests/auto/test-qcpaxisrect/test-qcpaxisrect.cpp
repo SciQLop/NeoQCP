@@ -988,6 +988,25 @@ void TestQCPAxisRect::aChosenLayerSurvivesAMoveOntoAnInset()
         QCOMPARE(item->layer(), mine);
     }
 }
+void TestQCPAxisRect::aClearedPixmapLetsTheThemeBack()
+{
+    // Clearing the pixmap is not choosing a background: the inset goes on following the plot's
+    // brush. A pixmap really set is a choice, and a later background leaves it alone.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto inset = plot.axisRect()->addInset(QRectF(0.25, 0.25, 0.5, 0.5));
+    inset->setBackground(QPixmap());
+    QVERIFY2(!inset->backgroundSetByUser(), "clearing the pixmap does not choose a background");
+    plot.setBackground(QBrush(QColor(255, 255, 0)));
+    QCOMPARE(inset->backgroundBrush().color(), QColor(255, 255, 0));
+
+    QPixmap pixmap(4, 4);
+    pixmap.fill(Qt::black);
+    inset->setBackground(pixmap);
+    QVERIFY(inset->backgroundSetByUser());
+    plot.setBackground(QBrush(QColor(0, 0, 255)));
+    QCOMPARE(inset->backgroundBrush().color(), QColor(255, 255, 0));
+}
 void TestQCPAxisRect::thePlotBackgroundReachesAnInset()
 {
     // An inset that follows the theme follows a later setBackground() too.

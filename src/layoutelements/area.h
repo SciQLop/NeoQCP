@@ -78,7 +78,8 @@ public:
     void setBackground(const QBrush& brush);
     void setBackgroundScaled(bool scaled);
     //! \internal The background a theme (or the plot's own) gives an area: not the user's choice,
-    //! so a later theme still reaches it.
+    //! so a later theme still reaches it. Public because QCustomPlot paints insets with it, not
+    //! because a user should call it: use setBackground() for a background of your own.
     void setThemedBackground(const QBrush& brush);
     void setBackgroundScaledMode(Qt::AspectRatioMode mode);
 

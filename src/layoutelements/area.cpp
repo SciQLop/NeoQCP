@@ -350,7 +350,10 @@ void QCPArea::draw(QCPPainter* painter)
 */
 void QCPArea::setBackground(const QPixmap& pm)
 {
-    mBackgroundSetByUser = true; // a background of its own, themed or not
+    // A null pixmap clears the pixmap, it does not pick a background: the brush the theme gave the
+    // area stays, and the next theme change still reaches it.
+    if (!pm.isNull())
+        mBackgroundSetByUser = true;
     if (pm.cacheKey() == mBackgroundPixmap.cacheKey())
         return;
     mBackgroundPixmap = pm;
