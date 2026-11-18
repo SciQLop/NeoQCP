@@ -193,6 +193,8 @@ void TestDataSwap::rescaleAxesSeesNewDataAtOnce()
 
     mg->setData(ramp(10, 100.0),
                 std::vector<std::vector<double>>{{0, 10, 20, 30, 40, 50, 60, 70, 80, 90}});
+    mPlot->xAxis->setRescaleMargin(0); // the new data is this test's business, not the margin
+    mPlot->yAxis->setRescaleMargin(0);
     mg->rescaleAxes();
 
     QCOMPARE(mPlot->xAxis->range(), QCPRange(100.0, 109.0));

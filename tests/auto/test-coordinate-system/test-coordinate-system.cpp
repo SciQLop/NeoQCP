@@ -1037,8 +1037,9 @@ void TestCoordinateSystem::rescaleAxesVisitsEveryArea()
 
     plot.rescaleAxes();
 
-    // The radial axis takes the drawn data range; the angular axis keeps its turn.
-    QCOMPARE(area->radialAxis()->range(), QCPRange(1, 9));
+    // The radial axis takes the drawn data range, with the fit's 5 % margin; the angular axis keeps
+    // its turn.
+    QCOMPARE(area->radialAxis()->range(), QCPRange(0.6, 9.4));
     QCOMPARE(area->angularAxis()->range(), angularBefore);
 }
 

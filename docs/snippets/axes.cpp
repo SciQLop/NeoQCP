@@ -226,3 +226,21 @@ DOC_SNIPPET(axes_secondary_units, 600, 360)
     customPlot->rescaleAxes();
     // [/axes_secondary_units]
 }
+
+DOC_SNIPPET(axes_rescale_margin, 600, 360)
+{
+    // [axes_rescale_margin]
+    customPlot->xAxis->setLabel("bin");
+    customPlot->yAxis->setLabel("counts");
+    customPlot->add<QCPGraph>()
+        .setData(QVector<double> { 0, 1, 2, 3, 4, 5, 6 },
+                 QVector<double> { 2, 5, 3, 7, 4, 9, 10 })
+        .setLineStyle(QCPGraph::lsImpulse)
+        .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 8));
+
+    customPlot->rescaleAxes();                 // 5 % of the span blank on each side
+
+    customPlot->yAxis->setRescaleMargin(0.1);  // ten percent, on this axis only
+    customPlot->yAxis->rescale();
+    // [/axes_rescale_margin]
+}

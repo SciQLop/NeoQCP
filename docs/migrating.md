@@ -63,6 +63,7 @@ Code using `rpQueuedRefresh` or `rpRefreshHint` compiles, with a deprecation war
 | `"main"` layer mode | `lmLogical` | `lmBuffered` |
 | Multisampling | — | 4 samples, or 1 on a HiDPI screen |
 | `focusPolicy()` | `Qt::ClickFocus` | `Qt::StrongFocus`: a click focuses the plot and so does Tab |
+| A fit | data on the axis edges | `rescale()`/`rescaleAxes()` leave 5 % of the span on each side; `setRescaleMargin(0)` restores the old fit |
 
 Set the old value back if your pictures depend on it, for example `customPlot->setAntialiasedElements(QCP::aeNone)`. GPU-drawn lines are antialiased by multisampling whatever the flags say; change that with `setSampleCount()`.
 

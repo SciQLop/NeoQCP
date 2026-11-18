@@ -1203,31 +1203,10 @@ void QCPPlottable::rescaleKeyAxis(bool onlyEnlarge) const
         signDomain = (keyAxis->range().upper < 0 ? QCP::sdNegative : QCP::sdPositive);
 
     bool foundRange;
-    QCPRange newRange = getKeyRange(foundRange, signDomain);
+    const QCPRange newRange = getKeyRange(foundRange, signDomain);
     if (foundRange)
-    {
-        if (onlyEnlarge)
-            newRange.expand(keyAxis->range());
-        if (!QCPRange::validRange(newRange)) // likely due to range being zero (plottable has only
-                                             // constant data in this axis dimension), shift current
-                                             // range to at least center the plottable
-        {
-            double center = (newRange.lower + newRange.upper)
-                * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
-                       // validRange returned false for other reason
-            if (!keyAxis->scale().isLog())
-            {
-                newRange.lower = center - keyAxis->range().size() / 2.0;
-                newRange.upper = center + keyAxis->range().size() / 2.0;
-            }
-            else // a logarithmic scale: a range is a ratio
-            {
-                newRange.lower = center / qSqrt(keyAxis->range().upper / keyAxis->range().lower);
-                newRange.upper = center * qSqrt(keyAxis->range().upper / keyAxis->range().lower);
-            }
-        }
-        keyAxis->setRange(newRange);
-    }
+        keyAxis->setRange(qcp::fittedRange(keyAxis->scale(), newRange, keyAxis->range(),
+                                           keyAxis->rescaleMargin(), onlyEnlarge));
 }
 
 /*!
@@ -1254,35 +1233,11 @@ void QCPPlottable::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) const
         signDomain = (valueAxis->range().upper < 0 ? QCP::sdNegative : QCP::sdPositive);
 
     bool foundRange;
-    QCPRange newRange
-        = getValueRange(foundRange, signDomain,
-                        inKeyRange && keyAxis ? keyAxis->range() : QCPRange());
+    const QCPRange newRange = getValueRange(foundRange, signDomain,
+                                            inKeyRange && keyAxis ? keyAxis->range() : QCPRange());
     if (foundRange)
-    {
-        if (onlyEnlarge)
-            newRange.expand(valueAxis->range());
-        if (!QCPRange::validRange(newRange)) // likely due to range being zero (plottable has only
-                                             // constant data in this axis dimension), shift current
-                                             // range to at least center the plottable
-        {
-            double center = (newRange.lower + newRange.upper)
-                * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
-                       // validRange returned false for other reason
-            if (!valueAxis->scale().isLog())
-            {
-                newRange.lower = center - valueAxis->range().size() / 2.0;
-                newRange.upper = center + valueAxis->range().size() / 2.0;
-            }
-            else // a logarithmic scale: a range is a ratio
-            {
-                newRange.lower
-                    = center / qSqrt(valueAxis->range().upper / valueAxis->range().lower);
-                newRange.upper
-                    = center * qSqrt(valueAxis->range().upper / valueAxis->range().lower);
-            }
-        }
-        valueAxis->setRange(newRange);
-    }
+        valueAxis->setRange(qcp::fittedRange(valueAxis->scale(), newRange, valueAxis->range(),
+                                             valueAxis->rescaleMargin(), onlyEnlarge));
 }
 
 /*! \overload

@@ -102,6 +102,9 @@ void TestQCustomPlot::interface_items()
 void TestQCustomPlot::rescaleAxes_GraphVisibility()
 {
   mPlot->setGeometry(50, 50, 500, 500);
+  // The margin has its own tests: these check which data a fit includes.
+  mPlot->xAxis->setRescaleMargin(0);
+  mPlot->yAxis->setRescaleMargin(0);
   
   mPlot->addGraph();
   mPlot->addGraph();
@@ -127,6 +130,8 @@ void TestQCustomPlot::rescaleAxes_GraphVisibility()
 void TestQCustomPlot::rescaleAxes_FlatGraph()
 {
   // test rescaling if only one graph is in plot and it's flat:
+  mPlot->xAxis->setRescaleMargin(0);
+  mPlot->yAxis->setRescaleMargin(0);
   mPlot->xAxis->setRange(10, 11);
   mPlot->yAxis->setRange(10, 11);
   mPlot->addGraph();
@@ -152,6 +157,8 @@ void TestQCustomPlot::rescaleAxes_FlatGraph()
 void TestQCustomPlot::rescaleAxes_MultipleFlatGraphs()
 {
   // test rescaling when there are multiple flat graphs:
+  mPlot->xAxis->setRescaleMargin(0);
+  mPlot->yAxis->setRescaleMargin(0);
   mPlot->addGraph();
   mPlot->addGraph();
   mPlot->graph(0)->setData(QVector<double>()<<1<<2<<3, QVector<double>()<<0<<0<<0);

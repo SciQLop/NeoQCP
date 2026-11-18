@@ -74,6 +74,9 @@ class QCP_LIB_DECL QCPAxisBase : public QCPLayerable
                    rangeDraggableChanged)
     Q_PROPERTY(
         bool rangeZoomable READ rangeZoomable WRITE setRangeZoomable NOTIFY rangeZoomableChanged)
+    Q_PROPERTY(
+        double rescaleMargin READ rescaleMargin WRITE setRescaleMargin NOTIFY
+            rescaleMarginChanged)
     /// \endcond
 
 public:
@@ -113,6 +116,9 @@ public:
     //! Whether a wheel zoom in the area scales this axis, when the area allows range zooming.
     bool rangeZoomable() const { return mRangeZoomable; }
 
+    //! The fraction of a fitted span left blank on each side by rescale(), 0.05 by default.
+    double rescaleMargin() const { return mRescaleMargin; }
+
     QSharedPointer<QCPAxisTicker> ticker() const { return mTicker; }
 
     QVector<double> tickVector() const { return mTickVector; }
@@ -140,6 +146,7 @@ public:
     void setRangeLower(double lower);
     void setRangeUpper(double upper);
     void setRangeReversed(bool reversed);
+    void setRescaleMargin(double fraction);
     void setRangeDraggable(bool draggable);
     void setRangeZoomable(bool zoomable);
     void setTicker(QSharedPointer<QCPAxisTicker> ticker);
@@ -156,10 +163,13 @@ public:
     Q_INVOKABLE void scaleRange(double factor);
     void scaleRange(double factor, double center);
 
-    // Changes the range so what the plottables of the systems using this axis draw is visible: their
-    // data ranges, in this axis' own dimension. Axes sharing a range through identity links fit the
-    // union of all their data, set on the source once (decision 13).
+    // Changes the range so what the plottables of the systems using this axis draw is visible:
+    // their data ranges, in this axis' own dimension, widened by rescaleMargin() on each side.
+    // Axes sharing a range through identity links fit the union of all their data, set on the
+    // source once (decision 13), so the margin is the source's.
     Q_INVOKABLE void rescale(bool onlyVisiblePlottables = false);
+    //! rescale(), leaving \a margin on each side instead of this axis' rescaleMargin().
+    Q_INVOKABLE void rescale(bool onlyVisiblePlottables, double margin);
     //! Whether this axis follows a source through a link with no functions: the two show the same
     //! range in the same units.
     [[nodiscard]] bool isIdentityFollower() const;
@@ -196,6 +206,7 @@ signals:
     void tickerChanged(const QSharedPointer<QCPAxisTicker>& ticker);
     void rangeDraggableChanged(bool rangeDraggable);
     void rangeZoomableChanged(bool rangeZoomable);
+    void rescaleMarginChanged(double rescaleMargin);
 
 protected:
     // The hot members sit together, first among this class's: a coordToPixel call reads where the
@@ -223,6 +234,8 @@ protected:
 
     // property members:
     SelectableParts mSelectableParts, mSelectedParts;
+    //! rescaleMargin(): the fraction of a fitted span left blank on each side.
+    double mRescaleMargin = 0.05;
 
     // non-property members:
     QSharedPointer<QCPAxisTicker> mTicker;
@@ -275,9 +288,9 @@ protected:
     // The plottables raw: rescale() walks them per axis, so it reads this one (K8).
     QList<QCPPlottable*> plottablesRaw() const;
 
-    // The tail of rescale(): stores \a range, or, when it is not usable (a constant plottable has a
-    // zero-size range), recentres the current range on it.
-    void rescaleTo(const QCPRange& range, bool haveRange);
+    // The tail of rescale(): stores the fitted \a range widened by \a margin, or, when it is not
+    // usable (a constant plottable has a zero-size range), recentres the current range on it.
+    void rescaleTo(const QCPRange& range, bool haveRange, double margin);
     // This axis' own data range under signDomain, from its plottables; false when it has none. The
     // drawn data ranges here; a cartesian axis uses its plottables' key and value ranges, and the
     // angular axis has none (it keeps its full turn).

@@ -618,3 +618,5 @@ that no section above lists, and the behaviour changes of 5f.
   that delete returns.
 - `QCPHandle<T>::remove()` is `const`, so a predicate that takes `const QCPHandle<T>&` can remove what it is looking
   at (brick-breaker's collision sweep does).
+- A fit leaves a margin: `rescale()` and `rescaleAxes()` keep `rescaleMargin()` (5 % by default) of the span blank on
+  each side, in the axis' own scale space. SciQLopPlots' own autoscale margin can move to `setRescaleMargin`.

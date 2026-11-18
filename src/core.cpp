@@ -3585,9 +3585,29 @@ double QCustomPlot::replotTime(bool average) const
   if \a onlyVisiblePlottables is set to true, only the plottables that have their visibility set to
   true (QCPLayerable::setVisible), will be used to rescale the axes.
 
-  \see QCPPlottable::rescaleAxes, QCPAxis::rescale
+  Each axis leaves its own rescaleMargin() blank on each side of what it fits.
+
+  \see QCPPlottable::rescaleAxes, QCPAxis::rescale, QCPAxisBase::setRescaleMargin
 */
 void QCustomPlot::rescaleAxes(bool onlyVisiblePlottables)
+{
+    rescaleAxesWith(onlyVisiblePlottables, std::nullopt);
+}
+
+/*! \overload
+
+  Same as above, but with \a margin of the fitted span left blank on each side of every axis of this
+  call, whatever their rescaleMargin(): one fit that does not depend on the axes' properties. \a
+  margin is no property, so a later rescaleAxes() is not affected.
+
+  \see QCPAxisBase::rescale
+*/
+void QCustomPlot::rescaleAxes(bool onlyVisiblePlottables, double margin)
+{
+    rescaleAxesWith(onlyVisiblePlottables, margin);
+}
+
+void QCustomPlot::rescaleAxesWith(bool onlyVisiblePlottables, std::optional<double> margin)
 {
     const QCPEmissionScope scope(this);
     QList<QPointer<QCPAxisBase>> allAxes;
@@ -3603,7 +3623,13 @@ void QCustomPlot::rescaleAxes(bool onlyVisiblePlottables)
     };
     for (const auto& axis : allAxes)
         if (axis && !(axis->isIdentityFollower() && walked(axis->linkSource())))
-            axis->rescale(onlyVisiblePlottables); // a rangeChanged slot may delete the others
+        {
+            // a rangeChanged slot may delete the others
+            if (margin)
+                axis->rescale(onlyVisiblePlottables, *margin);
+            else
+                axis->rescale(onlyVisiblePlottables);
+        }
 }
 
 /*!

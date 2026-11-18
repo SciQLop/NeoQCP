@@ -58,6 +58,25 @@ Tick marks and tick labels have their own switches:
 - `setTickLength(inside, outside)` and `setSubTickLength(inside, outside)` set their lengths.
 - `setTickLabelRotation(degrees)` rotates the tick labels. `setTickLabelSide(QCPAxis::lsInside)` moves them inside the axis rect.
 
+## The margin a fit leaves
+
+A fit leaves part of the fitted span blank on each side, as matplotlib's `axes.xmargin` and `axes.ymargin` do.
+The default is 5 % per side, so a marker or a lollipop disc sitting on an extreme value is not cut in half.
+
+```{literalinclude} snippets/axes.cpp
+:start-after: // [axes_rescale_margin]
+:end-before: // [/axes_rescale_margin]
+:language: cpp
+:dedent:
+```
+
+![A fit with the default 5 % margin on x and 10 % on y](images/axes-rescale-margin.png)
+
+- `setRescaleMargin(fraction)` sets the margin of one axis, `rescaleMargin()` reads it. `setRescaleMargin(0)` puts the data back on the edges.
+- `rescale(onlyVisiblePlottables, margin)` and `rescaleAxes(onlyVisiblePlottables, margin)` take one margin for that call and leave the axes' property alone.
+- The fraction is of the span in the axis' own scale: of the data span on a linear axis, of the decades on a log axis. A log fit stays in its sign domain, since the margin is applied in log space.
+- A fit of constant data has no span to widen: it recentres the current range instead, with no margin.
+
 ## Logarithmic axes
 
 ```{literalinclude} snippets/axes.cpp

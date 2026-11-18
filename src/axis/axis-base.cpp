@@ -480,17 +480,55 @@ QList<QCPPlottable*> QCPAxisBase::plottablesRaw() const
 }
 
 /*!
+  Sets the fraction of a fitted span left blank on each side by \ref rescale and by the plottable
+  rescale functions, as matplotlib's \c axes.xmargin and \c axes.ymargin: five percent on each side
+  by default, so a marker or a lollipop disc sitting on an extreme value is not cut in half.
+
+  The fraction is of the span in the axis' own scale (see QCPScale::widened): a fraction of the data
+  span on a linear axis, of the decades on a log axis, of the transformed units on a symlog axis. A
+  fit of constant data has a zero span: it recentres the current range and takes no margin.
+
+  A negative or non-finite \a fraction is misuse: the margin is unchanged.
+
+  \see rescale, QCustomPlot::rescaleAxes
+*/
+void QCPAxisBase::setRescaleMargin(double fraction)
+{
+    QCP_CHECK_OR_RETURN(std::isfinite(fraction) && fraction >= 0.0,
+                        "a rescale margin is a fraction: finite and not negative", );
+    if (fraction == mRescaleMargin)
+        return;
+    mRescaleMargin = fraction;
+    qcpEmit(this, mParentPlot, &QCPAxisBase::rescaleMarginChanged, rescaleMargin());
+}
+
+/*!
   Changes the range so what the plottables of the systems using this axis draw is visible, in this
-  axis' dimension (each axis kind collects its own range: see ownDataRange). Axes linked with no
-  functions show one range, so they fit the union of all their data, set once on the source, as
-  matplotlib's shared axes do; \ref QCPAxisRect::setupFullAxesBox "setupFullAxesBox(true)" makes such
-  links. A constant plottable leaves a zero-size range, which recentres the current range instead
-  (see rescaleTo).
+  axis' dimension (each axis kind collects its own range: see ownDataRange). The fitted range is
+  widened by rescaleMargin() on each side, in this axis' scale. Axes linked with no functions show
+  one range, so they fit the union of all their data, set once on the source, as matplotlib's shared
+  axes do; the margin is then the source's. \ref QCPAxisRect::setupFullAxesBox
+  "setupFullAxesBox(true)" makes such links. A constant plottable leaves a zero-size range, which
+  recentres the current range instead (see rescaleTo).
 
   \see QCPPlottable::rescaleAxes, QCustomPlot::rescaleAxes
 */
 void QCPAxisBase::rescale(bool onlyVisiblePlottables)
 {
+    // The margin of the axis that receives the range, the source of an identity link.
+    const QCPAxisBase* receiver = isIdentityFollower() ? mLink->source.data() : this;
+    rescale(onlyVisiblePlottables, receiver->mRescaleMargin);
+}
+
+/*! \overload
+
+  Same as above, but with \a margin instead of the receiving axis' rescaleMargin(), which is left
+  unchanged: one fit that does not depend on the axes' properties.
+*/
+void QCPAxisBase::rescale(bool onlyVisiblePlottables, double margin)
+{
+    QCP_CHECK_OR_RETURN(std::isfinite(margin) && margin >= 0.0,
+                        "a rescale margin is a fraction: finite and not negative", );
     QCPAxisBase* target = isIdentityFollower() ? mLink->source.data() : this;
     const QCP::SignDomain signDomain = target->mScale.isLog()
         ? (target->mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive)
@@ -512,7 +550,7 @@ void QCPAxisBase::rescale(bool onlyVisiblePlottables)
     for (const QPointer<QCPAxisBase>& user : target->mLinkedAxes)
         if (user && user->isIdentityFollower())
             include(user.data());
-    target->rescaleTo(unionRange, haveRange);
+    target->rescaleTo(unionRange, haveRange, margin);
 }
 
 QList<QCPAxisBase*> QCPAxisBase::identityFollowers() const
@@ -574,34 +612,15 @@ bool QCPAxisBase::ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signD
 
 /*! \internal
 
-  The tail of rescale(): stores \a range when one was found. A range that is not usable
-  (the plottables are constant in this dimension) recentres the current range on it, in the axis'
-  own scale.
+  The tail of rescale(): stores the fitted \a range, widened by \a margin on each side (see
+  qcp::fittedRange). A range that is not usable (the plottables are constant in this dimension)
+  recentres the current range on it instead, in the axis' own scale.
 */
-void QCPAxisBase::rescaleTo(const QCPRange& range, bool haveRange)
+void QCPAxisBase::rescaleTo(const QCPRange& range, bool haveRange, double margin)
 {
     if (!haveRange)
         return;
-    QCPRange newRange = range;
-    if (!QCPRange::validRange(newRange)) // likely due to range being zero (plottable has only
-                                        // constant data in this axis dimension), shift current
-                                        // range to at least center the plottable
-    {
-        double center = (newRange.lower + newRange.upper)
-            * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
-                   // validRange returned false for other reason
-        if (mScaleKind != QCPScale::Kind::Log)
-        {
-            newRange.lower = center - mRange.size() / 2.0;
-            newRange.upper = center + mRange.size() / 2.0;
-        }
-        else // log: the same ratio on both sides of the centre
-        {
-            newRange.lower = center / qSqrt(mRange.upper / mRange.lower);
-            newRange.upper = center * qSqrt(mRange.upper / mRange.lower);
-        }
-    }
-    setRange(newRange);
+    setRange(qcp::fittedRange(mScale, range, mRange, margin));
 }
 
 /*!

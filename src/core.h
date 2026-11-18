@@ -43,6 +43,7 @@
 #include <QTimer>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -515,6 +516,9 @@ public:
     [[nodiscard]] QCPHandle<QCPArea> areaAt(const QPointF& pos) const;
     [[nodiscard]] QCPHandle<QCPAxisRect> axisRectAt(const QPointF& pos) const;
     Q_SLOT void rescaleAxes(bool onlyVisiblePlottables = false);
+    //! rescaleAxes(), leaving \a margin on each side of every axis' fitted range instead of each
+    //! axis' own rescaleMargin().
+    Q_SLOT void rescaleAxes(bool onlyVisiblePlottables, double margin);
 
     [[nodiscard]] QList<QCPHandle<QCPAxis>> selectedAxes() const;
     [[nodiscard]] QList<QCPHandle<QCPLegend>> selectedLegends() const;
@@ -597,6 +601,9 @@ signals:
 private:
     template <typename T>
     friend struct qcp::Construct;
+    // rescaleAxes() and its overload, landed on rescaleAxesWith: the margin, when the call gives one
+    // rather than the axes' own (a slot signature takes no sentinel).
+    void rescaleAxesWith(bool onlyVisiblePlottables, std::optional<double> margin);
     // The axes add<T>() puts a new plottable on; both null (one misuse) when it must refuse.
     [[nodiscard]] std::pair<QCPAxis*, QCPAxis*> axesForAdd() const;
     bool detach(QCPPlottable* plottable);

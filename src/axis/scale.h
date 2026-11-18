@@ -81,6 +81,12 @@ public:
       QCPAxisBase::scaleRange does for a linear or symlog scale. A log range keeps its sign.
     */
     [[nodiscard]] QCPRange scaled(const QCPRange& range, double factor, double center) const;
+    /*!
+      \a range widened by \a fraction of its span on each side, in this scale's own space: a
+      fraction of the data span on a linear axis, of the decades on a log axis. A log range keeps
+      its sign, so the margin cannot cross zero.
+    */
+    [[nodiscard]] QCPRange widened(const QCPRange& range, double fraction) const;
 
     //! Same kind and same parameters. The two caches are derived from them, so they do not count.
     bool operator==(const QCPScale& other) const
@@ -105,5 +111,19 @@ private:
 
 //! Hash key for QHash and dependency revisions.
 QCP_LIB_DECL size_t qHash(const QCPScale& scale, size_t seed = 0);
+
+namespace qcp
+{
+/*!
+  The range an axis shows after a fit of \a fitted: widened by \a margin of its span in \a scale's
+  own space, unioned with \a current when \a onlyEnlarge, and, when the fit is not usable (constant
+  data leaves a zero span), \a current recentred on it instead.
+
+  The one place a fit that is not exact is computed: QCPAxisBase::rescaleTo and the plottable
+  rescale functions both end here.
+*/
+QCP_LIB_DECL QCPRange fittedRange(const QCPScale& scale, const QCPRange& fitted,
+                                  const QCPRange& current, double margin, bool onlyEnlarge = false);
+} // namespace qcp
 
 #endif // QCP_SCALE_H

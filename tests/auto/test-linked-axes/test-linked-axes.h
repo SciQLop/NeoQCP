@@ -1,5 +1,5 @@
-#include <QtTest/QtTest>
 #include "qcustomplot.h"
+#include <QtTest/QtTest>
 
 class TestLinkedAxes : public QObject
 {
@@ -36,4 +36,13 @@ private slots:
     void aMappedFollowerDoesNotWiden();
     void anIdentityLinkSharesTheScale();
     void identityLinksFlatten();
+
+    void rescaleLeavesTheDefaultMargin();
+    void rescaleMarginOnALogAxisIsInDecades();
+    void rescaleMarginZeroFitsExactly();
+    void rescaleAxesMarginArgumentOverridesTheAxes();
+    void rescaleOfAnIdentityFollowerUsesTheSourceMargin();
+    void plottableRescaleOnlyEnlargeDoesNotGrow();
+    void aNegativeOrNanMarginIsRefused();
+    void constantDataTakesNoMargin();
 };

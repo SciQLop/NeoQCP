@@ -140,3 +140,34 @@ size_t qHash(const QCPScale& scale, size_t seed)
     return qHashMulti(seed, static_cast<quint8>(scale.kind()), scale.base(), scale.threshold(),
                       scale.linearScale());
 }
+
+QCPRange QCPScale::widened(const QCPRange& range, double fraction) const
+{
+    // A margin of zero keeps the fit exactly as it was, with no round trip through the scale.
+    if (fraction <= 0.0)
+        return range;
+    const double lower = toScale(range.lower);
+    const double upper = toScale(range.upper);
+    if (!std::isfinite(lower) || !std::isfinite(upper)) // not a range this scale can widen (0 on a log)
+        return range;
+    const double sign = isLog() ? rangeSign(range) : 1.0;
+    const double delta = std::abs(upper - lower) * fraction;
+    return QCPRange(sign * fromScale(lower - delta), sign * fromScale(upper + delta));
+}
+
+QCPRange qcp::fittedRange(const QCPScale& scale, const QCPRange& fitted, const QCPRange& current,
+                          double margin, bool onlyEnlarge)
+{
+    QCPRange range = scale.widened(fitted, margin);
+    if (onlyEnlarge)
+        range.expand(current);
+    if (QCPRange::validRange(range))
+        return range;
+    // A constant plottable in this dimension: recentre the current range on it, no margin.
+    const double center = (fitted.lower + fitted.upper) * 0.5;
+    if (!scale.isLog())
+        return QCPRange(center - current.size() / 2.0, center + current.size() / 2.0);
+    // Log: the same ratio on both sides of the centre, so the range keeps its sign.
+    return QCPRange(center / qSqrt(current.upper / current.lower),
+                    center * qSqrt(current.upper / current.lower));
+}

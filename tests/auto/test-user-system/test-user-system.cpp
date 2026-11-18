@@ -1028,6 +1028,9 @@ void TestUserSystem::rescaleAxesFitsASkewCurve()
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
     rect->axis(QCPAxis::atLeft)->setRange(0, 50);
+    // The skew axes fit the data exactly: the margin has its own tests.
+    rect->axis(QCPAxis::atBottom)->setRescaleMargin(0);
+    rect->axis(QCPAxis::atLeft)->setRescaleMargin(0);
     InspectableCurve* curve = curveOn(rect);
     curve->setData(QVector<double> { 1, 5, 9 }, QVector<double> { 20, 30, 40 });
     settle(plot);
@@ -1094,6 +1097,8 @@ void TestUserSystem::rescaleAxesFitsASkewGraph()
     SkewRect* rect = skewRect(plot);
     rect->axis(QCPAxis::atBottom)->setRange(0, 50);
     rect->axis(QCPAxis::atLeft)->setRange(0, 50);
+    rect->axis(QCPAxis::atBottom)->setRescaleMargin(0); // the skew fit is the point, not the margin
+    rect->axis(QCPAxis::atLeft)->setRescaleMargin(0);
     InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 1, 5, 9 }, QVector<double> { 20, 30, 40 });
     settle(plot);
@@ -1110,6 +1115,8 @@ void TestUserSystem::aSkewGraphRescalesItsAxes()
     SkewRect* rect = skewRect(plot);
     rect->axis(QCPAxis::atBottom)->setRange(0, 50);
     rect->axis(QCPAxis::atLeft)->setRange(0, 50);
+    rect->axis(QCPAxis::atBottom)->setRescaleMargin(0); // the skew fit is the point, not the margin
+    rect->axis(QCPAxis::atLeft)->setRescaleMargin(0);
     InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 1, 5, 9 }, QVector<double> { 20, 30, 40 });
     settle(plot);
