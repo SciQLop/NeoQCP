@@ -242,6 +242,57 @@ void TestRSpan::dataDragMovesByMouseDelta()
     QCOMPARE(span->valueRange().upper, y->pixelToCoord(y->coordToPixel(6) + 30));
 }
 
+// A drag is measured from the press, not from the previous move, for every edge and the body.
+void TestRSpan::severalMovesKeepTheWholeDrag()
+{
+    mPlot->xAxis->setRange(0, 1000);
+    mPlot->yAxis->setRange(0, 1000);
+    mPlot->replot();
+    const QRect axRect = mPlot->axisRect()->rect();
+    const struct
+    {
+        const char* name;
+        QPoint from;
+        bool movesLeft, movesRight, movesTop, movesBottom;
+    } parts[] {
+        { "left edge", { 100, 75 }, true, false, false, false },
+        { "right edge", { 200, 75 }, false, true, false, false },
+        { "top edge", { 150, 50 }, false, false, true, false },
+        { "bottom edge", { 150, 100 }, false, false, false, true },
+        { "body", { 150, 75 }, true, true, true, true },
+    };
+    for (const auto& row : parts)
+    {
+        auto span = mPlot->add<QCPItemRSpan>();
+        for (auto* edge : { span->leftEdge, span->rightEdge, span->topEdge, span->bottomEdge })
+        {
+            edge->setTypeX(QCPItemPosition::ptAxisRectAbsolute);
+            edge->setTypeY(QCPItemPosition::ptAxisRectAbsolute);
+        }
+        span->setKeyRange(QCPRange(100, 200));
+        span->setValueRange(QCPRange(50, 100));
+        const QPoint from = axRect.topLeft() + row.from;
+        sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+        for (const QPoint step : { QPoint(10, 5), QPoint(25, 12), QPoint(55, 30) })
+            sendMouse(mPlot, QEvent::MouseMove, from + step, Qt::LeftButton);
+        sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(55, 30), Qt::NoButton);
+
+        QVERIFY2(span->keyRange().lower == (row.movesLeft ? 155.0 : 100.0),
+                 qPrintable(QStringLiteral("%1: the left edge follows the whole drag")
+                                .arg(QLatin1String(row.name))));
+        QVERIFY2(span->keyRange().upper == (row.movesRight ? 255.0 : 200.0),
+                 qPrintable(QStringLiteral("%1: the right edge follows the whole drag")
+                                .arg(QLatin1String(row.name))));
+        QVERIFY2(span->valueRange().lower == (row.movesTop ? 80.0 : 50.0),
+                 qPrintable(QStringLiteral("%1: the top edge follows the whole drag")
+                                .arg(QLatin1String(row.name))));
+        QVERIFY2(span->valueRange().upper == (row.movesBottom ? 130.0 : 100.0),
+                 qPrintable(QStringLiteral("%1: the bottom edge follows the whole drag")
+                                .arg(QLatin1String(row.name))));
+        QVERIFY(mPlot->removeItem(span));
+    }
+}
+
 void TestRSpan::logAxisDragFollowsTheMouseInPixels()
 {
     mPlot->xAxis->setScale(QCPScale::log());

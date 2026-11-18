@@ -235,6 +235,7 @@ void QCPItemRSpan::mousePressEvent(QCPMouseEvent* event)
     }
     // The span names its own parts: a press's details are one of HitPart, not a tagged map.
     mDragPart = static_cast<HitPart>(event->details().toInt());
+    mDragPressPixels = event->pixels();
     mDragStartLeft = leftEdge->pixelPosition().x();
     mDragStartRight = rightEdge->pixelPosition().x();
     mDragStartTop = topEdge->pixelPosition().y();
@@ -249,9 +250,9 @@ void QCPItemRSpan::mouseMoveEvent(QCPMouseEvent* event)
     // The drag signals both ranges itself, once, below.
     mEdgesQuiet = true;
 
-    const QCP::PixelOffset moved = event->moved();
-    const double dx = moved.dx;
-    const double dy = moved.dy;
+    const QCP::PixelOffset dragged = event->pixels() - mDragPressPixels;
+    const double dx = dragged.dx;
+    const double dy = dragged.dy;
 
     switch (mDragPart)
     {

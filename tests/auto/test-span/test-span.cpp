@@ -455,6 +455,67 @@ void TestSpan::dataDragMovesByMouseDelta()
     QCOMPARE(span->range().upper, upper);
 }
 
+void TestSpan::severalMovesKeepTheWholeDrag_data()
+{
+    QTest::addColumn<bool>("vertical");
+    QTest::addColumn<int>("part");
+    const struct
+    {
+        const char* name;
+        int part;
+    } parts[] { { "lower edge", 0 }, { "upper edge", 1 }, { "body", -1 } };
+    for (const auto& row : parts)
+    {
+        QTest::newRow(qPrintable(QStringLiteral("vertical, %1").arg(QLatin1String(row.name))))
+            << true << row.part;
+        QTest::newRow(qPrintable(QStringLiteral("horizontal, %1").arg(QLatin1String(row.name))))
+            << false << row.part;
+    }
+}
+
+// A drag is measured from the press, not from the previous move: three moves land on press + the
+// whole offset, whichever part was grabbed. A step added to the press positions loses all but the
+// last step.
+void TestSpan::severalMovesKeepTheWholeDrag()
+{
+    QFETCH(bool, vertical);
+    QFETCH(int, part);
+    QCPAxis* axis = rangeAxis(mPlot, vertical);
+    axis->setRange(0, 1000);
+    auto span = mPlot->add<QCPItemSpan>(orientationOf(vertical));
+    span->setRange(QCPRange(100, 600));
+    mPlot->replot();
+    const double grabbed = part == 0 ? 100.0 : part == 1 ? 600.0 : 350.0;
+    // Downwards on a horizontal span is a decrease in data, so the drag goes up to keep the band
+    // inside the axis range and its edges from crossing.
+    const int sign = vertical ? 1 : -1;
+    const QPoint from
+        = pointOf(vertical, axis->coordToPixel(grabbed), acrossMiddle(mPlot, vertical)).toPoint();
+    const auto moved = [&](int step) { return (from + dragOf(vertical, sign * step)).toPoint(); };
+    sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    for (const int step : { 10, 25, 55 })
+        sendMouse(mPlot, QEvent::MouseMove, moved(step), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, moved(55), Qt::NoButton);
+
+    const double lower = axis->pixelToCoord(axis->coordToPixel(100) + sign * 55);
+    const double upper = axis->pixelToCoord(axis->coordToPixel(600) + sign * 55);
+    if (part == 0)
+    {
+        QCOMPARE(span->range().lower, lower);
+        QCOMPARE(span->range().upper, 600.0);
+    }
+    else if (part == 1)
+    {
+        QCOMPARE(span->range().lower, 100.0);
+        QCOMPARE(span->range().upper, upper);
+    }
+    else
+    {
+        QCOMPARE(span->range().lower, lower);
+        QCOMPARE(span->range().upper, upper);
+    }
+}
+
 void TestSpan::logAxisDragFollowsTheMouseInPixels_data()
 {
     addOrientationRows();

@@ -64,6 +64,8 @@ protected:
 
     const Qt::Orientation mOrientation;
     HitPart mDragPart = hpNone;
+    //! The press pixel the drag is measured from: an edge follows the whole drag, not its last step.
+    QCP::Pixels mDragPressPixels {};
     double mDragStartLower = 0.0;
     double mDragStartUpper = 0.0;
 

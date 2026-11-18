@@ -37,6 +37,8 @@ private slots:
     void pixelModeDragMovesByPixels();
     void dataDragMovesByMouseDelta_data();
     void dataDragMovesByMouseDelta();
+    void severalMovesKeepTheWholeDrag_data();
+    void severalMovesKeepTheWholeDrag();
     void logAxisDragFollowsTheMouseInPixels_data();
     void logAxisDragFollowsTheMouseInPixels();
     void mixedEdgesEachMoveInTheirOwnUnit_data();

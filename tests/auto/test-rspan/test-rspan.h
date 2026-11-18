@@ -20,6 +20,7 @@ private slots:
     void fillDragSlotDeletingTheSpanIsSafe();
     void pixelModeDragMovesByPixels();
     void dataDragMovesByMouseDelta();
+    void severalMovesKeepTheWholeDrag();
     void logAxisDragFollowsTheMouseInPixels();
     void mixedEdgesEachMoveInTheirOwnUnit();
     void anEdgeWithAPixelOffsetIsRefused();

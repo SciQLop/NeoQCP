@@ -55,6 +55,8 @@ protected:
     enum AnchorIndex { aiTopLeft, aiTopRight, aiBottomRight, aiBottomLeft, aiCenter };
 
     HitPart mDragPart = hpNone;
+    //! The press pixel the drag is measured from: an edge follows the whole drag, not its last step.
+    QCP::Pixels mDragPressPixels {};
     double mDragStartLeft = 0, mDragStartRight = 0;
     double mDragStartTop = 0, mDragStartBottom = 0;
 

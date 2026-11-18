@@ -193,6 +193,7 @@ void QCPItemSpan::mousePressEvent(QCPMouseEvent* event)
     }
     // The span names its own parts: a press's details are one of HitPart, not a tagged map.
     mDragPart = static_cast<HitPart>(event->details().toInt());
+    mDragPressPixels = event->pixels();
     mDragStartLower = rangePixel(lowerEdge);
     mDragStartUpper = rangePixel(upperEdge);
     event->accept();
@@ -207,8 +208,8 @@ void QCPItemSpan::mouseMoveEvent(QCPMouseEvent* event)
 
     const bool vertical = mOrientation == Qt::Vertical;
     const Qt::Orientation edgeAxis = vertical ? Qt::Horizontal : Qt::Vertical;
-    const QCP::PixelOffset moved = event->moved();
-    const double delta = vertical ? moved.dx : moved.dy;
+    const QCP::PixelOffset dragged = event->pixels() - mDragPressPixels;
+    const double delta = vertical ? dragged.dx : dragged.dy;
 
     switch (mDragPart)
     {
