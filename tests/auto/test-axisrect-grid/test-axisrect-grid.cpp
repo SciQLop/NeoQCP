@@ -163,6 +163,8 @@ void TestAxisRectGrid::aSecondCallGrowsAndShrinks()
     QTest::mouseMove(mPlot, pressed + QPoint(12, 8));
 
     mPlot->setAxisRectGrid(2, 1);
+    QTest::mouseMove(mPlot, pressed + QPoint(24, 16));
+    QTest::mouseRelease(mPlot, Qt::LeftButton, Qt::NoModifier, pressed + QPoint(24, 16));
 
     QVERIFY(!rect);
     QVERIFY(!graph);
@@ -606,4 +608,72 @@ void TestAxisRectGrid::aShareThatWouldBreakAMappedLinkIsRefused()
     QVERIFY(upper->tickLabels());
     QCOMPARE(upper->linkSource(), nullptr);
     QCOMPARE(lower->linkSource(), upper);
+}
+
+void TestAxisRectGrid::aGrowingShareIsCheckedToo()
+{
+    // Growing from the default rect: the new cells do not exist yet when the call checks its
+    // shares, and the kept rect's axes must be checked all the same.
+    const auto twice = [](double v) { return 2 * v; };
+    const auto half = [](double v) { return v / 2; };
+
+    QCPAxisRect* kept = mPlot->axisRect().get();
+    QCPAxis* units = kept->axis(QCPAxis::atTop).get();
+    units->linkTo(kept->xAxis(), twice, half);
+    gMisuses = 0;
+    mPlot->setAxisRectGrid(2, 1, { .shareX = true });
+    QCOMPARE(gMisuses, 1);
+    QCOMPARE(mPlot->axisRectCount(), 1);
+    QCOMPARE(units->linkSource(), kept->xAxis().get());
+
+    QCustomPlot follower;
+    QCPAxis* x = follower.axisRect()->xAxis().get();
+    x->linkTo(follower.axisRect()->axis(QCPAxis::atTop), twice, half);
+    gMisuses = 0;
+    follower.setAxisRectGrid(2, 1, { .shareX = true });
+    QCOMPARE(gMisuses, 1);
+    QCOMPARE(follower.axisRectCount(), 1);
+    QVERIFY(!x->isIdentityFollower());
+
+    QCustomPlot source;
+    QCPAxis* y = source.axisRect()->yAxis().get();
+    y->linkTo(source.axisRect()->axis(QCPAxis::atRight), twice, half);
+    gMisuses = 0;
+    source.setAxisRectGrid(1, 2, { .shareY = true });
+    QCOMPARE(gMisuses, 1);
+    QCOMPARE(source.axisRectCount(), 1);
+}
+
+void TestAxisRectGrid::unsharingKeepsALinkTheUserMade()
+{
+    // The user relinked a shared axis: it is theirs now, and the next call leaves it alone.
+    mPlot->setAxisRectGrid(2, 1, { .shareX = true });
+    QCPAxisRect* top = mPlot->axisRect(0, 0).get();
+    QCPAxis* x = top->xAxis().get();
+    QCPAxis* units = top->axis(QCPAxis::atTop).get();
+    x->linkTo(units, [](double v) { return 2 * v; }, [](double v) { return v / 2; });
+    mPlot->setAxisRectGrid(2, 1);
+    QCOMPARE(x->linkSource(), units);
+}
+
+void TestAxisRectGrid::aGroupSignalWaitsForTheGrid()
+{
+    // The grid's own group takes the rect's left side from the user's group: the user's group
+    // reports it after the grid is built, not in the middle of it.
+    const QPointer<QCPAlignmentGroup> user
+        = QCPAlignmentGroup::create({ mPlot->axisRect().get() }, QCP::msLeft);
+    QVERIFY(user);
+    bool fired = false;
+    connect(user.data(), &QCPAlignmentGroup::membersChanged, this,
+            [&]
+            {
+                if (fired)
+                    return;
+                fired = true;
+                mPlot->setAxisRectGrid(2, 1);
+            });
+    gMisuses = 0;
+    mPlot->setAxisRectGrid(2, 1);
+    QVERIFY(fired);
+    QCOMPARE(gMisuses, 0);
 }

@@ -11,6 +11,7 @@
 #include "layoutelement-legend.h"
 
 #include <algorithm>
+#include <optional>
 #include <cmath>
 
 namespace
@@ -179,11 +180,14 @@ QList<QCPLayoutElement*> gridRow(QCPLayoutGrid& layout, int row, int columns)
 // Undoes the shares a previous call made (P-5): the grid's followers leave their sources, the axes
 // the share handed over return to the source they had (a full axes box's top axis, say), and the
 // tick labels the grid hid show again (even if the user set them while shared: the grid cannot
-// tell). A label the user hid before the share stays hidden.
+// tell). A label the user hid before the share stays hidden, and an axis the user relinked since
+// is theirs: the grid leaves it as it is.
 void unshare(QList<QCPAxisRectGridState::Share>& shares)
 {
-    const QList<QCPAxisRectGridState::Share> records = shares;
+    QList<QCPAxisRectGridState::Share> records = shares;
     shares.clear();
+    records.removeIf([](const QCPAxisRectGridState::Share& record)
+                     { return !record.follower || record.follower->linkSource() != record.sharedSource; });
     for (const auto& record : records)
         if (record.follower)
             record.follower->unlink();
@@ -198,29 +202,39 @@ void unshare(QList<QCPAxisRectGridState::Share>& shares)
     }
 }
 
-// The (follower, source) pairs the options ask for, in the cells that hold rects now.
+// The (follower, source) pairs the options ask for. A cell this call has not built yet gives a null
+// axis: it will be a fresh one, with no link to check. A rect without the axis gives no pair.
 QList<std::pair<QCPAxis*, QCPAxis*>> plannedShares(QCPLayoutGrid& layout, int rows, int columns,
                                                    const QCPAxisRectGridOptions& options)
 {
-    const auto rect = [&](int row, int column) -> QCPAxisRect*
+    using Pick = QCPAxis* (*)(QCPAxisRect*);
+    const auto axis = [&](int row, int column, Pick pick) -> std::optional<QCPAxis*>
     {
         if (row >= layout.rowCount() || column >= layout.columnCount())
             return nullptr;
-        return qobject_cast<QCPAxisRect*>(layout.element(row, column).get());
+        auto* rect = qobject_cast<QCPAxisRect*>(layout.element(row, column).get());
+        if (!rect)
+            return nullptr;
+        if (QCPAxis* found = pick(rect))
+            return found;
+        return std::nullopt;
     };
+    const Pick x = [](QCPAxisRect* rect) { return rect->xAxis().get(); };
+    const Pick y = [](QCPAxisRect* rect) { return rect->yAxis().get(); };
     QList<std::pair<QCPAxis*, QCPAxis*>> pairs;
+    const auto plan = [&](std::optional<QCPAxis*> follower, std::optional<QCPAxis*> source)
+    {
+        if (follower && source)
+            pairs.append(std::pair { *follower, *source });
+    };
     if (options.shareX)
         for (int column = 0; column < columns; ++column)
-            if (QCPAxisRect* bottom = rect(rows - 1, column); bottom && bottom->xAxis())
-                for (int row = 0; row < rows - 1; ++row)
-                    if (QCPAxisRect* above = rect(row, column); above && above->xAxis())
-                        pairs.append(std::pair { above->xAxis().get(), bottom->xAxis().get() });
+            for (int row = 0; row < rows - 1; ++row)
+                plan(axis(row, column, x), axis(rows - 1, column, x));
     if (options.shareY)
         for (int row = 0; row < rows; ++row)
-            if (QCPAxisRect* left = rect(row, 0); left && left->yAxis())
-                for (int column = 1; column < columns; ++column)
-                    if (QCPAxisRect* right = rect(row, column); right && right->yAxis())
-                        pairs.append(std::pair { right->yAxis().get(), left->yAxis().get() });
+            for (int column = 1; column < columns; ++column)
+                plan(axis(row, column, y), axis(row, 0, y));
     return pairs;
 }
 
@@ -240,11 +254,12 @@ bool sharesAreLinkable(const QList<std::pair<QCPAxis*, QCPAxis*>>& pairs)
     return std::none_of(pairs.cbegin(), pairs.cend(),
                         [&](const auto& pair)
                         {
+                            const auto [follower, source] = pair;
                             // A source that follows its own follower would turn the link round.
-                            const bool reversed = pair.second->isIdentityFollower()
-                                && pair.second->linkSource() == pair.first;
-                            return mapped(pair.first) || drivesMapped(pair.first)
-                                || mapped(pair.second) || reversed;
+                            const bool reversed = follower && source && source->isIdentityFollower()
+                                && source->linkSource() == follower;
+                            return (follower && (mapped(follower) || drivesMapped(follower)))
+                                || (source && mapped(source)) || reversed;
                         });
 }
 
@@ -254,7 +269,8 @@ bool sharesAreLinkable(const QList<std::pair<QCPAxis*, QCPAxis*>>& pairs)
 void shareAxes(QCPLayoutGrid& layout, int rows, int columns, const QCPAxisRectGridOptions& options,
                QList<QCPAxisRectGridState::Share>& shares)
 {
-    const QList<std::pair<QCPAxis*, QCPAxis*>> pairs = plannedShares(layout, rows, columns, options);
+    QList<std::pair<QCPAxis*, QCPAxis*>> pairs = plannedShares(layout, rows, columns, options);
+    pairs.removeIf([](const auto& pair) { return !pair.first || !pair.second; }); // every cell is built now
     const auto recorded = [&](const QCPAxis* axis)
     {
         return std::any_of(shares.cbegin(), shares.cend(),
@@ -287,6 +303,9 @@ void shareAxes(QCPLayoutGrid& layout, int rows, int columns, const QCPAxisRectGr
             follower->setTickLabels(false);
         }
     }
+    for (auto& record : shares)
+        if (record.follower && record.follower->isIdentityFollower())
+            record.sharedSource = record.follower->linkSource();
 }
 
 //! Takes the plot's legend out of the dropped rect it sits in, so the plot keeps its legend.

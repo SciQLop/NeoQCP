@@ -47,6 +47,7 @@ private slots:
   void aSecondNestedInsetIsOnTop();
   void aPlottableMovedOntoAnInsetIsDrawn();
   void anItemFollowsTheAreaItIsIn();
+  void aRemovedInsetHandsItsDataBack();
   void aChosenLayerSurvivesAMoveOntoAnInset();
   void aClearedPixmapLetsTheThemeBack();
   void thePlotBackgroundReachesAnInset();

@@ -33,6 +33,9 @@ private slots:
     void aSecondCallReshares();
     void sharingAndAFullAxesBox();
     void aShareThatWouldBreakAMappedLinkIsRefused();
+    void aGrowingShareIsCheckedToo();
+    void unsharingKeepsALinkTheUserMade();
+    void aGroupSignalWaitsForTheGrid();
 
 private:
     void renderOnce(QSize size);

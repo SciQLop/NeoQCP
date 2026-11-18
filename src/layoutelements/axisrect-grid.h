@@ -13,8 +13,11 @@ class QCPAxis;
 class QCPAxisRect;
 class QCPLayoutGrid;
 
-/*! \brief The options of QCustomPlot::setAxisRectGrid(): the shares (stored, applied by the
-  shared-axis step) and the per-row/per-column stretch factors.
+/*! \brief The options of QCustomPlot::setAxisRectGrid(): the shares and the per-row/per-column
+  stretch factors.
+
+  \c shareX links each column's bottom x axes to the bottom rect's, \c shareY each row's left y
+  axes to the leftmost rect's; the followers hide their tick labels.
 
   A stretch list shorter than the grid leaves the missing entries at 1. A longer one, or a factor
   that is not finite and greater than zero, is misuse and the call changes nothing.
@@ -32,8 +35,8 @@ struct QCPAxisRectGridOptions
 /*! \internal
 
   What QCustomPlot remembers about its axis rect grid between calls: the alignment groups it made
-  (one per column for the left/right sides, one per row for the top/bottom ones), the shares a later
-  step will unmake, and the options last applied.
+  (one per column for the left/right sides, one per row for the top/bottom ones), the shares the next
+  call undoes, and the options last applied.
 */
 struct QCPAxisRectGridState
 {
@@ -45,6 +48,7 @@ struct QCPAxisRectGridState
         QPointer<QCPAxis> follower;
         QPointer<QCPAxis> originalSource;
         bool hidLabels = false;
+        QPointer<QCPAxis> sharedSource; // what the grid linked it to: another link is the user's
     };
 
     QList<QPointer<QCPAlignmentGroup>> columnGroups;

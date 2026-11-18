@@ -1183,6 +1183,11 @@ void QCPAxisRect::removeOwnLayers()
 {
     if (!mParentPlot || mParentPlot->isBeingDestroyed())
         return;
+    if (mOwnLayers.data)
+        for (const QCPHandle<QCPLayerable>& child : mOwnLayers.data->children())
+            if (child)
+                child->setLayer(qobject_cast<QCPItem*>(child.get()) ? QStringLiteral("annotations")
+                                                                    : QStringLiteral("main"));
     for (QCPLayer* layer : { mOwnLayers.axes.data(), mOwnLayers.data.data(), mOwnLayers.back.data() })
         if (layer)
             (void)mParentPlot->removeLayer(layer);

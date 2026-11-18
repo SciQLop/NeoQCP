@@ -1,4 +1,6 @@
 #include "test-qcpaxisrect.h"
+
+#include <QTemporaryDir>
 #include "../expect-debug.h"
 #include "../keep-images.h"
 #include "../reference-image.h"
@@ -627,6 +629,13 @@ void TestQCPAxisRect::anInsetExportsLikeTheScreen()
     hiddenPlot.toPixmap(400, 300);
     QCOMPARE(hiddenInset->rect(), shownInset->rect());
     QCOMPARE(hiddenPlot.axisRect(1, 0)->rect(), shownPlot.axisRect(1, 0)->rect());
+
+    QCustomPlot pdfPlot;
+    auto pdfInset = build(pdfPlot);
+    QTemporaryDir dir;
+    QVERIFY(pdfPlot.savePdf(dir.filePath(QStringLiteral("grid.pdf")), 400, 300));
+    QCOMPARE(pdfInset->rect(), shownInset->rect());
+    QCOMPARE(pdfPlot.axisRect(1, 0)->rect(), shownPlot.axisRect(1, 0)->rect());
 }
 
 void TestQCPAxisRect::gridTitlesPicture()
@@ -812,8 +821,6 @@ void TestQCPAxisRect::aLegendKeepsItsPixelsOverAnInset()
     const int red = countColour(frame, legendBox, isRed);
     QVERIFY2(red == 0, qPrintable(QStringLiteral("the inset's GPU line covers the legend: %1 red pixels").arg(red)));
 
-    // The inset's axes paint after its data layer: the thick line reaches over the top spine and
-    // over the legend, and both keep their pixels.
     // The inset's axes paint after its data layer: the thick line reaches over the top spine and
     // the title, and both keep their pixels.
     const QRect topSpine(data.left(), data.top() - 1, data.width(), 1);
@@ -2472,4 +2479,27 @@ void TestQCPAxisRect::columnsOfTheWrongLengthAreRefused()
     QVERIFY2(!map, "a column needs one value per y value");
     QCOMPARE(gMisuses, 1);
     QVERIFY2(gLastMisuse.contains("one value per y value"), gLastMisuse.constData());
+}
+
+void TestQCPAxisRect::aRemovedInsetHandsItsDataBack()
+{
+    // A graph and an item left on an inset removed through its handle go back to their default
+    // layers, not to whatever layer sat under the inset's.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto inset = plot.axisRect()->addInset(QRectF(0.25, 0.25, 0.5, 0.5));
+    auto graph = inset->line(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 });
+    auto item = plot.add<QCPItemRect>();
+    for (QCPItemPosition* position : { item->topLeft, item->bottomRight })
+    {
+        position->setType(QCPItemPosition::ptAxisRectRatio);
+        position->setAxisRect(inset.get());
+    }
+    QCOMPARE(graph->layer()->name(), QStringLiteral("inset 1 data"));
+    QCOMPARE(item->layer()->name(), QStringLiteral("inset 1 data"));
+    inset.remove();
+    QVERIFY(graph);
+    QCOMPARE(graph->layer()->name(), QStringLiteral("main"));
+    QVERIFY(item);
+    QCOMPARE(item->layer()->name(), QStringLiteral("annotations"));
 }

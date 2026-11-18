@@ -2826,8 +2826,15 @@ bool QCustomPlot::moveLayer(QCPLayer* layer, QCPLayer* otherLayer,
 }
 
 /*!
-  Makes the plot layout a \a rows by \a columns grid of axis rects. \a options sets the shares
-  (stored here, applied with the shared axes) and the stretch factors of the rows and columns.
+  Makes the plot layout a \a rows by \a columns grid of axis rects. \a options sets the shares and
+  the stretch factors of the rows and columns.
+
+  With \c shareX, the bottom x axis of every rect of a column follows the bottom rect's, linked
+  without functions: one range, one scale and one rescale union for the column, and only the bottom
+  rect shows its tick labels. \c shareY does the same for each row's left y axes, the leftmost rect
+  being the source. Axis labels stay. A second call undoes the previous call's shares first: links
+  removed, axes the share handed over linked back to the source they had, hidden tick labels shown.
+  An axis the user relinked since the share is left as it is.
 
   The rects already in the grid stay in their cells as long as the cell is inside the new grid: in
   particular the default rect in cell (0, 0) keeps its plottables, items, colour scale, insets and
@@ -2846,7 +2853,9 @@ bool QCustomPlot::moveLayer(QCPLayer* layer, QCPLayer* otherLayer,
   Refused with one misuse report and no change: a non-positive row or column count, more stretch
   factors than rows or columns, a stretch factor that is not finite and greater than zero, and a
   plot layout holding anything but axis rects in its cells (a title row from insertRow, a legend
-  added to the main layout, a nested layout or a polar area). The call reports instead of doing
+  added to the main layout, a nested layout or a polar area), and a share that would replace or
+  break a link through functions (an axis in other units following or followed by a shared axis) or
+  turn a user's link round (a source already following its follower). The call reports instead of doing
   anything while the plot is being destroyed, and holds the signals its removals queue until it is
   done, so a slot cannot run in the middle of the walk. A call made while one is running (from a
   destroyed() slot of something it removes, say) is refused the same way: the grid it is building

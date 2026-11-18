@@ -128,7 +128,7 @@ void QCPAlignmentGroup::add(QCPLayoutElement* element)
             element->mAlignmentGroups[QCPLayoutElement::alignmentSlot(side)] = this;
     element->parentPlot()->watchAncestors();
     invalidate();
-    qcpEmit(this, nullptr, &QCPAlignmentGroup::membersChanged);
+    qcpEmit(this, element->parentPlot(), &QCPAlignmentGroup::membersChanged);
 }
 
 void QCPAlignmentGroup::remove(QCPLayoutElement* element)
@@ -155,7 +155,7 @@ void QCPAlignmentGroup::leave(QCPLayoutElement* element, QCP::MarginSides sides)
     if (plot)
         plot->watchAncestors();
     invalidate();
-    qcpEmit(this, nullptr, &QCPAlignmentGroup::membersChanged);
+    qcpEmit(this, plot, &QCPAlignmentGroup::membersChanged);
     if (mMembers.isEmpty())
     {
         // A plot being torn down may never run the event loop again: waiting for a deferred
