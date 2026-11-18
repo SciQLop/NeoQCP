@@ -969,31 +969,33 @@ std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixe
             return std::nullopt;
     }
     double best = kInfinity;
-    // The topmost command within the tolerance names what was hit (decision P-2): a peak's edge
-    // recorded over its body is grabbed anywhere within the tolerance of it, also from inside the
-    // body, while the distance stays the nearest command's.
+    int nearestIndex = -1;
+    // The topmost tagged command within the tolerance names what was hit (decision P-2): a peak's
+    // edge recorded over its body is grabbed anywhere within the tolerance of it, also from inside
+    // the body, while the distance stays the nearest command's. The topmost rule decides among the
+    // tagged commands only: an untagged line over an untagged batch names nothing, so the hit keeps
+    // the batch index of the nearest command, as it always did.
     int named = -1;
-    int namedIndex = -1;
     for (int i = 0; i < int(mState->recording.commands.size()); ++i)
     {
         int index = -1;
         const double distance = distanceTo(mState->recording.commands[size_t(i)], frame, point,
                                            &index);
         if (distance < best)
-            best = distance;
-        if (distance <= tolerance)
         {
-            named = i;
-            namedIndex = index;
+            best = distance;
+            nearestIndex = index;
         }
+        if (distance <= tolerance && mState->recording.tagAt(i))
+            named = i;
     }
     if (!(best <= tolerance))
         return std::nullopt;
     // A tagged command names the datum and the part it draws; anything else keeps what it always
-    // reported, a batch's rect index, so a bar click still says which bar.
+    // reported, the nearest command's batch rect index, so a bar click still says which bar.
     if (details)
     {
-        const QCPDrawList::Tag* tag = mState->recording.tagAt(named);
+        const QCPDrawList::Tag* tag = named >= 0 ? mState->recording.tagAt(named) : nullptr;
         if (tag)
         {
             QVariantMap map;
@@ -1003,8 +1005,8 @@ std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixe
                 map.insert(QStringLiteral("part"), tag->part);
             *details = map;
         }
-        else if (namedIndex >= 0)
-            *details = QVariant(namedIndex);
+        else if (nearestIndex >= 0)
+            *details = QVariant(nearestIndex);
     }
     // A distance is never negative: distanceTo() subtracts the stroke's half width, so a click
     // inside the stroke came out below zero, and the callers (the layerable selectTest contract)

@@ -56,6 +56,7 @@ private slots:
     void theTopmostTaggedCommandWins();
     void aRecordingWithFewerPointsForgetsTheOldTags();
     void untaggedCommandsKeepTheBatchDetails();
+    void anUntaggedBatchKeepsItsIndexUnderALine();
     void aUserPlottableIsNotRestyledWhenSelected();
     void defaultDataRangeFollowsTheExtentRules();
     void defaultLegendIconIsTheRecordingFitted();

@@ -383,7 +383,8 @@ public:
     {
         Discs, //!< one disc per data point, each naming its own row
         Parts, //!< a filled body (part 0) with an edge line recorded over it (part 1)
-        DiscsThenBars //!< a tagged disc, then bars recorded with no tag at all
+        DiscsThenBars, //!< a tagged disc, then bars recorded with no tag at all
+        UntaggedRectsThenLine //!< rects and a line over them, none of them tagged
     };
 
     TestTaggedShape() : QCPPlottable1D<QCPGraphData>() { }
@@ -412,6 +413,18 @@ public:
             context.setDataIndex(i);
             context.circle(QCP::Data { dataMainKey(i), dataMainValue(i) }, 0.3, QPen(Qt::black),
                            QBrush(Qt::yellow));
+        }
+        if (mode == UntaggedRectsThenLine)
+        {
+            context.setDataIndex(-1);
+            context.setPart(-1);
+            for (int i = 0; i < 3; ++i)
+                context.rect(QCP::Data { 1.0 + 2.0 * i, 1.0 }, QCP::Data { 2.0 + 2.0 * i, 3.0 },
+                             QPen(Qt::black), QBrush(Qt::green));
+            // Four pixels under a click in their middle row: within the tolerance, so it is the
+            // last command the hit test sees, but farther than the rect the click is in.
+            context.line(QCP::Data { 0.5, 1.8 }, QCP::Data { 9.5, 1.8 }, QPen(Qt::black));
+            return;
         }
         if (mode != DiscsThenBars)
             return;
@@ -1482,6 +1495,27 @@ void TestDrawable::untaggedCommandsKeepTheBatchDetails()
              "a click inside the seventh bar must hit");
     QCOMPARE(details.userType(), int(QMetaType::Int));
     QCOMPARE(details.toInt(), 7);
+    QVERIFY(!qcp::hitDataIndex(details).has_value());
+    QCOMPARE(qcpHitPart(details), -1);
+}
+
+void TestDrawable::anUntaggedBatchKeepsItsIndexUnderALine()
+{
+    // P-2 picks the topmost command among the tagged ones only: a line recorded over an untagged
+    // batch names nothing, so the hit keeps the batch index of the nearest rect, as it always did.
+    Fixture f;
+    auto shape = f.plot->add<TestTaggedShape>();
+    shape->mode = TestTaggedShape::UntaggedRectsThenLine;
+    shape->setPoints({ 1 }, { 1 });
+    f.plot->replot();
+    const QPointF inFirstRect(f.plot->xAxis->coordToPixel(1.5),
+                              f.plot->yAxis->coordToPixel(2.0));
+
+    QVariant details;
+    QVERIFY2(shape->hitTest(QCP::Pixels { inFirstRect.x(), inFirstRect.y() }, &details).has_value(),
+             "a click inside the first rect must hit");
+    QCOMPARE(details.userType(), int(QMetaType::Int));
+    QCOMPARE(details.toInt(), 0);
     QVERIFY(!qcp::hitDataIndex(details).has_value());
     QCOMPARE(qcpHitPart(details), -1);
 }
