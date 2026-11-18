@@ -43,6 +43,12 @@ class QCPPainter;
 class QCustomPlot;
 class QCPItemPosition;
 class QCPItem;
+namespace qcp::detail
+{
+// Declared so the item's destructor can friend it: it stops a remove() that a changed() slot makes
+// while the item is already being torn down. Defined in core.cpp.
+QCP_LIB_DECL void removeObject(QCPItem& item);
+} // namespace qcp::detail
 class QCPAxisRect;
 class QCPArea;
 class QCPCoordinateSystem;
@@ -488,6 +494,8 @@ private:
     QPointer<QCustomPlot> mRegisteredPlot; // the plot whose item list holds this one
     //! True while the destructor detaches the anchors: their item has lost its virtuals.
     bool mDetachingAnchors = false;
+
+    friend void qcp::detail::removeObject(QCPItem& item); // asks whether the item is already dying
 
 protected:
     //! Set by an item whose properties read its positions (the spans): its positions call

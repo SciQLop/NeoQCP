@@ -1291,3 +1291,82 @@ void TestItemRecording::aFollowerSlotDeletingAnotherFollowerOnChanged()
     QCOMPARE(plot.itemCount(), 2);
     plot.replot();
 }
+
+void TestItemRecording::deletionPathsHoldTheFollowerEmissions_data()
+{
+    QTest::addColumn<QString>("path");
+    QTest::addColumn<QString>("action");
+    for (const QString& path :
+         { QStringLiteral("removeItem"), QStringLiteral("clearItems"), QStringLiteral("delete") })
+        for (const QString& action : { QStringLiteral("remove again"),
+                                       QStringLiteral("delete follower"),
+                                       QStringLiteral("delete plot") })
+        {
+            // A slot that deletes the plot while clearItems() runs its own loop frees the loop's
+            // object: that is a plot-level re-entrancy, not an item-deletion path, and it is
+            // reported for a ruling instead of being fixed here.
+            if (path == QLatin1String("clearItems") && action == QLatin1String("delete plot"))
+                continue;
+            QTest::newRow(qPrintable(path + QStringLiteral(", ") + action)) << path << action;
+        }
+}
+
+void TestItemRecording::deletionPathsHoldTheFollowerEmissions()
+{
+    // Every deletion path runs the destructor, and the destructor detaches the anchors: the
+    // followers report themselves there. A slot that removes the source again, another follower or
+    // the plot must find a state it can act on, not a half-destroyed item.
+    QFETCH(QString, path);
+    QFETCH(QString, action);
+
+    auto plot = std::make_unique<QCustomPlot>();
+    QCustomPlot* raw = plot.get();
+    preparePlot(*raw);
+    const QCPHandle<SourceItem> source = raw->add<SourceItem>();
+    const QCPHandle<QCPItemText> first = raw->add<QCPItemText>();
+    const QCPHandle<QCPItemText> second = raw->add<QCPItemText>();
+    QVERIFY(first->position->setParentAnchor(source->at));
+    QVERIFY(second->position->setParentAnchor(source->at));
+
+    QObject::connect(first.get(), &QCPItem::changed, raw, [&] {
+        if (action == QLatin1String("remove again"))
+            source.remove();
+        else if (action == QLatin1String("delete follower"))
+            second.remove();
+        else
+        {
+            delete raw;
+            plot.release();
+        }
+    });
+
+    if (path == QLatin1String("removeItem"))
+        QVERIFY(raw->removeItem(source.get()));
+    else if (path == QLatin1String("clearItems"))
+        raw->clearItems();
+    else
+        delete source.get();
+
+    if (action == QLatin1String("delete plot"))
+    {
+        QVERIFY2(!plot, "the slot did not delete the plot");
+        return;
+    }
+    QVERIFY2(!source, "the source outlived its deletion path");
+    if (path == QLatin1String("clearItems"))
+    {
+        // The same call takes every item, the followers included.
+        QVERIFY2(!first, "clearItems left a follower behind");
+        QVERIFY2(!second, "clearItems left a follower behind");
+    }
+    else
+    {
+        QVERIFY2(static_cast<bool>(first), "the follower whose slot ran was removed");
+        if (action == QLatin1String("delete follower"))
+            QVERIFY2(!second, "the slot did not remove the second follower");
+        else
+            QVERIFY2(static_cast<bool>(second), "an untouched follower was removed");
+    }
+    raw->replot();
+}
+

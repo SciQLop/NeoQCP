@@ -2447,6 +2447,10 @@ QCPHandle<QCPItem> QCustomPlot::item() const
 bool QCustomPlot::removeItem(QCPItem* item)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
+    // Delivery is held until the delete below has returned: an item detaching its anchors makes
+    // every follower report itself, and a slot that removes another follower or the plot must run
+    // with this item already out of the lists, not in the middle of its destructor.
+    const QCPEmissionScope scope(this);
     // One search, not contains() then removeOne(); it stays a search (not item->mRegisteredPlot)
     // because the caller's pointer may already be dangling.
     if (const qsizetype index = mItems.indexOf(item); index >= 0)
@@ -2499,6 +2503,9 @@ int QCustomPlot::clearItems()
 
 int QCustomPlot::deleteAllItems()
 {
+    // One scope over the whole walk, for the same reason as in removeItem: no follower emission
+    // may run while an item is halfway through its destructor.
+    const QCPEmissionScope scope(this);
     // All unlisted before the first delete, as in removeItem: a slot on destroyed() finds none of
     // them. The guarded snapshot skips any that such a slot deletes itself.
     const auto items = guarded(mItems);
@@ -5961,9 +5968,11 @@ namespace qcp::detail
 void removeObject(QCPPlottable& plottable) { delete &plottable; }
 void removeObject(QCPItem& item)
 {
-    // Torn down inside a scope, as creation is made: detaching the anchors makes the followers
-    // report themselves, and a slot that removes this item again must find it gone, not dying.
-    const QCPEmissionScope scope(item.parentPlot().get());
+    // The destructor opens the scope every deletion path needs (removeItem and clearItems reach it
+    // too), so this only has to tell a dying item from a live one: a changed() slot that removes
+    // the item while it is being torn down must not run its destructor a second time.
+    if (item.mDetachingAnchors)
+        return;
     delete &item;
 }
 void removeObject(QCPBarsGroup& group) { delete &group; }
