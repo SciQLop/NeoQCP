@@ -45,7 +45,7 @@ QCPItemSpan::QCPItemSpan(Qt::Orientation orientation)
         , mOrientation(orientation)
         , lowerEdge(createPosition(QLatin1String("lowerEdge")))
         , upperEdge(createPosition(QLatin1String("upperEdge")))
-        , center(createAnchor(QLatin1String("center"), aiCenter))
+        , center(createAnchor(QLatin1String("center"), [this] { return centerPixel(); }))
 {
     mPositionsSignal = true; // its range reads the edges
     const QScopedValueRollback quiet(mEdgesQuiet, true);
@@ -171,17 +171,17 @@ std::optional<double> QCPItemSpan::hitTest(QCP::Pixels at, QVariant* details) co
     return std::nullopt;
 }
 
-QPointF QCPItemSpan::anchorPixelPosition(int anchorId) const
+/*! \internal
+
+  The middle of the band, halfway across the area it spans: where the center anchor sits.
+*/
+QCP::Pixels QCPItemSpan::centerPixel() const
 {
-    if (anchorId == aiCenter)
-    {
-        const double mid = (rangePixel(lowerEdge) + rangePixel(upperEdge)) * 0.5;
-        const QRectF axRect = clipRect();
-        return mOrientation == Qt::Vertical ? QPointF(mid, (axRect.top() + axRect.bottom()) * 0.5)
-                                            : QPointF((axRect.left() + axRect.right()) * 0.5, mid);
-    }
-    qDebug() << Q_FUNC_INFO << "invalid anchorId" << anchorId;
-    return { };
+    const double mid = (rangePixel(lowerEdge) + rangePixel(upperEdge)) * 0.5;
+    const QRectF axRect = clipRect();
+    return mOrientation == Qt::Vertical
+        ? QCP::Pixels { mid, (axRect.top() + axRect.bottom()) * 0.5 }
+        : QCP::Pixels { (axRect.left() + axRect.right()) * 0.5, mid };
 }
 
 void QCPItemSpan::mousePressEvent(QCPMouseEvent* event)

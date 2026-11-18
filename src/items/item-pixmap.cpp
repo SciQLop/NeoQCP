@@ -27,6 +27,19 @@
 
 #include "../core.h"
 #include "../painting/draw-context.h"
+
+namespace
+{
+QCP::Pixels toPixels(const QPointF& point)
+{
+    return { point.x(), point.y() };
+}
+
+QCP::Pixels midpoint(const QPointF& first, const QPointF& second)
+{
+    return { (first.x() + second.x()) * 0.5, (first.y() + second.y()) * 0.5 };
+}
+} // namespace
 #include <atomic>
 #include <cmath>
 
@@ -83,12 +96,30 @@ QCPItemPixmap::QCPItemPixmap()
         : QCPItem()
         , topLeft(createPosition(QLatin1String("topLeft")))
         , bottomRight(createPosition(QLatin1String("bottomRight")))
-        , top(createAnchor(QLatin1String("top"), aiTop))
-        , topRight(createAnchor(QLatin1String("topRight"), aiTopRight))
-        , right(createAnchor(QLatin1String("right"), aiRight))
-        , bottom(createAnchor(QLatin1String("bottom"), aiBottom))
-        , bottomLeft(createAnchor(QLatin1String("bottomLeft"), aiBottomLeft))
-        , left(createAnchor(QLatin1String("left"), aiLeft))
+        , top(createAnchor(QLatin1String("top"), [this] {
+            const QRectF box = anchorRect();
+            return midpoint(box.topLeft(), box.topRight());
+        }))
+        , topRight(createAnchor(QLatin1String("topRight"), [this] {
+            const QRectF box = anchorRect();
+            return toPixels(box.topRight());
+        }))
+        , right(createAnchor(QLatin1String("right"), [this] {
+            const QRectF box = anchorRect();
+            return midpoint(box.topRight(), box.bottomRight());
+        }))
+        , bottom(createAnchor(QLatin1String("bottom"), [this] {
+            const QRectF box = anchorRect();
+            return midpoint(box.bottomLeft(), box.bottomRight());
+        }))
+        , bottomLeft(createAnchor(QLatin1String("bottomLeft"), [this] {
+            const QRectF box = anchorRect();
+            return toPixels(box.bottomLeft());
+        }))
+        , left(createAnchor(QLatin1String("left"), [this] {
+            const QRectF box = anchorRect();
+            return midpoint(box.topLeft(), box.bottomLeft());
+        }))
         , mScaled(false)
         , mScaledPixmapInvalidated(true)
         , mAspectRatioMode(Qt::KeepAspectRatio)
@@ -214,8 +245,12 @@ void QCPItemPixmap::draw(QCPDrawContext& context) const
         context.rect(topLeft, bottomRight, mainPen(), QBrush(Qt::NoBrush));
 }
 
-/* inherits documentation from base class */
-QPointF QCPItemPixmap::anchorPixelPosition(int anchorId) const
+/*! \internal
+
+  The rectangle the anchors sit on. The flipped state is restored on purpose: the anchors follow
+  the corner the positions name, so a mirrored image keeps its anchors mirrored with it.
+*/
+QRectF QCPItemPixmap::anchorRect() const
 {
     bool flipHorz = false;
     bool flipVert = false;
@@ -226,25 +261,7 @@ QPointF QCPItemPixmap::anchorPixelPosition(int anchorId) const
         rect.adjust(rect.width(), 0, -rect.width(), 0);
     if (flipVert)
         rect.adjust(0, rect.height(), 0, -rect.height());
-
-    switch (anchorId)
-    {
-        case aiTop:
-            return (rect.topLeft() + rect.topRight()) * 0.5;
-        case aiTopRight:
-            return rect.topRight();
-        case aiRight:
-            return (rect.topRight() + rect.bottomRight()) * 0.5;
-        case aiBottom:
-            return (rect.bottomLeft() + rect.bottomRight()) * 0.5;
-        case aiBottomLeft:
-            return rect.bottomLeft();
-        case aiLeft:
-            return (rect.topLeft() + rect.bottomLeft()) * 0.5;
-    }
-
-    qDebug() << Q_FUNC_INFO << "invalid anchorId" << anchorId;
-    return {};
+    return rect;
 }
 
 /*! \internal

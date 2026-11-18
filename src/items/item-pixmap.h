@@ -97,16 +97,6 @@ signals:
     void selectedPenChanged(const QPen& selectedPen);
 
 protected:
-    enum AnchorIndex
-    {
-        aiTop,
-        aiTopRight,
-        aiRight,
-        aiBottom,
-        aiBottomLeft,
-        aiLeft
-    };
-
     // property members:
     QPixmap mPixmap;
     QPixmap mScaledPixmap;
@@ -117,10 +107,9 @@ protected:
     Qt::TransformationMode mTransformationMode;
     QPen mPen, mSelectedPen;
 
-    // reimplemented virtual methods:
-    virtual QPointF anchorPixelPosition(int anchorId) const override;
-
     // non-virtual methods:
+    //! The rectangle the anchors sit on, in pixels.
+    [[nodiscard]] QRectF anchorRect() const;
     void updateScaledPixmap(QRect finalRect = QRect(), bool flipHorz = false,
                             bool flipVert = false);
     QRectF getFinalRect(bool* flippedHorz = nullptr, bool* flippedVert = nullptr) const;

@@ -934,6 +934,14 @@ double QCPDrawnCore::pixelPad() const
   through the item's own view, so a log or reversed axis answers what it draws, not what a default
   pair would.
 */
+QCP::Pixels QCPDrawnCore::pixelsOf(const QCP::Position& position,
+                                   const QCPDrawnView& view) const
+{
+    const QCPDrawFrame& frame = memoFrame(view, view.clip.translated(0, -1));
+    const QPointF pixels = qcpResolvePosition(frame, position, false);
+    return { pixels.x(), pixels.y() };
+}
+
 QCP::Data QCPDrawnCore::dataAt(QCP::Pixels at, const QCPDrawnView& view) const
 {
     const QCPDrawFrame& frame = memoFrame(view, view.clip.translated(0, -1));

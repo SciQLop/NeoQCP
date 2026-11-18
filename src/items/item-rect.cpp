@@ -29,6 +29,19 @@
 #include "../painting/draw-commands.h"
 #include "../painting/draw-context.h"
 
+namespace
+{
+QCP::Pixels toPixels(const QPointF& point)
+{
+    return { point.x(), point.y() };
+}
+
+QCP::Pixels midpoint(const QPointF& first, const QPointF& second)
+{
+    return { (first.x() + second.x()) * 0.5, (first.y() + second.y()) * 0.5 };
+}
+} // namespace
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemRect
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,12 +89,22 @@ QCPItemRect::QCPItemRect()
         : QCPItem()
         , topLeft(createPosition(QLatin1String("topLeft")))
         , bottomRight(createPosition(QLatin1String("bottomRight")))
-        , top(createAnchor(QLatin1String("top"), aiTop))
-        , topRight(createAnchor(QLatin1String("topRight"), aiTopRight))
-        , right(createAnchor(QLatin1String("right"), aiRight))
-        , bottom(createAnchor(QLatin1String("bottom"), aiBottom))
-        , bottomLeft(createAnchor(QLatin1String("bottomLeft"), aiBottomLeft))
-        , left(createAnchor(QLatin1String("left"), aiLeft))
+        , top(createAnchor(QLatin1String("top"), [this] {
+            return midpoint(anchorRect().topLeft(), anchorRect().topRight());
+        }))
+        , topRight(createAnchor(QLatin1String("topRight"),
+                                [this] { return toPixels(anchorRect().topRight()); }))
+        , right(createAnchor(QLatin1String("right"), [this] {
+            return midpoint(anchorRect().topRight(), anchorRect().bottomRight());
+        }))
+        , bottom(createAnchor(QLatin1String("bottom"), [this] {
+            return midpoint(anchorRect().bottomLeft(), anchorRect().bottomRight());
+        }))
+        , bottomLeft(createAnchor(QLatin1String("bottomLeft"),
+                                  [this] { return toPixels(anchorRect().bottomLeft()); }))
+        , left(createAnchor(QLatin1String("left"), [this] {
+            return midpoint(anchorRect().topLeft(), anchorRect().bottomLeft());
+        }))
 {
     topLeft->setCoords(0, 1);
     bottomRight->setCoords(1, 0);
@@ -182,28 +205,13 @@ void QCPItemRect::draw(QCPDrawContext& context) const
     context.rect(pixelOf(from, topLeft), pixelOf(to, bottomRight), mainPen(), mainBrush());
 }
 
-/* inherits documentation from base class */
-QPointF QCPItemRect::anchorPixelPosition(int anchorId) const
-{
-    QRectF rect = QRectF(topLeft->pixelPosition(), bottomRight->pixelPosition());
-    switch (anchorId)
-    {
-        case aiTop:
-            return (rect.topLeft() + rect.topRight()) * 0.5;
-        case aiTopRight:
-            return rect.topRight();
-        case aiRight:
-            return (rect.topRight() + rect.bottomRight()) * 0.5;
-        case aiBottom:
-            return (rect.bottomLeft() + rect.bottomRight()) * 0.5;
-        case aiBottomLeft:
-            return rect.bottomLeft();
-        case aiLeft:
-            return (rect.topLeft() + rect.bottomLeft()) * 0.5;
-    }
+/*! \internal
 
-    qDebug() << Q_FUNC_INFO << "invalid anchorId" << anchorId;
-    return {};
+  The rectangle the anchors sit on, with the corners its positions name.
+*/
+QRectF QCPItemRect::anchorRect() const
+{
+    return QRectF(topLeft->pixelPosition(), bottomRight->pixelPosition());
 }
 
 /*! \internal

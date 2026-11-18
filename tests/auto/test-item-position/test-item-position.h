@@ -26,6 +26,11 @@ private slots:
     void mixedPlotCoordinatePairsKeepTheKeyAndValueRole();
     void setPixelPositionWithAVerticalKeyRoundTrips();
 
+    void aFunctionAnchorFollowsData();
+    void aFunctionAnchorWithAPixelOffset();
+    void anAnchorMadeBeforeThePlot();
+    void aPositionHangingFromAFunctionAnchorRepaintsWhenItMoves();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

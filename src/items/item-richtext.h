@@ -43,7 +43,7 @@ signals:
 protected:
     void draw(QCPDrawContext& context) const override;
     std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;
-    virtual QPointF anchorPixelPosition(int anchorId) const override;
+    [[nodiscard]] QPolygonF anchorPolygon() const override;
 
 private:
     void drawHtml(QCPPainter& painter) const;

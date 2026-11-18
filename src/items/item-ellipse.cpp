@@ -29,6 +29,26 @@
 #include "../painting/draw-commands.h"
 #include "../painting/draw-context.h"
 
+namespace
+{
+QCP::Pixels toPixels(const QPointF& point)
+{
+    return { point.x(), point.y() };
+}
+
+QCP::Pixels midpoint(const QPointF& first, const QPointF& second)
+{
+    return { (first.x() + second.x()) * 0.5, (first.y() + second.y()) * 0.5 };
+}
+
+//! A corner of the bounding box pulled onto the ellipse, where the rim anchors always sat.
+QCP::Pixels rim(const QRectF& box, const QPointF& corner)
+{
+    const QPointF at = box.center() + (corner - box.center()) * (1.0 / qSqrt(2.0));
+    return { at.x(), at.y() };
+}
+} // namespace
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemEllipse
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,15 +97,40 @@ QCPItemEllipse::QCPItemEllipse()
         : QCPItem()
         , topLeft(createPosition(QLatin1String("topLeft")))
         , bottomRight(createPosition(QLatin1String("bottomRight")))
-        , topLeftRim(createAnchor(QLatin1String("topLeftRim"), aiTopLeftRim))
-        , top(createAnchor(QLatin1String("top"), aiTop))
-        , topRightRim(createAnchor(QLatin1String("topRightRim"), aiTopRightRim))
-        , right(createAnchor(QLatin1String("right"), aiRight))
-        , bottomRightRim(createAnchor(QLatin1String("bottomRightRim"), aiBottomRightRim))
-        , bottom(createAnchor(QLatin1String("bottom"), aiBottom))
-        , bottomLeftRim(createAnchor(QLatin1String("bottomLeftRim"), aiBottomLeftRim))
-        , left(createAnchor(QLatin1String("left"), aiLeft))
-        , center(createAnchor(QLatin1String("center"), aiCenter))
+        , topLeftRim(createAnchor(QLatin1String("topLeftRim"), [this] {
+            const QRectF box = anchorRect();
+            return rim(box, box.topLeft());
+        }))
+        , top(createAnchor(QLatin1String("top"), [this] {
+            const QRectF box = anchorRect();
+            return midpoint(box.topLeft(), box.topRight());
+        }))
+        , topRightRim(createAnchor(QLatin1String("topRightRim"), [this] {
+            const QRectF box = anchorRect();
+            return rim(box, box.topRight());
+        }))
+        , right(createAnchor(QLatin1String("right"), [this] {
+            const QRectF box = anchorRect();
+            return midpoint(box.topRight(), box.bottomRight());
+        }))
+        , bottomRightRim(createAnchor(QLatin1String("bottomRightRim"), [this] {
+            const QRectF box = anchorRect();
+            return rim(box, box.bottomRight());
+        }))
+        , bottom(createAnchor(QLatin1String("bottom"), [this] {
+            const QRectF box = anchorRect();
+            return midpoint(box.bottomLeft(), box.bottomRight());
+        }))
+        , bottomLeftRim(createAnchor(QLatin1String("bottomLeftRim"), [this] {
+            const QRectF box = anchorRect();
+            return rim(box, box.bottomLeft());
+        }))
+        , left(createAnchor(QLatin1String("left"), [this] {
+            const QRectF box = anchorRect();
+            return midpoint(box.topLeft(), box.bottomLeft());
+        }))
+        , center(createAnchor(QLatin1String("center"),
+                              [this] { return toPixels(anchorRect().center()); }))
 {
     topLeft->setCoords(0, 1);
     bottomRight->setCoords(1, 0);
@@ -185,34 +230,13 @@ void QCPItemEllipse::draw(QCPDrawContext& context) const
     context.ellipse(pixelOf(from, topLeft), pixelOf(to, bottomRight), mainPen(), mainBrush());
 }
 
-/* inherits documentation from base class */
-QPointF QCPItemEllipse::anchorPixelPosition(int anchorId) const
-{
-    QRectF rect = QRectF(topLeft->pixelPosition(), bottomRight->pixelPosition());
-    switch (anchorId)
-    {
-        case aiTopLeftRim:
-            return rect.center() + (rect.topLeft() - rect.center()) * 1 / qSqrt(2);
-        case aiTop:
-            return (rect.topLeft() + rect.topRight()) * 0.5;
-        case aiTopRightRim:
-            return rect.center() + (rect.topRight() - rect.center()) * 1 / qSqrt(2);
-        case aiRight:
-            return (rect.topRight() + rect.bottomRight()) * 0.5;
-        case aiBottomRightRim:
-            return rect.center() + (rect.bottomRight() - rect.center()) * 1 / qSqrt(2);
-        case aiBottom:
-            return (rect.bottomLeft() + rect.bottomRight()) * 0.5;
-        case aiBottomLeftRim:
-            return rect.center() + (rect.bottomLeft() - rect.center()) * 1 / qSqrt(2);
-        case aiLeft:
-            return (rect.topLeft() + rect.bottomLeft()) * 0.5;
-        case aiCenter:
-            return (rect.topLeft() + rect.bottomRight()) * 0.5;
-    }
+/*! \internal
 
-    qDebug() << Q_FUNC_INFO << "invalid anchorId" << anchorId;
-    return {};
+  The box the anchors sit on, with the corners its positions name.
+*/
+QRectF QCPItemEllipse::anchorRect() const
+{
+    return QRectF(topLeft->pixelPosition(), bottomRight->pixelPosition());
 }
 
 /*! \internal

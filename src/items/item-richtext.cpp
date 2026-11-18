@@ -126,45 +126,27 @@ void QCPItemRichText::drawHtml(QCPPainter& painter) const
     mDoc.drawContents(&painter);
 }
 
-QPointF QCPItemRichText::anchorPixelPosition(int anchorId) const
+/*! \internal
+
+  The box around the drawn text, in pixels: the html box, placed as the recording places it and
+  turned by the rotation. Without html the plain text item answers.
+*/
+QPolygonF QCPItemRichText::anchorPolygon() const
 {
     if (!mUseHtml)
-        return QCPItemText::anchorPixelPosition(anchorId);
+        return QCPItemText::anchorPolygon();
 
-    QPointF pos(position->pixelPosition());
+    const QPointF pos(position->pixelPosition());
     QTransform transform;
     transform.translate(pos.x(), pos.y());
     if (!qFuzzyIsNull(mRotation))
         transform.rotate(mRotation);
 
     QRectF textBoxRect = mBoundingRect.adjusted(-mPadding.left(), -mPadding.top(),
-                                                 mPadding.right(), mPadding.bottom());
-    QPointF drawPos = getTextDrawPoint(QPointF(0, 0), textBoxRect, mPositionAlignment);
+                                                mPadding.right(), mPadding.bottom());
+    const QPointF drawPos = getTextDrawPoint(QPointF(0, 0), textBoxRect, mPositionAlignment);
     textBoxRect.moveTopLeft(drawPos);
-    QPolygonF rectPoly = transform.map(QPolygonF(textBoxRect));
-
-    switch (anchorId)
-    {
-        case aiTopLeft:
-            return rectPoly.at(0);
-        case aiTop:
-            return (rectPoly.at(0) + rectPoly.at(1)) * 0.5;
-        case aiTopRight:
-            return rectPoly.at(1);
-        case aiRight:
-            return (rectPoly.at(1) + rectPoly.at(2)) * 0.5;
-        case aiBottomRight:
-            return rectPoly.at(2);
-        case aiBottom:
-            return (rectPoly.at(2) + rectPoly.at(3)) * 0.5;
-        case aiBottomLeft:
-            return rectPoly.at(3);
-        case aiLeft:
-            return (rectPoly.at(3) + rectPoly.at(0)) * 0.5;
-    }
-
-    qDebug() << Q_FUNC_INFO << "invalid anchorId" << anchorId;
-    return {};
+    return transform.map(QPolygonF(textBoxRect));
 }
 
 QRectF QCPItemRichText::computeDrawRect(const QPointF& pos) const

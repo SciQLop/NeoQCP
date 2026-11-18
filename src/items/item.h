@@ -33,6 +33,7 @@
 #include "layer.h"
 #include "spatial-index.h"
 #include "vector2d.h"
+#include <functional>
 #include <optional>
 
 class QCPEmissionScope;
@@ -54,7 +55,8 @@ class QCP_LIB_DECL QCPItemAnchor
     friend class QCPLayer; // reads mParentItem to follow an anchor chain for repaint marking
 
 public:
-    QCPItemAnchor(QCPItem* parentItem, const QString& name, int anchorId = -1);
+    QCPItemAnchor(QCPItem* parentItem, const QString& name,
+                  std::function<QCP::Position()> where = {});
     virtual ~QCPItemAnchor();
 
     // getters:
@@ -69,7 +71,8 @@ protected:
     // non-property members:
     QCustomPlot* mParentPlot;
     QCPItem* mParentItem;
-    int mAnchorId;
+    //! Where the anchor sits, in whatever terms the item names it; resolved through the item's frame.
+    std::function<QCP::Position()> mWhere;
     QSet<QCPItemPosition*> mChildrenX, mChildrenY;
     //! The pixel position last reported, kept because a dying item can no longer compute one.
     mutable QPointF mLastPixel;
@@ -450,8 +453,6 @@ protected:
     virtual void deselectEvent(bool* selectionStateChanged) override;
 
     // introduced virtual methods:
-    virtual QPointF anchorPixelPosition(int anchorId) const;
-
     //! Called by \a position after its coordinates moved from \a before, as its last action, when
     //! \ref mPositionsSignal is set: an item whose properties read its positions signals them here.
     virtual void positionMoved(const QCPItemPosition* position, QPointF before)
@@ -463,7 +464,7 @@ protected:
     // non-virtual methods:
     double rectDistance(const QRectF& rect, const QPointF& pos, bool filledRect) const;
     QCPItemPosition* createPosition(const QString& name);
-    QCPItemAnchor* createAnchor(const QString& name, int anchorId);
+    QCPItemAnchor* createAnchor(const QString& name, std::function<QCP::Position()> where);
 
 private:
     Q_DISABLE_COPY_MOVE(QCPItem)

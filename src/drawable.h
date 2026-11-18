@@ -182,6 +182,11 @@ public:
     //! \a at in the frame the recording replays in: the item's own axes, never a default pair.
     [[nodiscard]] QCP::Data dataAt(QCP::Pixels at, const QCPDrawnView& view) const;
 
+    //! The pixels of \a position in the frame the recording replays in: what an anchor resolves
+    //! through, so an anchor lands where the item draws it.
+    [[nodiscard]] QCP::Pixels pixelsOf(const QCP::Position& position,
+                                       const QCPDrawnView& view) const;
+
     //! hitTest() as the bases' selectTest wants it: -1 when \a onlySelectable and not selectable.
     double selectTest(const QCPDrawable& object, const QPointF& pos, bool onlySelectable,
                       QVariant* details, const QCPDrawnView& view);

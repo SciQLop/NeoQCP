@@ -144,9 +144,10 @@ std::optional<double> plotSlotAlongScreenAxis(const QCPAxis* slotAxis, const QCP
   you want to make a new item subclass. Use \ref QCPItem::createAnchor instead, as
   explained in the subclassing section of the QCPItem documentation.
 */
-QCPItemAnchor::QCPItemAnchor(QCPItem* parentItem, const QString& name, int anchorId)
+QCPItemAnchor::QCPItemAnchor(QCPItem* parentItem, const QString& name,
+                             std::function<QCP::Position()> where)
         : mName(name), mParentPlot(parentItem->parentPlot()), mParentItem(parentItem)
-        , mAnchorId(anchorId)
+        , mWhere(std::move(where))
 {
 }
 
@@ -185,31 +186,23 @@ void QCPItemAnchor::detachChildren(bool keepPixelPosition)
 /*!
   Returns the final absolute pixel position of the QCPItemAnchor on the QCustomPlot surface.
 
-  The pixel information is internally retrieved via QCPItem::anchorPixelPosition of the
-  parent item, QCPItemAnchor is just an intermediary.
+  The position comes from the function the item gave at creation, resolved through the same frame
+  the item's own recording replays with: a data position lands where the item draws it. An anchor
+  without a function, or without a parent item, reports the origin.
 */
 QPointF QCPItemAnchor::pixelPosition() const
 {
-    if (mParentItem)
-    {
-        if (mAnchorId > -1)
-        {
-            if (mParentItem->mDetachingAnchors) // the item is going away, and so are its virtuals
-                return mLastPixel;
-            mLastPixel = mParentItem->anchorPixelPosition(mAnchorId);
-            return mLastPixel;
-        }
-        else
-        {
-            qDebug() << Q_FUNC_INFO << "no valid anchor id set:" << mAnchorId;
-            return {};
-        }
-    }
-    else
+    if (!mParentItem)
     {
         qDebug() << Q_FUNC_INFO << "no parent item set";
         return {};
     }
+    if (mParentItem->mDetachingAnchors) // the item is going away, and so are its virtuals
+        return mLastPixel;
+    const QCP::Position position = mWhere ? mWhere() : QCP::Position { QCP::Pixels {} };
+    const QCP::Pixels pixels = mParentItem->mCore.pixelsOf(position, mParentItem->view());
+    mLastPixel = QPointF(pixels.x, pixels.y);
+    return mLastPixel;
 }
 
 /*! \internal
@@ -1473,14 +1466,16 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 
   \code QCPItemAnchor * const bottom;\endcode
 
-  and create it in the constructor with the \ref createAnchor function, assigning it a name and an
-  anchor id (an integer enumerating all anchors on the item, you may create an own enum for this).
-  Since anchors can be placed anywhere, relative to the item's position(s), your item needs to
-  provide the position of every anchor with the reimplementation of the \ref anchorPixelPosition(int
-  anchorId) function.
+  and create it in the constructor with the \ref createAnchor function, giving it a name and a
+  function that says where the anchor sits, in whatever terms your item knows it (a data position
+  for a point of the data, a position plus a pixel offset for the corner of a box you draw around
+  it, a ratio of the item's area). The anchor resolves that function through the frame your
+  recording replays with, so it lands where the item draws, and it can read members you only set
+  later because nothing calls it until someone asks for its pixel position.
 
-  In essence the QCPItemAnchor is merely an intermediary that itself asks your item for the pixel
-  position when anything attached to the anchor needs to know the coordinates.
+  In essence the QCPItemAnchor is merely an intermediary that itself asks your item's anchor
+  function for the pixel position when anything attached to the anchor needs to know the
+  coordinates.
 */
 
 /*! \fn void QCPItem::clipToAxisRectChanged(bool clipToAxisRect)
@@ -1561,7 +1556,7 @@ QCPItem::QCPItem()
 QCPItem::~QCPItem()
 {
     // Before any of them goes away: resolving the pixels a child keeps reads our positions, which
-    // only this class's anchorPixelPosition can still do - the item's own is gone by now.
+    // only these anchor functions can still do - the item's own virtuals are gone by now.
     mDetachingAnchors = true;
     for (QCPItemAnchor* anchor : mAnchors)
         anchor->detachChildren(true);
@@ -2041,25 +2036,6 @@ double QCPItem::rectDistance(const QRectF& rect, const QPointF& pos, bool filled
     return result;
 }
 
-/*! \internal
-
-  Returns the pixel position of the anchor with Id \a anchorId. This function must be reimplemented
-  in item subclasses if they want to provide anchors (QCPItemAnchor).
-
-  For example, if the item has two anchors with id 0 and 1, this function takes one of these anchor
-  ids and returns the respective pixel points of the specified anchor.
-
-  \see createAnchor
-*/
-QPointF QCPItem::anchorPixelPosition(int anchorId) const
-{
-    qDebug() << Q_FUNC_INFO
-             << "called on item which shouldn't have any anchors (this method not reimplemented). "
-                "anchorId"
-             << anchorId;
-    return {};
-}
-
 /*!
   Asks for this item to be recorded and drawn again. Call it after changing what draw() reads.
 */
@@ -2225,24 +2201,26 @@ QCPItemPosition* QCPItem::createPosition(const QString& name)
   \a name must be a unique string that is usually identical to the variable name of the anchor
   member (This is needed to provide the name based \ref anchor access to anchors).
 
-  The \a anchorId must be a number identifying the created anchor. It is recommended to create an
-  enum (e.g. "AnchorIndex") for this on each item that uses anchors. This id is used by the anchor
-  to identify itself when it calls QCPItem::anchorPixelPosition. That function then returns
-  the correct pixel coordinates for the passed anchor id.
+  \a where says where the anchor sits, in whatever terms the item knows it: a data position, a
+  pixel position, a ratio of the item's area, or a position plus an offset. The anchor resolves it
+  through the same frame the item's recording replays with, so it lands where the item draws.
+  Since it is a function, it may read members the item sets later, and it is only called when
+  someone asks for the anchor's pixel position.
 
   Don't delete anchors created by this function manually, as the item will take care of it.
 
   Use this function in the constructor (initialization list) of the specific item subclass to
-  create each anchor member. Don't create QCPItemAnchors with \b new yourself, because then they
-  won't be registered with the item properly.
+  create each anchor member, even before the item has a plot. Don't create QCPItemAnchors with
+  \b new yourself, because then they won't be registered with the item properly.
 
   \see createPosition
 */
-QCPItemAnchor* QCPItem::createAnchor(const QString& name, int anchorId)
+QCPItemAnchor* QCPItem::createAnchor(const QString& name,
+                                      std::function<QCP::Position()> where)
 {
     if (hasAnchor(name))
         qDebug() << Q_FUNC_INFO << "anchor/position with name exists already:" << name;
-    QCPItemAnchor* newAnchor = new QCPItemAnchor(this, name, anchorId);
+    QCPItemAnchor* newAnchor = new QCPItemAnchor(this, name, std::move(where));
     mAnchors.append(newAnchor);
     return newAnchor;
 }

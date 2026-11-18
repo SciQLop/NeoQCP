@@ -57,10 +57,6 @@ signals:
 
 protected:
     void positionMoved(const QCPItemPosition* position, QPointF before) override;
-    enum AnchorIndex
-    {
-        aiCenter
-    };
 
     const Qt::Orientation mOrientation;
     HitPart mDragPart = hpNone;
@@ -72,7 +68,8 @@ protected:
     //! The edge's pixel position along the range axis: x for a vertical span, y for a horizontal
     //! one.
     double rangePixel(const QCPItemPosition* edge) const;
-    virtual QPointF anchorPixelPosition(int anchorId) const override;
+    //! Where the center anchor sits, in pixels.
+    [[nodiscard]] QCP::Pixels centerPixel() const;
     virtual void mousePressEvent(QCPMouseEvent* event) override;
     virtual void mouseMoveEvent(QCPMouseEvent* event) override;
     virtual void mouseReleaseEvent(QCPMouseEvent* event) override;

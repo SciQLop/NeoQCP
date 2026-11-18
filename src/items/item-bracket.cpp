@@ -87,7 +87,7 @@ QCPItemBracket::QCPItemBracket()
         : QCPItem()
         , left(createPosition(QLatin1String("left")))
         , right(createPosition(QLatin1String("right")))
-        , center(createAnchor(QLatin1String("center"), aiCenter))
+        , center(createAnchor(QLatin1String("center"), [this] { return centerPixel(); }))
         , mLength(8)
         , mStyle(bsCalligraphic)
 {
@@ -252,25 +252,21 @@ void QCPItemBracket::draw(QCPDrawContext& context) const
                  path.translated(-leftVec.toPointF()), pen, brush);
 }
 
-/* inherits documentation from base class */
-QPointF QCPItemBracket::anchorPixelPosition(int anchorId) const
+/*! \internal
+
+  The middle of the bracket, pushed back by its length: where the center anchor sits.
+*/
+QCP::Pixels QCPItemBracket::centerPixel() const
 {
-    QCPVector2D leftVec(left->pixelPosition());
-    QCPVector2D rightVec(right->pixelPosition());
+    const QCPVector2D leftVec(left->pixelPosition());
+    const QCPVector2D rightVec(right->pixelPosition());
     if (leftVec.toPoint() == rightVec.toPoint())
-        return leftVec.toPointF();
+        return { leftVec.x(), leftVec.y() };
 
-    QCPVector2D widthVec = (rightVec - leftVec) * 0.5;
-    QCPVector2D lengthVec = widthVec.perpendicular().normalized() * mLength;
-    QCPVector2D centerVec = (rightVec + leftVec) * 0.5 - lengthVec;
-
-    switch (anchorId)
-    {
-        case aiCenter:
-            return centerVec.toPointF();
-    }
-    qDebug() << Q_FUNC_INFO << "invalid anchorId" << anchorId;
-    return {};
+    const QCPVector2D widthVec = (rightVec - leftVec) * 0.5;
+    const QCPVector2D lengthVec = widthVec.perpendicular().normalized() * mLength;
+    const QCPVector2D centerVec = (rightVec + leftVec) * 0.5 - lengthVec;
+    return { centerVec.x(), centerVec.y() };
 }
 
 /*! \internal

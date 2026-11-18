@@ -28,6 +28,19 @@
 #include "../core.h"
 #include "../painting/draw-commands.h"
 
+namespace
+{
+QCP::Pixels toPixels(const QPointF& point)
+{
+    return { point.x(), point.y() };
+}
+
+QCP::Pixels midpoint(const QPointF& first, const QPointF& second)
+{
+    return { (first.x() + second.x()) * 0.5, (first.y() + second.y()) * 0.5 };
+}
+} // namespace
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemText
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -134,14 +147,30 @@
 QCPItemText::QCPItemText()
         : QCPItem()
         , position(createPosition(QLatin1String("position")))
-        , topLeft(createAnchor(QLatin1String("topLeft"), aiTopLeft))
-        , top(createAnchor(QLatin1String("top"), aiTop))
-        , topRight(createAnchor(QLatin1String("topRight"), aiTopRight))
-        , right(createAnchor(QLatin1String("right"), aiRight))
-        , bottomRight(createAnchor(QLatin1String("bottomRight"), aiBottomRight))
-        , bottom(createAnchor(QLatin1String("bottom"), aiBottom))
-        , bottomLeft(createAnchor(QLatin1String("bottomLeft"), aiBottomLeft))
-        , left(createAnchor(QLatin1String("left"), aiLeft))
+        , topLeft(createAnchor(QLatin1String("topLeft"),
+                               [this] { return toPixels(anchorPolygon().at(0)); }))
+        , top(createAnchor(QLatin1String("top"), [this] {
+            const QPolygonF box = anchorPolygon();
+            return midpoint(box.at(0), box.at(1));
+        }))
+        , topRight(createAnchor(QLatin1String("topRight"),
+                                [this] { return toPixels(anchorPolygon().at(1)); }))
+        , right(createAnchor(QLatin1String("right"), [this] {
+            const QPolygonF box = anchorPolygon();
+            return midpoint(box.at(1), box.at(2));
+        }))
+        , bottomRight(createAnchor(QLatin1String("bottomRight"),
+                                   [this] { return toPixels(anchorPolygon().at(2)); }))
+        , bottom(createAnchor(QLatin1String("bottom"), [this] {
+            const QPolygonF box = anchorPolygon();
+            return midpoint(box.at(2), box.at(3));
+        }))
+        , bottomLeft(createAnchor(QLatin1String("bottomLeft"),
+                                  [this] { return toPixels(anchorPolygon().at(3)); }))
+        , left(createAnchor(QLatin1String("left"), [this] {
+            const QPolygonF box = anchorPolygon();
+            return midpoint(box.at(3), box.at(0));
+        }))
         , mText(QLatin1String("text"))
         , mPositionAlignment(Qt::AlignCenter)
         , mTextAlignment(Qt::AlignTop | Qt::AlignHCenter)
@@ -465,39 +494,19 @@ std::optional<double> QCPItemText::hitTest(QCP::Pixels at, [[maybe_unused]] QVar
 }
 
 
-/* inherits documentation from base class */
-QPointF QCPItemText::anchorPixelPosition(int anchorId) const
+/*! \internal
+
+  The box around the drawn text, in pixels: the four corners of \ref textBoxAtOrigin, moved to the
+  position and turned by the rotation, exactly as the recording draws it.
+*/
+QPolygonF QCPItemText::anchorPolygon() const
 {
-    // The same box the recording carries, turned around the position the same way:
     const QPointF pos(position->pixelPosition());
     QTransform transform;
     transform.translate(pos.x(), pos.y());
     if (!qFuzzyIsNull(mRotation))
         transform.rotate(mRotation);
-    const QPolygonF rectPoly = transform.map(QPolygonF(textBoxAtOrigin()));
-
-    switch (anchorId)
-    {
-        case aiTopLeft:
-            return rectPoly.at(0);
-        case aiTop:
-            return (rectPoly.at(0) + rectPoly.at(1)) * 0.5;
-        case aiTopRight:
-            return rectPoly.at(1);
-        case aiRight:
-            return (rectPoly.at(1) + rectPoly.at(2)) * 0.5;
-        case aiBottomRight:
-            return rectPoly.at(2);
-        case aiBottom:
-            return (rectPoly.at(2) + rectPoly.at(3)) * 0.5;
-        case aiBottomLeft:
-            return rectPoly.at(3);
-        case aiLeft:
-            return (rectPoly.at(3) + rectPoly.at(0)) * 0.5;
-    }
-
-    qDebug() << Q_FUNC_INFO << "invalid anchorId" << anchorId;
-    return {};
+    return transform.map(QPolygonF(textBoxAtOrigin()));
 }
 
 /*! \internal

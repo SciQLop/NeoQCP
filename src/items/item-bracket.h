@@ -104,19 +104,13 @@ signals:
 
 protected:
     // property members:
-    enum AnchorIndex
-    {
-        aiCenter
-    };
-
     QPen mPen, mSelectedPen;
     double mLength;
     BracketStyle mStyle;
 
-    // reimplemented virtual methods:
-    virtual QPointF anchorPixelPosition(int anchorId) const override;
-
     // non-virtual methods:
+    //! Where the center anchor sits, in pixels.
+    [[nodiscard]] QCP::Pixels centerPixel() const;
     QPen mainPen() const;
 };
 

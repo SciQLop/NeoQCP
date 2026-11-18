@@ -91,24 +91,13 @@ signals:
     void selectedBrushChanged(const QBrush& selectedBrush);
 
 protected:
-    enum AnchorIndex
-    {
-        aiTop,
-        aiTopRight,
-        aiRight,
-        aiBottom,
-        aiBottomLeft,
-        aiLeft
-    };
-
     // property members:
     QPen mPen, mSelectedPen;
     QBrush mBrush, mSelectedBrush;
 
-    // reimplemented virtual methods:
-    virtual QPointF anchorPixelPosition(int anchorId) const override;
-
     // non-virtual methods:
+    //! The rectangle the anchors sit on, in pixels.
+    [[nodiscard]] QRectF anchorRect() const;
     QPen mainPen() const;
     QBrush mainBrush() const;
 };

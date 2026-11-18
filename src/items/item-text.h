@@ -148,18 +148,6 @@ signals:
     void mathTextChanged(bool mathText);
 
 protected:
-    enum AnchorIndex
-    {
-        aiTopLeft,
-        aiTop,
-        aiTopRight,
-        aiRight,
-        aiBottomRight,
-        aiBottom,
-        aiBottomLeft,
-        aiLeft
-    };
-
     // property members:
     QColor mColor, mSelectedColor;
     //! Whether each colour is still the constructor's default, and so the theme's to fill.
@@ -185,7 +173,8 @@ protected:
     // reimplemented virtual methods:
     void draw(QCPDrawContext& context) const override;
     std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;
-    virtual QPointF anchorPixelPosition(int anchorId) const override;
+    //! The box around the drawn text, in pixels: the four corners, turned with the item.
+    [[nodiscard]] virtual QPolygonF anchorPolygon() const;
 
     // non-virtual methods:
     //! What the item draws, hit-tests and anchors with: the selected variants when selected.

@@ -52,15 +52,14 @@ signals:
 
 protected:
     void positionMoved(const QCPItemPosition* position, QPointF before) override;
-    enum AnchorIndex { aiTopLeft, aiTopRight, aiBottomRight, aiBottomLeft, aiCenter };
-
     HitPart mDragPart = hpNone;
     //! The press pixel the drag is measured from: an edge follows the whole drag, not its last step.
     QCP::Pixels mDragPressPixels {};
     double mDragStartLeft = 0, mDragStartRight = 0;
     double mDragStartTop = 0, mDragStartBottom = 0;
 
-    virtual QPointF anchorPixelPosition(int anchorId) const override;
+    //! The band the anchors sit on, in pixels.
+    [[nodiscard]] QRectF anchorRect() const;
     virtual void mousePressEvent(QCPMouseEvent* event) override;
     virtual void mouseMoveEvent(QCPMouseEvent* event) override;
     virtual void mouseReleaseEvent(QCPMouseEvent* event) override;

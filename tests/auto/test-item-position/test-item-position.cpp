@@ -14,6 +14,22 @@ public:
     int recordings() const { return mCore.recordingCount(); }
 };
 
+//! An item whose anchor is a function: it may be built before it has a plot.
+class AnchorItem : public QCPItem
+{
+public:
+    AnchorItem() = default;
+    explicit AnchorItem(QCP::Position where) : where(std::move(where)) { }
+
+    QCP::Position where;
+    QCPItemPosition* const framePosition = createPosition(QStringLiteral("frame"));
+    QCPItemAnchor* const at = createAnchor(QStringLiteral("at"), [this] { return where; });
+
+    quint64 generation() const { return mCore.generation(); }
+
+    void draw(QCPDrawContext&) const override { }
+};
+
 // The axis rect only has a meaningful geometry once the layout has run.
 QCPItemText* laidOutTextItem(QCustomPlot* plot)
 {
@@ -502,4 +518,52 @@ void TestItemPosition::setPixelPositionWithAVerticalKeyRoundTrips()
                             .arg(position->pixelPosition().y())
                             .arg(pixel.x())
                             .arg(pixel.y())));
+}
+
+void TestItemPosition::aFunctionAnchorFollowsData()
+{
+    auto item = mPlot->add<AnchorItem>(QCP::Data { 2, 3 });
+    const auto expected = [this] {
+        return QPointF(mPlot->xAxis->coordToPixel(2), mPlot->yAxis->coordToPixel(3));
+    };
+    QCOMPARE(item->at->pixelPosition(), expected());
+
+    mPlot->xAxis->setRange(0, 5);
+    QCOMPARE(item->at->pixelPosition(), expected());
+}
+
+void TestItemPosition::aFunctionAnchorWithAPixelOffset()
+{
+    auto item = mPlot->add<AnchorItem>(QCP::Data { 2, 3 } + QCP::PixelOffset { 10, -5 });
+    const QPointF expected(mPlot->xAxis->coordToPixel(2) + 10, mPlot->yAxis->coordToPixel(3) - 5);
+    QCOMPARE(item->at->pixelPosition(), expected);
+}
+
+void TestItemPosition::anAnchorMadeBeforeThePlot()
+{
+    auto built = std::make_unique<AnchorItem>(QCP::Data { 2, 3 });
+    AnchorItem* item = built.get();
+    mPlot->add(std::move(built));
+
+    const QPointF expected(mPlot->xAxis->coordToPixel(2), mPlot->yAxis->coordToPixel(3));
+    QCOMPARE(item->at->pixelPosition(), expected);
+
+    auto follower = mPlot->add<AnchorItem>();
+    follower->framePosition->setParentAnchor(item->at);
+    QCOMPARE(follower->framePosition->pixelPosition(), expected);
+}
+
+void TestItemPosition::aPositionHangingFromAFunctionAnchorRepaintsWhenItMoves()
+{
+    auto source = mPlot->add<AnchorItem>(QCP::Data { 2, 3 });
+    auto follower = mPlot->add<AnchorItem>();
+    follower->framePosition->setParentAnchor(source->at);
+
+    const quint64 quiet = follower->generation();
+    mPlot->replot();
+    QCOMPARE(follower->generation(), quiet);
+
+    source->where = QCP::Data { 4, 1 };
+    source->update();
+    QVERIFY2(follower->generation() > quiet, "the follower follows the anchor's move");
 }

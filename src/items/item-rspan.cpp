@@ -6,17 +6,30 @@
 
 #include "../painting/draw-context.h"
 
+namespace
+{
+QCP::Pixels toPixels(const QPointF& point)
+{
+    return { point.x(), point.y() };
+}
+} // namespace
+
 QCPItemRSpan::QCPItemRSpan()
     : QCPSpanItem()
     , leftEdge(createPosition(QLatin1String("leftEdge")))
     , rightEdge(createPosition(QLatin1String("rightEdge")))
     , topEdge(createPosition(QLatin1String("topEdge")))
     , bottomEdge(createPosition(QLatin1String("bottomEdge")))
-    , topLeft(createAnchor(QLatin1String("topLeft"), aiTopLeft))
-    , topRight(createAnchor(QLatin1String("topRight"), aiTopRight))
-    , bottomRight(createAnchor(QLatin1String("bottomRight"), aiBottomRight))
-    , bottomLeft(createAnchor(QLatin1String("bottomLeft"), aiBottomLeft))
-    , center(createAnchor(QLatin1String("center"), aiCenter))
+    , topLeft(createAnchor(QLatin1String("topLeft"),
+                           [this] { return toPixels(anchorRect().topLeft()); }))
+    , topRight(createAnchor(QLatin1String("topRight"),
+                            [this] { return toPixels(anchorRect().topRight()); }))
+    , bottomRight(createAnchor(QLatin1String("bottomRight"),
+                               [this] { return toPixels(anchorRect().bottomRight()); }))
+    , bottomLeft(createAnchor(QLatin1String("bottomLeft"),
+                              [this] { return toPixels(anchorRect().bottomLeft()); }))
+    , center(createAnchor(QLatin1String("center"),
+                          [this] { return toPixels(anchorRect().center()); }))
 {
     mPositionsSignal = true; // its ranges read the edges
     const QScopedValueRollback quiet(mEdgesQuiet, true);
@@ -204,26 +217,18 @@ void QCPItemRSpan::draw(QCPDrawContext& context) const
     context.polyline(std::array<QCP::Position, 2> { leftBottom, rightBottom }, border);
 }
 
-QPointF QCPItemRSpan::anchorPixelPosition(int anchorId) const
+/*! \internal
+
+  The band the anchors sit on: its edges' pixels, or an empty rectangle while the band has no axes
+  to measure on (its anchors then report the origin, as they always did).
+*/
+QRectF QCPItemRSpan::anchorRect() const
 {
     if (!leftEdge->keyAxisRaw() || !leftEdge->valueAxisRaw())
         return {};
-
-    const double leftPx = leftEdge->pixelPosition().x();
-    const double rightPx = rightEdge->pixelPosition().x();
-    const double topPx = topEdge->pixelPosition().y();
-    const double bottomPx = bottomEdge->pixelPosition().y();
-
-    switch (anchorId)
-    {
-        case aiTopLeft:     return QPointF(leftPx, topPx);
-        case aiTopRight:    return QPointF(rightPx, topPx);
-        case aiBottomRight: return QPointF(rightPx, bottomPx);
-        case aiBottomLeft:  return QPointF(leftPx, bottomPx);
-        case aiCenter:      return QPointF((leftPx + rightPx) * 0.5, (topPx + bottomPx) * 0.5);
-    }
-    qDebug() << Q_FUNC_INFO << "invalid anchorId" << anchorId;
-    return {};
+    return QRectF(
+        QPointF(leftEdge->pixelPosition().x(), topEdge->pixelPosition().y()),
+        QPointF(rightEdge->pixelPosition().x(), bottomEdge->pixelPosition().y()));
 }
 
 void QCPItemRSpan::mousePressEvent(QCPMouseEvent* event)
