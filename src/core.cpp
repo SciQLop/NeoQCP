@@ -90,6 +90,15 @@ quint64 qcp::nextFrameEpoch()
 namespace
 {
 using qcp::guarded;
+
+// An item that lets go of its anchors makes every follower report itself. The reports wait for this
+// scope, so a slot runs once the delete has returned: it finds the item's handle null, never a
+// half-destroyed item (a typed handle to one is a bad downcast).
+void deleteHoldingReports(QCustomPlot* plot, QCPItem* item)
+{
+    const QCPEmissionScope scope(plot);
+    delete item;
+}
 } // namespace
 
 
@@ -718,6 +727,7 @@ QCustomPlot::~QCustomPlot()
     while (!mPlottables.isEmpty())
         deletePlottable(mPlottables.last());
     deleteAllItems();
+    deleteUnlistedItems();
 
     delete mPlotLayout.data();
     deleteLooseElements();
@@ -727,6 +737,19 @@ QCustomPlot::~QCustomPlot()
     qDeleteAll(std::exchange(mLayers, {}));
     // Last: the spans and axes deleted above unregister from the span and grid GPU layers.
     releaseCompositeResources();
+}
+
+/*! \internal
+
+  Deletes the items still parented to the plot that no list holds any more: a slot that deletes the
+  plot while clearItems() walks its unlisted snapshot leaves the rest of it here. They go while the
+  plot is whole, not in ~QObject, where their destructors would reach a plot that is no longer a
+  QCustomPlot.
+*/
+void QCustomPlot::deleteUnlistedItems()
+{
+    for (const QPointer<QCPItem>& item : guarded(findChildren<QCPItem*>(Qt::FindDirectChildrenOnly)))
+        delete item.data();
 }
 
 /*! \internal
@@ -2447,10 +2470,6 @@ QCPHandle<QCPItem> QCustomPlot::item() const
 bool QCustomPlot::removeItem(QCPItem* item)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
-    // Delivery is held until the delete below has returned: an item detaching its anchors makes
-    // every follower report itself, and a slot that removes another follower or the plot must run
-    // with this item already out of the lists, not in the middle of its destructor.
-    const QCPEmissionScope scope(this);
     // One search, not contains() then removeOne(); it stays a search (not item->mRegisteredPlot)
     // because the caller's pointer may already be dangling.
     if (const qsizetype index = mItems.indexOf(item); index >= 0)
@@ -2458,11 +2477,8 @@ bool QCustomPlot::removeItem(QCPItem* item)
         // Unlisted first: a slot on destroyed() that calls removeItem or clearItems must find it gone.
         mItems.removeAt(index);
         item->mRegisteredPlot = nullptr;
-        // Un-parented and counted before the delete: destroyed() runs while the item is still one of
-        // the plot's children, and a slot that deletes the plot must not free it twice.
-        item->setParent(nullptr);
         ++mItemsEpoch;
-        delete item;
+        deleteHoldingReports(this, item);
         return true;
     }
     else
@@ -2503,17 +2519,12 @@ int QCustomPlot::clearItems()
 
 int QCustomPlot::deleteAllItems()
 {
-    // One scope over the whole walk, for the same reason as in removeItem: no follower emission
-    // may run while an item is halfway through its destructor.
-    const QCPEmissionScope scope(this);
     // All unlisted before the first delete, as in removeItem: a slot on destroyed() finds none of
-    // them. The guarded snapshot skips any that such a slot deletes itself.
+    // them. The guarded snapshot skips any that such a slot deletes itself, and all of them once a
+    // slot deletes this plot: they are still its children, and go with it (deleteUnlistedItems).
     const auto items = guarded(mItems);
     for (QCPItem* item : std::as_const(mItems))
-    {
         item->mRegisteredPlot = nullptr;
-        item->setParent(nullptr); // as in removeItem: a destroyed() slot must not free it twice
-    }
     QSet<QCPLayerable*> dying;
     for (const auto& item : items)
         if (item)
@@ -2526,8 +2537,10 @@ int QCustomPlot::deleteAllItems()
     for (QCPLayer* layer : std::as_const(mLayers))
         layer->removeChildren(dying);
     // Oldest first: Qt's children indexOf finds each at the front, where erase is a pointer bump.
+    // A live item means a live plot: a slot that deletes this plot takes the rest of them with it.
     for (const auto& item : items)
-        delete item.data();
+        if (item)
+            deleteHoldingReports(this, item.data());
     return items.size();
 }
 
@@ -5968,12 +5981,10 @@ namespace qcp::detail
 void removeObject(QCPPlottable& plottable) { delete &plottable; }
 void removeObject(QCPItem& item)
 {
-    // The destructor opens the scope every deletion path needs (removeItem and clearItems reach it
-    // too), so this only has to tell a dying item from a live one: a changed() slot that removes
-    // the item while it is being torn down must not run its destructor a second time.
+    // A changed() slot run by a plain delete reaches a dying item: it must not be deleted twice.
     if (item.mDetachingAnchors)
         return;
-    delete &item;
+    deleteHoldingReports(item.parentPlot().get(), &item);
 }
 void removeObject(QCPBarsGroup& group) { delete &group; }
 void removeObject(QCPPlottableGroup& group) { delete &group; }

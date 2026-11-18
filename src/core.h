@@ -834,6 +834,7 @@ protected:
     //! inset-layout margins. The grid and the constructor both build through here (C9).
     QCPAxisRect* createAxisRect();
     void deleteLooseElements();
+    void deleteUnlistedItems();
     QCPTheme* ownedTheme();
     void updateLayerIndices() const;
     bool deselectAllExcept(const QCPLayerable* kept);

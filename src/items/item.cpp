@@ -1570,27 +1570,41 @@ QCPItem::~QCPItem()
     // Before any of them goes away: resolving the pixels a child keeps reads our positions, which
     // only these anchor functions can still do - the item's own virtuals are gone by now.
     mDetachingAnchors = true;
-    // Out of the plot before any signal can run: a slot that deletes the plot would otherwise have
-    // it free this item a second time on the way down.
+    // The followers' reports (and a span's range) are held while the anchors let go. A removal
+    // through the library holds them past the delete; a plain delete gets them as this scope closes,
+    // the destructor's last statement, so a slot that deletes the plot, another follower or this
+    // item again finds nothing of this item's state to trip on.
+    const QCPEmissionScope deliverOnceReleased(leavePlot());
+    releaseAnchors();
+}
+
+/*! \internal
+
+  Takes the dying item out of everything its plot keeps: the QObject children (a slot that deletes
+  the plot must not free it a second time), the item list and the layer. Returns the plot it left,
+  and from then on the item answers to none.
+*/
+QCustomPlot* QCPItem::leavePlot()
+{
     setParent(nullptr);
     if (mRegisteredPlot)
-    {
         mRegisteredPlot->itemDestroyed(this);
-        mRegisteredPlot.clear();
-    }
-    {
-        // Detaching makes every follower report itself, and a slot may remove this item, another
-        // follower or the plot. Nothing is delivered while the loop reads mAnchors: the scope
-        // collects the emissions and hands them over once the anchors have let go. A slot that
-        // removes this item again finds it dying and leaves it alone (removeObject asks).
-        // Through the tracked handle, not mParentPlot: a slot may have deleted the plot while a
-        // list of items was being walked, and the raw pointer dangles by now.
-        const QCPEmissionScope scope(mRegisteredPlot.get());
-        for (QCPItemAnchor* anchor : mAnchors)
-            anchor->detachChildren(true);
-    }
-    // don't delete mPositions because every position is also an anchor and thus in mAnchors
-    qDeleteAll(mAnchors);
+    mRegisteredPlot.clear();
+    leaveLayerSilently();
+    return std::exchange(mParentPlot, nullptr);
+}
+
+/*! \internal
+
+  Detaches every position that follows one of this item's anchors, then deletes the anchors and the
+  positions. Every position is also an anchor, so mAnchors owns them all.
+*/
+void QCPItem::releaseAnchors()
+{
+    for (QCPItemAnchor* anchor : std::as_const(mAnchors))
+        anchor->detachChildren(true);
+    mPositions.clear();
+    qDeleteAll(std::exchange(mAnchors, {}));
 }
 
 /* can't make this a header inline function, because QPointer breaks with forward declared types,

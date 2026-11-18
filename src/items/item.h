@@ -381,7 +381,8 @@ public:
 
 signals:
     //! Sent once per update(): the item's recording, and what hangs off it, has changed. A slot may
-    //! delete the item or the plot.
+    //! delete the item or the plot. An item that hangs off a deleted item sends it once the deleted
+    //! item has let go of it, before the delete returns.
     void changed();
     void selectionChanged();
     void selectableChanged();
@@ -494,6 +495,8 @@ private:
     QPointer<QCustomPlot> mRegisteredPlot; // the plot whose item list holds this one
     //! True while the destructor detaches the anchors: their item has lost its virtuals.
     bool mDetachingAnchors = false;
+    [[nodiscard]] QCustomPlot* leavePlot();
+    void releaseAnchors();
 
     friend void qcp::detail::removeObject(QCPItem& item); // asks whether the item is already dying
 

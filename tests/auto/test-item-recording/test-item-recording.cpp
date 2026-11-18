@@ -1297,18 +1297,12 @@ void TestItemRecording::deletionPathsHoldTheFollowerEmissions_data()
     QTest::addColumn<QString>("path");
     QTest::addColumn<QString>("action");
     for (const QString& path :
-         { QStringLiteral("removeItem"), QStringLiteral("clearItems"), QStringLiteral("delete") })
+         { QStringLiteral("removeItem"), QStringLiteral("clearItems"), QStringLiteral("remove()"),
+           QStringLiteral("delete") })
         for (const QString& action : { QStringLiteral("remove again"),
                                        QStringLiteral("delete follower"),
                                        QStringLiteral("delete plot") })
-        {
-            // A slot that deletes the plot while clearItems() walks its own snapshot frees the
-            // object that walk is about to use: a plot-level re-entrancy, not an item-deletion
-            // path, and not this fix's to make safe.
-            if (path == QLatin1String("clearItems") && action == QLatin1String("delete plot"))
-                continue;
             QTest::newRow(qPrintable(path + QStringLiteral(", ") + action)) << path << action;
-        }
 }
 
 void TestItemRecording::deletionPathsHoldTheFollowerEmissions()
@@ -1323,9 +1317,16 @@ void TestItemRecording::deletionPathsHoldTheFollowerEmissions()
     const QCPHandle<QCPItemText> second = raw->add<QCPItemText>();
     QVERIFY(first->position->setParentAnchor(source->at));
     QVERIFY(second->position->setParentAnchor(source->at));
+    int heard = 0;
+    bool sourceSeenAlive = false;
+    // A plain delete runs the slot inside the destructor, where the item is no longer a SourceItem:
+    // a QCPHandle<SourceItem> would downcast it. The base handle is what such a slot can use.
+    const QCPHandle<QCPItem> sourceAsItem = source;
     QObject::connect(first.get(), &QCPItem::changed, raw, [&] {
+        ++heard;
+        sourceSeenAlive = sourceSeenAlive || static_cast<bool>(sourceAsItem);
         if (action == QLatin1String("remove again"))
-            source.remove();
+            sourceAsItem.remove();
         else if (action == QLatin1String("delete follower"))
             second.remove();
         else
@@ -1339,9 +1340,18 @@ void TestItemRecording::deletionPathsHoldTheFollowerEmissions()
         raw->removeItem(source.get());
     else if (path == QLatin1String("clearItems"))
         raw->clearItems();
+    else if (path == QLatin1String("remove()"))
+        source.remove();
     else
         delete source.get();
 
+    // Every path delivers the follower's report: a held emission that dies with its sender proves
+    // nothing about the slot.
+    QVERIFY(heard > 0);
+    // Through the library, the reports wait until the item is gone, so a slot finds its handle null
+    // and never reaches a half-destroyed object. A plain delete has no outer call to wait for.
+    if (path != QLatin1String("delete"))
+        QVERIFY2(!sourceSeenAlive, "a follower's slot ran while the removed item was being destroyed");
     if (action == QLatin1String("delete plot"))
     {
         QVERIFY(!plot);
