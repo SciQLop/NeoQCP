@@ -326,6 +326,31 @@ void TestItemEvents::aDragStartedByADoubleClickKeepsItsPart()
     QCOMPARE(probe->releasePart, 2);
 }
 
+// The review's M2: a press the item does not see is still answered by another layerable (the axis
+// rect, at the least), which replaces the item as the drag's grabber, so no stale grabber survives
+// to take the next drag's moves. A press no candidate accepts would have to land outside every
+// layerable, and the plot has none.
+void TestItemEvents::aNewPressReplacesTheGrabber()
+{
+    mPlot->setInteractions(QCP::iRangeDrag);
+    Probe* probe = mPlot->add<Probe>().get();
+    mPlot->replot();
+    const QRect rect = mPlot->axisRect()->rect();
+    sendMouse(mPlot, QEvent::MouseButtonPress, rect.center(), Qt::LeftButton);
+    QCOMPARE(probe->pressCount, 1);
+    const double before = mPlot->xAxis->range().lower;
+
+    const QPoint besideTheBox(rect.left() + rect.width() * 9 / 10, rect.center().y());
+    sendMouse(mPlot, QEvent::MouseButtonPress, besideTheBox, Qt::LeftButton);
+    QCOMPARE(probe->pressCount, 1);
+    sendMouse(mPlot, QEvent::MouseMove, besideTheBox + QPoint(20, 0), Qt::LeftButton);
+    QCOMPARE(probe->moveCount, 0);
+    QVERIFY2(mPlot->xAxis->range().lower < before,
+             "the axis rect took the press and pans, instead of the item");
+    sendMouse(mPlot, QEvent::MouseButtonRelease, besideTheBox + QPoint(20, 0), Qt::NoButton);
+    QCOMPARE(probe->releaseCount, 0);
+}
+
 void TestItemEvents::anItemDeletedInItsMoveHandler()
 {
     Probe* probe = mPlot->add<Probe>().get();

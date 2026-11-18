@@ -21,6 +21,7 @@ private slots:
     void dataFollowsTheItemsOwnAxes();
     void aDragOutsideThePlotStillEndsOnRelease();
     void aDragStartedByADoubleClickKeepsItsPart();
+    void aNewPressReplacesTheGrabber();
     void anItemDeletedInItsMoveHandler();
     void aPlotDeletedInAPressHandler();
     void spansStillDrag();
