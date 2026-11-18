@@ -551,6 +551,8 @@ signals:
     void mouseMove(QMouseEvent* event);
     void mouseRelease(QMouseEvent* event);
     void mouseWheel(QWheelEvent* event);
+    void keyPress(QKeyEvent* event);
+    void keyRelease(QKeyEvent* event);
     void viewportChanged(const QRect& viewport);
     void backgroundChanged(const QPixmap& background);
     void backgroundScaledChanged(bool backgroundScaled);
@@ -756,6 +758,7 @@ protected:
     virtual void mouseReleaseEvent(QMouseEvent* event) override;
     virtual void wheelEvent(QWheelEvent* event) override;
     virtual void keyPressEvent(QKeyEvent* event) override;
+    virtual void keyReleaseEvent(QKeyEvent* event) override;
     virtual bool event(QEvent* event) override;
     bool handleInScope(QEvent* event);
     bool handleEvent(QEvent* event);

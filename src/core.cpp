@@ -650,7 +650,7 @@ QCustomPlot::QCustomPlot(QWidget* parent)
     // bandwidth. Non-HiDPI gets 4x MSAA for proper antialiasing of GPU-rendered lines.
     // Users can override via setSampleCount() after construction.
     setSampleCount(devicePixelRatioF() >= 2.0 ? 1 : 4);
-    setFocusPolicy(Qt::ClickFocus);
+    setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
     QLocale currentLocale = locale();
     currentLocale.setNumberOptions(QLocale::OmitGroupSeparator);
@@ -4978,8 +4978,8 @@ void QCustomPlot::wheelEvent(QWheelEvent* event)
 
 /*! \internal
 
-  Event handler for key press events. Emits \ref deleteRequested on all selected items when the
-  Delete or Backspace key is pressed.
+  Event handler for key press events. Emits \ref keyPress first, then, unless a slot accepted the
+  key, emits \ref deleteRequested on all selected items when the Delete or Backspace key is pressed.
 */
 void QCustomPlot::keyPressEvent(QKeyEvent* event)
 {
@@ -5000,15 +5000,17 @@ void QCustomPlot::keyPressEvent(QKeyEvent* event)
         return;
     }
 
-    bool consumed = false;
-    for (const auto& plottable : guarded(mPlottables))
-        if (plottable)
-            consumed = plottable->keyPress(event) || consumed;
-    if (consumed)
+    event->ignore(); // the plot hands the key to its parent, unless a slot takes it
+    const QPointer<QCustomPlot> alive(this);
     {
-        event->accept();
-        return;
+        // Delivered before the built-in handling below, so that a slot accepting the key stops it.
+        const QCPEmissionScope scope(this, QCPEmissionScope::Kind::Event);
+        deliver(this, [this, event] { emit keyPress(event); });
     }
+    if (!alive)
+        return;
+    if (event->isAccepted())
+        return;
 
     if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace)
     {
@@ -5019,6 +5021,24 @@ void QCustomPlot::keyPressEvent(QKeyEvent* event)
         }
     }
     QRhiWidget::keyPressEvent(event);
+}
+
+/*! \internal
+
+  Event handler for key release events. Emits \ref keyRelease, so that a program holding keys while
+  they are down learns that one came up.
+*/
+void QCustomPlot::keyReleaseEvent(QKeyEvent* event)
+{
+    event->ignore();
+    const QPointer<QCustomPlot> alive(this);
+    {
+        const QCPEmissionScope scope(this, QCPEmissionScope::Kind::Event);
+        deliver(this, [this, event] { emit keyRelease(event); });
+    }
+    if (!alive)
+        return;
+    QRhiWidget::keyReleaseEvent(event);
 }
 
 /*! \internal

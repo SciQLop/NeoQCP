@@ -1,10 +1,9 @@
-// Target program (milestone 6): a brick breaker, collisions in data units. Does not compile yet.
-
-#include <qcustomplot.h>
+// Target program (milestone 6): a brick breaker, collisions in data units.
 
 #include <QApplication>
 #include <QKeyEvent>
 #include <QTimer>
+#include <qcustomplot.h>
 
 #include <algorithm>
 #include <cmath>
@@ -151,6 +150,7 @@ int main(int argc, char** argv)
                                      QColor::fromHsv(row * 50, 160, 230));
     auto paddle = ax->add<Paddle>();
     auto ball = ax->add<Ball>(game.radius);
+    ball->setCentre(game.ball); // the first frame has it, before the first tick
 
     QObject::connect(&plot, &QCustomPlot::keyPress, [&](QKeyEvent* event) {
         if (event->key() == Qt::Key_Space)

@@ -134,7 +134,9 @@ public:
     [[nodiscard]] std::optional<Qt::CursorShape> cursorAt(const QPointF& pos) const;
     [[nodiscard]] bool gestureActive() const { return mGesture.has_value(); }
 
-    bool keyPress(QKeyEvent* event) override;
+    //! Takes the keys its plot offers through \ref QCustomPlot::keyPress: Escape cancels a drag,
+    //! the arrows nudge and Delete asks for a deletion, each when the edit modes allow it.
+    void handleKeyPress(QKeyEvent* event);
 
     //! A change that remakes the bars repaints the labels too: they live on a layer of their own.
     void update() override;
@@ -186,6 +188,12 @@ protected:
     void emitSelectionChanged() override;
     //! Makes the lane labels' layerable once a plot takes this plottable.
     void systemDidChange() override;
+
+    //! Listens to the keys of the plot that took this plottable; a move rebinds the listener.
+    void parentPlotInitialized(QCustomPlot* parentPlot) override;
+
+    //! Runs the edit \a key stands for on the selected rows; false when it edits nothing here.
+    bool takeKey(int key);
 
     void followArrivalLayout();
     void followLaneLayout();
@@ -285,6 +293,8 @@ protected:
     std::optional<QRectF> mRubberBand;
 
     QPointer<QCPLaneLayout> mLayout;
+    //! The plot whose \ref QCustomPlot::keyPress this plottable listens to: it moves with the plot.
+    QPointer<QCustomPlot> mKeyPlot;
     //! The layout whose changed() this plottable listens to, so a new one replaces the old listen.
     QPointer<QCPLaneLayout> mFollowedLayout;
     //! A layout the caller gave: never replaced, wherever the plottable goes.

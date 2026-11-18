@@ -71,6 +71,9 @@ private slots:
     void lollipopTarget();
     void calloutTarget();
     void peakFitTarget();
+    void brickBreakerTarget();
+    void asteroidsTarget();
+    void asteroidsOverTarget();
 };
 
 #endif // TEST_REFERENCE_M4E_H

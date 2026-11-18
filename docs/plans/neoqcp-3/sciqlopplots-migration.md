@@ -592,3 +592,28 @@ that no section above lists, and the behaviour changes of 5f.
 - 6e rescale union: `QCPAxisBase::rescale()` is no longer virtual (the hook is `ownDataRange()`), and identity-linked
   axes rescale as one. SciQLopPlots wraps `QCPAxis::rescale()` (`SciQLopPlotAxis::rescale`, `ColorScaleController`)
   without overriding it and makes no identity link: nothing to change.
+
+## From milestone 6d (identity and hooks)
+
+### Compile breaks
+
+- The plottable key virtual is gone: `QCPPlottable::keyPress` and a `keyPress` override on a plottable no longer
+  exist. A plottable that took keys connects to its plot's `keyPress`/`keyRelease` signals instead, and calls
+  `event->accept()` to take the key.
+- An anchor is a function: `QCPItem::createAnchor(name, int anchorId)`, the built-in items' `AnchorIndex` enums and
+  every `anchorPixelPosition()` override are deleted, in favour of
+  `createAnchor(name, std::function<QCP::Position()>)` with the anchor addressed by name.
+- `QCPItem::dataExtent()` is gone: `dataRect()` answers the recording's data box, and a subclass overrides the
+  protected `indexExtent()`.
+- An item's mouse handlers take a `QCPMouseEvent*`; the `QMouseEvent` overloads on `QCPItem` are `final`, so an
+  item that overrode them must move to the value event.
+
+### Behaviour changes
+
+- Keys arrive as the plot's signals before any built-in handling, and the plot ignores what it offers: a slot that
+  accepts decides whether `Delete` reaches the selected items and whether the key goes on to the parent widget.
+  The default focus policy is `Qt::StrongFocus`, so the plot takes focus on Tab as well as on a click.
+- An `item->changed()` that a slot sees may come from a delete: an item anchored to a deleted item emits it before
+  that delete returns.
+- `QCPHandle<T>::remove()` is `const`, so a predicate that takes `const QCPHandle<T>&` can remove what it is looking
+  at (brick-breaker's collision sweep does).

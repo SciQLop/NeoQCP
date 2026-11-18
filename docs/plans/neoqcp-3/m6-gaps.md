@@ -122,6 +122,8 @@ Counts are `grep -o` hits on the 2026-11-14 tree (`src/`, `tests/`, `examples/` 
 4. **6d, identity and hooks:** `setDataIndex`, `setPart`, `QCPMouseEvent` and handlers, function anchors,
    `changed()`, `dataRect()`, key signals and focus, legend icon frame. Lollipop, asteroids, brick-breaker, callout
    compile.
+   **Done 2026-11-18**; lollipop, brick-breaker, asteroids, callout and peak-fit compile, the first four have
+   reference pictures.
 5. **6e, multi-panel:** the rect grid, shared rescale, `setTitle`, `addInset`. Shared-x and peak-fit compile.
    **Done 2026-11-18** (`milestone-6e-rulings.md`); shared-x, symlog and spectrogram compile and have reference
    pictures; peak-fit also needs 6d.

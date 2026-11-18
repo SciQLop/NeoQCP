@@ -1,7 +1,6 @@
-// Target program (milestone 6): a callout annotation, dragged and resized. Does not compile yet.
+// Target program (milestone 6): a callout annotation, dragged and resized.
 
 #include <qcustomplot.h>
-
 #include <QApplication>
 
 #include <cmath>

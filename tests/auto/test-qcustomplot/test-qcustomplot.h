@@ -22,6 +22,10 @@ private slots:
   void rectDeselectSlotDeletingACandidateIsSafe();
   void clickSlotDeletingTheItemIsSafe();
   void deleteKeySlotDeletingEveryItemIsSafe();
+  void keysReachASlot();
+  void theFocusPolicyIsStrong();
+  void anAcceptedKeyStopsTheDeleteRequest();
+  void aSlotDeletingThePlotOnKeyPress();
   void moveSlotReplacingTheSelectionRectIsSafe();
   void cancelSlotReplacingTheSelectionRectIsSafe();
   void escapeSlotReplacingTheSelectionRectIsSafe();

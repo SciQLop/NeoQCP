@@ -115,6 +115,7 @@ private slots:
     void upDownChangeLaneWhenAllowed();
     void escapeCancelsTheGesture();
     void keysAreNotConsumedWhenNotEditable();
+    void keysFollowThePlottableToAnotherPlot();
 
     void setDataDropsSelectionOfVanishedIds();
     void setDataSelectionFollowsTheId();

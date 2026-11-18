@@ -832,7 +832,7 @@ void exerciseIntervals(QCPIntervals* iv, QCustomPlot* plot)
     for (int key : { Qt::Key_Left, Qt::Key_Up, Qt::Key_Delete, Qt::Key_Escape })
     {
         QKeyEvent e(QEvent::KeyPress, key, Qt::NoModifier);
-        (void)iv->keyPress(&e);
+        QCoreApplication::sendEvent(plot, &e); // the plot's signal reaches the intervals
     }
     sendMouse(plot, QEvent::MouseButtonPress, pos.toPoint(), Qt::LeftButton);
     sendMouse(plot, QEvent::MouseMove, pos.toPoint() + QPoint(30, 20), Qt::LeftButton);

@@ -139,6 +139,15 @@ void QCPIntervals::systemDidChange()
     mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
 }
 
+void QCPIntervals::parentPlotInitialized(QCustomPlot* parentPlot)
+{
+    if (mKeyPlot)
+        disconnect(mKeyPlot, &QCustomPlot::keyPress, this, &QCPIntervals::handleKeyPress);
+    mKeyPlot = parentPlot;
+    if (mKeyPlot)
+        connect(mKeyPlot, &QCustomPlot::keyPress, this, &QCPIntervals::handleKeyPress);
+}
+
 //! The lane layout of the plot the plottable arrives in: the default one add<T>() has always made
 //! for an intervals (without a layout it drops every row: groupByLane() keeps only lanes the layout
 //! names, and it draws nothing), unless the caller gave one.
@@ -825,20 +834,25 @@ void QCPIntervals::emitEdits(const std::vector<qcp::intervals::Edit>& edits)
     qcpEmit(this, mParentPlot, &QCPIntervals::intervalsEdited, out);
 }
 
-bool QCPIntervals::keyPress(QKeyEvent* event)
+void QCPIntervals::handleKeyPress(QKeyEvent* event)
 {
     if (!realVisibility())
-        return false;
+        return;
     if (event->key() == Qt::Key_Escape && (mGesture || mRubberBand))
     {
         mGesture.reset();
         mRubberBand.reset();
         requestRepaint();
-        return true;
+        event->accept();
+        return;
     }
-    if (!mEditable || !selected())
-        return false;
-    switch (event->key())
+    if (mEditable && selected() && takeKey(event->key()))
+        event->accept();
+}
+
+bool QCPIntervals::takeKey(int key)
+{
+    switch (key)
     {
         case Qt::Key_Delete:
         case Qt::Key_Backspace:

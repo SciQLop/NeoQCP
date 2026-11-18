@@ -1137,13 +1137,41 @@ void TestIntervals::escapeCancelsTheGesture()
     QCOMPARE(spy.count(), 0);
 }
 
+void TestIntervals::keysFollowThePlottableToAnotherPlot()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emMove);
+    iv->setSelectedRows({ 0 });
+    QKeyEvent here(QEvent::KeyPress, Qt::Key_Right, Qt::NoModifier);
+    QApplication::sendEvent(mPlot, &here);
+    QVERIFY(here.isAccepted()); // a nudge, taken from its own plot
+
+    QCustomPlot other;
+    other.resize(400, 300);
+    other.show();
+    auto moved = other.add(mPlot->take(QCPHandle<QCPIntervals>(iv)));
+    QVERIFY(moved);
+    other.replot();
+
+    // The keys of the plot it left no longer reach it; the ones of the plot it joined do.
+    QKeyEvent stale(QEvent::KeyPress, Qt::Key_Right, Qt::NoModifier);
+    QApplication::sendEvent(mPlot, &stale);
+    QVERIFY(!stale.isAccepted());
+    QKeyEvent fresh(QEvent::KeyPress, Qt::Key_Right, Qt::NoModifier);
+    QApplication::sendEvent(&other, &fresh);
+    QVERIFY(fresh.isAccepted());
+}
+
 void TestIntervals::keysAreNotConsumedWhenNotEditable()
 {
     QCPLaneLayout layout;
     auto* iv = laidOutTwoBars(mPlot, &layout);
     iv->setSelectedRows({ 0 });
+    QSignalSpy spy(iv, &QCPIntervals::deleteRequested);
     QKeyEvent e(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
-    QVERIFY(!iv->keyPress(&e));
+    QApplication::sendEvent(mPlot, &e);
+    QCOMPARE(spy.count(), 0);
+    QVERIFY(!e.isAccepted()); // left to the plot, which leaves it to its parent
 }
 
 void TestIntervals::setDataDropsSelectionOfVanishedIds()
@@ -1266,8 +1294,11 @@ void TestIntervals::hiddenTimelineDoesNotConsumeKeys()
     auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emDelete);
     iv->setSelectedRows({ 0 });
     iv->setVisible(false);
+    QSignalSpy spy(iv, &QCPIntervals::deleteRequested);
     QKeyEvent e(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
-    QVERIFY(!iv->keyPress(&e));
+    QApplication::sendEvent(mPlot, &e);
+    QCOMPARE(spy.count(), 0);
+    QVERIFY(!e.isAccepted());
 }
 
 void TestIntervals::createWithStepSnapsBothEnds()

@@ -2,8 +2,9 @@
 
 The programs a user should be able to write with NeoQCP 3.0. The library changes until they compile (spec
 `docs/specs/2026-11-14-neoqcp-3-milestone-6-design.md`). Since milestones 6d and 6e, `lollipop`, `shared-x`, `symlog`,
-`spectrogram`, `callout` and `peak-fit` compile and are built with the examples (`-Dwith_examples=true`,
-`examples/user-code/meson.build`); the others wait for 6g (fill between, zoom indicator) and 6h (annotations). Every name they assume that does not exist today is
+`spectrogram`, `callout`, `peak-fit`, `brick-breaker` and `asteroids` compile and are built with the examples
+(`-Dwith_examples=true`, `examples/user-code/meson.build`); the others wait for 6g (fill between, zoom indicator) and
+6h (annotations). Every name they assume that does not exist today is
 in `docs/plans/neoqcp-3/m6-vocabulary.md`. Each folder has the C++ target and a Python sketch of the same program.
 
 | Target | What it shows | Survey row it answers |
@@ -32,10 +33,12 @@ matplotlib count is the gallery code that draws the same picture, its imports in
 
 | Target | NeoQCP C++ | Python sketch | matplotlib | Where the difference goes |
 |---|---|---|---|---|
-| `lollipop/` | 45 | 34 | 6 | the plot type itself: matplotlib's `stem()` is one call, so every line of `draw()` and the legend icon is the difference |
+| `lollipop/` | 47 | 34 | 6 | the plot type itself: matplotlib's `stem()` is one call, so every line of `draw()` and the legend icon is the difference |
 | `shared-x/` | 33 | 25 | 13 | 9 lines of C++ frame (`QApplication`, includes, `show`, `exec`); data built in a loop instead of numpy |
 | `symlog/` | 39 | 32 | 21 | the frame; two lines hide the grid of the middle panel (matplotlib's default grid is off) |
 | `inset-zoom/` | 48 | 33 | 17 | 14 lines rebuild matplotlib's sample image (`get_sample_data("axes_grid/bivariate_normal.npy")`) |
 | `fill-between/` | 29 | 29 | 14 | the frame; 7 lines for the Up/Down keys that show the fill following (not in matplotlib) |
 | `spectrogram/` | 71 | 33 | 20 | 27 lines are the DFT that matplotlib's `specgram` computes; the plot itself is 15 lines |
 | `annotations/` | 66 | 51 | 35 | a 14-row table, one line per style; the spare cell's text annotation (8 lines, not in matplotlib); hiding the four axes' grid |
+| `brick-breaker/` | 157 | 105 | — | no matplotlib program draws this; against the sketch, the 46 extra lines are the three item classes with their `draw()` calls, and the 72 bricks in one loop |
+| `asteroids/` | 212 | 135 | — | no matplotlib program draws this; against the sketch, `Sprites` and `Hud` are the typed classes, and held keys need the plot's `keyPress`/`keyRelease` signals |

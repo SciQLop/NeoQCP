@@ -62,6 +62,7 @@ Code using `rpQueuedRefresh` or `rpRefreshHint` compiles, with a deprecation war
 | `plottingHints()` | `phCacheLabels \| phImmediateRefresh` | `phImmediateRefresh` (label caching off) |
 | `"main"` layer mode | `lmLogical` | `lmBuffered` |
 | Multisampling | — | 4 samples, or 1 on a HiDPI screen |
+| `focusPolicy()` | `Qt::ClickFocus` | `Qt::StrongFocus`: a click focuses the plot and so does Tab |
 
 Set the old value back if your pictures depend on it, for example `customPlot->setAntialiasedElements(QCP::aeNone)`. GPU-drawn lines are antialiased by multisampling whatever the flags say; change that with `setSampleCount()`.
 
@@ -90,7 +91,10 @@ Most changes are confined to the new classes. A few touch existing code.
 - **Rescale on linked axes.** An axis linked with no functions (`linkTo(source)`, and the top and right axes of `setupFullAxesBox(true)`) and its source show one range, so `rescale()` on any of them, and `QCustomPlot::rescaleAxes()`, now fit the union of all their data and set it once on the source, as matplotlib's shared axes do. Upstream each axis fitted its own data and the last one rescaled won. A link through functions shows other units: its data does not widen the source. `rescale()` is no longer virtual; a subclass overrides `ownDataRange()`, the data range of one axis.
 - **An identity link shares the scale.** `linkTo(source)` with no functions (and `setupFullAxesBox(true)`) now makes the follower take the source's scale and follow its changes; `setScale()` on the follower goes to the source. Upstream and in 6f each axis kept its own scale. A link through functions keeps its own scale, so a log axis showing a linear source's values goes through a link with explicit functions.
 - **Identity links flatten.** `linkTo(source)` to an axis that follows another without functions links to that one's source, and an axis that drives such followers hands them to its new source, instead of refusing ("the source axis is linked itself" / "already drives a link"). Links through functions keep refusing chains.
-- **Keyboard.** `QCustomPlot` now handles key presses. Each plottable sees the key first, through the new virtual `QCPPlottable::keyPress()`. Delete and Backspace make every selected item emit `QCPItem::deleteRequested()`; nothing is deleted for you.
+- **Keyboard.** A key is a signal now. `QCustomPlot::keyPress(QKeyEvent*)` and `keyRelease(QKeyEvent*)` hand each key to your slots before anything else; a slot that calls `event->accept()` stops the plot's own handling of it and its propagation to the parent widget. The plot itself ignores the key it offers, so arrow keys still reach a scrolling parent until a slot takes them. If no slot takes a Delete or Backspace, every selected item then emits `QCPItem::deleteRequested()`; nothing is deleted for you. `QCPIntervals` takes its keys from its plot's signal and follows the plottable to another plot.
+- **An item's `changed()` outlives the item it hangs from.** Deleting an item, or removing it from its plot, still reports the change to the items anchored to it: each of them emits `changed()` once the deleted item has let go, before the delete returns. A slot may delete them in turn, and the plot.
+- **An anchor links items of one plot.** A position that takes its pixels from another item's anchor needs both items in the same plot; the write is refused, once, otherwise.
+- **A legend icon draws in the icon box.** Every position in the context handed to `drawLegendIcon(QCPDrawContext&)` is relative to the icon rectangle: an `AxisRatio` spans the icon, a `QCP::Pixels` value counts from its top-left. An icon that holds no data position is drawn rather than skipped.
 - **Fixed upstream bugs.** DPI scaling on macOS and Windows; a crash of the date-time ticker on Qt 6.10 and newer; a use-after-delete in `removeLayer()`.
 - **Slots may delete their sender.** A slot connected to a NeoQCP signal can delete the object that emitted it: a plottable, an item, an axis rect, the legend, a colour scale, even the plot. Upstream this often crashed. To make it safe, a few signals moved or went away:
   - Deleting a selection rect no longer emits its `canceled` signal. If your code resets its own drag state on `canceled`, also watch the rect's `destroyed` signal.
@@ -320,6 +324,11 @@ Plot-wide settings:
 | `QCPMarginGroup`, `QCPLayoutElement::setMarginGroup()`/`marginGroup()`/`marginGroups()` | `QCPAlignmentGroup::create({ a, b }, sides)`. Membership is per side, so one element can be in a left/right group and in a top/bottom group: `a->setMarginGroup(QCP::msLeft, g); b->setMarginGroup(QCP::msLeft, g);` becomes `QCPAlignmentGroup::create({ a, b }, QCP::msLeft);`. A group lines up inner edges instead of making margins equal; for elements in one column or one row this is the same. Stacked rows grouped on their top and bottom sides too (`msAll`) have no port: group their left and right sides only, and set the top and bottom margins by hand if they must match |
 | `QCPLayoutElement::alignmentGroup()` (3.0 preview, one group per element) | `alignmentGroup(side)`: an element holds one group per side |
 | `QCPItemSpan`/`QCPItemRSpan` `setPen()`, `setSelectedPen()`, `pen()`, `selectedPen()` and the `pen`/`selectedPen` properties | nothing: a span never drew its pen. It has no pen, so `handle.setPen(...)` on a span handle no longer compiles. Use `setBorderPen()`/`setSelectedBorderPen()` for the edge lines and `setBrush()` for the band |
+| `QCPPlottable::keyPress(QKeyEvent*)`, the virtual a plottable consumed a key through | connect to `QCustomPlot::keyPress`, and call `event->accept()` to take the key; `QCPIntervals` does its own through its plot's signal |
+| `QCPItem::createAnchor(const QString&, int anchorId)` and the items' `AnchorIndex` enums | `createAnchor(name, std::function<QCP::Position()>)`, lambda over the maths; an anchor is addressed by name |
+| `QCPItem::anchorPixelPosition(int)` (the virtual, and the function of the same name on `QCPItemAnchor`) | the function the anchor was created with; a consumer still asks the position that hangs off it `pixelPosition()` |
+| `QCPItem::dataExtent()` | `dataRect()`; a subclass overrides the protected `indexExtent()` |
+| Overriding `QCPItem::mousePressEvent(QMouseEvent*, ...)`, `mouseMoveEvent`, `mouseReleaseEvent`, `mouseDoubleClickEvent` | the same four taking a `QCPMouseEvent*`; the `QMouseEvent` ones are `final` |
 
 Everything else in the public API of QCustomPlot 2.1.1 is still there. The polar classes were a 2.1 tech preview; their changes are listed above.
 
@@ -412,6 +421,62 @@ this", instead of black. A recording that never named a colour draws in the pain
 | Old | New |
 |---|---|
 | `QCPTextStyle style; style.color = Qt::black;` | `QCPTextStyle style;` (unset) or `style.color = plot->theme()->foreground();` |
+
+## An item handles its own mouse
+
+An item's mouse handlers take a `QCPMouseEvent*` instead of the `QMouseEvent*` the core sends, because
+an item works in its own terms rather than the plot's:
+
+| The event answers | |
+|---|---|
+| `pixels()`, `lastPixels()`, `moved()` | where the mouse is, where the previous event of the drag was, and the difference, in plot pixels |
+| `data()`, `lastData()` | the same two points in the item's own frame: its area's axes, log and reversed axes included |
+| `part()` | what the press hit in the item's recording, `-1` when it hit no tagged command |
+| `button()`, `buttons()`, `modifiers()` | as in Qt |
+
+The handlers are the protected `mousePressEvent`, `mouseMoveEvent`, `mouseReleaseEvent` and
+`mouseDoubleClickEvent`, and they arrive accepted: an item that does not want the press calls
+`ignore()`, which is what all four do. An item that accepts a press gets the whole drag — the moves,
+the release, and `part()` as the press found it — wherever the mouse then goes; a press nothing
+accepts hands no drag to anything. The `QMouseEvent` overloads of those four on `QCPItem` are `final`,
+so an override written against them no longer compiles:
+
+| Old | New |
+|---|---|
+| `void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) override` | `void mouseMoveEvent(QCPMouseEvent* event) override`, then `event->accept()` in the press |
+| mapping `event->pos()` to data by hand | `event->data()` |
+| `startPos` for the press point | `event->lastPixels()` and `event->moved()` |
+| a hit test that returns the part under the mouse | `context.setPart(n)` and `context.setDataIndex(i)` on the recording's commands, read back through `event->part()` |
+
+An item's own `hitTest()` details still reach it, in `event->details()`. `QCPItemSpan` and
+`QCPItemRSpan` read their edge from there.
+
+## An item says what it covers and when it changes
+
+`QCPItem::dataExtent()` (public, and the virtual a subclass overrode) is gone. In its place:
+
+| Old | New |
+|---|---|
+| `dataExtent()` called by the plot or by a test | `dataRect()`: the data box the item's recording covers, positive width and height, empty for an item that records no data position. It answers before the first replot too |
+| `dataExtent()` overridden in a subclass | the protected `indexExtent()`: return the box and the pixel slack `draw()` needs around it, or nothing to keep the positions-based answer |
+
+`QCPItem::changed()` is the new signal: it is sent once per `update()`, after the recording and
+everything anchored to it have been marked, and a slot may delete the item or the plot.
+
+## An anchor takes a function
+
+An anchor no longer names an index into its item's `anchorPixelPosition()`: it holds a function that
+returns a `QCP::Position`, resolved through the frame the item's recording replays with.
+
+| Old | New |
+|---|---|
+| `createAnchor("name", MyItem::aiSomewhere)` and an `AnchorIndex` enum | `createAnchor("name", [this] { return QCP::Data { mX, mY }; })` |
+| `anchorPixelPosition(int anchorId) override` | the function the anchor was created with |
+| an anchor addressed by an `int` | `anchor("name")`, and `hasAnchor("name")` |
+
+The eight built-in items lose their `AnchorIndex` enums and `anchorPixelPosition()` overrides; their
+anchors are lambdas over the maths that was already there, so every anchor sits where it did. An
+anchor that resolves to another item's frame needs both items in the same plot.
 
 ## One-call annotations: `ax->line`, `ax->text`, `ax->ellipse`
 

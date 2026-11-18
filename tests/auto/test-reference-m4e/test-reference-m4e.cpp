@@ -8,6 +8,8 @@
 #include <functional>
 #include <numbers>
 #include <numeric>
+#include <random>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -1143,6 +1145,414 @@ QImage peakFitScene()
     return plot.toPixmap(800, 560).toImage().convertToFormat(QImage::Format_ARGB32);
 }
 
+namespace
+{
+// The brick-breaker target's own rules and items, copied: the picture is the example's first frame.
+struct Breakout
+{
+    QPointF ball { 50, 6 };
+    QPointF velocity;
+    double radius = 1.0;
+    int lives = 3;
+    int score = 0;
+    bool waiting = true;
+
+    QRectF ballRect() const
+    {
+        return { ball - QPointF(radius, radius), QSizeF(2 * radius, 2 * radius) };
+    }
+
+    void launch()
+    {
+        if (!waiting || lives == 0)
+            return;
+        velocity = { 18, 40 };
+        waiting = false;
+    }
+
+    void step(double dt, double paddleCentre)
+    {
+        if (waiting)
+        {
+            ball = { paddleCentre, 6 };
+            return;
+        }
+        ball += dt * velocity;
+        if (ball.x() < radius || ball.x() > 100 - radius)
+            velocity.setX(-velocity.x());
+        if (ball.y() > 60 - radius)
+            velocity.setY(-std::abs(velocity.y()));
+        if (ball.y() < 0)
+        {
+            --lives;
+            waiting = true;
+        }
+    }
+
+    void bounceOff(const QRectF& box)
+    {
+        const QRectF overlap = ballRect().intersected(box);
+        const QPointF away = ball - box.center();
+        if (overlap.width() < overlap.height())
+            velocity.setX(std::copysign(velocity.x(), away.x()));
+        else
+            velocity.setY(std::copysign(velocity.y(), away.y()));
+    }
+
+    void bounceOffPaddle(const QRectF& paddle)
+    {
+        velocity = { 4 * (ball.x() - paddle.center().x()), std::abs(velocity.y()) };
+    }
+};
+
+class Brick : public QCPItem
+{
+public:
+    Brick(QRectF box, QColor color) : mBox(box), mColor(color) { }
+
+protected:
+    void draw(QCPDrawContext& context) const override
+    {
+        context.rect(mBox, QPen(Qt::white), mColor);
+    }
+
+private:
+    QRectF mBox;
+    QColor mColor;
+};
+
+class Ball : public QCPItem
+{
+public:
+    explicit Ball(double radius) : mRadius(radius) { }
+
+    void setCentre(QPointF centre)
+    {
+        mCentre = centre;
+        update();
+    }
+
+protected:
+    void draw(QCPDrawContext& context) const override
+    {
+        context.circle(QCP::Data { mCentre.x(), mCentre.y() }, mRadius, Qt::NoPen, Qt::white);
+    }
+
+private:
+    double mRadius;
+    QPointF mCentre;
+};
+
+class Paddle : public QCPItem
+{
+public:
+    double centre() const { return mCentre; }
+
+protected:
+    void draw(QCPDrawContext& context) const override
+    {
+        context.rect(QRectF(mCentre - 7, 2, 14, 1.5), Qt::NoPen, QColor(90, 200, 255));
+    }
+
+    void mousePressEvent(QCPMouseEvent* event) override { event->accept(); }
+
+    void mouseMoveEvent(QCPMouseEvent* event) override
+    {
+        mCentre = std::clamp(event->data().x, 7.0, 93.0);
+        update();
+    }
+
+private:
+    double mCentre = 50;
+};
+
+QImage brickBreakerScene()
+{
+    QCustomPlot plot;
+    targetPlot(plot, 800, 520);
+    plot.setBackground(QColor(20, 20, 30));
+
+    Breakout game;
+    auto ax = plot.axisRect();
+    ax->xAxis()->setRange(0, 100);
+    ax->yAxis()->setRange(0, 60);
+    ax->xAxis()->setVisible(false);
+    ax->yAxis()->setVisible(false);
+    for (int row = 0; row < 6; ++row)
+        for (int column = 0; column < 12; ++column)
+            ax->add<Brick>(QRectF(column * 100.0 / 12, 36 + row * 3, 100.0 / 12, 3),
+                           QColor::fromHsv(row * 50, 160, 230));
+    ax->add<Paddle>();
+    ax->add<Ball>(game.radius)->setCentre(game.ball);
+
+    plot.replot();
+    return plot.toPixmap(800, 520).toImage().convertToFormat(QImage::Format_ARGB32);
+}
+
+// The Asteroids target's own rules and items, copied from the example.
+struct Body
+{
+    QPointF pos;
+    QPointF vel;
+    double angle = 0;
+    double size = 1;
+    double life = 0;
+};
+
+struct Game
+{
+    static constexpr double width = 100, height = 75;
+    Body ship;
+    std::vector<Body> rocks, bullets;
+    std::set<int> held;
+    int score = 0;
+    bool over = false;
+
+    Game() { restart(); }
+
+    void restart()
+    {
+        ship = Body { { width / 2, height / 2 }, { }, 90, 2 };
+        rocks.clear();
+        bullets.clear();
+        score = 0;
+        over = false;
+        std::mt19937 rng(3);
+        std::uniform_real_distribution<double> unit(0, 1);
+        for (int i = 0; i < 5; ++i)
+            rocks.push_back({ { unit(rng) * width, 0 },
+                              { 12 * unit(rng) - 6, 12 * unit(rng) - 6 },
+                              360 * unit(rng),
+                              6 });
+    }
+
+    void press(int key)
+    {
+        held.insert(key);
+        if (key == Qt::Key_Space && !over)
+            fire();
+        if (key == Qt::Key_R && over)
+            restart();
+    }
+
+    void release(int key) { held.erase(key); }
+
+    void step(double dt)
+    {
+        if (over)
+            return;
+        steer(dt);
+        move(ship, dt);
+        for (Body& rock : rocks)
+            move(rock, dt);
+        for (Body& bullet : bullets)
+            move(bullet, dt);
+        std::erase_if(bullets, [](const Body& b) { return b.life <= 0; });
+        collide();
+    }
+
+private:
+    static QPointF heading(double degrees)
+    {
+        const double rad = degrees * std::numbers::pi / 180;
+        return { std::cos(rad), std::sin(rad) };
+    }
+
+    static QPointF wrap(QPointF p)
+    {
+        return { std::fmod(p.x() + width, width), std::fmod(p.y() + height, height) };
+    }
+
+    static double distance(QPointF a, QPointF b)
+    {
+        return std::hypot(a.x() - b.x(), a.y() - b.y());
+    }
+
+    void steer(double dt)
+    {
+        if (held.contains(Qt::Key_Left))
+            ship.angle += 200 * dt;
+        if (held.contains(Qt::Key_Right))
+            ship.angle -= 200 * dt;
+        if (held.contains(Qt::Key_Up))
+            ship.vel += 30 * dt * heading(ship.angle);
+    }
+
+    static void move(Body& body, double dt)
+    {
+        body.pos = wrap(body.pos + dt * body.vel);
+        body.life -= dt;
+    }
+
+    void fire()
+    {
+        bullets.push_back({ ship.pos, ship.vel + 60 * heading(ship.angle), ship.angle, 0.4, 1.2 });
+    }
+
+    void collide()
+    {
+        std::vector<Body> fragments;
+        std::erase_if(rocks,
+                      [&](const Body& rock)
+                      {
+                          const auto hit = std::ranges::find_if(
+                              bullets, [&](const Body& b)
+                              { return b.life > 0 && distance(b.pos, rock.pos) < rock.size; });
+                          if (hit == bullets.end())
+                              return false;
+                          hit->life = 0;
+                          score += 10;
+                          if (rock.size > 2)
+                              for (double turn : { 90.0, -90.0 })
+                                  fragments.push_back(
+                                      { rock.pos, QTransform().rotate(turn).map(rock.vel) * 1.5,
+                                        rock.angle + turn, rock.size / 2 });
+                          return true;
+                      });
+        rocks.insert(rocks.end(), fragments.begin(), fragments.end());
+        over
+            = std::ranges::any_of(rocks, [&](const Body& r)
+                                  { return distance(r.pos, ship.pos) < r.size + ship.size * 0.6; });
+    }
+};
+
+class Sprites : public QCPItem
+{
+public:
+    Sprites(QPolygonF outline, QColor color) : mOutline(std::move(outline)), mPen(color, 1.5) { }
+
+    void setBodies(std::vector<Body> bodies)
+    {
+        mBodies = std::move(bodies);
+        update();
+    }
+
+protected:
+    void draw(QCPDrawContext& context) const override
+    {
+        for (const Body& b : mBodies)
+        {
+            const QTransform pose = QTransform()
+                                        .translate(b.pos.x(), b.pos.y())
+                                        .rotate(b.angle)
+                                        .scale(b.size, b.size);
+            context.polygon(pose.map(mOutline), mPen);
+        }
+    }
+
+private:
+    QPolygonF mOutline;
+    QPen mPen;
+    std::vector<Body> mBodies;
+};
+
+// The example picks "monospace"; the picture takes the reference font instead, so that it is the
+// same picture on every platform.
+class Hud : public QCPItem
+{
+public:
+    explicit Hud(QFont font) : mFont(std::move(font)) { }
+
+    void setScore(int score)
+    {
+        mScore = score;
+        update();
+    }
+
+    void setGameOver(bool over)
+    {
+        mOver = over;
+        update();
+    }
+
+protected:
+    void draw(QCPDrawContext& context) const override
+    {
+        context.text(QCP::AxisRatio { 0.02, 0.02 }, QString("SCORE %1").arg(mScore),
+                     { .font = mFont, .color = Qt::white });
+        if (!mOver)
+            return;
+        context.rect(QCP::AxisRatio { 0.2, 0.4 }, QCP::AxisRatio { 0.8, 0.6 }, QPen(Qt::white),
+                     QColor(40, 0, 0, 220));
+        context.text(QCP::AxisRatio { 0.5, 0.5 }, "GAME OVER - press R",
+                     { .font = mFont, .color = Qt::white, .alignment = Qt::AlignCenter });
+    }
+
+private:
+    QFont mFont;
+    int mScore = 0;
+    bool mOver = false;
+};
+
+void sendKey(QCustomPlot& plot, QEvent::Type type, Qt::Key key)
+{
+    QKeyEvent event(type, key, Qt::NoModifier);
+    QCoreApplication::sendEvent(&plot, &event);
+}
+
+//! Up and Left held and one bullet fired, thirty frames later; \a over also shows the banner.
+QImage asteroidsScene(bool over)
+{
+    QCustomPlot plot;
+    targetPlot(plot, 800, 600);
+    plot.setBackground(Qt::black);
+
+    const QPolygonF shipOutline { { 1, 0 }, { -0.7, 0.6 }, { -0.4, 0 }, { -0.7, -0.6 } };
+    const QPolygonF rockOutline { { 1, 0 },    { 0.6, 0.7 },   { 0, 0.9 },  { -0.7, 0.8 },
+                                  { -1, 0.1 }, { -0.6, -0.8 }, { 0.1, -1 }, { 0.8, -0.6 } };
+    const QPolygonF bulletOutline { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } };
+
+    auto ax = plot.axisRect();
+    ax->xAxis()->setRange(0, Game::width);
+    ax->yAxis()->setRange(0, Game::height);
+    ax->xAxis()->setVisible(false);
+    ax->yAxis()->setVisible(false);
+    auto rocks = ax->add<Sprites>(rockOutline, QColor(200, 200, 200));
+    auto bullets = ax->add<Sprites>(bulletOutline, QColor(255, 220, 90));
+    auto ship = ax->add<Sprites>(shipOutline, QColor(120, 220, 255));
+    QFont hudFont = qcp::test::referenceFont();
+    hudFont.setPixelSize(16);
+    hudFont.setBold(true);
+    auto hud = ax->add<Hud>(hudFont);
+
+    Game game;
+    // The example's five rocks come from the standard library's distribution, which differs
+    // between implementations: a fixed table keeps the picture the same everywhere.
+    game.rocks = { { { 18, 12 }, { 3, 1.5 }, 20, 6 },
+                   { { 45, 20 }, { -2, 2 }, 80, 6 },
+                   { { 76, 8 }, { 1.5, 3 }, 140, 6 },
+                   { { 30, 55 }, { 2.5, -1 }, 200, 6 },
+                   { { 68, 48 }, { -1, -2.5 }, 300, 6 } };
+    QObject::connect(&plot, &QCustomPlot::keyPress,
+                     [&](QKeyEvent* event)
+                     {
+                         if (!event->isAutoRepeat())
+                             game.press(event->key());
+                     });
+    QObject::connect(&plot, &QCustomPlot::keyRelease,
+                     [&](QKeyEvent* event)
+                     {
+                         if (!event->isAutoRepeat())
+                             game.release(event->key());
+                     });
+
+    sendKey(plot, QEvent::KeyPress, Qt::Key_Up);
+    sendKey(plot, QEvent::KeyPress, Qt::Key_Left);
+    sendKey(plot, QEvent::KeyPress, Qt::Key_Space);
+    for (int frame = 0; frame < 30; ++frame)
+        game.step(1.0 / 60);
+    game.over = over;
+
+    rocks->setBodies(game.rocks);
+    bullets->setBodies(game.bullets);
+    ship->setBodies({ game.ship });
+    hud->setScore(game.score);
+    hud->setGameOver(game.over);
+    plot.replot();
+    return plot.toPixmap(800, 600).toImage().convertToFormat(QImage::Format_ARGB32);
+}
+} // namespace
+
 void TestReferenceM4e::errorBarsPlain()
 {
     check(errorBarsScene(false, false, false, false), "errorbars-plain.png");
@@ -1414,4 +1824,19 @@ void TestReferenceM4e::calloutTarget()
 void TestReferenceM4e::peakFitTarget()
 {
     check(peakFitScene(), "peak-fit-target.png");
+}
+
+void TestReferenceM4e::brickBreakerTarget()
+{
+    check(brickBreakerScene(), "brick-breaker-target.png");
+}
+
+void TestReferenceM4e::asteroidsTarget()
+{
+    check(asteroidsScene(false), "asteroids-target.png");
+}
+
+void TestReferenceM4e::asteroidsOverTarget()
+{
+    check(asteroidsScene(true), "asteroids-over-target.png");
 }

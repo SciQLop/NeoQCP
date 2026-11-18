@@ -1,7 +1,6 @@
-// Target program (milestone 6): Asteroids, annotations the user derives. Does not compile yet.
+// Target program (milestone 6): Asteroids, annotations the user derives.
 
 #include <qcustomplot.h>
-
 #include <QApplication>
 #include <QKeyEvent>
 #include <QTimer>

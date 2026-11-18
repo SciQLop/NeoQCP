@@ -351,6 +351,61 @@ void TestQCustomPlot::deleteKeySlotDeletingEveryItemIsSafe()
   QCOMPARE(mPlot->itemCount(), 0);
 }
 
+// A key is also the plot's own signal: the key of Left arrives, press and release, with the
+// auto-repeat flag the event carried.
+void TestQCustomPlot::keysReachASlot()
+{
+  layOut(mPlot, QCP::Interactions());
+  QList<QPair<int, bool>> presses, releases; // key, auto repeat
+  connect(mPlot, &QCustomPlot::keyPress, mPlot, [&presses](QKeyEvent* event)
+          { presses << qMakePair(event->key(), event->isAutoRepeat()); });
+  connect(mPlot, &QCustomPlot::keyRelease, mPlot, [&releases](QKeyEvent* event)
+          { releases << qMakePair(event->key(), event->isAutoRepeat()); });
+  QKeyEvent press(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
+  QCoreApplication::sendEvent(mPlot, &press);
+  QKeyEvent repeat(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier, QString(), true, 2);
+  QCoreApplication::sendEvent(mPlot, &repeat);
+  QKeyEvent release(QEvent::KeyRelease, Qt::Key_Left, Qt::NoModifier);
+  QCoreApplication::sendEvent(mPlot, &release);
+  QCOMPARE(presses.size(), 2);
+  QCOMPARE(presses.at(0), qMakePair(int(Qt::Key_Left), false));
+  QCOMPARE(presses.at(1), qMakePair(int(Qt::Key_Left), true));
+  QCOMPARE(releases.size(), 1);
+  QCOMPARE(releases.at(0), qMakePair(int(Qt::Key_Left), false));
+}
+
+// A plot takes the keyboard without a click first, so its keys reach it in a window.
+void TestQCustomPlot::theFocusPolicyIsStrong()
+{
+  QCOMPARE(mPlot->focusPolicy(), Qt::StrongFocus);
+}
+
+// A slot that accepts the key consumes it: no delete is requested on the selected items, and the
+// event goes no further. The same key without the slot is the plot's own delete.
+void TestQCustomPlot::anAcceptedKeyStopsTheDeleteRequest()
+{
+  layOut(mPlot, QCP::iSelectItems);
+  auto line = mPlot->add<QCPItemLine>();
+  line->setSelected(true);
+  QSignalSpy spy(line.get(), &QCPItem::deleteRequested);
+  bool consuming = true;
+  connect(mPlot, &QCustomPlot::keyPress, mPlot, [&consuming](QKeyEvent* event)
+          {
+            if (consuming)
+              event->accept();
+          });
+  QKeyEvent del(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
+  QCoreApplication::sendEvent(mPlot, &del);
+  QCOMPARE(spy.count(), 0);
+  QVERIFY(del.isAccepted());
+
+  consuming = false;
+  QKeyEvent again(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
+  QCoreApplication::sendEvent(mPlot, &again);
+  QCOMPARE(spy.count(), 1);
+  QVERIFY(!again.isAccepted()); // ignored: the plot leaves the keys to its parent
+}
+
 namespace {
 void startRubberBand(QCustomPlot* plot)
 {
@@ -623,6 +678,27 @@ void TestQCustomPlot::wheelSlotDeletingThePlotIsSafe()
   QSpontaneKeyEvent::setSpontaneous(&event);
   QCoreApplication::instance()->notify(mPlot, &event);
   QVERIFY(ran);
+}
+
+// Review focus 1: the slot of a key signal may delete the plot, from a press and from a release.
+void TestQCustomPlot::aSlotDeletingThePlotOnKeyPress()
+{
+  layOut(mPlot, QCP::Interactions());
+  bool ran = false;
+  deletePlotOn(mPlot, mPlot, &QCustomPlot::keyPress, &ran);
+  QKeyEvent press(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
+  QCoreApplication::sendEvent(mPlot, &press);
+  QVERIFY(ran);
+  QVERIFY(press.isAccepted()); // taken: Qt passes it to no widget that is gone
+
+  QCustomPlot* plot = new QCustomPlot(nullptr);
+  plot->show();
+  bool released = false;
+  deletePlotOn(plot, plot, &QCustomPlot::keyRelease, &released);
+  QKeyEvent release(QEvent::KeyRelease, Qt::Key_Left, Qt::NoModifier);
+  QCoreApplication::sendEvent(plot, &release);
+  QVERIFY(released);
+  QVERIFY(release.isAccepted());
 }
 
 // Through the window, as a real click: QWidgetWindow dispatches it and forwards the right button
