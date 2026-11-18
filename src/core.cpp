@@ -4488,6 +4488,9 @@ void QCustomPlot::mouseDoubleClickEvent(QMouseEvent* event)
     deliver(this, [this, event] { emit mouseDoubleClick(event); });
     mMouseHasMoved = false;
     mMousePressPos = event->pos();
+    // A double click is the press that starts its drag: it clears the last grab like one.
+    mMouseEventLayerable = nullptr;
+    mMouseEventLayerableDetails.clear();
 
     // determine layerable under the cursor (this event is called instead of the second press event
     // in a double-click):
@@ -4533,6 +4536,12 @@ void QCustomPlot::mousePressEvent(QMouseEvent* event)
     // save some state to tell in releaseEvent whether it was a click:
     mMouseHasMoved = false;
     mMousePressPos = event->pos();
+
+    // A press begins a new grab, even one nothing accepts: the layerable that took the last press
+    // must not go on receiving moves because this press found nothing (a lost release, a press in
+    // the gap between two rects, a press on something that ignores the mouse).
+    mMouseEventLayerable = nullptr;
+    mMouseEventLayerableDetails.clear();
 
     // Right-click cancels in-progress creation
     if (event->button() == Qt::RightButton && mCreationState

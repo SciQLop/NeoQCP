@@ -326,10 +326,9 @@ void TestItemEvents::aDragStartedByADoubleClickKeepsItsPart()
     QCOMPARE(probe->releasePart, 2);
 }
 
-// The review's M2: a press the item does not see is still answered by another layerable (the axis
-// rect, at the least), which replaces the item as the drag's grabber, so no stale grabber survives
-// to take the next drag's moves. A press no candidate accepts would have to land outside every
-// layerable, and the plot has none.
+// The review's M2, the other half: another layerable answers a press over the plot (the axis rect,
+// at the least), so it replaces the item as the drag's grabber. That is this test; the press with
+// nothing at all under it is the one below.
 void TestItemEvents::aNewPressReplacesTheGrabber()
 {
     mPlot->setInteractions(QCP::iRangeDrag);
@@ -349,6 +348,30 @@ void TestItemEvents::aNewPressReplacesTheGrabber()
              "the axis rect took the press and pans, instead of the item");
     sendMouse(mPlot, QEvent::MouseButtonRelease, besideTheBox + QPoint(20, 0), Qt::NoButton);
     QCOMPARE(probe->releaseCount, 0);
+}
+
+// The re-review's M2: a press that nothing accepts used to leave the previous grabber in place, so
+// the next move went to the old item with the old part. A lost release (a press handler that opens a
+// modal menu, a window that loses the mouse) puts that within reach of a plain drag.
+void TestItemEvents::aPressNothingAcceptsLeavesNoGrabber()
+{
+    mPlot->setAxisRectGrid(2, 1);
+    mPlot->replot();
+    Probe* probe = mPlot->add<Probe>().get();
+    mPlot->replot();
+    const QRect top = mPlot->axisRect(0)->outerRect();
+    const QRect bottom = mPlot->axisRect(1)->outerRect();
+    QVERIFY2(bottom.top() - top.bottom() >= 3, "the grid leaves a gap between the rects");
+
+    sendMouse(mPlot, QEvent::MouseButtonPress, top.center(), Qt::LeftButton);
+    QCOMPARE(probe->pressCount, 1);
+    // The release never arrives.
+
+    const QPoint inTheGap(top.center().x(), (top.bottom() + bottom.top()) / 2);
+    sendMouse(mPlot, QEvent::MouseButtonPress, inTheGap, Qt::LeftButton);
+    QCOMPARE(probe->pressCount, 1);
+    sendMouse(mPlot, QEvent::MouseMove, inTheGap + QPoint(20, 0), Qt::LeftButton);
+    QCOMPARE(probe->moveCount, 0);
 }
 
 void TestItemEvents::anItemDeletedInItsMoveHandler()
