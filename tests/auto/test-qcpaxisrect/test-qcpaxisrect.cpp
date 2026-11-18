@@ -264,11 +264,14 @@ QRect inkBox(const QImage& image, const QCPAxisRect* rect, int top, int bottom)
     return box;
 }
 
+// The box the title adds to the top margin: its text as the label renderer measures it (the
+// measure the layout uses; QFontMetrics::height() differs from it on macOS), plus the text
+// element's default margins, 2 px above and below.
 int titleTextHeight(QCPAxisRect* rect)
 {
     QFont font = rect->axis(QCPAxis::atTop)->labelFont();
     font.setPointSizeF(font.pointSizeF() * 1.2);
-    return QFontMetrics(font).height();
+    return QCPLabelRenderer::measureWith(nullptr, font, rect->title()).height() + 4;
 }
 } // namespace
 
@@ -324,8 +327,7 @@ void TestQCPAxisRect::aTitleSitsAboveTheTopAxis()
     rect->setTitle(QStringLiteral("Title"));
     const QImage titled = exported(plot);
     const int withTitle = rect->rect().top() - rect->outerRect().top();
-    QVERIFY(withTitle - axisOnly >= titleTextHeight(rect));
-    QVERIFY(withTitle - axisOnly <= titleTextHeight(rect) + 8);
+    QCOMPARE(withTitle - axisOnly, titleTextHeight(rect));
     const QRect titleInk
         = inkBox(titled, rect, rect->outerRect().top(), rect->outerRect().top() + withTitle - axisOnly);
     QVERIFY2(!titleInk.isEmpty(), "the title sits in the band above the axis");
