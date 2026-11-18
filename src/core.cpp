@@ -1886,9 +1886,11 @@ bool QCustomPlot::adoptPlottable(QCPPlottable* plottable, QCPCoordinateSystem* s
     plottable->setParentLayerable(area);
     if (!registerJoinedPlottable(plottable))
         return false;
-    // An inset draws above its parent: what is added to it goes to its own layer.
+    // An inset draws above its parent: what is added to it goes to its own layer, unless the caller
+    // put it on a layer of its own.
     if (const auto* rect = qobject_cast<QCPAxisRect*>(area))
-        if (QCPLayer* own = rect->ownDataLayer())
+        if (QCPLayer* own = rect->ownDataLayer();
+            own && isDefaultOrInsetDataLayer(plottable->layer(), false))
             plottable->setLayer(own);
     return true;
 }
@@ -1898,12 +1900,15 @@ bool QCustomPlot::adoptPlottable(QCPPlottable* plottable, QCPCoordinateSystem* s
   A plottable or an item whose area changed joins the data layer of the inset it now hangs on, and
   goes back to the layer it would have had outside one ("main" for a plottable, "annotations" for an
   item) when it leaves: an inset's opaque background covers everything under its own layers, so the
-  plot's default layers would hide it.
+  plot's default layers would hide it. Only an object on one of those default layers, or on another
+  inset's data layer, moves: a layer the user chose stays, and the inset's background covers the
+  object instead.
 */
 void QCustomPlot::followAreaLayer(QCPLayerable* object, const QCPArea* area)
 {
     if (!object || mBeingDestroyed || !object->layer())
         return;
+    const bool item = qobject_cast<QCPItem*>(object) != nullptr;
     QCPLayer* own = nullptr;
     if (const auto* rect = qobject_cast<const QCPAxisRect*>(area))
         own = rect->ownDataLayer();
@@ -1912,11 +1917,25 @@ void QCustomPlot::followAreaLayer(QCPLayerable* object, const QCPArea* area)
     {
         if (!isInsetDataLayer(object->layer()))
             return;
-        target = qobject_cast<QCPItem*>(object) ? layer(QLatin1String("annotations")).get()
-                                                : layer(QLatin1String("main")).get();
+        target = item ? layer(QLatin1String("annotations")).get() : layer(QLatin1String("main")).get();
     }
+    else if (!isDefaultOrInsetDataLayer(object->layer(), item))
+        return;
     if (target && target != object->layer())
         object->setLayer(target);
+}
+
+/*! \internal
+
+  Whether a move onto an area may take \a layer away from an object: its default layer ("main" for a
+  plottable, "annotations" for an item) or an inset's data layer. Anything else is the user's choice.
+*/
+bool QCustomPlot::isDefaultOrInsetDataLayer(const QCPLayer* layer, bool item) const
+{
+    if (!layer)
+        return false;
+    const QLatin1String defaultName(item ? "annotations" : "main");
+    return layer->name() == defaultName || isInsetDataLayer(layer);
 }
 
 //! \internal

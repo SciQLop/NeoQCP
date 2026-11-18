@@ -613,6 +613,10 @@ private:
     void followAreaLayer(QCPLayerable* object, const QCPArea* area);
     //! Whether \a layer is the data layer of one of this plot's insets.
     [[nodiscard]] bool isInsetDataLayer(const QCPLayer* layer) const;
+    // Whether a layer may be replaced by a move onto an area: the object's default one ("main" for
+    // a plottable, "annotations" for an item) or an inset's data layer. A layer the user chose
+    // stays where it is.
+    [[nodiscard]] bool isDefaultOrInsetDataLayer(const QCPLayer* layer, bool item) const;
     void cutAnchorLinks(QCPItem* item);
     // Also themes a rect's own colour scale, which QCPAxisRect makes after the theme was set.
     void applyThemeToAxis(QCPAxis* axis);

@@ -945,6 +945,49 @@ void TestQCPAxisRect::anItemFollowsTheAreaItIsIn()
 }
 
 
+void TestQCPAxisRect::aChosenLayerSurvivesAMoveOntoAnInset()
+{
+    // Only a default layer moves with the area: an object on a layer of the user's own stays there,
+    // and the inset's opaque background then draws over it.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* parent = plot.axisRect().get();
+    parent->xAxis()->setRange(0, 1);
+    parent->yAxis()->setRange(0, 1);
+    auto inset = parent->addInset(QRectF(0.25, 0.25, 0.5, 0.5));
+    inset->xAxis()->setRange(0, 1);
+    inset->yAxis()->setRange(0, 1);
+    QVERIFY(plot.addLayer(QStringLiteral("mine"), plot.layer(QStringLiteral("main")).get(),
+                          QCustomPlot::limAbove));
+    QCPLayer* mine = plot.layer(QStringLiteral("mine")).get();
+
+    auto graph = parent->line(std::vector<double> { 0, 1 }, std::vector<double> { 0.5, 0.5 },
+                              { .pen = QPen(Qt::red, 9) });
+    graph->setLayer(mine);
+    qcp::ops::setAxisRect(*graph, inset.get());
+    QCOMPARE(graph->layer(), mine);
+    plot.replot();
+    QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QCOMPARE(countColour(image, inset->rect().adjusted(3, 3, -3, -3), isRed), 0);
+
+    auto item = plot.add<QCPItemRect>();
+    item->setLayer(mine);
+    for (QCPItemPosition* position : { item->topLeft, item->bottomRight })
+    {
+        position->setType(QCPItemPosition::ptAxisRectRatio);
+        position->setAxisRect(inset.get());
+        QCOMPARE(item->layer(), mine);
+    }
+    item->topLeft->setCoords(0.2, 0.2);
+    item->bottomRight->setCoords(0.8, 0.8);
+    item->setBrush(QBrush(Qt::blue));
+    item->setPen(QPen(Qt::NoPen));
+    for (QCPItemPosition* position : { item->topLeft, item->bottomRight })
+    {
+        position->setAxisRect(parent);
+        QCOMPARE(item->layer(), mine);
+    }
+}
 void TestQCPAxisRect::thePlotBackgroundReachesAnInset()
 {
     // An inset that follows the theme follows a later setBackground() too.

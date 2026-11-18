@@ -180,8 +180,10 @@ Its grid is painted with it, on its own background layer, not by the plot's GPU 
 It draws above everything of the parent, plottables added to the parent later included: it has its own layers above the plot's "axes" layer.
 A newer inset draws above the older ones, and an inset of an inset stays inside its parent's stack.
 A plottable or an item moved onto an inset's axes (its `setAxisRect`, an item position's `setAxisRect`) joins the inset's own data layer, so it is drawn in the inset; moved back off, it returns to the plot's `"main"` or `"annotations"` layer and goes under the inset's background.
-The three layers are named `inset N back`, `inset N data` and `inset N axes`, N counting the plot's insets, so `plot.layer("inset 1 data")` finds one.
-The inset's background follows the plot's, a later `QCustomPlot::setBackground()` included, until the inset's own `setBackground()` names one: a theme leaves that choice alone. A `Qt::NoBrush` plot background leaves an inset see-through.
+Only an object on one of those default layers moves: one you put on a layer of your own stays there, and the inset's background then draws over it.
+An item whose positions name different areas follows the first position that names one, so a connector from the parent into an inset measures in the parent and stays under the inset.
+The three layers are named `inset N back`, `inset N data` and `inset N axes`, N counting the insets the plot has ever made, so `plot.layer("inset 1 data")` finds one and the numbers keep their meaning after an inset is deleted.
+The inset's background follows the plot's, a later `QCustomPlot::setBackground()` included, until the inset's own `setBackground()` sets a brush or a pixmap: a theme leaves that choice alone, and the inset keeps the plot's colour when its parent rect's background changes, the way matplotlib's face colour does. `setBackground(QPixmap())` only clears the pixmap and leaves that choice alone. A `Qt::NoBrush` plot background leaves an inset see-through.
 The inset's own title (`setTitle`) and colour scale draw on its axes layer, above its data.
 A drag or a wheel zoom inside it moves the inset, not the parent.
 It follows the parent when the plot resizes and is deleted with it.
