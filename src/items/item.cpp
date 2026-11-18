@@ -1814,10 +1814,10 @@ std::optional<QCPItemExtent> QCPItem::indexExtent() const
 */
 QRectF QCPItem::dataRect() const
 {
-    const std::optional<QCPItemExtent> extent = indexExtent();
-    if (!extent)
+    const std::optional<QCPDataBox> data = mCore.dataRange(*this, view(), false);
+    if (!data)
         return {};
-    const QCPDataBox& box = extent->box;
+    const QCPDataBox& box = *data;
     if (!std::isfinite(box.keyLower) || !std::isfinite(box.keyUpper) || !std::isfinite(box.valueLower)
         || !std::isfinite(box.valueUpper))
         return {};

@@ -1212,7 +1212,30 @@ void TestItemRecording::dataRectOfAPositionlessItem()
     QVERIFY(pixel->dataRect().isEmpty());
 }
 
+void TestItemRecording::dataRectOfACalloutRecording()
+{
+    // The box hangs off the tip by pixels: its data corners are what the rect reports, and 2..5 by
+    // 3..7 is the box the item will draw when the frame is the plot's.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto item = plot.add<CalloutShapeItem>();
+    QCOMPARE(item->dataRect(), QRectF(2, 3, 3, 4));
+    plot.replot();
+    QCOMPARE(item->dataRect(), QRectF(2, 3, 3, 4));
+}
 
+void TestItemRecording::dataRectIgnoresTheLogAndReverseRules()
+{
+    // A reversed log key axis would make the log rule drop the side below 1, and reverse the range:
+    // the data box is neither, so dataRect() stays left = key lower.
+    QCustomPlot plot;
+    preparePlot(plot);
+    plot.xAxis->setScale(QCPScale::log());
+    plot.xAxis->setRangeReversed(true);
+    auto item = plot.add<LogBoxItem>();
+    plot.replot();
+    QCOMPARE(item->dataRect(), QRectF(1, 36, 99, 3));
+}
 
 void TestItemRecording::aFollowerSlotDeletingTheSourceOnChanged()
 {
