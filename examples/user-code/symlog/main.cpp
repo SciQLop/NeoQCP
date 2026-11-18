@@ -1,4 +1,4 @@
-// Target program (milestone 6): symmetric log axes, linear near zero. Does not compile yet.
+// Target program (milestone 6): symmetric log axes, linear near zero.
 // https://matplotlib.org/stable/gallery/scales/symlog_demo.html
 
 #include <qcustomplot.h>

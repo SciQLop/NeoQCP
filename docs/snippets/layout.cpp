@@ -23,6 +23,19 @@ DOC_SNIPPET(layout_title, 600, 380)
     // [/layout_title]
 }
 
+DOC_CODE(layout_grid)
+{
+    // [layout_grid]
+    customPlot->setAxisRectGrid(2, 1, { .shareX = true, .rowStretch = { 1, 0.35 } });
+    auto signal = customPlot->axisRect(0, 0);
+    auto residuals = customPlot->axisRect(1, 0);
+    signal->line(std::vector<double> { 0, 1, 2, 3 }, std::vector<double> { 1, 3, 2, 4 });
+    residuals->line(std::vector<double> { 0, 1, 2, 3 }, std::vector<double> { 0.1, -0.2, 0.1, 0 });
+    residuals->xAxis()->setLabel("time (s)");
+    customPlot->rescaleAxes(); // the shared x fits both panels' data
+    // [/layout_grid]
+}
+
 DOC_CODE(layout_rect_title)
 {
     // [layout_rect_title]

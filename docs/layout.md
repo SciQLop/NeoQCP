@@ -103,6 +103,24 @@ New elements land on the current layer, `main`, which is drawn below the legend'
 
 The extra grid is only there for its margins: it keeps the legend border a few pixels off the widget edge.
 
+## A grid of axis rects
+
+`setAxisRectGrid(rows, columns, options)` makes the plot a grid of axis rects in one call:
+
+```{literalinclude} snippets/layout.cpp
+:start-after: // [layout_grid]
+:end-before: // [/layout_grid]
+:language: cpp
+:dedent:
+```
+
+- `axisRect(row, column)` returns the rect of a cell; `axisRect()` is still cell (0, 0), with what it held before the call.
+- The data edges of every column line up, and so do those of every row, shared axes or not: a colour bar beside one rect counts in its margin.
+- `shareX` links the bottom axes of each column to the bottom rect's, which keeps the column's tick labels; the others hide theirs. `shareY` does the same per row with the left axes, the leftmost keeping its labels. Shared axes show one range and one scale, a drag or a zoom on any panel moves them all, and `rescaleAxes()` fits the data of every panel.
+- `rowStretch` and `columnStretch` size the rows and columns (a missing entry is 1).
+- A second call grows or shrinks the grid. The rects in the kept cells stay; a rect outside the new grid goes with its plottables, items, colour scale and insets. The shares of the previous call are undone first.
+- The main layout must hold axis rects only: a title row or a legend placed there is refused. Use `setTitle` on a rect, and the rect's own colour scale.
+
 ## Several axis rects
 
 Arranging axis rects is what the layout system is for.
@@ -190,6 +208,8 @@ A member can be an axis rect, a colour scale or any other layout element, in one
 - Across plot widgets, members line up while both plots are shown.
 
 ### Stacked axis rects
+
+`setAxisRectGrid` does this, and shares the x axis, in one call (see "A grid of axis rects" above). By hand:
 
 Two axis rects stacked in a column rarely line up by themselves.
 Each one sizes its left margin to fit its own tick labels, and "80000" is wider than "1".

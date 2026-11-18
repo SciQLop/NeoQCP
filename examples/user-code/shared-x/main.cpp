@@ -1,4 +1,4 @@
-// Target program (milestone 6): two panels sharing x. Does not compile yet.
+// Target program (milestone 6): two panels sharing x.
 // https://matplotlib.org/stable/gallery/subplots_axes_and_figures/shared_axis_demo.html
 
 #include <qcustomplot.h>

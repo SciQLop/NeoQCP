@@ -1,4 +1,4 @@
-// Target program (milestone 6): a spectrogram over a time series, sharing time. Does not compile yet.
+// Target program (milestone 6): a spectrogram over a time series, sharing time.
 // https://matplotlib.org/stable/gallery/images_contours_and_fields/specgram_demo.html
 
 #include <qcustomplot.h>
