@@ -264,14 +264,16 @@ QRect inkBox(const QImage& image, const QCPAxisRect* rect, int top, int bottom)
     return box;
 }
 
-// The box the title adds to the top margin: its text as the label renderer measures it (the
-// measure the layout uses; QFontMetrics::height() differs from it on macOS), plus the text
-// element's default margins, 2 px above and below.
+// The box the title adds to the top margin: its text as the label renderer measures it - the
+// renderer the layout measures with, since the painted metrics beside it round the box one pixel
+// shorter - plus the text element's default margins, 2 px above and below.
 int titleTextHeight(QCPAxisRect* rect)
 {
     QFont font = rect->axis(QCPAxis::atTop)->labelFont();
     font.setPointSizeF(font.pointSizeF() * 1.2);
-    return QCPLabelRenderer::measureWith(nullptr, font, rect->title()).height() + 4;
+    return QCPLabelRenderer::measureWith(QCPLabelRenderer::defaultRenderer(), font, rect->title())
+               .height()
+        + 4;
 }
 } // namespace
 
