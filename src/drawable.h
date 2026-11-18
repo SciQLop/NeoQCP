@@ -179,6 +179,9 @@ public:
     std::optional<double> hitTest(const QCPDrawable& object, QCP::Pixels at, QVariant* details,
                                   const QCPDrawnView& view);
 
+    //! \a at in the frame the recording replays in: the item's own axes, never a default pair.
+    [[nodiscard]] QCP::Data dataAt(QCP::Pixels at, const QCPDrawnView& view) const;
+
     //! hitTest() as the bases' selectTest wants it: -1 when \a onlySelectable and not selectable.
     double selectTest(const QCPDrawable& object, const QPointF& pos, bool onlySelectable,
                       QVariant* details, const QCPDrawnView& view);

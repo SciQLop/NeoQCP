@@ -37,6 +37,7 @@
 
 class QCPEmissionScope;
 
+class QCPMouseEvent;
 class QCPPainter;
 class QCustomPlot;
 class QCPItemPosition;
@@ -399,12 +400,35 @@ protected:
     //! one an item overrides.
     void draw(QCPPainter* painter) final;
 
+    // The mouse handlers, as QCPLayerable knows them: final, because an item handles the mouse with
+    // the value event below. This is where the press part is remembered and the drag is kept.
+    void mousePressEvent(QMouseEvent* event, const QVariant& details) final;
+    void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) final;
+    void mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos) final;
+    void mouseDoubleClickEvent(QMouseEvent* event, const QVariant& details) final;
+
+    /*! The mouse handlers an item overrides, and the ones a plot reaches through the four final
+      methods above. All four ignore the event: an item that wants a press calls accept() on it,
+      and then it gets the whole drag, with the part the press hit. */
+    virtual void mousePressEvent(QCPMouseEvent* event);
+    virtual void mouseMoveEvent(QCPMouseEvent* event);
+    virtual void mouseReleaseEvent(QCPMouseEvent* event);
+    virtual void mouseDoubleClickEvent(QCPMouseEvent* event);
+
     //! What the core reads from this item this frame.
     [[nodiscard]] QCPDrawnView view() const;
 
     //! The recording, its keys and its caches.
     mutable QCPDrawnCore mCore;
 
+    //! Where the previous mouse event of the drag was: the press for the first move.
+    QCP::Pixels mMouseLastPixels {};
+    //! The part the press hit, kept for the whole drag.
+    int mMousePressPart = -1;
+    //! What the press's hitTest answered, for an item whose details are its own.
+    QVariant mMousePressDetails;
+
+    friend class QCPMouseEvent; // reads the recording's frame for data() and lastData()
     void markFollowersDirty();
     bool mMarking = false;
     //! How many of the positions hang from another item's anchor, so that an item that hangs from

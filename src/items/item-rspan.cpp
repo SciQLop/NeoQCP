@@ -1,4 +1,5 @@
 #include "item-rspan.h"
+#include "item-mouse-event.h"
 
 #include "../core.h"
 #include <array>
@@ -225,14 +226,15 @@ QPointF QCPItemRSpan::anchorPixelPosition(int anchorId) const
     return {};
 }
 
-void QCPItemRSpan::mousePressEvent(QMouseEvent* event, const QVariant& details)
+void QCPItemRSpan::mousePressEvent(QCPMouseEvent* event)
 {
     if (!mMovable)
     {
         event->ignore();
         return;
     }
-    mDragPart = static_cast<HitPart>(details.toInt());
+    // The span names its own parts: a press's details are one of HitPart, not a tagged map.
+    mDragPart = static_cast<HitPart>(event->details().toInt());
     mDragStartLeft = leftEdge->pixelPosition().x();
     mDragStartRight = rightEdge->pixelPosition().x();
     mDragStartTop = topEdge->pixelPosition().y();
@@ -240,15 +242,16 @@ void QCPItemRSpan::mousePressEvent(QMouseEvent* event, const QVariant& details)
     event->accept();
 }
 
-void QCPItemRSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
+void QCPItemRSpan::mouseMoveEvent(QCPMouseEvent* event)
 {
     if (mDragPart == hpNone)
         return;
     // The drag signals both ranges itself, once, below.
     mEdgesQuiet = true;
 
-    const double dx = event->pos().x() - startPos.x();
-    const double dy = event->pos().y() - startPos.y();
+    const QCP::PixelOffset moved = event->moved();
+    const double dx = moved.dx;
+    const double dy = moved.dy;
 
     switch (mDragPart)
     {
@@ -294,8 +297,7 @@ void QCPItemRSpan::emitDraggedRanges()
                        [this] { return valueRange(); });
 }
 
-void QCPItemRSpan::mouseReleaseEvent([[maybe_unused]] QMouseEvent* event,
-                                     [[maybe_unused]] const QPointF& startPos)
+void QCPItemRSpan::mouseReleaseEvent([[maybe_unused]] QCPMouseEvent* event)
 {
     mDragPart = hpNone;
 }

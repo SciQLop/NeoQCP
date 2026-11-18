@@ -24,6 +24,7 @@
 ****************************************************************************/
 
 #include "item.h"
+#include "item-mouse-event.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1627,6 +1628,119 @@ void QCPItem::draw(QCPPainter* painter)
 QCPDrawnView QCPItem::view() const
 {
     return qcpDrawnViewOf(*this, clipRect());
+}
+
+namespace
+{
+QCP::Pixels mousePixels(const QMouseEvent* event)
+{
+    const QPoint position = event->pos();
+    return QCP::Pixels { double(position.x()), double(position.y()) };
+}
+
+void copyAccepted(QMouseEvent* event, const QCPMouseEvent& mouse)
+{
+    if (mouse.isAccepted())
+        event->accept();
+    else
+        event->ignore();
+}
+} // namespace
+
+/*! \internal
+
+  Offers a press to the item through QCPMouseEvent, and keeps what the drag needs: the position of
+  this event and the part the press hit. An item that accepts the press gets every move and the
+  release, wherever the mouse goes; one that ignores it leaves the press to whoever is under it.
+*/
+void QCPItem::mousePressEvent(QMouseEvent* event, const QVariant& details)
+{
+    const QPointer<QCPItem> alive(this);
+    const QCP::Pixels pixels = mousePixels(event);
+    mMouseLastPixels = pixels;
+    mMousePressPart = qcpHitPart(details);
+    mMousePressDetails = details;
+    QCPMouseEvent mouse(this, event, pixels, pixels, mMousePressPart, details);
+    mousePressEvent(&mouse);
+    if (!alive)
+        return; // the handler deleted the item, and the drag with it
+    copyAccepted(event, mouse);
+}
+
+/*! \internal
+
+  A move of a drag the item accepted. The part is the press's: what the mouse passes over during a
+  drag changes nothing. \a startPos is the plot's press position, kept for the 2.x signature; the
+  previous event of this drag is mMouseLastPixels, which is the same point for the first move and
+  the last move afterwards.
+*/
+void QCPItem::mouseMoveEvent(QMouseEvent* event, [[maybe_unused]] const QPointF& startPos)
+{
+    const QPointer<QCPItem> alive(this);
+    const QCP::Pixels pixels = mousePixels(event);
+    QCPMouseEvent mouse(this, event, pixels, mMouseLastPixels, mMousePressPart, mMousePressDetails);
+    mouseMoveEvent(&mouse);
+    if (!alive)
+        return;
+    mMouseLastPixels = pixels;
+    copyAccepted(event, mouse);
+}
+
+/*! \internal
+
+  The end of a drag, sent wherever the mouse is. The press state is cleared afterwards: the next
+  press names a new part.
+*/
+void QCPItem::mouseReleaseEvent(QMouseEvent* event, [[maybe_unused]] const QPointF& startPos)
+{
+    const QPointer<QCPItem> alive(this);
+    const QCP::Pixels pixels = mousePixels(event);
+    QCPMouseEvent mouse(this, event, pixels, mMouseLastPixels, mMousePressPart, mMousePressDetails);
+    mouseReleaseEvent(&mouse);
+    if (!alive)
+        return;
+    mMouseLastPixels = pixels;
+    mMousePressPart = -1;
+    mMousePressDetails.clear();
+    copyAccepted(event, mouse);
+}
+
+/*! \internal
+
+  A double click, offered as a press would be: the part the click hit, and this position as the
+  previous event, because a double click starts no drag.
+*/
+void QCPItem::mouseDoubleClickEvent(QMouseEvent* event, const QVariant& details)
+{
+    const QPointer<QCPItem> alive(this);
+    const QCP::Pixels pixels = mousePixels(event);
+    const int part = qcpHitPart(details);
+    QCPMouseEvent mouse(this, event, pixels, pixels, part, details);
+    mouseDoubleClickEvent(&mouse);
+    if (!alive)
+        return;
+    copyAccepted(event, mouse);
+}
+
+//! The default mouse handlers: an item that does not want the event ignores it.
+void QCPItem::mousePressEvent(QCPMouseEvent* event)
+{
+    event->ignore();
+}
+
+void QCPItem::mouseMoveEvent(QCPMouseEvent* event)
+{
+    event->ignore();
+}
+
+void QCPItem::mouseReleaseEvent(QCPMouseEvent* event)
+{
+    event->ignore();
+}
+
+void QCPItem::mouseDoubleClickEvent(QCPMouseEvent* event)
+{
+    event->ignore();
 }
 
 //! What the recording occupies in data coordinates.

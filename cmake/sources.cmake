@@ -65,6 +65,7 @@ set(NEOQCP_SOURCES
     src/items/item-spanbase.cpp
     src/items/item-rspan.cpp
     src/items/item-span.cpp
+    src/items/item-mouse-event.cpp
     src/layoutelements/area.cpp
     src/layoutelements/axisrect-grid.cpp
     src/layoutelements/layoutelement-axisrect.cpp
@@ -146,6 +147,7 @@ set(NEOQCP_MOC_HEADERS
     src/items/item-spanbase.h
     src/items/item-rspan.h
     src/items/item-span.h
+    src/items/item-mouse-event.h
     src/layer.h
     src/spatial-index.h
     src/coords.h

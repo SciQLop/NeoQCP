@@ -1,4 +1,5 @@
 #include "item-span.h"
+#include "item-mouse-event.h"
 
 #include <array>
 
@@ -183,20 +184,21 @@ QPointF QCPItemSpan::anchorPixelPosition(int anchorId) const
     return { };
 }
 
-void QCPItemSpan::mousePressEvent(QMouseEvent* event, const QVariant& details)
+void QCPItemSpan::mousePressEvent(QCPMouseEvent* event)
 {
     if (!mMovable)
     {
         event->ignore();
         return;
     }
-    mDragPart = static_cast<HitPart>(details.toInt());
+    // The span names its own parts: a press's details are one of HitPart, not a tagged map.
+    mDragPart = static_cast<HitPart>(event->details().toInt());
     mDragStartLower = rangePixel(lowerEdge);
     mDragStartUpper = rangePixel(upperEdge);
     event->accept();
 }
 
-void QCPItemSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
+void QCPItemSpan::mouseMoveEvent(QCPMouseEvent* event)
 {
     if (mDragPart == hpNone)
         return;
@@ -205,8 +207,8 @@ void QCPItemSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
 
     const bool vertical = mOrientation == Qt::Vertical;
     const Qt::Orientation edgeAxis = vertical ? Qt::Horizontal : Qt::Vertical;
-    const double delta
-        = (vertical ? event->pos().x() - startPos.x() : event->pos().y() - startPos.y());
+    const QCP::PixelOffset moved = event->moved();
+    const double delta = vertical ? moved.dx : moved.dy;
 
     switch (mDragPart)
     {
@@ -230,8 +232,7 @@ void QCPItemSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
     qcpEmit(this, mParentPlot, &QCPItemSpan::rangeChanged, range());
 }
 
-void QCPItemSpan::mouseReleaseEvent([[maybe_unused]] QMouseEvent* event,
-                                    [[maybe_unused]] const QPointF& startPos)
+void QCPItemSpan::mouseReleaseEvent([[maybe_unused]] QCPMouseEvent* event)
 {
     mDragPart = hpNone;
 }

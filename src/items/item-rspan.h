@@ -59,9 +59,9 @@ protected:
     double mDragStartTop = 0, mDragStartBottom = 0;
 
     virtual QPointF anchorPixelPosition(int anchorId) const override;
-    virtual void mousePressEvent(QMouseEvent* event, const QVariant& details) override;
-    virtual void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) override;
-    virtual void mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos) override;
+    virtual void mousePressEvent(QCPMouseEvent* event) override;
+    virtual void mouseMoveEvent(QCPMouseEvent* event) override;
+    virtual void mouseReleaseEvent(QCPMouseEvent* event) override;
 
 private:
     void emitDraggedRanges();

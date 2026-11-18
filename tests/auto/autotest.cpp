@@ -32,6 +32,7 @@
 #include "test-intervals/test-intervals.h"
 #include "test-item-index/test-item-index.h"
 #include "test-item-position/test-item-position.h"
+#include "test-item-events/test-item-events.h"
 #include "test-item-recording/test-item-recording.h"
 #include "test-item-system/test-item-system.h"
 #include "test-item-without-plot/test-item-without-plot.h"
@@ -191,6 +192,7 @@ int main(int argc, char** argv)
     QCPTEST(TestRSpan);
     QCPTEST(TestScale);
     QCPTEST(TestSpan);
+    QCPTEST(TestItemEvents);
     QCPTEST(TestItemRecording);
     QCPTEST(TestStatisticalBox);
     QCPTEST(TestWaterfall);

@@ -13,7 +13,7 @@ public:
     int presses = 0;
 
 protected:
-    void mousePressEvent(QMouseEvent* event, const QVariant&) override
+    void mousePressEvent(QCPMouseEvent* event) override
     {
         ++presses;
         event->accept();

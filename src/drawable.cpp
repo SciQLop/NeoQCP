@@ -928,6 +928,18 @@ double QCPDrawnCore::pixelPad() const
     return pad + 1.0; // antialiasing
 }
 
+/*! \internal
+
+  The data position of \a at in the frame the object's recording replays in. A mouse event asks it
+  through the item's own view, so a log or reversed axis answers what it draws, not what a default
+  pair would.
+*/
+QCP::Data QCPDrawnCore::dataAt(QCP::Pixels at, const QCPDrawnView& view) const
+{
+    const QCPDrawFrame& frame = memoFrame(view, view.clip.translated(0, -1));
+    return frame.transform.inverse(QPointF(at.x, at.y));
+}
+
 std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixels at,
                                             QVariant* details, const QCPDrawnView& view)
 {

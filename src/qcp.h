@@ -55,6 +55,7 @@
 #include "core.h"
 #include "datacontainer.h"
 #include "global.h"
+#include "items/item-mouse-event.h"
 #include "items/item.h"
 #include "items/item-bracket.h"
 #include "items/item-curve.h"

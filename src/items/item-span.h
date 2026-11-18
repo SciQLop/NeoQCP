@@ -71,9 +71,9 @@ protected:
     //! one.
     double rangePixel(const QCPItemPosition* edge) const;
     virtual QPointF anchorPixelPosition(int anchorId) const override;
-    virtual void mousePressEvent(QMouseEvent* event, const QVariant& details) override;
-    virtual void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) override;
-    virtual void mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos) override;
+    virtual void mousePressEvent(QCPMouseEvent* event) override;
+    virtual void mouseMoveEvent(QCPMouseEvent* event) override;
+    virtual void mouseReleaseEvent(QCPMouseEvent* event) override;
 };
 
 // The fluent handle of a QCPItemSpan; see QCPItemOps for the subclass contract.
