@@ -22,6 +22,9 @@ private slots:
   void colorMapWithoutColorBar();
   void colorMapFromAView();
   void spectrogramSingleRect();
+  void sharedXTargetPicture();
+  void symlogTargetPicture();
+  void spectrogramTargetPicture();
   void aTitleTakesTheTopMargin();
   void aTitleSitsAboveTheTopAxis();
   void aHiddenRectHidesItsTitleAndColourScale();

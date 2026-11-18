@@ -159,23 +159,31 @@ Spectrogram spectrogram(const std::vector<double>& signal, int nfft, double rate
     return s;
 }
 
-// The spectrum panel of examples/user-code/spectrogram: noise, a 100 Hz tone and a 400 Hz chirp
-// over one rect, log frequency, log power colour.
-void drawSpectrogram(QCustomPlot& plot)
+// The signal of examples/user-code/spectrogram: noise, a 100 Hz tone and a 400 Hz chirp between
+// 10 s and 12 s.
+std::vector<double> targetSignal(std::vector<double>& t)
 {
     std::mt19937 rng(19680801);
     std::uniform_real_distribution<double> noise(0.0, 0.01);
     const double dt = 0.0005;
-    std::vector<double> t, x;
+    std::vector<double> x;
     for (int i = 0; i < 41000; ++i)
     {
         t.push_back(i * dt);
         const bool chirp = t.back() > 10 && t.back() < 12;
         x.push_back(std::sin(2 * std::numbers::pi * 100 * t.back())
-                    + (chirp ? 2 * std::sin(2 * std::numbers::pi * 400 * t.back()) : 0)
-                    + noise(rng));
+                    + (chirp ? 2 * std::sin(2 * std::numbers::pi * 400 * t.back()) : 0) + noise(rng));
     }
-    const Spectrogram s = spectrogram(x, 1024, 1 / dt, 128);
+    return x;
+}
+
+// The spectrum panel of examples/user-code/spectrogram: noise, a 100 Hz tone and a 400 Hz chirp
+// over one rect, log frequency, log power colour.
+void drawSpectrogram(QCustomPlot& plot)
+{
+    std::vector<double> t;
+    const std::vector<double> x = targetSignal(t);
+    const Spectrogram s = spectrogram(x, 1024, 1 / 0.0005, 128);
 
     QCPAxisRect* spectrum = plot.axisRect();
     spectrum->colorMap(s.time, s.frequency, s.power,
@@ -205,6 +213,21 @@ bool waitUntilIdle(QCustomPlot& plot)
     }
     return false;
 }
+// Every axis of every rect draws with the reference font, so a picture of the grid does not depend
+// on the fonts the machine has.
+void useReferenceFont(QCustomPlot& plot)
+{
+    QFont font = qcp::test::referenceFont();
+    font.setPixelSize(10);
+    plot.setFont(font);
+    for (const QCPHandle<QCPAxisRect>& rect : plot.axisRects())
+        for (QCPAxis* axis : rect->axes())
+        {
+            axis->setTickLabelFont(font);
+            axis->setLabelFont(font);
+        }
+}
+
 } // namespace
 
 void TestQCPAxisRect::init()
@@ -2269,6 +2292,132 @@ void TestQCPAxisRect::spectrogramSingleRect()
     QString why;
     QVERIFY2(qcp::test::matchesReference(image, QStringLiteral("test-qcpaxisrect"),
                                          QStringLiteral("spectrogram-single-rect.png"), &why),
+             qPrintable(why));
+}
+
+// examples/user-code/shared-x/main.cpp, drawn as the target draws it: two panels sharing x, the
+// upper one's x tick labels hidden and drawn only under the lower one.
+void TestQCPAxisRect::sharedXTargetPicture()
+{
+    QCustomPlot plot;
+    plot.resize(640, 480);
+    plot.setAxisRectGrid(2, 1, { .shareX = true });
+    useReferenceFont(plot);
+
+    constexpr double pi = std::numbers::pi;
+    std::vector<double> t1, y1, t2, y2;
+    for (int i = 0; i <= 200; ++i)
+    {
+        t1.push_back(8.0 * i / 200);
+        y1.push_back(std::sin(2 * pi * t1.back()));
+        t2.push_back(2 + 8.0 * i / 200);
+        y2.push_back(20 * std::pow(std::cos(2 * pi * t2.back()), 2) * std::exp(-0.3 * t2.back()));
+    }
+    auto ax1 = plot.axisRect(0, 0);
+    auto ax2 = plot.axisRect(1, 0);
+    const QPen blue(QColor(31, 119, 180), 1.5);
+    ax1->line(t1, y1, { .pen = blue });
+    ax1->yAxis()->setLabel("Signal 1");
+    ax2->line(t2, y2, { .pen = blue });
+    ax2->yAxis()->setLabel("Signal 2");
+    ax2->xAxis()->setLabel("Time (s)");
+    plot.rescaleAxes();
+
+    plot.replot();
+    const QImage image
+        = plot.toPixmap(640, 480).toImage().convertToFormat(QImage::Format_ARGB32);
+    QString why;
+    QVERIFY2(qcp::test::matchesReference(image, QStringLiteral("test-qcpaxisrect"),
+                                         QStringLiteral("shared-x-target.png"), &why),
+             qPrintable(why));
+}
+
+// examples/user-code/symlog/main.cpp: three panels, the symmetric log on x, on y, then on both.
+void TestQCPAxisRect::symlogTargetPicture()
+{
+    QCustomPlot plot;
+    plot.resize(640, 720);
+    plot.setAxisRectGrid(3, 1);
+    useReferenceFont(plot);
+
+    std::vector<double> x, y, wave;
+    for (int i = 0; i < 10000; ++i)
+    {
+        x.push_back(-50.0 + 0.01 * i);
+        y.push_back(0.01 * i);
+        wave.push_back(std::sin(x.back() / 3.0));
+    }
+    auto ax0 = plot.axisRect(0, 0);
+    auto ax1 = plot.axisRect(1, 0);
+    auto ax2 = plot.axisRect(2, 0);
+    const QPen blue(QColor(31, 119, 180), 1.5);
+    ax0->line(x, y, { .pen = blue });
+    ax0->xAxis()->setScale(QCPScale::symlog());
+    ax0->xAxis()->grid()->setSubGridVisible(true);
+    ax0->yAxis()->setLabel("symlogx");
+    ax1->line(y, x, { .pen = blue });
+    ax1->yAxis()->setScale(QCPScale::symlog());
+    ax1->yAxis()->setLabel("symlogy");
+    ax1->xAxis()->grid()->setVisible(false);
+    ax1->yAxis()->grid()->setVisible(false);
+    ax2->line(x, wave, { .pen = blue });
+    ax2->xAxis()->setScale(QCPScale::symlog());
+    ax2->yAxis()->setScale(QCPScale::symlog(0.015));
+    ax2->yAxis()->setLabel("symlog both");
+    plot.rescaleAxes();
+
+    plot.replot();
+    const QImage image
+        = plot.toPixmap(640, 720).toImage().convertToFormat(QImage::Format_ARGB32);
+    QString why;
+    QVERIFY2(qcp::test::matchesReference(image, QStringLiteral("test-qcpaxisrect"),
+                                         QStringLiteral("symlog-target.png"), &why),
+             qPrintable(why));
+}
+
+// examples/user-code/spectrogram/main.cpp: the spectrogram over the signal, sharing time. Review
+// Focus 2: the column's data edges line up although only the top rect carries the colour bar, and
+// the bar stays at the top row's height.
+void TestQCPAxisRect::spectrogramTargetPicture()
+{
+    QCustomPlot plot;
+    plot.resize(720, 560);
+    std::vector<double> t;
+    const std::vector<double> x = targetSignal(t);
+    const Spectrogram s = spectrogram(x, 1024, 1 / 0.0005, 128);
+
+    plot.setAxisRectGrid(2, 1, { .shareX = true });
+    useReferenceFont(plot);
+    auto spectrum = plot.axisRect(0, 0);
+    auto signal = plot.axisRect(1, 0);
+    spectrum->colorMap(s.time, s.frequency, s.power,
+                       { .gradient = QCPColorGradient::gpViridis, .dataScale = QCPScale::log() });
+    spectrum->yAxis()->setScale(QCPScale::log());
+    spectrum->yAxis()->setLabel("Frequency (Hz)");
+    spectrum->colorScale()->setLabel("power (1/Hz)");
+    signal->line(t, x, { .pen = QPen(QColor(31, 119, 180)) });
+    signal->yAxis()->setLabel("Signal");
+    signal->xAxis()->setLabel("Time (s)");
+    plot.rescaleAxes();
+    signal->xAxis()->setRange(0, 20);
+    plot.replot();
+    QVERIFY2(waitUntilIdle(plot), "the colour map did not finish its first picture in 10 s");
+    plot.replot();
+
+    QCOMPARE(signal->rect().left(), spectrum->rect().left());
+    QCOMPARE(signal->rect().right(), spectrum->rect().right());
+    const auto scale = spectrum->colorScale();
+    QVERIFY(scale);
+    QVERIFY2(scale->outerRect().left() > spectrum->rect().right(),
+             "the colour bar sits beside the top rect, not over it");
+    QVERIFY2(scale->outerRect().bottom() < signal->rect().top(),
+             "the colour bar spans the top row only");
+
+    const QImage image
+        = plot.toPixmap(720, 560).toImage().convertToFormat(QImage::Format_ARGB32);
+    QString why;
+    QVERIFY2(qcp::test::matchesReference(image, QStringLiteral("test-qcpaxisrect"),
+                                         QStringLiteral("spectrogram-target.png"), &why),
              qPrintable(why));
 }
 
