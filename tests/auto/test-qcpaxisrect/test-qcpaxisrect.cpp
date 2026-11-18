@@ -3,6 +3,7 @@
 #include "../keep-images.h"
 #include "../reference-image.h"
 #include "axis/labelrenderer.h"
+#include "painting/plottable-rhi-layer.h"
 #if NEOQCP_WITH_LATEX
 #include "axis/latexlabelrenderer.h"
 #endif
@@ -468,6 +469,11 @@ bool isBlue(const QColor& c)
     return c.blue() > 150 && c.red() < 120 && c.green() < 120;
 }
 
+bool isMagenta(const QColor& c)
+{
+    return c.red() > 150 && c.blue() > 150 && c.green() < 120;
+}
+
 // The layers an inset made, in plot order.
 QStringList insetLayerNames(QCustomPlot& plot)
 {
@@ -726,8 +732,10 @@ void TestQCPAxisRect::anInsetGridShowsOnTheGpu()
 
 void TestQCPAxisRect::aLegendKeepsItsPixelsOverAnInset()
 {
-    // The legend draws above an inset's data, GPU lines included: an inset placed over it keeps
-    // the legend's pixels.
+    // Only graphs and scatters reach an inset's GPU layer: a colour map is painted into the paint
+    // buffer, so the colour map this test used to hold said nothing about the GPU pass. This inset
+    // holds a red graph and sits under the legend; the legend and the inset's own axes draw after
+    // its data layer, so neither may take the line's pixels.
     QCustomPlot plot;
     plot.resize(400, 300);
     if (!showOnTheGpu(plot))
@@ -739,38 +747,63 @@ void TestQCPAxisRect::aLegendKeepsItsPixelsOverAnInset()
     plot.legend->setBrush(QBrush(Qt::yellow));
     parent->line(std::vector<double> { 0, 1 }, std::vector<double> { 0.5, 0.5 },
                  { .pen = QPen(Qt::green, 3), .name = QStringLiteral("signal") });
-    // The inset's own line must not add a row: its red legend icon would count as red pixels.
+    // The inset's own graph must not add a legend row: its red icon would be red legend pixels.
     plot.setAutoAddPlottableToLegend(false);
 
     auto inset = parent->addInset(QRectF(0.5, 0.03, 0.47, 0.5));
     inset->xAxis()->setRange(0, 1);
     inset->yAxis()->setRange(0, 1);
-    QCPColorGradient redGradient;
-    redGradient.setColorStopAt(0.0, QColor(Qt::red));
-    redGradient.setColorStopAt(1.0, QColor(Qt::red));
-    auto map = inset->colorMap(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 },
-                               std::vector<double> { 0.5, 0.5, 0.5, 0.5 },
-                               { .gradient = redGradient, .colorBar = false });
-    QVERIFY(map);
-    plot.replot();
-    QTRY_VERIFY_WITH_TIMEOUT(!map->pipeline().isBusy(), 2000);
+    inset->setTitle(QStringLiteral("zoom"));
+    inset->axis(QCPAxis::atTop)->setVisible(true);
+    inset->axis(QCPAxis::atTop)->setLabelColor(QColor(Qt::magenta));
+    for (QCPAxis* axis : inset->axes())
+    {
+        axis->setBasePen(QPen(QColor(Qt::magenta), 2));
+        axis->setTickPen(QPen(QColor(Qt::magenta)));
+        axis->setSubTickPen(QPen(QColor(Qt::magenta)));
+        axis->setTickLabelColor(QColor(Qt::magenta));
+    }
+    // Near the top of the data rect, where the legend is: the line runs the full width, and its
+    // thick pen reaches over the top spine.
+    const auto line = inset->line(std::vector<double> { 0, 1 }, std::vector<double> { 0.97, 0.97 },
+                                  { .pen = QPen(Qt::red, 18),
+                                    .name = QStringLiteral("inset signal") });
     plot.replot(QCustomPlot::rpImmediateRefresh);
     QCoreApplication::processEvents();
-    (void)plot.grabFramebuffer(); // the frame the map's image lands in is the next one
+    (void)plot.grabFramebuffer(); // the frame the graph's geometry lands in is the next one
     plot.replot(QCustomPlot::rpImmediateRefresh);
     QCoreApplication::processEvents();
 
     const QImage frame = plot.grabFramebuffer();
     const double scale = frame.width() / double(plot.width());
     const QRect legendBox = scaledRect(plot.legend->rect().adjusted(1, 1, -1, -1), scale);
+    const QRect data = scaledRect(inset->rect(), scale);
+    QVERIFY2(!legendBox.intersected(data).isEmpty(), "the legend sits over the inset's data");
+    auto* gpu = plot.plottableRhiLayer(line->layer());
+    QVERIFY2(gpu && gpu->hasGeometry(), "the inset's line must take the GPU path");
+
     const int yellow = countColour(frame, legendBox,
                                    [](const QColor& c)
                                    { return c.red() > 170 && c.green() > 170 && c.blue() < 120; });
-    const int red = countColour(frame, legendBox, isRed);
     QVERIFY2(yellow > 20, "the legend's background must still be there");
-    QVERIFY2(red == 0, qPrintable(QStringLiteral("the inset's GPU image covers the legend: %1 red pixels").arg(red)));
-}
+    const int red = countColour(frame, legendBox, isRed);
+    QVERIFY2(red == 0, qPrintable(QStringLiteral("the inset's GPU line covers the legend: %1 red pixels").arg(red)));
 
+    // The inset's axes paint after its data layer: the thick line reaches over the top spine and
+    // over the legend, and both keep their pixels.
+    // The inset's axes paint after its data layer: the thick line reaches over the top spine and
+    // the title, and both keep their pixels.
+    const QRect topSpine(data.left(), data.top() - 1, data.width(), 1);
+    QVERIFY2(countColour(frame, topSpine, isMagenta) > 100,
+             "the inset's top spine is drawn above its data");
+    QCOMPARE(countColour(frame, topSpine, isRed), 0);
+    const QRect dataTop(data.left() + 20, data.top() + 4, data.width() / 4, 8);
+    QVERIFY2(countColour(frame, dataTop, isRed) > 20, "the line draws inside the inset's data rect");
+    const QRect titleBand = scaledRect(inset->outerRect(), scale)
+                                .intersected(QRect(0, 0, frame.width(), data.top() - 2));
+    QVERIFY2(countColour(frame, titleBand, isMagenta) > 0, "the inset's title sits above its data");
+    QCOMPARE(countColour(frame, titleBand, isRed), 0);
+}
 void TestQCPAxisRect::anInsetDrawsAboveItsParentOnTheGpu()
 {
     // The export path's anInsetDrawsAboveItsParent, on the screen frame: the inset's own layers
