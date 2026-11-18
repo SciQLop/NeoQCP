@@ -540,8 +540,8 @@ void TestErrorBarGeometry::aStackedBarsErrorBarSitsOnTheTopOfTheStack()
     QCOMPARE(redPixelsNear(imageOf(plot), onTheRawValue, 2), 0);
 }
 
-// The legend row paints the icon from a recording of its own, boxed by the unit square, and not
-// from the chart's data: the icon is drawn even with no data at all.
+// The legend row paints the icon from a recording of its own, laid out in the icon rect by the
+// painter, and not from the chart's data: the icon is drawn even with no data at all.
 void TestErrorBarGeometry::theLegendIconIsRecorded()
 {
     QCustomPlot plot;
@@ -549,9 +549,9 @@ void TestErrorBarGeometry::theLegendIconIsRecorded()
     plot.legend->setVisible(true);
     [[maybe_unused]] const QPixmap painted = plot.toPixmap(300, 200);
     const QCPDrawList& icon = bars->iconList();
-    QVERIFY2(icon.data.keyBounded && icon.data.valueBounded, "the legend icon was not recorded");
-    QCOMPARE(icon.data.bounds.keyLower, 0.0);
-    QCOMPARE(icon.data.bounds.keyUpper, 1.0);
-    QCOMPARE(icon.data.bounds.valueLower, 0.0);
-    QCOMPARE(icon.data.bounds.valueUpper, 1.0);
+    QVERIFY2(!icon.commands.empty(), "the legend icon was not recorded");
+    // No data box: the painter gets the icon rect itself, which an icon with no data position is
+    // laid out in (P-6).
+    QVERIFY2(!icon.data.keyBounded && !icon.data.valueBounded,
+             "the icon records no data position");
 }

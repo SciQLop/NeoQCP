@@ -656,10 +656,9 @@ void QCPStatisticalBox::draw(QCPDrawContext& context) const
 /* inherits documentation from base class */
 void QCPStatisticalBox::drawLegendIcon(QCPDrawContext& icon) const
 {
-    // The icon has no data of its own: an invisible unit rect gives the box the replay is fitted
-    // to, and the box covers the middle 67% of the icon, as it always did.
-    icon.rect(QCP::Data { 0.0, 0.0 }, QCP::Data { 1.0, 1.0 }, QPen(Qt::NoPen), QBrush(Qt::NoBrush));
-    icon.rect(QCP::Data { 0.165, 0.165 }, QCP::Data { 0.835, 0.835 }, mPen, mBrush);
+    // The icon names positions in the icon rect, so it needs no data of its own: the box covers
+    // the middle 67% of the rect, as it always did.
+    icon.rect(QCP::AxisRatio { 0.165, 0.165 }, QCP::AxisRatio { 0.835, 0.835 }, mPen, mBrush);
 }
 
 /*! \internal

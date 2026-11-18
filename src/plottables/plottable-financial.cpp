@@ -687,9 +687,8 @@ void QCPFinancial::draw(QCPDrawContext& context) const
 void QCPFinancial::drawLegendIcon(QCPDrawContext& icon) const
 {
     // The icon clips to two diagonal halves and turns antialiasing off, which no native command
-    // expresses: the unit rect gives the replay its box, and the painter draws inside the rect the
-    // box was fitted to.
-    icon.rect(QCP::Data { 0.0, 0.0 }, QCP::Data { 1.0, 1.0 }, QPen(Qt::NoPen), QBrush(Qt::NoBrush));
+    // expresses: the painter gets the icon rect itself, which an icon with no data position is laid
+    // out in (P-6).
     icon.painter([this](QCPPainter& painter, const QCPTransform& transform)
                  { paintLegendIcon(&painter, qcp::unitBoxPixels(transform)); });
 }

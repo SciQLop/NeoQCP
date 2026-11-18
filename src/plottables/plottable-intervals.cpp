@@ -1091,9 +1091,8 @@ void QCPIntervals::draw(QCPDrawContext& context) const
 
 void QCPIntervals::drawLegendIcon(QCPDrawContext& icon) const
 {
-    // An invisible unit rect gives the box the replay is fitted to; the swatch is its middle half.
-    icon.rect(QCP::Data { 0.0, 0.0 }, QCP::Data { 1.0, 1.0 }, QPen(Qt::NoPen), QBrush(Qt::NoBrush));
-    icon.rect(QCP::Data { 0.0, 0.25 }, QCP::Data { 1.0, 0.75 }, QPen(Qt::NoPen),
+    // The icon names positions in the icon rect: the swatch is its middle half.
+    icon.rect(QCP::AxisRatio { 0.0, 0.25 }, QCP::AxisRatio { 1.0, 0.75 }, QPen(Qt::NoPen),
               QBrush(categoryColor(0)));
 }
 

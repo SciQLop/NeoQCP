@@ -419,11 +419,15 @@ public:
     //! from a disc (the angle wraps, so a pixel on the -pi seam answers near 0 or near 1).
     [[nodiscard]] QCP::AxisRatio inverse(QPointF pixel) const;
 
-    //! False when the rect is gone or has no area, or the disc has no radius or no span.
+    //! False when the rect is gone or has no area, or the disc has no radius or no span. A ratio
+    //! fitted over a plain rect (a legend icon's) has no axis rect to lose and stays while the rect
+    //! has area.
     [[nodiscard]] bool valid() const
     {
         if (mPolar)
             return mRadius > 0.0 && mSpan != 0.0;
+        if (mRectFitted)
+            return mWidth > 0.0 && mHeight > 0.0;
         return mAxisRect && mWidth > 0.0 && mHeight > 0.0;
     }
 
@@ -438,6 +442,8 @@ private:
     double mWidth = 0;
     double mHeight = 0;
     bool mPolar = false;
+    //! True for a ratio fitted over a rect rather than read from an axis rect.
+    bool mRectFitted = false;
     QPointF mCentre;
     double mRadius = 0;
     double mStart = 0; //!< radians, where the zero fraction points

@@ -22,6 +22,8 @@ private slots:
   void aRowTakenOutOfItsLegendOutlivesIt();
   void removingAnItemSignalsTheStretchFactorsOnce();
   void aStretchSlotDeletingTheLegendOnRemovalIsSafe();
+  void aRatioOnlyIconIsDrawn();
+  void aPixelIconSitsInTheIconRect();
   
 private:
   QCustomPlot *mPlot;

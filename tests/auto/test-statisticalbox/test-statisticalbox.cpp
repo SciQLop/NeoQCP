@@ -178,11 +178,10 @@ void TestStatisticalBox::theLegendIconIsRecorded()
     plot.legend->setVisible(true);
     [[maybe_unused]] const QPixmap painted = plot.toPixmap(300, 200);
     const QCPDrawList& icon = box->iconList();
-    QVERIFY2(icon.data.keyBounded && icon.data.valueBounded, "the legend icon was not recorded");
-    QCOMPARE(icon.data.bounds.keyLower, 0.0);
-    QCOMPARE(icon.data.bounds.keyUpper, 1.0);
-    QCOMPARE(icon.data.bounds.valueLower, 0.0);
-    QCOMPARE(icon.data.bounds.valueUpper, 1.0);
+    QVERIFY2(!icon.commands.empty(), "the legend icon was not recorded");
+    // The icon names positions in the icon rect: no data box, or the replay would fit it.
+    QVERIFY2(!icon.data.keyBounded && !icon.data.valueBounded,
+    "the icon records in the icon rect, not in data coordinates");
 }
 
 namespace

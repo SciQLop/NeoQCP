@@ -1,5 +1,51 @@
 #include "test-qcplegend.h"
 
+namespace {
+using namespace QCP::Literals;
+
+//! An icon that names positions in the icon rect only: no data position, so nothing to fit.
+class RatioIconPlottable : public QCPPlottable
+{
+public:
+    using QCPPlottable::drawLegendIcon;
+    void draw(QCPDrawContext&) const override { }
+    void drawLegendIcon(QCPDrawContext& icon) const override
+    {
+        icon.line(QCP::AxisRatio { 0.5, 1.0 }, QCP::AxisRatio { 0.5, 0.0 }, pen());
+    }
+};
+
+//! An icon whose only position is a pixel radius around a ratio centre.
+class PixelIconPlottable : public QCPPlottable
+{
+public:
+    using QCPPlottable::drawLegendIcon;
+    void draw(QCPDrawContext&) const override { }
+    void drawLegendIcon(QCPDrawContext& icon) const override
+    {
+        icon.circle(QCP::AxisRatio { 0.5, 0.5 }, 3_px, pen(), brush());
+    }
+};
+
+bool isRed(const QColor& colour) { return colour.red() > 150 && colour.green() < 100 && colour.blue() < 100; }
+
+//! The icon rect of the legend's only row, in the plot's pixels.
+QRect iconRectOf(QCustomPlot& plot)
+{
+    auto* item = qobject_cast<QCPPlottableLegendItem*>(plot.legend->item(0));
+    return item ? QRect(item->rect().topLeft(), plot.legend->iconSize()) : QRect();
+}
+
+int redInColumn(const QImage& frame, const QRect& rect, int x)
+{
+    int count = 0;
+    for (int y = rect.top(); y <= rect.bottom(); ++y)
+        if (rect.contains(x, y) && isRed(frame.pixelColor(x, y)))
+            ++count;
+    return count;
+}
+} // namespace
+
 void TestQCPLegend::init()
 {
   mPlot = new QCustomPlot(0);
@@ -291,4 +337,47 @@ void TestQCPLegend::aStretchSlotDeletingTheLegendOnRemovalIsSafe()
   QVERIFY(ran);
   QCOMPARE(mPlot->legend, nullptr);
   mPlot->replot(QCustomPlot::rpImmediateRefresh);
+}
+
+void TestQCPLegend::aRatioOnlyIconIsDrawn()
+{
+    mPlot->resize(400, 300);
+    auto* plottable = mPlot->add<RatioIconPlottable>().get();
+    plottable->setPen(QPen(Qt::red, 2));
+    mPlot->replot();
+    const QRect icon = iconRectOf(*mPlot);
+    QVERIFY(!icon.isEmpty());
+    const QImage frame = mPlot->toPixmap(400, 300).toImage();
+    // The half way point of the rect, which is where a ratio of 0.5 lands: not QRect::center(),
+    // which rounds the middle of an even width to the left.
+    const int middle = icon.left() + icon.width() / 2;
+    QVERIFY2(redInColumn(frame, icon, middle) >= icon.height() / 2,
+             "the icon's middle column carries the line");
+    QCOMPARE(redInColumn(frame, icon, icon.left()), 0);
+    QCOMPARE(redInColumn(frame, icon, icon.right()), 0);
+}
+
+void TestQCPLegend::aPixelIconSitsInTheIconRect()
+{
+    mPlot->resize(400, 300);
+    auto* plottable = mPlot->add<PixelIconPlottable>().get();
+    plottable->setPen(QPen(Qt::red));
+    plottable->setBrush(Qt::red);
+    mPlot->replot();
+    const QRect icon = iconRectOf(*mPlot);
+    QVERIFY(!icon.isEmpty());
+    const QImage frame = mPlot->toPixmap(400, 300).toImage();
+    QRect disc;
+    int count = 0;
+    for (int x = icon.left(); x <= icon.right(); ++x)
+        for (int y = icon.top(); y <= icon.bottom(); ++y)
+            if (isRed(frame.pixelColor(x, y)))
+            {
+                disc = disc.isNull() ? QRect(x, y, 1, 1) : disc.united(QRect(x, y, 1, 1));
+                ++count;
+            }
+    QVERIFY2(count > 10, "the pixel icon is drawn");
+    QVERIFY2(qAbs(disc.center().x() - icon.center().x()) <= 1, "the disc sits at the icon's centre");
+    QVERIFY2(qAbs(disc.center().y() - icon.center().y()) <= 1, "the disc sits at the icon's centre");
+    QVERIFY2(disc.width() >= 5 && disc.width() <= 8, "the disc keeps its 3 px radius");
 }

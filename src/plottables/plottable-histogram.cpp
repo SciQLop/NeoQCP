@@ -500,13 +500,13 @@ QCPHistogram::ColumnLook QCPHistogram::columnLook(int column) const
 // The icon is the unit square in data space; one slot per column, full height.
 void QCPHistogram::drawLegendIcon(QCPDrawContext& icon) const
 {
-    icon.rect(QCP::Data{ 0, 0 }, QCP::Data{ 1, 1 }, QPen(Qt::NoPen), QBrush(Qt::transparent));
+    // The icon names positions in the icon rect, so it needs no data of its own.
     const int columns = mResult ? std::max(1, int(mResult->heights.size())) : 1;
     for (int c = 0; c < columns; ++c)
     {
         const ColumnLook look = columnLook(c);
-        icon.rect(QCP::Data{ double(c) / columns, 0.0 }, QCP::Data{ double(c + 1) / columns, 1.0 },
-                  look.outline, look.fill);
+        icon.rect(QCP::AxisRatio { double(c) / columns, 0.0 },
+                  QCP::AxisRatio { double(c + 1) / columns, 1.0 }, look.outline, look.fill);
     }
 }
 

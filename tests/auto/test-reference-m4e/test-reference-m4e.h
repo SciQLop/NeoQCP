@@ -68,6 +68,7 @@ private slots:
     void userSystemMultiGraph();
 
     void symlogSingleRect();
+    void lollipopTarget();
 };
 
 #endif // TEST_REFERENCE_M4E_H

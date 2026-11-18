@@ -632,10 +632,8 @@ void QCPErrorBars::draw(QCPDrawContext& context) const
 /* inherits documentation from base class */
 void QCPErrorBars::drawLegendIcon(QCPDrawContext& icon) const
 {
-    // The bars sit a few pixels from the icon's edges, which a recording fitted to the rect cannot
-    // know: the unit rect gives the replay its box, and the painter draws inside the rect the box
-    // was fitted to.
-    icon.rect(QCP::Data { 0.0, 0.0 }, QCP::Data { 1.0, 1.0 }, QPen(Qt::NoPen), QBrush(Qt::NoBrush));
+    // The bars sit a few pixels from the icon's edges, which no position names: the painter gets
+    // the icon rect itself, which an icon with no data position is laid out in (P-6).
     icon.painter([this](QCPPainter& painter, const QCPTransform& transform)
                  { paintLegendIcon(&painter, qcp::unitBoxPixels(transform)); });
 }

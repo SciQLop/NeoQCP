@@ -171,6 +171,7 @@ QCPRatioTransform QCPRatioTransform::fitted(const QRectF& rect)
     transform.mTop = rect.top();
     transform.mWidth = rect.width();
     transform.mHeight = rect.height();
+    transform.mRectFitted = true;
     return transform;
 }
 

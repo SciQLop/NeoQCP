@@ -1,4 +1,4 @@
-// Target program (milestone 6): a plot type the user writes. Does not compile yet.
+// Target program (milestone 6): a plot type the user writes.
 
 #include <qcustomplot.h>
 

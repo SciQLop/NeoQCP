@@ -1290,13 +1290,18 @@ void QCPDrawnCore::paintIcon(const QCPDrawable& object, QCPPainter& painter, con
         mState->iconDependency = dependency;
         mState->iconRecorded = true;
     }
-    if (!mState->icon.data.keyBounded || !mState->icon.data.valueBounded)
-        return; // nothing to fit the recording into the rect with
+    const bool fitted = mState->icon.data.keyBounded && mState->icon.data.valueBounded;
+    if (!fitted && (mState->icon.data.keyBounded || mState->icon.data.valueBounded))
+        return; // data on one side only: no box to fit, and no frame to draw the other side in
+    // An icon that names no data position records in the icon's own frame: its ratio positions are
+    // fractions of the rect and its pixels are plot pixels inside it (P-6). The unit box gives it,
+    // and the icons that paint through a callback, the transform they are laid out with.
+    const QCPDataBox fitBox = fitted ? mState->icon.data.bounds : QCPDataBox { 0.0, 1.0, 0.0, 1.0 };
     // The frame the icon replays in is the system's: a cartesian system fits the recording into the
     // rect, as every 2.x icon did, but a system may lay its legend icon out its own way.
-    const QCPTransform transform = view.system
-        ? view.system->iconTransform(mState->icon.data.bounds, rect)
-        : QCPTransform::fitted(mState->icon.data.bounds, rect);
+    const QCPTransform transform = fitted && view.system
+        ? view.system->iconTransform(fitBox, rect)
+        : QCPTransform::fitted(fitBox, rect);
     const QCPDrawFrame frame { transform, QCPRatioTransform::fitted(rect), rect };
     qcpReplayWithPainter(mState->icon, painter, frame, QCPReplayKinds::All);
 }

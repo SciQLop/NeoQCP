@@ -704,6 +704,74 @@ QImage symlogScene()
         });
 }
 
+using namespace QCP::Literals;
+
+// Copied from examples/user-code/lollipop/main.cpp: the picture is the target's own scene, at the
+// target's own size, with the fifth lollipop picked the way a click picks it.
+class QCPLollipop : public QCPPlottable1D<QCPGraphData>
+{
+public:
+    using QCPPlottable1D::QCPPlottable1D;
+
+    void draw(QCPDrawContext& context) const override
+    {
+        for (int i = 0; i < dataCount(); ++i)
+        {
+            const QCPGraphData& point = at(i);
+            const QCP::Data tip { point.key, point.value };
+            const bool picked = selection().contains(i);
+            const QPen stem(pen().color(), picked ? 3.5 : 1.5);
+            context.setDataIndex(i);
+            context.line(QCP::Data { point.key, 0 }, tip, stem);
+            context.circle(tip, picked ? 8_px : 5_px, stem, brush());
+        }
+    }
+
+    void drawLegendIcon(QCPDrawContext& icon) const override
+    {
+        icon.line(QCP::AxisRatio { 0.5, 1.0 }, QCP::AxisRatio { 0.5, 0.4 }, pen());
+        icon.circle(QCP::AxisRatio { 0.5, 0.35 }, 3_px, pen(), brush());
+    }
+};
+
+QImage lollipopScene()
+{
+    QCustomPlot plot;
+    plot.resize(640, 400);
+    QFont font = qcp::test::referenceFont();
+    font.setPixelSize(10);
+    plot.setFont(font);
+    for (QCPAxis* axis : plot.axisRect()->axes())
+    {
+        axis->setTickLabelFont(font);
+        axis->setLabelFont(font);
+    }
+
+    const std::vector<double> month { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+    const std::vector<double> rainfall { 78, 61, 55, 52, 63, 49, 62, 53, 47, 64, 79, 76 };
+    const QColor blue(31, 119, 180);
+    auto ax = plot.axisRect();
+    auto lollipops = ax->add<QCPLollipop>(month, rainfall)
+                         .setName("rainfall (mm)")
+                         .setPen(QPen(blue))
+                         .setBrush(blue);
+    lollipops->setSelectable(QCP::stSingleData);
+    plot.setInteractions(QCP::iSelectPlottables);
+    plot.legend->setVisible(true);
+    ax->xAxis()->setLabel("month");
+    plot.rescaleAxes();
+
+    plot.show();
+    QTest::qWaitForWindowExposed(&plot);
+    plot.replot();
+    const QCPGraphData& fifth = lollipops->at(4);
+    const QPoint click(qRound(plot.xAxis->coordToPixel(fifth.key)),
+                       qRound(plot.yAxis->coordToPixel(fifth.value)));
+    QTest::mouseClick(&plot, Qt::LeftButton, Qt::NoModifier, click);
+    plot.replot();
+    return plot.toPixmap(640, 400).toImage().convertToFormat(QImage::Format_ARGB32);
+}
+
 } // namespace
 
 QImage polarItemsScene()
@@ -1019,4 +1087,9 @@ void TestReferenceM4e::polarItems()
 void TestReferenceM4e::symlogSingleRect()
 {
     check(symlogScene(), "symlog-single-rect.png");
+}
+
+void TestReferenceM4e::lollipopTarget()
+{
+    check(lollipopScene(), "lollipop-target.png");
 }

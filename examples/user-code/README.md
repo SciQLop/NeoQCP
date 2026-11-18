@@ -1,9 +1,9 @@
 # User-code targets (milestone 6)
 
 The programs a user should be able to write with NeoQCP 3.0. The library changes until they compile (spec
-`docs/specs/2026-11-14-neoqcp-3-milestone-6-design.md`). Since milestone 6e, `shared-x`, `symlog` and `spectrogram`
-compile and are built with the examples (`-Dwith_examples=true`, `examples/user-code/meson.build`); the others wait
-for 6d (identity and hooks), 6g (fill between, zoom indicator) and 6h (annotations). Every name they assume that does not exist today is
+`docs/specs/2026-11-14-neoqcp-3-milestone-6-design.md`). Since milestones 6d and 6e, `lollipop`, `shared-x`, `symlog`
+and `spectrogram` compile and are built with the examples (`-Dwith_examples=true`, `examples/user-code/meson.build`);
+the others wait for 6g (fill between, zoom indicator) and 6h (annotations). Every name they assume that does not exist today is
 in `docs/plans/neoqcp-3/m6-vocabulary.md`. Each folder has the C++ target and a Python sketch of the same program.
 
 | Target | What it shows | Survey row it answers |
@@ -32,6 +32,7 @@ matplotlib count is the gallery code that draws the same picture, its imports in
 
 | Target | NeoQCP C++ | Python sketch | matplotlib | Where the difference goes |
 |---|---|---|---|---|
+| `lollipop/` | 45 | 34 | 6 | the plot type itself: matplotlib's `stem()` is one call, so every line of `draw()` and the legend icon is the difference |
 | `shared-x/` | 33 | 25 | 13 | 9 lines of C++ frame (`QApplication`, includes, `show`, `exec`); data built in a loop instead of numpy |
 | `symlog/` | 39 | 32 | 21 | the frame; two lines hide the grid of the middle panel (matplotlib's default grid is off) |
 | `inset-zoom/` | 48 | 33 | 17 | 14 lines rebuild matplotlib's sample image (`get_sample_data("axes_grid/bivariate_normal.npy")`) |
