@@ -1,4 +1,7 @@
 #include "test-item-position.h"
+#include "../../../src/polar/angularaxis.h"
+#include "../../../src/polar/polar-area.h"
+#include "../../../src/polar/radialaxis.h"
 #include "qcustomplot.h"
 #include <functional>
 #include <limits>
@@ -592,6 +595,42 @@ void TestItemPosition::anAnchorMadeBeforeThePlot()
     auto follower = mPlot->add<FollowerItem>();
     QVERIFY(follower->position->setParentAnchor(item->at));
     QCOMPARE(follower->position->pixelPosition(), expected);
+}
+
+void TestItemPosition::aPositionlessItemOnASystemAreaMeasuresInItsSystem()
+{
+    // A system area names no axis pair: the item measures in that area's system, as a position on
+    // it does, and never falls back to the plot's first Cartesian rect, where the same Data means
+    // something else entirely.
+    auto* polar = new QCPPolarArea(mPlot);
+    mPlot->plotLayout()->addElement(1, 0, polar);
+    polar->angularAxis()->setRange(0, 360);
+    polar->radialAxis()->setRange(0, 1);
+    mPlot->replot();
+
+    auto item = mPlot->add<AnchorItem>(QCP::Data { 90, 0.5 });
+    item->setClipArea(polar);
+    item->setClipToAxisRect(true);
+
+    // What "measuring on that area" means, taken from a position that sits there.
+    auto measured = mPlot->add<QCPItemEllipse>();
+    measured->topLeft->setSystem(polar->system(polar->angularAxis(), polar->radialAxis()));
+    measured->topLeft->setType(QCPItemPosition::ptPlotCoords);
+    measured->topLeft->setCoords(90, 0.5);
+    mPlot->replot();
+
+    QVERIFY(mPlot->axisRect()); // the Cartesian rect is there, for the wrong answer to land in
+    const QPointF onTheArea = measured->topLeft->pixelPosition();
+    const QPointF here = item->at->pixelPosition();
+    const double dx = here.x() - onTheArea.x();
+    const double dy = here.y() - onTheArea.y();
+    QVERIFY2(qSqrt(dx * dx + dy * dy) < 1.0,
+             "a positionless item clipped to a polar area measures where a position on it does");
+    const QPointF cartesian(mPlot->xAxis->coordToPixel(90), mPlot->yAxis->coordToPixel(0.5));
+    const double cx = here.x() - cartesian.x();
+    const double cy = here.y() - cartesian.y();
+    QVERIFY2(qSqrt(cx * cx + cy * cy) > 20.0,
+             "a positionless item clipped to a polar area does not measure in the plot's first rect");
 }
 
 void TestItemPosition::aPositionHangingFromAFunctionAnchorRepaintsWhenItMoves()

@@ -571,16 +571,30 @@ QCPDrawnView qcpDrawnViewOf(const QCPItem& item, QRect clip)
     // An item with no position at all still measures in the rect it lives in: the callout hangs
     // its anchors from plot coordinates and has none to read a pair from. A position that has had
     // its axes taken away names none on purpose, and keeps being reported as such.
+    // Only a rect answers with an axis pair. An item clipped to a system area (a polar disc, say)
+    // measures in that area's system instead, as a position on it would: measuring its Data in the
+    // plot's first Cartesian rect would put it somewhere else without a word.
     if (!view.keyAxis && !first)
     {
-        const QCPAxisRect* rect = view.axisRect;
-        if (!rect && item.parentPlotRaw())
-            rect = item.parentPlotRaw()->axisRect();
-        if (rect)
+        const auto* clipRect = qobject_cast<const QCPAxisRect*>(view.clipArea);
+        if (clipRect || !view.clipArea)
         {
-            view.axisRect = rect;
-            view.keyAxis = rect->axis(QCPAxis::atBottom).get();
-            view.valueAxis = rect->axis(QCPAxis::atLeft).get();
+            const QCPAxisRect* frameRect = clipRect ? clipRect : view.axisRect;
+            if (!frameRect && item.parentPlotRaw())
+                frameRect = item.parentPlotRaw()->axisRect();
+            if (frameRect)
+            {
+                view.axisRect = frameRect;
+                view.keyAxis = frameRect->axis(QCPAxis::atBottom).get();
+                view.valueAxis = frameRect->axis(QCPAxis::atLeft).get();
+            }
+        }
+        else if (const QList<QCPHandle<QCPCoordinateSystem>> systems = view.clipArea->systems();
+                 !systems.isEmpty())
+        {
+            view.system = systems.first().get();
+            view.area = view.clipArea;
+            view.axisRect = nullptr;
         }
     }
     // An area that has not been laid out yet, or that was taken out of the layout, has no frame to
