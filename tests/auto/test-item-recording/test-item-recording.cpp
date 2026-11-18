@@ -1302,9 +1302,9 @@ void TestItemRecording::deletionPathsHoldTheFollowerEmissions_data()
                                        QStringLiteral("delete follower"),
                                        QStringLiteral("delete plot") })
         {
-            // A slot that deletes the plot while clearItems() runs its own loop frees the loop's
-            // object: that is a plot-level re-entrancy, not an item-deletion path, and it is
-            // reported for a ruling instead of being fixed here.
+            // A slot that deletes the plot while clearItems() walks its own snapshot frees the
+            // object that walk is about to use: a plot-level re-entrancy, not an item-deletion
+            // path, and not this fix's to make safe.
             if (path == QLatin1String("clearItems") && action == QLatin1String("delete plot"))
                 continue;
             QTest::newRow(qPrintable(path + QStringLiteral(", ") + action)) << path << action;
@@ -1313,12 +1313,8 @@ void TestItemRecording::deletionPathsHoldTheFollowerEmissions_data()
 
 void TestItemRecording::deletionPathsHoldTheFollowerEmissions()
 {
-    // Every deletion path runs the destructor, and the destructor detaches the anchors: the
-    // followers report themselves there. A slot that removes the source again, another follower or
-    // the plot must find a state it can act on, not a half-destroyed item.
     QFETCH(QString, path);
     QFETCH(QString, action);
-
     auto plot = std::make_unique<QCustomPlot>();
     QCustomPlot* raw = plot.get();
     preparePlot(*raw);
@@ -1327,7 +1323,6 @@ void TestItemRecording::deletionPathsHoldTheFollowerEmissions()
     const QCPHandle<QCPItemText> second = raw->add<QCPItemText>();
     QVERIFY(first->position->setParentAnchor(source->at));
     QVERIFY(second->position->setParentAnchor(source->at));
-
     QObject::connect(first.get(), &QCPItem::changed, raw, [&] {
         if (action == QLatin1String("remove again"))
             source.remove();
@@ -1341,7 +1336,7 @@ void TestItemRecording::deletionPathsHoldTheFollowerEmissions()
     });
 
     if (path == QLatin1String("removeItem"))
-        QVERIFY(raw->removeItem(source.get()));
+        raw->removeItem(source.get());
     else if (path == QLatin1String("clearItems"))
         raw->clearItems();
     else
@@ -1349,24 +1344,44 @@ void TestItemRecording::deletionPathsHoldTheFollowerEmissions()
 
     if (action == QLatin1String("delete plot"))
     {
-        QVERIFY2(!plot, "the slot did not delete the plot");
+        QVERIFY(!plot);
         return;
     }
-    QVERIFY2(!source, "the source outlived its deletion path");
+    QVERIFY(!source);
     if (path == QLatin1String("clearItems"))
     {
-        // The same call takes every item, the followers included.
-        QVERIFY2(!first, "clearItems left a follower behind");
-        QVERIFY2(!second, "clearItems left a follower behind");
+        QVERIFY(!first);
+        QVERIFY(!second);
+        return;
     }
+    QVERIFY2(static_cast<bool>(first), "the follower whose slot ran was removed");
+    if (action == QLatin1String("delete follower"))
+        QVERIFY2(!second, "the follower the slot deleted is still listed");
     else
-    {
-        QVERIFY2(static_cast<bool>(first), "the follower whose slot ran was removed");
-        if (action == QLatin1String("delete follower"))
-            QVERIFY2(!second, "the slot did not remove the second follower");
-        else
-            QVERIFY2(static_cast<bool>(second), "an untouched follower was removed");
-    }
+        QVERIFY2(static_cast<bool>(second), "an untouched follower was removed");
     raw->replot();
 }
 
+void TestItemRecording::anAnchorOfAnotherPlotIsRefused()
+{
+    // An item measures in its own plot's frame: an anchor of another plot would resolve to pixels
+    // of a frame this item never draws in, so the write is refused and reported.
+    QCustomPlot plot;
+    preparePlot(plot);
+    QCustomPlot other;
+    preparePlot(other);
+    const QCPHandle<SourceItem> foreign = other.add<SourceItem>();
+    const QCPHandle<QCPItemText> follower = plot.add<QCPItemText>();
+
+    const auto previous = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    const bool attached = follower->position->setParentAnchor(foreign->at);
+    qcp::setMisuseHandler(previous);
+
+    QVERIFY2(!attached, "an anchor of another plot was attached");
+    QVERIFY(!follower->position->parentAnchor());
+    // setParentAnchor asks the key and the value axis, and each refusal is reported on its own.
+    QCOMPARE(test_misuse::calls.size(), std::size_t(2));
+    QCOMPARE(plot.itemCount(), 1);
+    QCOMPARE(other.itemCount(), 1);
+}

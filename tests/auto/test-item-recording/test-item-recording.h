@@ -56,4 +56,5 @@ private slots:
     void aFollowerSlotDeletingAnotherFollowerOnChanged();
     void deletionPathsHoldTheFollowerEmissions_data();
     void deletionPathsHoldTheFollowerEmissions();
+    void anAnchorOfAnotherPlotIsRefused();
 };

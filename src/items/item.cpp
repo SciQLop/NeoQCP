@@ -346,12 +346,6 @@ QCPItemPosition::QCPItemPosition(QCPItem* parentItem, const QString& name)
 
 QCPItemPosition::~QCPItemPosition()
 {
-    // Leave the anchors that hold this position as a child: a follower may be deleted before the
-    // item it hangs from, and the source's detach loop would otherwise resolve a freed position.
-    if (mParentAnchorX)
-        mParentAnchorX->removeChildX(this);
-    if (mParentAnchorY)
-        mParentAnchorY->removeChildY(this);
     // unregister as parent at children:
     // Note: this is done in ~QCPItemAnchor again, but it's important QCPItemPosition does it
     // itself, because only then
@@ -684,6 +678,10 @@ bool QCPItemPosition::setParentAnchorX(QCPItemAnchor* parentAnchor, bool keepPix
 
     // An anchor resolves through its own item's frame, and the walk that follows a move emits on
     // that item's plot: a parent on another plot would report into a frame that knows nothing of it.
+    QCP_CHECK_OR_RETURN(!parentAnchor || !mParentItem
+                            || parentAnchor->mParentItem->parentPlot().get()
+                                == mParentItem->parentPlot().get(),
+                        "an anchor of an item on another plot cannot be a parent anchor", false);
     // if previously no parent set and PosType is still ptPlotCoords, set to ptAbsolute:
     if (!mParentAnchorX && mPositionTypeX == ptPlotCoords)
         setTypeX(ptAbsolute);
@@ -747,6 +745,10 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
 
     // An anchor resolves through its own item's frame, and the walk that follows a move emits on
     // that item's plot: a parent on another plot would report into a frame that knows nothing of it.
+    QCP_CHECK_OR_RETURN(!parentAnchor || !mParentItem
+                            || parentAnchor->mParentItem->parentPlot().get()
+                                == mParentItem->parentPlot().get(),
+                        "an anchor of an item on another plot cannot be a parent anchor", false);
     // if previously no parent set and PosType is still ptPlotCoords, set to ptAbsolute:
     if (!mParentAnchorY && mPositionTypeY == ptPlotCoords)
         setTypeY(ptAbsolute);
@@ -1568,11 +1570,8 @@ QCPItem::~QCPItem()
     // Before any of them goes away: resolving the pixels a child keeps reads our positions, which
     // only these anchor functions can still do - the item's own virtuals are gone by now.
     mDetachingAnchors = true;
-    // The plot may already be gone: a slot can delete it while a list of items is walked, and the
-    // raw pointer is not asked then. The handle answers null once the plot is destroyed.
-    const QPointer<QCustomPlot> plot = mRegisteredPlot.get();
-    // Out of the plot before any signal can run: a slot that deletes the plot would otherwise
-    // have it free this item a second time on the way down.
+    // Out of the plot before any signal can run: a slot that deletes the plot would otherwise have
+    // it free this item a second time on the way down.
     setParent(nullptr);
     if (mRegisteredPlot)
     {
@@ -1580,16 +1579,11 @@ QCPItem::~QCPItem()
         mRegisteredPlot.clear();
     }
     {
-        // Every deletion path - a handle, removeItem, clearItems, a plain delete - comes through
-        // here, so the scope that holds every follower emission until the anchors have let go is
-        // opened once, on the handle the plot answered through.
-        const QCPEmissionScope scope(plot);
         // Detaching makes every follower report itself, and a slot may remove this item, another
         // follower or the plot. Nothing is delivered while the loop reads mAnchors: the scope
-        // collects the emissions and hands them over at the end of this block, when every follower
-        // has let go and the anchors are still here for the ones that are deleted. Nothing may be
-        // delivered once the anchors are gone, or a slot that deletes a follower would reach a
-        // freed anchor.
+        // collects the emissions and hands them over once the anchors have let go. A slot that
+        // removes this item again finds it dying and leaves it alone (removeObject asks).
+        const QCPEmissionScope scope(mParentPlot);
         for (QCPItemAnchor* anchor : mAnchors)
             anchor->detachChildren(true);
     }
