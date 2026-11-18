@@ -291,6 +291,28 @@ void TestItemEvents::aDragOutsideThePlotStillEndsOnRelease()
     QCOMPARE(probe->moveCount, 1);
 }
 
+// A double click an item accepts makes it the drag's grabber: what follows keeps the part the
+// double click hit and steps from the double click's own position.
+void TestItemEvents::aDragStartedByADoubleClickKeepsItsPart()
+{
+    Probe* probe = mPlot->add<Probe>().get();
+    probe->shape = Probe::twoBoxes;
+    mPlot->replot();
+    const QRect rect = mPlot->axisRect()->rect();
+    const QPoint onTheRightHalf(rect.left() + rect.width() * 3 / 4, rect.center().y());
+    sendMouse(mPlot, QEvent::MouseButtonDblClick, onTheRightHalf, Qt::LeftButton);
+    QCOMPARE(probe->doubleClickCount, 1);
+
+    const QPoint moved = onTheRightHalf + QPoint(7, 0);
+    sendMouse(mPlot, QEvent::MouseMove, moved, Qt::LeftButton);
+    QCOMPARE(probe->moveCount, 1);
+    QCOMPARE(probe->moveParts.at(0), 2);
+    QCOMPARE(probe->moveDiffs.at(0), QPointF(7, 0));
+
+    sendMouse(mPlot, QEvent::MouseButtonRelease, moved, Qt::NoButton);
+    QCOMPARE(probe->releasePart, 2);
+}
+
 void TestItemEvents::anItemDeletedInItsMoveHandler()
 {
     Probe* probe = mPlot->add<Probe>().get();

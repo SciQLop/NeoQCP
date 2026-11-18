@@ -1670,9 +1670,7 @@ void QCPItem::mousePressEvent(QMouseEvent* event, const QVariant& details)
 /*! \internal
 
   A move of a drag the item accepted. The part is the press's: what the mouse passes over during a
-  drag changes nothing. \a startPos is the plot's press position, kept for the 2.x signature; the
-  previous event of this drag is mMouseLastPixels, which is the same point for the first move and
-  the last move afterwards.
+  drag changes nothing. \a startPos is the plot's press position, kept for the 2.x signature.
 */
 void QCPItem::mouseMoveEvent(QMouseEvent* event, [[maybe_unused]] const QPointF& startPos)
 {
@@ -1707,15 +1705,18 @@ void QCPItem::mouseReleaseEvent(QMouseEvent* event, [[maybe_unused]] const QPoin
 
 /*! \internal
 
-  A double click, offered as a press would be: the part the click hit, and this position as the
-  previous event, because a double click starts no drag.
+  A double click, offered as a press would be. An item that accepts it becomes the drag's grabber,
+  so it records the press state as the press handler does: the moves that follow keep the part the
+  double click hit and step from this position.
 */
 void QCPItem::mouseDoubleClickEvent(QMouseEvent* event, const QVariant& details)
 {
     const QPointer<QCPItem> alive(this);
     const QCP::Pixels pixels = mousePixels(event);
-    const int part = qcpHitPart(details);
-    QCPMouseEvent mouse(this, event, pixels, pixels, part, details);
+    mMouseLastPixels = pixels;
+    mMousePressPart = qcpHitPart(details);
+    mMousePressDetails = details;
+    QCPMouseEvent mouse(this, event, pixels, pixels, mMousePressPart, details);
     mouseDoubleClickEvent(&mouse);
     if (!alive)
         return;

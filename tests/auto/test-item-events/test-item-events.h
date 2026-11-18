@@ -20,6 +20,7 @@ private slots:
     void dataFollowsTheItemsOwnAxes_data();
     void dataFollowsTheItemsOwnAxes();
     void aDragOutsideThePlotStillEndsOnRelease();
+    void aDragStartedByADoubleClickKeepsItsPart();
     void anItemDeletedInItsMoveHandler();
     void aPlotDeletedInAPressHandler();
     void spansStillDrag();
