@@ -57,4 +57,7 @@ private slots:
     void deletionPathsHoldTheFollowerEmissions_data();
     void deletionPathsHoldTheFollowerEmissions();
     void anAnchorOfAnotherPlotIsRefused();
+    void anUnplacedItemCannotFollowAnother();
+    void aLinkMadeBeforeThePlotsIsRefused();
+    void anUnplacedItemMayFollowItself();
 };

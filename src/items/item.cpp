@@ -676,12 +676,9 @@ bool QCPItemPosition::setParentAnchorX(QCPItemAnchor* parentAnchor, bool keepPix
         return false;
     }
 
-    // An anchor resolves through its own item's frame, and the walk that follows a move emits on
-    // that item's plot: a parent on another plot would report into a frame that knows nothing of it.
-    QCP_CHECK_OR_RETURN(!parentAnchor || !mParentItem
-                            || parentAnchor->mParentItem->parentPlot().get()
-                                == mParentItem->parentPlot().get(),
-                        "an anchor of an item on another plot cannot be a parent anchor", false);
+    QCP_CHECK_OR_RETURN(mayFollow(parentAnchor),
+                        "an anchor of another item is a parent anchor only on the same plot",
+                        false);
     // if previously no parent set and PosType is still ptPlotCoords, set to ptAbsolute:
     if (!mParentAnchorX && mPositionTypeX == ptPlotCoords)
         setTypeX(ptAbsolute);
@@ -743,12 +740,9 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
         return false;
     }
 
-    // An anchor resolves through its own item's frame, and the walk that follows a move emits on
-    // that item's plot: a parent on another plot would report into a frame that knows nothing of it.
-    QCP_CHECK_OR_RETURN(!parentAnchor || !mParentItem
-                            || parentAnchor->mParentItem->parentPlot().get()
-                                == mParentItem->parentPlot().get(),
-                        "an anchor of an item on another plot cannot be a parent anchor", false);
+    QCP_CHECK_OR_RETURN(mayFollow(parentAnchor),
+                        "an anchor of another item is a parent anchor only on the same plot",
+                        false);
     // if previously no parent set and PosType is still ptPlotCoords, set to ptAbsolute:
     if (!mParentAnchorY && mPositionTypeY == ptPlotCoords)
         setTypeY(ptAbsolute);
@@ -802,6 +796,21 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
 
   \see setPixelPosition
 */
+/*! \internal
+
+  Whether this position may hang from \a parentAnchor. Within one item, always. From another item,
+  only when both are on the same plot: the walk that follows a move holds every follower's report in
+  that plot's queue, and an item outside a plot has none (a slot would run inside the walk). A link
+  made before add() would also cross plots once the two items are placed apart.
+*/
+bool QCPItemPosition::mayFollow(const QCPItemAnchor* parentAnchor) const
+{
+    if (!parentAnchor || !mParentItem || parentAnchor->mParentItem == mParentItem)
+        return true;
+    const QCustomPlot* plot = mParentItem->parentPlot().get();
+    return plot && parentAnchor->mParentItem->parentPlot().get() == plot;
+}
+
 /*! \internal
 
   The scope a multi-step setter holds when its item signals from its positions (\ref

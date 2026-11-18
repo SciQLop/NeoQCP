@@ -1395,3 +1395,54 @@ void TestItemRecording::anAnchorOfAnotherPlotIsRefused()
     QCOMPARE(plot.itemCount(), 1);
     QCOMPARE(other.itemCount(), 1);
 }
+
+void TestItemRecording::anUnplacedItemCannotFollowAnother()
+{
+    // No plot, no queue to hold a report in: the follower's slot would run inside the source's
+    // walk and free the follower under it. The link is refused instead.
+    auto source = std::make_unique<SourceItem>();
+    auto follower = std::make_unique<QCPItemText>();
+
+    const auto previous = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    const bool linked = follower->position->setParentAnchor(source->at);
+    qcp::setMisuseHandler(previous);
+
+    QVERIFY2(!linked, "an unplaced item followed another one");
+    QVERIFY(!follower->position->parentAnchor());
+    QCOMPARE(test_misuse::calls.size(), std::size_t(2));
+    QObject::connect(follower.get(), &QCPItem::changed, [&] { follower.reset(); });
+    source->update();
+    QVERIFY(follower != nullptr);
+}
+
+void TestItemRecording::aLinkMadeBeforeThePlotsIsRefused()
+{
+    // Linked while unplaced, then placed on two plots: the link would cross them.
+    QCustomPlot plot;
+    preparePlot(plot);
+    QCustomPlot other;
+    preparePlot(other);
+    auto source = std::make_unique<SourceItem>();
+    auto follower = std::make_unique<QCPItemText>();
+
+    const auto previous = qcp::setMisuseHandler(test_misuse::record);
+    static_cast<void>(follower->position->setParentAnchor(source->at));
+    qcp::setMisuseHandler(previous);
+    plot.add(std::move(source));
+    const auto placed = other.add(std::move(follower));
+
+    QVERIFY2(!placed->position->parentAnchorX() && !placed->position->parentAnchorY(),
+             "a link made before the plots crosses them");
+}
+
+void TestItemRecording::anUnplacedItemMayFollowItself()
+{
+    // Within one item a link reaches no other item's walk: it stays allowed before the plot.
+    auto line = std::make_unique<QCPItemLine>();
+    QVERIFY(line->end->setParentAnchor(line->start));
+    QCustomPlot plot;
+    preparePlot(plot);
+    const auto placed = plot.add(std::move(line));
+    QCOMPARE(placed->end->parentAnchor(), static_cast<QCPItemAnchor*>(placed->start));
+}

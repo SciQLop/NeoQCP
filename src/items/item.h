@@ -224,6 +224,7 @@ protected:
     virtual QCPItemPosition* toQCPItemPosition() override { return this; }
 
     [[nodiscard]] std::optional<QCPEmissionScope> signallingScope() const;
+    [[nodiscard]] bool mayFollow(const QCPItemAnchor* parentAnchor) const;
 
 private:
     Q_DISABLE_COPY(QCPItemPosition)
