@@ -44,4 +44,9 @@ private slots:
     void theTracerRefusesAnOutOfRangeComponent();
     void aSwappedGraphContainerReRecords();
     void selectionReRecords();
+    void updateEmitsChanged();
+    void aSlotDeletingTheItemOnChanged();
+    void dataRectIsTheRecordedBox();
+    void dataRectBeforeTheFirstReplot();
+    void dataRectOfAPositionlessItem();
 };

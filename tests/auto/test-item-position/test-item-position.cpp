@@ -434,7 +434,7 @@ void TestItemPosition::mixedPlotCoordinatePairsKeepTheKeyAndValueRole()
 
         // The item index boxes the same numbers as key and value, so its box must agree with the
         // pixels: a mismatch here is the same slot-crossing bug on the culling path.
-        const std::optional<QCPItemExtent> extent = item->dataExtent();
+        const std::optional<QCPItemExtent> extent = item->indexExtent();
         QVERIFY2(extent.has_value(), qPrintable(name(c)));
         QCOMPARE(extent->keyAxis, keyAxis);
         QCOMPARE(extent->valueAxis, valueAxis);

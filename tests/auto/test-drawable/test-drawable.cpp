@@ -53,6 +53,9 @@ void countAxisMessages(QtMsgType type, const QMessageLogContext& context, const 
 class TestShape : public QCPItem
 {
 public:
+    // The layer index reads this; the test reads it through the item that records.
+    using QCPItem::indexExtent;
+
     TestShape() : QCPItem()
     {
         mAnchor = createPosition(QStringLiteral("anchor"));
@@ -285,8 +288,8 @@ public:
     //! Test hook: how many recordings the object has built.
     [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
 
-    //! The adapter's dataExtent(), which the layer index reads.
-    [[nodiscard]] std::optional<QCPItemExtent> extent() const { return dataExtent(); }
+    //! The adapter's indexExtent(), which the layer index reads.
+    [[nodiscard]] std::optional<QCPItemExtent> extent() const { return indexExtent(); }
 
     QCPItemPosition* mAnchor = nullptr;
     //! An anchor owned by another item, for the lifetime test.
@@ -1619,7 +1622,7 @@ void TestDrawable::aWhiskerTipIsHittable()
     const QPointF tip(f.plot->xAxis->coordToPixel(5) - 15, f.plot->yAxis->coordToPixel(7));
     QVERIFY2(shape->hitTest(QCP::Pixels { tip.x(), tip.y() }, nullptr).has_value(),
              "the hit test culls the whisker tip");
-    const std::optional<QCPItemExtent> extent = shape->dataExtent();
+    const std::optional<QCPItemExtent> extent = shape->extent();
     QVERIFY(extent.has_value());
     QVERIFY2(extent->pixelPad >= 20.0, "the item index box stops short of the whisker tip");
 }

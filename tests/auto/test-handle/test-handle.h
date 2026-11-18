@@ -35,6 +35,7 @@ private slots:
     void everyObjectPropertyReadsThroughQObjectProperty();
     void handleAsCast();
     void handleRemove();
+    void removeThroughAConstHandle();
     void deadHandleReportsMisuse();
 
     void removeAxisThroughHandle();

@@ -69,6 +69,8 @@ private slots:
 
     void symlogSingleRect();
     void lollipopTarget();
+    void calloutTarget();
+    void peakFitTarget();
 };
 
 #endif // TEST_REFERENCE_M4E_H

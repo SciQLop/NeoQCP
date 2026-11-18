@@ -279,7 +279,7 @@ QPen QCPItemBracket::mainPen() const
     return mSelected ? mSelectedPen : mPen;
 }
 
-std::optional<QCPItemExtent> QCPItemBracket::dataExtent() const
+std::optional<QCPItemExtent> QCPItemBracket::indexExtent() const
 {
     // the curly and calligraphic paths bend away from the corner polygon
     const double pad = qMax(1.5 * mLength, qMax(mPen.widthF(), mSelectedPen.widthF())) + 2.0;

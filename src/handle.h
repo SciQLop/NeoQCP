@@ -113,7 +113,7 @@ public:
       QCPHandle<QCustomPlot> has no remove(), close the window or call deleteLater(). A dead handle
       makes it a no-op.
     */
-    void remove()
+    void remove() const
         requires qcp::Removable<T>
     {
         if (T* object = mObject.data())

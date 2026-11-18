@@ -162,7 +162,7 @@ int main(int argc, char** argv)
         game.step(1.0 / 60, paddle->centre());
         if (game.ballRect().intersects(paddle->dataRect()))
             game.bounceOffPaddle(paddle->dataRect());
-        bricks.removeIf([&](QCPHandle<Brick>& brick) {
+        bricks.removeIf([&](const QCPHandle<Brick>& brick) {
             if (!brick->dataRect().intersects(game.ballRect()))
                 return false;
             game.bounceOff(brick->dataRect());

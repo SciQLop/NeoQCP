@@ -8,6 +8,7 @@
 #include "../../../src/qcp.h"
 #include <painting/draw-commands.h>
 #include "reference-image.h"
+#include <signal-delivery.h>
 
 namespace
 {
@@ -42,6 +43,17 @@ public:
                 if (const auto* pixels = std::get_if<QCP::Pixels>(&image->a))
                     return *pixels;
         return { };
+    }
+};
+
+//! An item with no position at all that records a box in data coordinates: the callout's shape.
+class DataBoxItem : public QCPItem
+{
+public:
+    void draw(QCPDrawContext& context) const override
+    {
+        context.rect(QCP::Data { 10, 36 }, QCP::Data { 18, 39 }, QPen(Qt::black),
+                     QBrush(Qt::yellow));
     }
 };
 
@@ -1082,4 +1094,82 @@ void TestItemRecording::aSwappedGraphContainerReRecords()
     image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
     QVERIFY2(redPixelsNear(image, high, 8) > 0, "the tracer did not follow the swapped container");
     QCOMPARE(redPixelsNear(image, low, 8), 0);
+}
+
+void TestItemRecording::updateEmitsChanged()
+{
+    // Once per update(), and held back while the plot is emitting: a scope delivers it as it closes.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto item = plot.add<DataBoxItem>();
+    QSignalSpy spy(item.get(), &QCPItem::changed);
+    item->update();
+    item->update();
+    QCOMPARE(spy.count(), 2);
+    {
+        const QCPEmissionScope scope(&plot);
+        item->update();
+        QCOMPARE(spy.count(), 2);
+    }
+    QCOMPARE(spy.count(), 3);
+}
+
+void TestItemRecording::aSlotDeletingTheItemOnChanged()
+{
+    // Review Focus 1: the slot deletes the item, and nothing reads it afterwards.
+    QCustomPlot plot;
+    preparePlot(plot);
+    const QCPHandle<DataBoxItem> item = plot.add<DataBoxItem>();
+    connect(item.get(), &QCPItem::changed, &plot, [&] { item.remove(); });
+    item->update();
+    QVERIFY(!item);
+    QCOMPARE(plot.itemCount(), 0);
+
+    // The same for a slot that deletes the plot.
+    auto* owned = new QCustomPlot;
+    preparePlot(*owned);
+    const QCPHandle<DataBoxItem> doomed = owned->add<DataBoxItem>();
+    connect(doomed.get(), &QCPItem::changed, owned, [&] { delete owned; owned = nullptr; });
+    doomed->update();
+    QVERIFY(!doomed);
+    QVERIFY(owned == nullptr);
+}
+
+void TestItemRecording::dataRectIsTheRecordedBox()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto item = plot.add<DataBoxItem>();
+    plot.replot();
+    QCOMPARE(item->dataRect(), QRectF(10, 36, 8, 3));
+}
+
+void TestItemRecording::dataRectBeforeTheFirstReplot()
+{
+    // Review Focus 5: the box the item is about to draw, before it has drawn it.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto item = plot.add<DataBoxItem>();
+    QCOMPARE(item->dataRect(), QRectF(10, 36, 8, 3));
+}
+
+void TestItemRecording::dataRectOfAPositionlessItem()
+{
+    // The callout: no position of its own, everything in the function that its anchors run.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto item = plot.add<DataBoxItem>();
+    plot.replot();
+    QCOMPARE(item->dataRect(), QRectF(10, 36, 8, 3));
+
+    // An item drawn in pixels alone holds no data position, so there is no data box.
+    auto pixel = plot.add<QCPItemRect>();
+    for (QCPItemPosition* position : { pixel->topLeft, pixel->bottomRight })
+    {
+        position->setType(QCPItemPosition::ptAbsolute);
+    }
+    pixel->topLeft->setCoords(20, 20);
+    pixel->bottomRight->setCoords(80, 60);
+    plot.replot();
+    QVERIFY(pixel->dataRect().isEmpty());
 }

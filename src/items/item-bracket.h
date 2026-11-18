@@ -89,8 +89,8 @@ public:
     // reimplemented virtual methods:
     void draw(QCPDrawContext& context) const override;
 
-    // what the layer's index needs; see QCPItem::dataExtent()
-    [[nodiscard]] std::optional<QCPItemExtent> dataExtent() const override;
+    // what the layer's index needs; see QCPItem::indexExtent()
+    [[nodiscard]] std::optional<QCPItemExtent> indexExtent() const override;
 
     QCPItemPosition* const left;
     QCPItemPosition* const right;

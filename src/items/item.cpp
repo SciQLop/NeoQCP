@@ -1794,14 +1794,36 @@ double QCPItem::selectTest(const QPointF& pos, bool onlySelectable, QVariant* de
 }
 
 /*!
-  The recording's box, once the item has one. An item that does not record keeps the
+  \internal
+  The recording's box, for the layer's spatial index. An item that does not record keeps the
   positions-based answer of its subclass; this default is none.
 */
-std::optional<QCPItemExtent> QCPItem::dataExtent() const
+std::optional<QCPItemExtent> QCPItem::indexExtent() const
 {
     // A subclass that draws through positions overrides this; one that records gets the index box
     // of its recording. An item that records nothing answers none, exactly as the default did.
     return mCore.dataExtent(*this, view());
+}
+
+/*!
+  The data box this item's recording covers, in the axes it measures in.
+
+  Left is the lower key and top the lower value, with a positive width and height whatever the
+  axes' directions. The answer is empty when the recording holds no data position: an item drawn
+  in pixels or ratios alone has no data box, and neither has one that has not recorded.
+*/
+QRectF QCPItem::dataRect() const
+{
+    const std::optional<QCPItemExtent> extent = indexExtent();
+    if (!extent)
+        return {};
+    const QCPDataBox& box = extent->box;
+    if (!std::isfinite(box.keyLower) || !std::isfinite(box.keyUpper) || !std::isfinite(box.valueLower)
+        || !std::isfinite(box.valueUpper))
+        return {};
+    const QPointF corner(std::min(box.keyLower, box.keyUpper), std::min(box.valueLower, box.valueUpper));
+    const QPointF opposite(std::max(box.keyLower, box.keyUpper), std::max(box.valueLower, box.valueUpper));
+    return QRectF(corner, opposite);
 }
 
 /*!
@@ -2050,13 +2072,21 @@ void QCPItem::update()
     // reports): that recording is being made, and marking it now would never settle.
     if (!mCore.newGeneration())
         return;
-    QScopedValueRollback<bool> marking(mMarking, true);
-    QCPLayerable::update();
-    // The index is in data coordinates and survives range changes, but not a moved item: the item
-    // leaves the tree and is tested one by one until the layer rebuilds it.
-    if (mLayer)
-        mLayer->noteItemExtentChanged(this);
-    markFollowersDirty();
+    const QPointer<QCPItem> alive(this);
+    {
+        QScopedValueRollback<bool> marking(mMarking, true);
+        QCPLayerable::update();
+        // The index is in data coordinates and survives range changes, but not a moved item: the
+        // item leaves the tree and is tested one by one until the layer rebuilds it.
+        if (mLayer)
+            mLayer->noteItemExtentChanged(this);
+        markFollowersDirty();
+    }
+    // Last, once, and outside the marking scope: a slot may delete this item or the plot, and the
+    // scope's closing write would then land in freed memory. An item being torn down has nothing
+    // left to report to.
+    if (alive && !mDetachingAnchors)
+        qcpEmit(this, mParentPlot, &QCPItem::changed);
 }
 
 void QCPItem::markFollowersDirty()
@@ -2064,13 +2094,20 @@ void QCPItem::markFollowersDirty()
     // A position that follows one of this item's anchors moves with it, whatever layer it is on.
     // A follower may belong to this very item: update() returns at once when it is already
     // marking, which is what ends the walk.
+    // A follower's own update() emits changed(), and a slot there may delete this item: the walk
+    // stops at once instead of reading anchors that went with it.
+    const QPointer<QCPItem> alive(this);
     for (const QCPItemAnchor* anchor : std::as_const(mAnchors))
     {
         for (QCPItemPosition* follower : anchor->mChildrenX)
             follower->mParentItem->update();
+        if (!alive)
+            return;
         for (QCPItemPosition* follower : anchor->mChildrenY)
             if (!anchor->mChildrenX.contains(follower))
                 follower->mParentItem->update();
+        if (!alive)
+            return;
     }
 }
 

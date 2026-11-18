@@ -215,7 +215,7 @@ QPen QCPItemLine::mainPen() const
     return mSelected ? mSelectedPen : mPen;
 }
 
-std::optional<QCPItemExtent> QCPItemLine::dataExtent() const
+std::optional<QCPItemExtent> QCPItemLine::indexExtent() const
 {
     const double pad =
         qMax(qMax(mHead.boundingDistance(), mTail.boundingDistance()),

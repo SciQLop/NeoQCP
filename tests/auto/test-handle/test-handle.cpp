@@ -1226,3 +1226,14 @@ void TestHandle::aNullAxisInARangeListIsRefused()
     plot.axisRect()->setRangeZoomAxes(QList<QCPAxis*> {nullptr});
     QCOMPARE(gMisuses, 2);
 }
+
+void TestHandle::removeThroughAConstHandle()
+{
+    // brick-breaker's lambda reads the handle it removes: a const one removes like any other.
+    QCustomPlot plot;
+    const QCPHandle<QCPItemText> text = plot.add<QCPItemText>();
+    QCOMPARE(plot.itemCount(), 1);
+    text.remove();
+    QVERIFY(!text);
+    QCOMPARE(plot.itemCount(), 0);
+}

@@ -242,7 +242,7 @@ QBrush QCPItemRect::mainBrush() const
   and a recorded position is either wholly data or wholly pixels, so the recording would lose the
   data side and the layer's index would never keep the item.
 */
-std::optional<QCPItemExtent> QCPItemRect::dataExtent() const
+std::optional<QCPItemExtent> QCPItemRect::indexExtent() const
 {
     const double pad = qMax(mPen.widthF(), mSelectedPen.widthF()) + 2.0;
     return positionsExtent(pad, positions());

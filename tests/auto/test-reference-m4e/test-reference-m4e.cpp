@@ -831,6 +831,318 @@ QImage polarItemsScene()
         });
 }
 
+
+// Copied from examples/user-code/callout/main.cpp: the target's own class and scene, with the drags
+// the picture is taken after.
+class Callout : public QCPItem
+{
+public:
+    Callout(QCP::Data tip, QString text) : mTip(tip), mText(std::move(text)) { }
+
+    QCPItemAnchor* const tip = createAnchor("tip", [this] { return mTip; });
+    QCPItemAnchor* const box = createAnchor("box", [this] { return mTip + offset(mBox.center()); });
+
+    //! Where the drags land: the box's centre and its bottom-right corner, in plot pixels.
+    QPointF boxCentrePixels() const
+    {
+        return QPointF(tip->pixelPosition().x() + mBox.center().x(),
+                       tip->pixelPosition().y() + mBox.center().y());
+    }
+    QPointF cornerPixels() const
+    {
+        return QPointF(tip->pixelPosition().x() + mBox.right(),
+                       tip->pixelPosition().y() + mBox.bottom());
+    }
+
+protected:
+    enum Part { Pointer, Box, Corner };
+
+    void draw(QCPDrawContext& context) const override
+    {
+        const auto topLeft = mTip + offset(mBox.topLeft());
+        const auto bottomRight = mTip + offset(mBox.bottomRight());
+        const QPen outline(QColor(60, 60, 60), 1.2);
+        const QColor paper(255, 250, 225);
+
+        context.setPart(Pointer);
+        context.polygon({ mTip, mTip + offset(mBox.center() + QPointF(-12, 0)),
+                          mTip + offset(mBox.center() + QPointF(12, 0)) },
+                        outline, paper);
+        context.setPart(Box);
+        context.roundedRect(topLeft, bottomRight, 6_px, outline, paper);
+        context.text(topLeft, bottomRight, mText, { .padding = QMarginsF(8, 6, 8, 6) });
+        context.setPart(Corner);
+        context.rect(bottomRight + QCP::PixelOffset { -8, -8 }, bottomRight, Qt::NoPen,
+                     QColor(60, 60, 60));
+    }
+
+    void mousePressEvent(QCPMouseEvent* event) override
+    {
+        if (event->part() == Pointer)
+            event->ignore(); // a press on the pointer pans the plot
+    }
+
+    void mouseMoveEvent(QCPMouseEvent* event) override
+    {
+        const QCP::PixelOffset moved = event->pixels() - event->lastPixels();
+        const QPointF delta(moved.dx, moved.dy);
+        if (event->part() == Box)
+            mBox.translate(delta);
+        else
+            mBox.setBottomRight(mBox.bottomRight() + delta);
+        mBox.setSize(mBox.size().expandedTo(QSizeF(80, 36)));
+        update();
+    }
+
+private:
+    static QCP::PixelOffset offset(QPointF p) { return { p.x(), p.y() }; }
+
+    QCP::Data mTip;
+    QString mText;
+    QRectF mBox { 30, -110, 170, 60 }; // pixels from the tip; y grows downwards
+};
+
+//! The target's font and size, ready for a scene that shows its own picture.
+void targetPlot(QCustomPlot& plot, int width, int height)
+{
+    plot.resize(width, height);
+    QFont font = qcp::test::referenceFont();
+    font.setPixelSize(10);
+    plot.setFont(font);
+    for (const QCPHandle<QCPAxisRect>& rect : plot.axisRects())
+        for (QCPAxis* axis : rect->axes())
+        {
+            axis->setTickLabelFont(font);
+            axis->setLabelFont(font);
+        }
+}
+
+void sendMouse(QCustomPlot& plot, QEvent::Type type, QPoint pos, Qt::MouseButtons buttons)
+{
+    QMouseEvent event(type, pos, plot.mapToGlobal(pos), Qt::LeftButton, buttons, Qt::NoModifier);
+    QCoreApplication::sendEvent(&plot, &event);
+}
+
+void drag(QCustomPlot& plot, QPoint from, QPoint by)
+{
+    sendMouse(plot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(plot, QEvent::MouseMove, from + by / 2, Qt::LeftButton);
+    sendMouse(plot, QEvent::MouseMove, from + by, Qt::LeftButton);
+    sendMouse(plot, QEvent::MouseButtonRelease, from + by, Qt::NoButton);
+}
+
+QImage calloutScene()
+{
+    QCustomPlot plot;
+    targetPlot(plot, 720, 460);
+
+    std::vector<double> t, signal;
+    for (int i = 0; i <= 400; ++i)
+    {
+        t.push_back(i / 40.0);
+        signal.push_back(std::sin(t.back()) * std::exp(-t.back() / 8));
+    }
+    auto ax = plot.axisRect();
+    ax->line(t, signal, { .pen = QPen(QColor(31, 119, 180), 2), .name = "damped sine" });
+
+    const double firstMax = std::numbers::pi / 2;
+    auto peak = ax->add<Callout>(QCP::Data { firstMax, std::exp(-firstMax / 8) },
+                                 "First maximum.\nDrag the box; resize it from its corner.");
+
+    ax->ellipse(peak->tip + QCP::PixelOffset { -7, -7 }, peak->tip + QCP::PixelOffset { 7, 7 },
+                { .pen = QPen(QColor(214, 39, 40), 2) });
+    ax->text(peak->box + QCP::PixelOffset { 0, 50 }, "hangs below the box",
+             { .alignment = Qt::AlignHCenter | Qt::AlignTop });
+
+    plot.setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
+    plot.rescaleAxes();
+    // The target's box hangs 110 px above the first maximum, which its own rescale puts at the top
+    // edge: the picture gives the value axis the room the annotation needs, or there is nothing to
+    // drag and nothing to see.
+    plot.yAxis->setRange(plot.yAxis->range().lower, plot.yAxis->range().upper + 0.45);
+    plot.replot();
+
+    // The drags the picture is taken after: the box by (+40, +20), then its corner by (+30, +10).
+    drag(plot, peak->boxCentrePixels().toPoint(), QPoint(40, 20));
+    drag(plot, peak->cornerPixels().toPoint(), QPoint(30, 10));
+    plot.replot();
+    return plot.toPixmap(720, 460).toImage().convertToFormat(QImage::Format_ARGB32);
+}
+
+// Copied from examples/user-code/peak-fit/main.cpp: the fit and the peak bands, dragged like the
+// target drags them.
+struct Gaussian
+{
+    double centre;
+    double width;
+};
+
+struct Fit
+{
+    std::vector<double> model;
+    std::vector<double> residuals;
+};
+
+double basis(const std::vector<Gaussian>& peaks, std::size_t k, double x)
+{
+    if (k == 0)
+        return 1.0;
+    const double u = (x - peaks[k - 1].centre) / peaks[k - 1].width;
+    return std::exp(-0.5 * u * u);
+}
+
+std::vector<double> solve(std::vector<std::vector<double>> a)
+{
+    const std::size_t n = a.size();
+    for (std::size_t col = 0; col < n; ++col)
+        for (std::size_t row = 0; row < n; ++row)
+            if (row != col)
+            {
+                const double f = a[row][col] / a[col][col];
+                for (std::size_t j = col; j <= n; ++j)
+                    a[row][j] -= f * a[col][j];
+            }
+    std::vector<double> x(n);
+    for (std::size_t i = 0; i < n; ++i)
+        x[i] = a[i][n] / a[i][i];
+    return x;
+}
+
+Fit fitAmplitudes(const std::vector<double>& x, const std::vector<double>& y,
+                  const std::vector<Gaussian>& peaks)
+{
+    const std::size_t n = peaks.size() + 1;
+    std::vector<std::vector<double>> normal(n, std::vector<double>(n + 1, 0.0));
+    for (std::size_t i = 0; i < x.size(); ++i)
+        for (std::size_t k = 0; k < n; ++k)
+        {
+            for (std::size_t j = 0; j < n; ++j)
+                normal[k][j] += basis(peaks, k, x[i]) * basis(peaks, j, x[i]);
+            normal[k][n] += basis(peaks, k, x[i]) * y[i];
+        }
+    const std::vector<double> amplitude = solve(normal);
+    Fit fit;
+    for (std::size_t i = 0; i < x.size(); ++i)
+    {
+        double model = 0;
+        for (std::size_t k = 0; k < n; ++k)
+            model += amplitude[k] * basis(peaks, k, x[i]);
+        fit.model.push_back(model);
+        fit.residuals.push_back(y[i] - model);
+    }
+    return fit;
+}
+
+class Peak : public QCPItem
+{
+public:
+    Peak(double centre, double width) : mGaussian { centre, width } { }
+
+    Gaussian gaussian() const { return mGaussian; }
+
+protected:
+    enum Part { Body, LeftEdge, RightEdge };
+
+    void draw(QCPDrawContext& context) const override
+    {
+        const double left = mGaussian.centre - mGaussian.width;
+        const double right = mGaussian.centre + mGaussian.width;
+        const QPen edge(QColor(214, 39, 40), 2);
+
+        context.setPart(Body);
+        context.rect(QCP::DataXRatioY { left, 0 }, QCP::DataXRatioY { right, 1 }, Qt::NoPen,
+                     QColor(214, 39, 40, 40));
+        context.line(QCP::DataXRatioY { mGaussian.centre, 0 },
+                     QCP::DataXRatioY { mGaussian.centre, 1 }, QPen(edge.color(), 1, Qt::DashLine));
+        context.setPart(LeftEdge);
+        context.line(QCP::DataXRatioY { left, 0 }, QCP::DataXRatioY { left, 1 }, edge);
+        context.setPart(RightEdge);
+        context.line(QCP::DataXRatioY { right, 0 }, QCP::DataXRatioY { right, 1 }, edge);
+    }
+
+    void mousePressEvent(QCPMouseEvent* event) override { event->accept(); }
+
+    void mouseMoveEvent(QCPMouseEvent* event) override
+    {
+        const double dx = event->data().x - event->lastData().x;
+        switch (event->part())
+        {
+            case Body: mGaussian.centre += dx; break;
+            case LeftEdge: mGaussian.width -= dx; break;
+            case RightEdge: mGaussian.width += dx; break;
+        }
+        mGaussian.width = std::max(mGaussian.width, 0.3);
+        update();
+    }
+
+private:
+    Gaussian mGaussian;
+};
+
+QImage peakFitScene()
+{
+    QCustomPlot plot;
+    targetPlot(plot, 800, 560);
+
+    std::mt19937 rng(7);
+    std::normal_distribution<double> noise(0.0, 6.0);
+    const std::vector<Gaussian> truth { { 25, 2.5 }, { 48, 4 }, { 70, 3 } };
+    const double height[] = { 120, 80, 150 };
+    std::vector<double> energy, counts;
+    for (int i = 0; i <= 400; ++i)
+    {
+        energy.push_back(i * 0.25);
+        double c = 12 + noise(rng);
+        for (std::size_t k = 0; k < truth.size(); ++k)
+            c += height[k] * basis(truth, k + 1, energy.back());
+        counts.push_back(c);
+    }
+
+    plot.setAxisRectGrid(2, 1, { .shareX = true, .rowStretch = { 1, 0.35 } });
+    auto spectrum = plot.axisRect(0, 0);
+    auto residuals = plot.axisRect(1, 0);
+    spectrum->yAxis()->setLabel("counts");
+    residuals->yAxis()->setLabel("residual");
+    residuals->xAxis()->setLabel("energy (keV)");
+
+    QList<QCPHandle<Peak>> peaks;
+    for (double centre : { 22.0, 52.0, 67.0 })
+        peaks << spectrum->add<Peak>(centre, 4.0);
+    const auto guesses = [&] {
+        std::vector<Gaussian> g;
+        for (const auto& peak : peaks)
+            g.push_back(peak->gaussian());
+        return g;
+    };
+
+    const Fit first = fitAmplitudes(energy, counts, guesses());
+    spectrum->line(energy, counts, { .pen = QPen(Qt::gray), .name = "spectrum" });
+    auto model = spectrum->line(energy, first.model, { .pen = QPen(Qt::black, 2), .name = "fit" });
+    auto misfit = residuals->line(energy, first.residuals,
+                                 { .pen = QPen(Qt::gray), .name = "residual" });
+
+    const auto refit = [&] {
+        const Fit fit = fitAmplitudes(energy, counts, guesses());
+        model->setData(energy, fit.model);
+        misfit->setData(energy, fit.residuals);
+    };
+    for (const auto& peak : peaks)
+        QObject::connect(peak, &QCPItem::changed, &plot, refit);
+
+    plot.legend->setVisible(true);
+    plot.rescaleAxes();
+    plot.replot();
+
+    // The middle peak's body, dragged by 5 keV: the fit and the residual follow it.
+    const QRect rect = spectrum->rect();
+    const QPoint from(qRound(spectrum->xAxis()->coordToPixel(52.0)), rect.center().y());
+    const int by = qRound(spectrum->xAxis()->coordToPixel(57.0)
+                          - spectrum->xAxis()->coordToPixel(52.0));
+    drag(plot, from, QPoint(by, 0));
+    plot.replot();
+    return plot.toPixmap(800, 560).toImage().convertToFormat(QImage::Format_ARGB32);
+}
+
 void TestReferenceM4e::errorBarsPlain()
 {
     check(errorBarsScene(false, false, false, false), "errorbars-plain.png");
@@ -1092,4 +1404,14 @@ void TestReferenceM4e::symlogSingleRect()
 void TestReferenceM4e::lollipopTarget()
 {
     check(lollipopScene(), "lollipop-target.png");
+}
+
+void TestReferenceM4e::calloutTarget()
+{
+    check(calloutScene(), "callout-target.png");
+}
+
+void TestReferenceM4e::peakFitTarget()
+{
+    check(peakFitScene(), "peak-fit-target.png");
 }

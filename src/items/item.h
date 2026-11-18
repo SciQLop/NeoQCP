@@ -248,6 +248,10 @@ private:
     friend class QCPAxis;
     friend class QCPAxisRect;
     friend class QCPLayer;
+    // The index box is protected on purpose; the suites that check it read it here.
+    friend class TestItemIndex;
+    friend class TestItemPosition;
+    friend class TestRepaint;
     friend QCPDrawnView qcpDrawnViewOf(const QCPItem& item, QRect clip);
 
     // True when the pixel dependency graph above  parent comes back here: a position depends on its
@@ -319,6 +323,12 @@ public:
     // Tells the layer that this item may have moved (see QCPLayer::noteItemExtentChanged).
     void update() override;
 
+    //! The data box this item's recording covers, in the axes it measures in: left is the lower key,
+    //! top the lower value, width and height positive. Empty when the recording holds no data
+    //! position, and empty for an item that draws through positions alone. Answering before the
+    //! first replot records the item, so it is the box the item is about to draw.
+    [[nodiscard]] QRectF dataRect() const;
+
     // reimplemented virtual methods:
     //! The click path: the distance to the recording, or -1 when the click misses it.
     double selectTest(const QPointF& pos, bool onlySelectable,
@@ -365,7 +375,7 @@ public:
       appended, made of data positions only. An item that does not record keeps the positions-based
       answer of its subclass; the default here returns none, so a user item is drawn and tested
       exactly as before. */
-    [[nodiscard]] virtual std::optional<QCPItemExtent> dataExtent() const;
+    [[nodiscard]] virtual std::optional<QCPItemExtent> indexExtent() const;
 
     // Child slot in the owning layer, written when that layer rebuilds its index (QCPLayer).
     mutable int mItemSlot = -1;
@@ -380,6 +390,9 @@ public:
     [[nodiscard]] bool hasAnchor(const QString& name) const;
 
 signals:
+    //! Sent once per update(): the item's recording, and what hangs off it, has changed. A slot may
+    //! delete the item or the plot.
+    void changed();
     void selectionChanged();
     void selectableChanged();
     void deleteRequested();

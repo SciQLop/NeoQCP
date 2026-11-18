@@ -1604,7 +1604,7 @@ void QCPLayer::rebuildItemIndex() const
             continue;
         // Cached child slot: a move is O(1) instead of an indexOf over the whole layer.
         item->mItemSlot = i;
-        const std::optional<QCPItemExtent> extent = item->dataExtent();
+        const std::optional<QCPItemExtent> extent = item->indexExtent();
         // A NaN side describes nothing drawable: such an item stays unindexed and is tested as before.
         const bool indexable
             = extent && !std::isnan(extent->box.keyLower) && !std::isnan(extent->box.keyUpper)
