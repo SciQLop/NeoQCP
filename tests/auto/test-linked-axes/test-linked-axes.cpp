@@ -919,17 +919,35 @@ void TestLinkedAxes::rescaleAxesMarginArgumentOverridesTheAxes()
     QCOMPARE(gMisuses, 0);
 }
 
-void TestLinkedAxes::rescaleOfAnIdentityFollowerUsesTheSourceMargin()
+void TestLinkedAxes::aFollowerTakesItsMarginToItsSource()
 {
-    // The margin is read from the axis that receives the range: the link's source.
+    // M-3: every fit reads the margin of the axis that receives the range, so a margin set on an
+    // identity follower would be ignored. The setter hands it to the source, as setRange and
+    // setScale do, and the link keeps one value.
     Stacked s;
-    s.bottom->xAxis()->setRescaleMargin(0.1);
-    s.top->xAxis()->setRescaleMargin(0.5);
+    s.top->xAxis()->setRescaleMargin(0);
+    QCOMPARE(s.bottom->xAxis()->rescaleMargin(), 0.0);
+    QCOMPARE(s.top->xAxis()->rescaleMargin(), 0.0);
+
+    s.bottom->xAxis()->setRescaleMargin(0.5); // and the source's value reaches the follower
+    QCOMPARE(s.top->xAxis()->rescaleMargin(), 0.5);
+
+    s.top->xAxis()->setRescaleMargin(0);
     s.top->line(ramp(0, 8), ramp(0, 1));
     s.bottom->line(ramp(2, 10), ramp(0, 1));
     s.top->xAxis()->rescale();
-    QCOMPARE(s.bottom->xAxis()->range(), QCPRange(-1, 11));
-    QCOMPARE(s.top->xAxis()->range(), QCPRange(-1, 11));
+    QCOMPARE(s.bottom->xAxis()->range(), QCPRange(0, 10));
+    QCOMPARE(s.top->xAxis()->range(), QCPRange(0, 10));
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestLinkedAxes::linkingTakesTheSourcesMargin()
+{
+    // A link made after the source's margin was set reports the same margin on the follower.
+    QCustomPlot plot;
+    plot.xAxis->setRescaleMargin(0.2);
+    plot.xAxis2->linkTo(plot.xAxis);
+    QCOMPARE(plot.xAxis2->rescaleMargin(), 0.2);
     QCOMPARE(gMisuses, 0);
 }
 
@@ -995,11 +1013,11 @@ void TestLinkedAxes::rescaleMarginOnANegativeLogAxis()
 
 void TestLinkedAxes::plottableRescaleOnAnIdentityFollowerUsesTheSourceMargin()
 {
-    // setRange on a follower hands the range to the link's source, so a plottable fit reads the
-    // margin that will receive it, as the axis fit does.
+    // A plottable fit sets its range on the follower, which hands it to the link's source: the two
+    // share one margin, so the fit uses the one set through either axis.
     Stacked s;
-    s.bottom->xAxis()->setRescaleMargin(0.1);
-    s.top->xAxis()->setRescaleMargin(0.5);
+    s.top->xAxis()->setRescaleMargin(0.1);
+    QCOMPARE(s.bottom->xAxis()->rescaleMargin(), 0.1);
     const auto graph = s.top->line(ramp(0, 10), ramp(0, 1));
     graph->rescaleKeyAxis();
     QCOMPARE(s.bottom->xAxis()->range(), QCPRange(-1, 11));

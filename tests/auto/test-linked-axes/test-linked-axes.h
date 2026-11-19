@@ -42,7 +42,8 @@ private slots:
     void rescaleMarginOnANegativeLogAxis();
     void rescaleMarginZeroFitsExactly();
     void rescaleAxesMarginArgumentOverridesTheAxes();
-    void rescaleOfAnIdentityFollowerUsesTheSourceMargin();
+    void aFollowerTakesItsMarginToItsSource();
+    void linkingTakesTheSourcesMargin();
     void plottableRescaleOnAnIdentityFollowerUsesTheSourceMargin();
     void plottableRescaleOnlyEnlargeDoesNotGrow();
     void aNegativeOrNanMarginIsRefused();

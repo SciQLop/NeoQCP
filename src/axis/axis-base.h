@@ -274,6 +274,8 @@ protected:
     virtual void scaleDidChange();
     // setScale without the identity-link redirection: the source applies it to its followers.
     void applyScale(const QCPScale& scale);
+    // setRescaleMargin without the identity-link redirection, as applyScale does for the scale.
+    void applyRescaleMargin(double fraction);
     // Dirties what a look change moves. The default dirties the axis alone; a cartesian axis also
     // dirties the rect's layers.
     virtual void markAppearanceDirty();

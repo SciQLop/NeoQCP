@@ -496,10 +496,33 @@ void QCPAxisBase::setRescaleMargin(double fraction)
 {
     QCP_CHECK_OR_RETURN(qcp::validRescaleMargin(fraction),
                         "a rescale margin is a fraction: finite and not negative", );
+    // An identity follower shows its source's values, so every fit through either axis reads the
+    // same margin: it belongs to the source (as the scale does), which hands it to each follower.
+    if (isIdentityFollower() && fraction != mLink->source->mRescaleMargin)
+    {
+        mLink->source->setRescaleMargin(fraction);
+        return;
+    }
+    applyRescaleMargin(fraction);
+}
+
+/*! \internal
+
+  setRescaleMargin without the identity-link redirection: the source hands its new margin to its
+  identity followers through it.
+*/
+void QCPAxisBase::applyRescaleMargin(double fraction)
+{
     if (fraction == mRescaleMargin)
         return;
     mRescaleMargin = fraction;
+    // Taken before the signal: with no scope open a slot runs now and may delete this axis, so
+    // nothing of it is read after the emit.
+    const QList<QPointer<QCPAxisBase>> users = mLinkedAxes;
     qcpEmit(this, mParentPlot, &QCPAxisBase::rescaleMarginChanged, rescaleMargin());
+    for (const QPointer<QCPAxisBase>& user : users)
+        if (user && user->isIdentityFollower())
+            user->applyRescaleMargin(fraction);
 }
 
 /*!
@@ -704,6 +727,8 @@ void QCPAxisBase::linkTo(QCPAxisBase* source, QCPAxisFunction forward, QCPAxisFu
         }
     if (identity && mScale != source->mScale)
         applyScale(source->mScale); // shares the source's scale (P-3); the same scale keeps a ticker
+    if (identity && mRescaleMargin != source->mRescaleMargin)
+        applyRescaleMargin(source->mRescaleMargin); // a fit through either axis uses one margin
     notifyMappingChanged();
     refreshFromLink();
     markAppearanceDirty();
