@@ -403,6 +403,64 @@ void TestItemEvents::aPlotDeletedInAPressHandler()
     mPlot = nullptr; // the handler deleted it, and the dispatch returned on a dead plot
 }
 
+void TestItemEvents::anItemTakenByItsPressHandlerLosesTheGrab()
+{
+    // M-2: taking an item to another plot must drop it from this plot's drag, or the next move here
+    // reaches an item that no longer belongs to the plot.
+    QCustomPlot other;
+    other.resize(400, 300);
+    other.xAxis->setRange(0, 10);
+    other.yAxis->setRange(0, 10);
+    other.replot();
+
+    const auto handle = mPlot->add<Probe>();
+    Probe* probe = handle.get();
+    probe->onPress = [&other, handle](Probe& self) { other.add(self.parentPlot()->take(handle)); };
+    mPlot->replot();
+
+    const QPoint from = mPlot->viewport().center();
+    sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    QCOMPARE(other.itemCount(), 1);
+    QCOMPARE(mPlot->itemCount(), 0);
+
+    sendMouse(mPlot, QEvent::MouseMove, from + QPoint(20, 0), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(20, 0), Qt::NoButton);
+
+    QCOMPARE(probe->pressCount, 1);
+    QCOMPARE(probe->moveCount, 0);
+    QCOMPARE(probe->releaseCount, 0);
+}
+
+void TestItemEvents::anItemTakenDuringTheDragLosesTheGrab()
+{
+    QCustomPlot other;
+    other.resize(400, 300);
+    other.replot();
+
+    const auto handle = mPlot->add<Probe>();
+    Probe* probe = handle.get();
+    bool taken = false;
+    probe->onMove = [this, &other, &taken, handle](Probe&)
+    {
+        if (std::exchange(taken, true))
+            return;
+        other.add(mPlot->take(handle));
+    };
+    mPlot->replot();
+
+    const QPoint from = mPlot->viewport().center();
+    sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseMove, from + QPoint(10, 0), Qt::LeftButton);
+    QCOMPARE(probe->moveCount, 1);
+    QCOMPARE(other.itemCount(), 1);
+
+    sendMouse(mPlot, QEvent::MouseMove, from + QPoint(20, 0), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(20, 0), Qt::NoButton);
+
+    QCOMPARE(probe->moveCount, 1);
+    QCOMPARE(probe->releaseCount, 0);
+}
+
 void TestItemEvents::spansStillDrag()
 {
     auto span = mPlot->add<QCPItemSpan>(Qt::Vertical);

@@ -25,6 +25,8 @@ private slots:
     void aPressNothingAcceptsLeavesNoGrabber();
     void anItemDeletedInItsMoveHandler();
     void aPlotDeletedInAPressHandler();
+    void anItemTakenByItsPressHandlerLosesTheGrab();
+    void anItemTakenDuringTheDragLosesTheGrab();
     void spansStillDrag();
 
 private:

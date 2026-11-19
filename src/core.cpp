@@ -1830,6 +1830,7 @@ bool QCustomPlot::detach(QCPPlottable* plottable)
     plottable->mRegisteredPlot = nullptr;
     plottable->mParentPlot = nullptr;
     plottable->setParent(nullptr);
+    clearGrabOf(plottable);
     // What follows it (a band filled to it) learns it left: it drops the link.
     plottable->markDependentsDirty();
     if (group)
@@ -2032,6 +2033,7 @@ bool QCustomPlot::detach(QCPItem* item)
         tracer->setGraph(nullptr);
     item->mParentPlot = nullptr;
     item->setParent(nullptr);
+    clearGrabOf(item);
     return true;
 }
 
@@ -4551,8 +4553,7 @@ void QCustomPlot::mouseDoubleClickEvent(QMouseEvent* event)
             return;
         if (event->isAccepted())
         {
-            mMouseEventLayerable = candidates.at(i);
-            mMouseEventLayerableDetails = details.at(i);
+            grabIfOurs(candidates.at(i), details.at(i));
             break;
         }
     }
@@ -4641,8 +4642,7 @@ void QCustomPlot::mousePressEvent(QMouseEvent* event)
                 return;
             if (event->isAccepted())
             {
-                mMouseEventLayerable = candidates.at(i);
-                mMouseEventLayerableDetails = details.at(i);
+                grabIfOurs(candidates.at(i), details.at(i));
                 break;
             }
         }
@@ -4782,6 +4782,26 @@ void QCustomPlot::releaseDrag(QMouseEvent* event)
         mSelectionRect->endSelection(event);
     else if (const QPointer<QCPLayerable> target = std::exchange(mMouseEventLayerable, nullptr))
         target->mouseReleaseEvent(event, QPointF(mMousePressPos));
+}
+
+// An object leaving this plot cannot keep receiving its drags: a move here would reach something
+// that no longer belongs to the plot.
+void QCustomPlot::clearGrabOf(const QCPLayerable* layerable)
+{
+    if (mMouseEventLayerable != layerable)
+        return;
+    mMouseEventLayerable = nullptr;
+    mMouseEventLayerableDetails.clear();
+}
+
+// A press grabs a layerable only while it still belongs to this plot: its handler may have taken it
+// to another one, and the drags here must not reach it.
+void QCustomPlot::grabIfOurs(QCPLayerable* layerable, const QVariant& details)
+{
+    if (layerable->parentPlot().get() != this)
+        return;
+    mMouseEventLayerable = layerable;
+    mMouseEventLayerableDetails = details;
 }
 
 namespace

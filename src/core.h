@@ -786,6 +786,8 @@ protected:
     void emitDoubleClickSignal(QCPLayerable* clicked, const QVariant& details, QMouseEvent* event);
     bool emitReplotSignal(void (QCustomPlot::*signal)());
     void releaseDrag(QMouseEvent* event);
+    void clearGrabOf(const QCPLayerable* layerable);
+    void grabIfOurs(QCPLayerable* layerable, const QVariant& details);
     void announceUserSelection();
     void pinchStep(const QEventPoint& a, const QEventPoint& b);
     QPointF touchPosition(const QEventPoint& point) const;
