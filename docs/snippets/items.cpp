@@ -251,6 +251,66 @@ DOC_SNIPPET(items_creation, 600, 360)
     // [/items_creation]
 }
 
+DOC_CODE(items_mouse)
+{
+    // [items_mouse]
+    using namespace QCP::Literals;
+
+    // A marker the user drags: it draws its own parts, names them with setPart, and moves from the
+    // QCPMouseEvent its handlers receive. A press it accepts grabs the drag; one it ignores pans.
+    class Marker : public QCPItem
+    {
+    public:
+        Marker() : mAt(createPosition(QStringLiteral("at"))) { mAt->setCoords(4, 4); }
+
+        //! Sits wherever the function says: another item's position can hang from it.
+        QCPItemAnchor* const centre
+            = createAnchor(QStringLiteral("centre"),
+                           [this] { return QCP::Data { mAt->coords().x(), mAt->coords().y() }; });
+
+    protected:
+        enum Part
+        {
+            Stem,
+            Head
+        };
+
+        void draw(QCPDrawContext& context) const override
+        {
+            const QPointF at = mAt->coords();
+            const QPen pen(QColor(31, 119, 180), 2);
+            context.setPart(Stem);
+            context.line(QCP::Data { at.x(), 0 }, QCP::Data { at.x(), at.y() }, pen);
+            context.setPart(Head);
+            context.circle(QCP::Data { at.x(), at.y() }, 6_px, pen, QColor(31, 119, 180));
+        }
+
+        void mousePressEvent(QCPMouseEvent* event) override
+        {
+            if (event->part() != Head)
+                event->ignore(); // a press on the stem goes on to the plot, which pans
+        }
+
+        void mouseMoveEvent(QCPMouseEvent* event) override
+        {
+            const QCP::Data to = event->data();
+            const QCP::Data from = event->lastData();
+            mAt->setCoords(mAt->coords() + QPointF(to.x - from.x, to.y - from.y));
+            update();
+        }
+
+    private:
+        QCPItemPosition* const mAt;
+    };
+
+    customPlot->xAxis->setRange(0, 10);
+    customPlot->yAxis->setRange(0, 10);
+    auto marker = customPlot->add<Marker>();
+    QObject::connect(marker.get(), &QCPItem::changed, customPlot,
+                     [m = marker.get()] { qDebug() << "marker now at" << m->dataRect(); });
+    // [/items_mouse]
+}
+
 DOC_CODE(items_overlay)
 {
     // [items_overlay]

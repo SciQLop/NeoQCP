@@ -33,7 +33,7 @@ The range is the part of the data the axis shows.
 - `setRange(position, size, Qt::AlignLeft)` sets it from one end, the centre (`Qt::AlignCenter`) or the other end (`Qt::AlignRight`).
 - `setRangeLower()` and `setRangeUpper()` move one end.
 - `moveRange(diff)` shifts it. `scaleRange(factor, center)` zooms around a point.
-- `rescale()` fits the axis to the plottables on it. `QCustomPlot::rescaleAxes()` does that for every axis.
+- `rescale()` fits the axis to the plottables on it. `QCustomPlot::rescaleAxes()` does that for every axis. A plottable's own `rescaleAxes()` fits the axes to that plottable alone, so it only knows that plottable's sticky values: use `QCustomPlot::rescaleAxes()` or `axis->rescale()` to honour all of them (a bar's baseline 0, for example).
 - `setRangeReversed(true)` flips the direction: values grow to the left, or downward.
 
 A <a href="api/classQCPRange.html">QCPRange</a> is just two doubles, `lower` and `upper`.

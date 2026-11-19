@@ -620,3 +620,5 @@ that no section above lists, and the behaviour changes of 5f.
   at (brick-breaker's collision sweep does).
 - A fit leaves a margin: `rescale()` and `rescaleAxes()` keep `rescaleMargin()` (5 % by default) of the span blank on
   each side, in the axis' own scale space. SciQLopPlots' own autoscale margin can move to `setRescaleMargin`.
+- An impulse graph's value range holds its baseline, as bars do: value 0 is a sticky value, so the fit includes it on
+  a linear or symlog value axis whatever `setRescaleMargin` says. A log value axis has no zero to keep.

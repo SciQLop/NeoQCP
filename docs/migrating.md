@@ -63,7 +63,7 @@ Code using `rpQueuedRefresh` or `rpRefreshHint` compiles, with a deprecation war
 | `"main"` layer mode | `lmLogical` | `lmBuffered` |
 | Multisampling | — | 4 samples, or 1 on a HiDPI screen |
 | `focusPolicy()` | `Qt::ClickFocus` | `Qt::StrongFocus`: a click focuses the plot and so does Tab |
-| A fit | data on the axis edges | `rescale()`/`rescaleAxes()` leave 5 % of the span on each side; `setRescaleMargin(0)` restores the old fit |
+| A fit | data on the axis edges | `rescale()`/`rescaleAxes()` leave 5 % of the span on each side; `setRescaleMargin(0)` restores the old fit, except on the baseline side of an impulse graph (see below) |
 
 Set the old value back if your pictures depend on it, for example `customPlot->setAntialiasedElements(QCP::aeNone)`. GPU-drawn lines are antialiased by multisampling whatever the flags say; change that with `setSampleCount()`.
 
@@ -102,6 +102,7 @@ Most changes are confined to the new classes. A few touch existing code.
   - `setSelectionRect()` with the rect already in use does nothing. It used to delete and reinstall it.
   - Deleting a `QCPColorScale` detaches the colour maps that use it, without a signal. Their `colorScale()` then returns `nullptr`.
   - A signal argument that points to an object arrives as `nullptr` when that object was deleted before the signal was delivered.
+- **An impulse graph's value range holds its baseline.** An impulse `QCPGraph` reports value 0 as a sticky value like a `QCPBars` does, so its value range and every fit of it include 0 whatever the rescale margin is: on a linear or symlog value axis, data from 2 to 10 fits 0 to 10 even with `setRescaleMargin(0)`. A log value axis has no zero to keep and still fits the data, its stems running to the axis edge. Set `setLineStyle(lsLine)` or another style to fit the data alone.
 - **Span dragging.** Dragging a `QCPItemSpan` or `QCPItemRSpan` moves its edges by the mouse movement in pixels, whatever the type of their positions. An edge placed in pixels used to move by the wrong amount. If the axis moves during the drag, the edge now stays under the pointer.
 - **Native pinch.** A macOS pinch that the plot does not zoom on is left to the parent widget. It used to be swallowed.
 - **Call order is screen order.** Painter-only content recorded after GPU content, a text or a painter callback in a recording, or a plain layerable added after a plottable, paints into a painter slice of its layer: a picture of the output submitted over that GPU content. A text recorded after a rect covers it on the screen as it already did in an export. A layer that holds a slice is not translated on a pan.

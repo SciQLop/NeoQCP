@@ -271,6 +271,33 @@ The overlay is not an item: it is a layerable on its own `notification` layer, k
 A `FullWidget` message catches mouse clicks, so the plot cannot be dragged while it shows.
 Exports leave the overlay out.
 
+## Drag an item from the mouse
+
+An item that draws its own parts can move itself.
+Override the mouse handlers and they arrive as <a href="api/classQCPMouseEvent.html">QCPMouseEvent</a>s:
+
+```{literalinclude} snippets/items.cpp
+:start-after: // [items_mouse]
+:end-before: // [/items_mouse]
+:language: cpp
+:dedent:
+```
+
+- `mousePressEvent`, `mouseMoveEvent`, `mouseReleaseEvent` and `mouseDoubleClickEvent` are protected virtuals of `QCPItem`. All four ignore by default.
+- `QCPMouseEvent` arrives accepted; the item's verdict on it is the acceptance of the Qt event the plot sees.
+  An item that accepts the press grabs the drag: it gets the moves and the release, and the plot does not pan.
+  An item that ignores it leaves the plot to pan, as a press outside the item does.
+  All four handlers ignore by default, so an item that overrides none changes nothing.
+- The event gives `pixels()` and `lastPixels()` in widget pixels, `data()` and `lastData()` in the item's own axes, `moved()` for a drag that is not the press, `part()` for the part the press hit, held for the whole drag, `button()`, `buttons()` and `modifiers()`.
+- `createAnchor(name, function)` makes an anchor that sits wherever the function says, in any space.
+  A position can hang from it with `setParentAnchor()`, so a line follows the point an item computes.
+- `changed()` is emitted once per `update()`.
+  `dataRect()` gives the box the item covers in data coordinates.
+
+A recorded command can name what it draws.
+`context.setDataIndex(row)` makes a click on that command select that datum.
+`context.setPart(number)` makes a hit report the part, which a slot reads with `qcpHitPart(details)`, and which `QCPMouseEvent::part()` delivers during a drag.
+
 ## Selection and layers
 
 Items are selectable by default.
