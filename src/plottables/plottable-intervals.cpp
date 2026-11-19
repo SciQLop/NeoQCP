@@ -485,7 +485,7 @@ bool QCPIntervals::siblingHasBarAt(const QPointF& pos) const
 void QCPIntervals::selectEvent(QMouseEvent*, bool additive, const QVariant& details,
                                bool* selectionStateChanged)
 {
-    const QCPDataSelection hit = details.value<QCPDataSelection>();
+    const QCPDataSelection hit = qcp::hitSelection(details);
     const QCPDataSelection before = mSelection;
     const QPointer<QCPIntervals> alive(this);
     if (!additive)

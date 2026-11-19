@@ -1687,6 +1687,8 @@ QVector<QCPDataSelection> QCPGraph::componentHits(const QVariant& details) const
     const int row = map.value(QStringLiteral("dataIndex"), -1).toInt();
     if (component >= 0 && component < hits.size() && row >= 0)
         hits[component] = QCPDataSelection(QCPDataRange(row, row + 1));
+    else // a part-only hit names no row: it selects the whole plottable, as selectTest said
+        hits.fill(qcp::hitSelection(details));
     return hits;
 }
 

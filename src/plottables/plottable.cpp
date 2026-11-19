@@ -600,7 +600,8 @@ std::optional<double> QCPPlottable::hitTest(QCP::Pixels at, QVariant* details) c
 /*!
   A click inside the axis rect hits the recording. \a details then names the whole recording as a
   data selection: the recording keeps no per-point index to hand out, and an empty selection would
-  make the click select nothing.
+  make the click select nothing. A hit that names only a part keeps the part in its details map and
+  carries that same whole-recording selection beside it, under "selection".
 */
 double QCPPlottable::selectTest(const QPointF& pos, bool onlySelectable,
                                         QVariant* details) const
@@ -613,7 +614,14 @@ double QCPPlottable::selectTest(const QPointF& pos, bool onlySelectable,
     const double hit = mCore.selectTest(*this, pos, onlySelectable, details, view());
     if (hit < 0 || !details)
         return hit;
-    if (details->isValid() && !details->value<QCPDataSelection>().isEmpty())
+    // The whole-plottable selection the details fall back on when the hit names no datum.
+    const auto wholeSelection = [this]()
+    {
+        const QCPPlottableInterface1D* iface = const_cast<QCPPlottable*>(this)->interface1D();
+        return QVariant::fromValue(
+            QCPDataSelection(QCPDataRange(0, iface ? iface->dataCount() : 1)));
+    };
+    if (details->isValid() && !qcp::hitSelection(*details).isEmpty())
         return hit;
     // A tagged hit names one datum of this plottable: the caller gets a one-point selection, so a
     // click selects the row it landed on rather than everything the plottable holds.
@@ -622,13 +630,17 @@ double QCPPlottable::selectTest(const QPointF& pos, bool onlySelectable,
         *details = QVariant::fromValue(QCPDataSelection(QCPDataRange(*index, *index + 1)));
         return hit;
     }
-    // A hit that names only a part keeps its details map, where the caller reads the part with
-    // qcpHitPart: replacing it with a whole-plottable selection would lose which piece was clicked.
+    // A hit that names only a part keeps its map, where the caller reads the part with qcpHitPart,
+    // and carries the whole-plottable selection beside it: an empty selection would make the click
+    // deselect the plottable it just hit.
     if (qcpHitPart(*details) >= 0)
+    {
+        QVariantMap map = details->toMap();
+        map.insert(QStringLiteral("selection"), wholeSelection());
+        *details = map;
         return hit;
-    const QCPPlottableInterface1D* iface = const_cast<QCPPlottable*>(this)->interface1D();
-    const int count = iface ? iface->dataCount() : 1;
-    *details = QVariant::fromValue(QCPDataSelection(QCPDataRange(0, count)));
+    }
+    *details = wholeSelection();
     return hit;
 }
 
@@ -1454,7 +1466,7 @@ void QCPPlottable::selectEvent([[maybe_unused]] QMouseEvent* event, bool additiv
 
     if (mSelectable != QCP::stNone)
     {
-        QCPDataSelection newSelection = details.value<QCPDataSelection>();
+        QCPDataSelection newSelection = qcp::hitSelection(details);
         QCPDataSelection selectionBefore = mSelection;
         const QPointer<QCPPlottable> alive(this);
         if (additive)

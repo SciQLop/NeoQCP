@@ -441,6 +441,26 @@ public:
         }
     }
 
+    //! The click path QCustomPlot uses: selectTest fills the details, selectEvent applies them.
+    void clickSelect(const QPointF& pos, bool additive = false)
+    {
+        QVariant details;
+        if (selectTest(pos, true, &details) < 0)
+            return;
+        bool changed = false;
+        selectEvent(nullptr, additive, details, &changed);
+    }
+
+    void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
+                     bool* selectionStateChanged) override
+    {
+        seenDetails = details;
+        QCPPlottable::selectEvent(event, additive, details, selectionStateChanged);
+    }
+
+    //! What selectEvent was handed, as a slot overriding it would read it.
+    QVariant seenDetails;
+
     Mode mode = Discs;
 };
 
@@ -1430,6 +1450,34 @@ void TestDrawable::aTaggedCommandNamesItsDataIndex()
 
     // The index names a datum of the container: that is what the API hands out.
     QCOMPARE(shape->at(1).key, 2.0);
+}
+
+void TestDrawable::aPartOnlyHitSelectsTheWholePlottable()
+{
+    // I-1: a recording that tags its parts but no datum kept its details map, which the click path
+    // read as an empty selection: a click deselected it. The hit now carries the whole-plottable
+    // selection beside the part, so the click selects it and the part survives.
+    Fixture f;
+    f.plot->setInteractions(QCP::iSelectPlottables);
+    auto* shape = f.plot->add<TestTaggedShape>().get();
+    shape->mode = TestTaggedShape::Parts;
+    shape->setPoints({ 3, 5 }, { 4, 4 });
+    shape->setSelectable(QCP::stWhole);
+    f.plot->replot();
+    QVERIFY(!shape->selected());
+
+    const QPointF onBody(f.plot->xAxis->coordToPixel(4), f.plot->yAxis->coordToPixel(4));
+    shape->clickSelect(onBody);
+    QVERIFY2(shape->selected(), "a click on a part-only plottable selects it whole");
+    QCOMPARE(shape->selection().dataRangeCount(), 1);
+    QCOMPARE(shape->selection().dataRange(0), QCPDataRange(0, 2));
+    // A slot that overrides selectEvent still reads which piece was clicked.
+    QCOMPARE(qcpHitPart(shape->seenDetails), 0);
+
+    // Additive: a second click on the selected plottable toggles it off.
+    shape->clickSelect(onBody, true);
+    QVERIFY2(!shape->selected(), "an additive click on a selected plottable deselects it");
+    QCOMPARE(qcpHitPart(shape->seenDetails), 0);
 }
 
 void TestDrawable::theTopmostTaggedCommandWins()

@@ -53,6 +53,7 @@ private slots:
     void twoRectsOneLayerDrawInTheirOwnFrames();
     void batchHitTestNamesTheRect();
     void aTaggedCommandNamesItsDataIndex();
+    void aPartOnlyHitSelectsTheWholePlottable();
     void theTopmostTaggedCommandWins();
     void aRecordingWithFewerPointsForgetsTheOldTags();
     void untaggedCommandsKeepTheBatchDetails();

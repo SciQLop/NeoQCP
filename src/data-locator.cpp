@@ -59,7 +59,7 @@ bool QCPDataLocator::locateCurve(const QPointF& pixelPos)
     if (dist < 0)
         return false;
 
-    auto sel = details.value<QCPDataSelection>();
+    auto sel = qcp::hitSelection(details);
     if (sel.dataRangeCount() == 0)
         return false;
 

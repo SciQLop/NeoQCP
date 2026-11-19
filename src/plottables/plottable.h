@@ -559,6 +559,15 @@ inline std::optional<int> hitDataIndex(const QVariant& details)
         return it->toInt();
     return std::nullopt;
 }
+
+//! The selection a hit's \a details ask for: a plain selection, or the "selection" a part-only hit
+//! carries beside its part. Empty when the details name no selection at all.
+inline QCPDataSelection hitSelection(const QVariant& details)
+{
+    if (details.metaType() == QMetaType::fromType<QCPDataSelection>())
+        return details.value<QCPDataSelection>();
+    return details.toMap().value(QStringLiteral("selection")).value<QCPDataSelection>();
+}
 } // namespace qcp
 
 #endif // QCP_PLOTTABLE_H
