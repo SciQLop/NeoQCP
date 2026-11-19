@@ -30,6 +30,7 @@ private slots:
     void aFillAcrossTwoValueAxesFollowsTheSecondAxis();
     void aDenseFillIsRebinnedAfterAZoom();
     void aSteppedFillSwapsColourWhereTheLinesSwap();
+    void aFillsLegendIconShowsItsBrushes();
 
 private:
     QCustomPlot* mPlot = nullptr;

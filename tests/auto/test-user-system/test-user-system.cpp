@@ -1276,6 +1276,82 @@ void TestUserSystem::channelFillNeedsOneSystem()
     test_misuse::calls.clear();
 }
 
+void TestUserSystem::aMultiGraphFillBetweenColumnsOnASkewRect()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setData(
+        QVector<double> { 2, 4, 6 },
+        std::vector<QVector<double>> { QVector<double> { 2, 2, 2 }, QVector<double> { 8, 8, 8 } });
+    const QColor brush(220, 40, 40, 80);
+    QVERIFY2(rect->fillBetween(QCPHandle<QCPGraph>(graph), QCPHandle<QCPGraph>(graph),
+                               { .brush = brush, .firstComponent = 0, .secondComponent = 1 }),
+             "a fill between columns was refused on a skew rect");
+    settle(plot);
+
+    const QImage image = render(plot);
+    const QPointF inside = pixelOf(system->pixelOf(4, 5));
+    QVERIFY(rect->rect().contains(inside.toPoint()));
+    QVERIFY2(colourNear(image.pixelColor(inside.toPoint()), overWhite(brush)),
+             "the band between the two columns is not drawn on the skew mapping");
+    QCOMPARE(lightnessAt(image, pixelOf(system->pixelOf(4, 0.5))), 255);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
+void TestUserSystem::aFillToAnotherGraphOnASkewRect()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    InspectableMultiGraph* owner = multiGraphOn(rect);
+    auto* partner = rect->axis(QCPAxis::atBottom)->axisRect()->add<QCPGraph>(
+            rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)).get();
+    owner->setData(QVector<double> { 2, 4, 6 }, QVector<double> { 2, 6, 3 });
+    partner->setData(QVector<double> { 2, 4, 6 }, QVector<double> { 8, 9, 5 });
+    owner->setComponentPens({ QPen(Qt::NoPen) });
+    partner->setComponentPens({ QPen(Qt::NoPen) });
+
+    const QColor brush(40, 220, 40, 80);
+    QVERIFY2(rect->fillBetween(QCPHandle<QCPGraph>(owner), QCPHandle<QCPGraph>(partner),
+                               { .brush = brush }),
+             "a fill to another graph was refused on a skew rect");
+    settle(plot);
+
+    const QImage image = render(plot);
+    const QPointF inside = pixelOf(system->pixelOf(4, 7));
+    QVERIFY(rect->rect().contains(inside.toPoint()));
+    QVERIFY2(colourNear(image.pixelColor(inside.toPoint()), overWhite(brush)),
+             "the band to another graph is not drawn on the skew mapping");
+    QCOMPARE(lightnessAt(image, pixelOf(system->pixelOf(4, 0.5))), 255);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
+void TestUserSystem::aChannelFillAcrossSystemsDrawsNoBand()
+{
+    QCustomPlot plot;
+    TwoRects rects = twoRects(plot);
+    InspectableMultiGraph* graph = multiGraphOn(rects.skew);
+    InspectableMultiGraph* other = multiGraphOn(rects.skew);
+    graph->setData(QVector<double> { 2, 8 }, QVector<double> { 2, 2 });
+    other->setData(QVector<double> { 2, 8 }, QVector<double> { 8, 8 });
+    QVERIFY(rects.skew->fillBetween(QCPHandle<QCPGraph>(graph), QCPHandle<QCPGraph>(other),
+                                    { .brush = QColor(255, 0, 0) }));
+    settle(plot);
+
+    const QPointF inside = pixelOf(rects.skew->skew()->pixelOf(5, 5));
+    QVERIFY2(isRed(render(plot), inside), "the fill between the two skew graphs is not drawn");
+
+    // The second line moves to the cartesian frame after the fill was made: the band would join two
+    // planes, so it is not drawn.
+    other->setSystem(rects.cartesian->system(rects.cartesian->axis(QCPAxis::atBottom),
+                                             rects.cartesian->axis(QCPAxis::atLeft)));
+    settle(plot);
+    QCOMPARE(lightnessAt(render(plot), inside), 255);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
 void TestUserSystem::aCartesianChannelFillPartnerThatLostItsSystemDrawsNoBand()
 {
     QCustomPlot plot;

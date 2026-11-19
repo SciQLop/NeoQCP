@@ -292,7 +292,8 @@ void TestFillBetween::aFillOfLinesOnAnotherKeyAxisIsReported()
 
     QVERIFY2(!fill, "a fill between two key axes was made");
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
-    QVERIFY2(test_misuse::calls.front().what.find("key axis") != std::string::npos,
+    // Two key axes are two systems: the two lines do not fill to each other.
+    QVERIFY2(test_misuse::calls.front().what.find("fill to each other") != std::string::npos,
              test_misuse::calls.front().what.c_str());
 }
 
@@ -426,4 +427,36 @@ void TestFillBetween::aFillIsNotSelectableByDefault()
              "a click inside the fill selects it");
     QVERIFY2(!mPlot->plottableAt(inside, /*onlySelectable=*/true),
              "the fill is hit as a selectable plottable");
+}
+
+// The legend row of a fill is a swatch of its brushes: the upper half where the first line is above,
+// the lower half where it is below. The row must not replay the band into a 24 px icon.
+void TestFillBetween::aFillsLegendIconShowsItsBrushes()
+{
+    QCPFillOptions options = greenAbove();
+    options.belowBrush = kRed;
+    const auto fill = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(mSecond), options);
+    QVERIFY(fill);
+    const auto oneSided = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(mSecond), greenAbove());
+    QVERIFY(oneSided);
+
+    const auto iconOf = [](const QCPHandle<QCPFillBetween>& plottable)
+    {
+        QImage icon(40, 20, QImage::Format_ARGB32);
+        icon.fill(Qt::white);
+        QCPPainter painter(&icon);
+        plottable->drawLegendIcon(&painter, QRectF(0, 0, 40, 20));
+        painter.end();
+        return icon;
+    };
+
+    const QImage split = iconOf(fill);
+    QVERIFY2(isGreen(split.pixelColor(20, 6)), "the icon's upper half is not the fill's brush");
+    QVERIFY2(isRed(split.pixelColor(20, 14)), "the icon's lower half is not the below brush");
+
+    const QImage plain = iconOf(oneSided);
+    QVERIFY2(isGreen(plain.pixelColor(20, 6)), "the icon's upper half is not the fill's brush");
+    QVERIFY2(isGreen(plain.pixelColor(20, 14)), "one brush fills both halves of the icon");
 }

@@ -49,6 +49,9 @@ private slots:
     void aShearedPointOutsideTheKeyWindowIsHit();
     void hoveringASkewGraphDoesNotCrash();
     void channelFillNeedsOneSystem();
+    void aMultiGraphFillBetweenColumnsOnASkewRect();
+    void aFillToAnotherGraphOnASkewRect();
+    void aChannelFillAcrossSystemsDrawsNoBand();
     void aCartesianChannelFillAcrossValueAxesStillWorks();
     void aResizeMovesTheRevision();
 

@@ -97,6 +97,8 @@ The first line's step style shapes both edges, and the colours swap where the st
 
 The fill goes just below the lower of its two lines in the layer, so the lines and their markers stay on top.
 It is not selectable: a click inside it reaches the lines, and the drag pans the plot.
+Lines on a user coordinate system fill like any other: both must be on the same system, and the band
+is drawn through that system's mapping as the lines are.
 Pass `options.name` to name the row a fill takes in the legend; `removeFromLegend()` takes that row away.
 Calling `fillBetween(graph, graph, options)` with two different components of one graph fills between those two columns.
 
@@ -111,8 +113,8 @@ This is how you draw an error band: one graph for the upper edge, one for the lo
 
 ![A mean curve inside a band](images/graphs-channel-fill.png)
 
-`removeFromLegend()` keeps a helper graph out of the legend; the band above states no name and keeps
-no row of its own either, so the mean curve's row is the one legend row.
+`removeFromLegend()` keeps a helper graph out of the legend; the band has a row of its own, named by
+`options.name`, and its icon is a swatch of the fill's brushes.
 
 ## Plot your own arrays
 

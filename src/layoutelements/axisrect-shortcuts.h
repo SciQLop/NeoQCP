@@ -47,10 +47,11 @@ QCPHandle<QCPGraph> QCPAxisRect::line(const K& keys, const V& values, const QCPL
   draws first, on that line's layer. For two lines on one key axis, the key axis decides the frame,
   and a fill across two value axes reads both.
 
-  Both lines must be on this rect's axes, and must fill to each other: the same system, or 2.x's
-  channel between y and y2 (one key axis, two value axes). A fill of a line with itself needs two
-  different components, and a component a line does not have is refused too. Anything else is
-  misuse, reported once, and gives an empty handle.
+  Both lines must be in this rect and must fill to each other: the same coordinate system, which
+  may be a user system (the fill then draws in that frame, as the lines do), or 2.x's channel
+  between y and y2 (one key axis, two value axes). A fill of a line with itself needs two different
+  components, and a component a line does not have is refused too. Anything else is misuse,
+  reported once, and gives an empty handle.
 */
 inline QCPHandle<QCPFillBetween> QCPAxisRect::fillBetween(const QCPHandle<QCPGraph>& first,
                                                           const QCPHandle<QCPGraph>& second,
@@ -60,17 +61,24 @@ inline QCPHandle<QCPFillBetween> QCPAxisRect::fillBetween(const QCPHandle<QCPGra
     QCP_CHECK_OR_RETURN(first.get() != second.get()
                             || options.firstComponent != options.secondComponent,
                         "a fill of a line with itself needs two components of it", { });
-    QCP_CHECK_OR_RETURN(first->keyAxis().get() == second->keyAxis().get(),
-                        "the two lines of a fill must share the key axis", { });
     QCP_CHECK_OR_RETURN(first.get() == second.get() || qcp::fill::canFillTo(*first, *second),
                         "the two lines of a fill must fill to each other", { });
+    // In this rect, and in this rect's frame: its axes carry a cartesian line, its system carries a
+    // line drawn through a user system (which keeps no key or value axis).
     const QList<QCPAxis*> own = axesRaw();
-    const auto onThisRect
-        = [&own](const QCPAxis* axis) { return axis && own.contains(const_cast<QCPAxis*>(axis)); };
-    QCP_CHECK_OR_RETURN(onThisRect(first->keyAxis().get()) && onThisRect(first->valueAxis().get())
-                            && onThisRect(second->keyAxis().get())
-                            && onThisRect(second->valueAxis().get()),
-                        "the two lines of a fill must be on this rect's axes", { });
+    const auto onThisRect = [this, &own](const QCPGraph& line)
+    {
+        const QCPCoordinateSystem* frame = line.system().get();
+        if (!frame || const_cast<QCPCoordinateSystem*>(frame)->area().get() != this)
+            return false;
+        const QCPAxis* key = line.keyAxis().get();
+        const QCPAxis* value = line.valueAxis().get();
+        if (!key || !value)
+            return true; // a user system: its own mapping says where the line lands
+        return own.contains(const_cast<QCPAxis*>(key)) && own.contains(const_cast<QCPAxis*>(value));
+    };
+    QCP_CHECK_OR_RETURN(onThisRect(*first) && onThisRect(*second),
+                        "the two lines of a fill must be on this rect", { });
     const auto namesAColumn = [](const QCPGraph& line, int component)
     {
         const QCPMultiDataSource* source = line.dataSource();
@@ -82,8 +90,19 @@ inline QCPHandle<QCPFillBetween> QCPAxisRect::fillBetween(const QCPHandle<QCPGra
                             && namesAColumn(*second, options.secondComponent),
                         "the fill's component does not name a column of its line", { });
 
-    const QCPHandle<QCPFillBetween> fill
-        = add<QCPFillBetween>(first->keyAxis().get(), first->valueAxis().get());
+    // The fill joins the frame the lines draw in: their own axis pair when they have one, else this
+    // rect's bottom and left pair, whose system must be theirs.
+    QCPAxis* keyAxis = first->keyAxis().get();
+    QCPAxis* valueAxis = first->valueAxis().get();
+    if (!keyAxis || !valueAxis)
+    {
+        keyAxis = xAxis();
+        valueAxis = yAxis();
+        QCP_CHECK_OR_RETURN(keyAxis && valueAxis
+                                && this->system(keyAxis, valueAxis).get() == first->system().get(),
+                            "the two lines of a fill must draw in this rect's system", { });
+    }
+    const QCPHandle<QCPFillBetween> fill = add<QCPFillBetween>(keyAxis, valueAxis);
     if (!fill)
         return fill;
     fill->setLines(first.get(), options.firstComponent, second.get(), options.secondComponent);

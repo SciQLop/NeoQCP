@@ -57,7 +57,10 @@ signals:
     void belowBrushChanged();
 
 protected:
+    using QCPPlottable::drawLegendIcon; // the painter form replays the icon this class records
     void draw(QCPDrawContext& context) const override;
+    //! The legend row's swatch: \ref brush above, \ref belowBrush under it when there is one.
+    void drawLegendIcon(QCPDrawContext& icon) const override;
 
     //! The recording reads both lines' data and axes: a change to either makes it stale.
     [[nodiscard]] quint64 dependencyRevision() const override;

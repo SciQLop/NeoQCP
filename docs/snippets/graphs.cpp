@@ -318,11 +318,10 @@ DOC_SNIPPET(graphs_component_band, 600, 300)
     model->setComponentNames({ "model", "low", "high" });
     const QColor blue(31, 119, 180);
     model->setComponentPens({ QPen(blue, 2), QPen(blue.lighter(150), 0.5), QPen(blue.lighter(150), 0.5) });
-    auto band = customPlot->axisRect()->fillBetween(
-        model, model,
-        { .brush = QColor(31, 119, 180, 60), .firstComponent = 1,
-          .secondComponent = 2 });   // from "low" up to "high"
-    band->removeFromLegend();           // the band is the model's shadow, not a row of its own
+    customPlot->axisRect()->fillBetween(model, model,
+                                        { .brush = QColor(31, 119, 180, 60),
+                                          .firstComponent = 1, .secondComponent = 2,
+                                          .name = QStringLiteral("±spread") }); // low up to high
     model->setComponentInLegend(1, false);  // the edges still draw, but have no legend row
     model->setComponentInLegend(2, false);
     customPlot->rescaleAxes();
@@ -398,9 +397,9 @@ DOC_SNIPPET(graphs_fill_to_graph, 600, 320)
     reference->setComponentPens({ QPen(QColor(214, 39, 40), 1.5) });
 
     // The band is cropped to 0..9 and the reference is interpolated onto the model's keys.
-    customPlot->axisRect()
-        ->fillBetween(curve, reference, { .brush = QColor(214, 39, 40, 60) })
-        ->removeFromLegend(); // the band is no row of its own
+    customPlot->axisRect()->fillBetween(curve, reference,
+                                        { .brush = QColor(214, 39, 40, 60),
+                                          .name = QStringLiteral("band") });
     customPlot->xAxis->setLabel("time (s)");
     customPlot->rescaleAxes();
     customPlot->legend->setVisible(true);

@@ -159,11 +159,12 @@ void QCPFillBetween::draw(QCPDrawContext& context) const
 {
     QCPGraph* first = mFirstLine.data();
     QCPGraph* second = mSecondLine.data();
-    if (!first || !second || !keyAxisRaw() || !valueAxisRaw() || keyAxisRaw()->range().size() <= 0)
+    const QCPAxisBase* keyBase = keyAxisBase().get();
+    if (!first || !second || !system() || !keyBase || keyBase->range().size() <= 0)
         return;
-    // The band is drawn in the first line's frame: a line moved to another rect leaves the fill
-    // drawing nothing until it names lines of this one again.
-    if (first->keyAxis().get() != keyAxisRaw() || first->valueAxis().get() != valueAxisRaw())
+    // The band is drawn in the first line's frame: a line moved to another system leaves the fill
+    // drawing nothing until it names lines of this frame again.
+    if (first->system().get() != system().get())
         return;
     if (first == second ? mFirstComponent == mSecondComponent
                         : !qcp::fill::canFillTo(*first, *second))
@@ -174,7 +175,7 @@ void QCPFillBetween::draw(QCPDrawContext& context) const
     const std::optional<Interval> shared = sharedKeys(*first->dataSource(), *second->dataSource());
     if (!shared || !(shared->upper > shared->lower))
         return;
-    const QCPScale keyScale = keyAxisRaw()->scale();
+    const QCPScale keyScale = keyBase->scale();
     const bool across = first != second && qcp::fill::fillsAcrossValueAxes(*first, *second);
     std::vector<qcp::fill::SeriesRow> firstRows
         = rowsOf(*first->dataSource(), mFirstComponent, keyScale, *shared, nullptr, nullptr);
@@ -186,13 +187,16 @@ void QCPFillBetween::draw(QCPDrawContext& context) const
     if (rows.empty())
         return;
     // A value a log axis cannot place closes on the range bound on zero's side, as the graph's own
-    // fills do: the polygon then follows a bound that moves with the range.
-    for (qcp::fill::StripPoint& row : rows)
-    {
-        row.a = qcp::fill::fillValue(*valueAxisRaw(), row.a);
-        row.b = qcp::fill::fillValue(*valueAxisRaw(), row.b);
-    }
-    if (valueAxisRaw()->scale().isLog())
+    // fills do: the polygon then follows a bound that moves with the range. A user system whose value
+    // axis is no axis at all places every value it is given.
+    QCPAxis* valueAxis = qobject_cast<QCPAxis*>(valueAxisBase().get());
+    if (valueAxis)
+        for (qcp::fill::StripPoint& row : rows)
+        {
+            row.a = qcp::fill::fillValue(*valueAxis, row.a);
+            row.b = qcp::fill::fillValue(*valueAxis, row.b);
+        }
+    if (valueAxis && valueAxis->scale().isLog())
         (void)context.transform();
 
     const QBrush above = brush();
@@ -207,14 +211,32 @@ void QCPFillBetween::draw(QCPDrawContext& context) const
         const QBrush& runBrush = run.firstAbove ? above : below;
         if (runBrush.style() == Qt::NoBrush || runBrush.color().alpha() == 0)
             continue;
-        // Binned per run: a bin keeps one side, where binning the union would merge the two.
+        // Binned per run: a bin keeps one side, where binning the union would merge the two. A user
+        // system has no key pixel to bin against: every row is recorded, as the graph's fills did.
         const std::vector<qcp::fill::StripPoint> binned
-            = qcp::fill::binnedForAxis(context, *keyAxisRaw(), run.rows);
+            = keyAxisRaw() ? qcp::fill::binnedForAxis(context, *keyAxisRaw(), run.rows) : run.rows;
         const auto [upper, lower] = qcp::fill::fillSeries(binned);
         if (!upper)
             continue;
         context.fillBetween(upper, lower, runBrush);
     }
+}
+
+// The legend row is a swatch, not a replay of the band: the fill's brush where the first line is
+// above, its below brush under it. The box is the bars' icon box.
+void QCPFillBetween::drawLegendIcon(QCPDrawContext& icon) const
+{
+    const QCP::AxisRatio left { 0.165, 0.165 };
+    const QCP::AxisRatio right { 0.835, 0.835 };
+    if (!mBelowBrush)
+    {
+        icon.rect(left, right, QPen(), brush());
+        return;
+    }
+    const QCP::AxisRatio lowerLeft { 0.165, 0.5 };
+    const QCP::AxisRatio lowerRight { 0.835, 0.5 };
+    icon.rect(left, lowerRight, QPen(), brush());
+    icon.rect(lowerLeft, right, QPen(), *mBelowBrush);
 }
 
 quint64 QCPFillBetween::dependencyRevision() const
@@ -226,6 +248,9 @@ quint64 QCPFillBetween::dependencyRevision() const
         first ? first->keyAxis().get() : nullptr, first ? first->valueAxis().get() : nullptr,
         second ? second->keyAxis().get() : nullptr, second ? second->valueAxis().get() : nullptr,
         mFirstComponent, mSecondComponent);
+    // The band is drawn in its system's frame: a mapping change (a shear, a resize) moves it.
+    if (const QCPCoordinateSystem* frame = system().get())
+        revision = qHashMulti(revision, frame->revision());
     // Across two value axes the band reads both systems' pixels: a pan of either moves it.
     if (first && second && first != second && qcp::fill::fillsAcrossValueAxes(*first, *second))
         revision = qHashMulti(revision, first->system()->revision(), second->system()->revision());
