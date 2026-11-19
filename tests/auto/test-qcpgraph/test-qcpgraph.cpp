@@ -1,6 +1,7 @@
 #include "test-qcpgraph.h"
 #include <QMainWindow>
 #include <QPicture>
+#include <cmath>
 
 void TestQCPGraph::init()
 {
@@ -194,4 +195,47 @@ void TestQCPGraph::anImpulseGraphFitsItsBaseline()
   mGraph->rescaleValueAxis();
   QCOMPARE(mPlot->yAxis->range().lower, 0.0);
   QCOMPARE(mPlot->yAxis->range().upper, 10.5);
+}
+
+void TestQCPGraph::anImpulseGraphOnALogAxisFitsItsData()
+{
+  // On a log value axis the stem is drawn down to the axis' bound, whatever it is: that bound is
+  // not a data value, so the fit neither holds it nor leaves the margin below the data.
+  mPlot->yAxis->setScale(QCPScale::log());
+  mPlot->yAxis->setRange(0.001, 1000);
+  mGraph->setLineStyle(QCPGraph::lsImpulse);
+  mGraph->setData({1.0, 2.0, 3.0}, {2.0, 6.0, 10.0});
+
+  mPlot->yAxis->rescale();
+
+  const double margin = 0.05 * (1.0 - std::log10(2.0));
+  QVERIFY(std::abs(mPlot->yAxis->range().lower - std::pow(10.0, std::log10(2.0) - margin)) < 1e-9);
+  QVERIFY(std::abs(mPlot->yAxis->range().upper - std::pow(10.0, 1.0 + margin)) < 1e-9);
+}
+
+void TestQCPGraph::aComponentDrawingImpulsesFitsItsBaseline()
+{
+  // The drawing decides per component: a component set to impulses draws stems from zero although
+  // the graph-wide style is a line, so the fit holds zero.
+  mGraph->setData({1.0, 2.0, 3.0}, {2.0, 6.0, 10.0});
+  mGraph->setComponentLineStyle(0, QCPGraph::lsImpulse);
+
+  mPlot->yAxis->rescale();
+
+  QCOMPARE(mPlot->yAxis->range().lower, 0.0);
+  QCOMPARE(mPlot->yAxis->range().upper, 10.5);
+}
+
+void TestQCPGraph::aGraphWhoseVisibleComponentsDrawLinesTakesNoBaseline()
+{
+  // The reverse: a graph-wide impulse style whose components all draw lines draws no stem, so zero
+  // stays out of the fit and the margin goes below the data.
+  mGraph->setData({1.0, 2.0, 3.0}, {2.0, 6.0, 10.0});
+  mGraph->setLineStyle(QCPGraph::lsImpulse);
+  mGraph->setComponentLineStyle(0, QCPGraph::lsLine);
+
+  mPlot->yAxis->rescale();
+
+  QCOMPARE(mPlot->yAxis->range().lower, 1.6);
+  QCOMPARE(mPlot->yAxis->range().upper, 10.4);
 }

@@ -95,6 +95,24 @@ double QCPGraph::dataSpaceBaseline() const
     return 0.0;
 }
 
+std::optional<double> QCPGraph::impulseBaseline() const
+{
+    // Drawing decides per component: a component set to impulse draws stems even when the graph's
+    // own style is a line, and a graph whose visible components all draw lines has none (I-3).
+    const bool impulses = std::any_of(mComponents.cbegin(), mComponents.cend(),
+                                      [](const QCPGraphComponent& c) {
+                                          return c.visible && c.lineStyle == lsImpulse;
+                                      });
+    if (!impulses)
+        return std::nullopt;
+    // On a log value axis the baseline is the current bound nearer zero, not a data value: holding
+    // it in the fit would make the fit depend on the range it replaces, so it takes no part (I-2).
+    const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
+    if (valueAxis && valueAxis->scale().isLog())
+        return std::nullopt;
+    return 0.0;
+}
+
 double QCPGraph::dataSpaceFillValue(double value) const
 {
     const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
@@ -1495,21 +1513,22 @@ QCPRange QCPGraph::getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
             foundRange = true;
         }
     }
-    if (foundRange && mLineStyle == lsImpulse) {
+    if (foundRange) {
         // An impulse stem is drawn from the baseline, so the fit has to hold the baseline too.
-        const double impulseBaseline = dataSpaceBaseline();
-        lower = qMin(lower, impulseBaseline);
-        upper = qMax(upper, impulseBaseline);
+        if (const std::optional<double> baseline = impulseBaseline()) {
+            lower = qMin(lower, *baseline);
+            upper = qMax(upper, *baseline);
+        }
     }
     return foundRange ? QCPRange(lower, upper) : QCPRange();
 }
 
-std::optional<QCPRange> QCPGraph::stickyValues(QCPDrawnSide side) const
+QVector<double> QCPGraph::stickyValues(QCPDrawnSide side) const
 {
     // The stem of an impulse starts on the baseline, so the fit keeps the baseline on the axis.
-    if (side != QCPDrawnSide::Value || mLineStyle != lsImpulse) return std::nullopt;
-    const double impulseBaseline = dataSpaceBaseline();
-    return QCPRange(impulseBaseline, impulseBaseline);
+    if (side != QCPDrawnSide::Value) return {};
+    const std::optional<double> baseline = impulseBaseline();
+    return baseline ? QVector<double>{*baseline} : QVector<double>{};
 }
 
 // --- Selection ---

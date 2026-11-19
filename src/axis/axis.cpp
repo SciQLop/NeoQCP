@@ -1649,7 +1649,7 @@ void QCPAxis::setScaleRatio(const QCPAxis* otherAxis, double ratio)
   cartesian axis always fitted (see QCPAxisBase::rescale).
 */
 bool QCPAxis::ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signDomain,
-                           QCPRange& range, std::optional<QCPRange>& sticky) const
+                           QCPRange& range, QVector<double>& sticky) const
 {
     bool haveRange = false;
     for (QCPPlottable* plottable : plottablesRaw())
@@ -1668,7 +1668,7 @@ bool QCPAxis::ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signDomai
         else
             range = found;
         haveRange = true;
-        sticky = qcp::stickyUnion(sticky, plottable->stickyValues(side));
+        sticky += plottable->stickyValues(side);
     }
     return haveRange;
 }

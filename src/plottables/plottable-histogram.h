@@ -65,9 +65,9 @@ public:
     QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override;
     //! The bin heights stand on zero: the fit takes its margin above them, never below.
-    std::optional<QCPRange> stickyValues(QCPDrawnSide side) const override
+    QVector<double> stickyValues(QCPDrawnSide side) const override
     {
-        return side == QCPDrawnSide::Value ? std::optional<QCPRange>(QCPRange(0, 0)) : std::nullopt;
+        return side == QCPDrawnSide::Value ? QVector<double>{0.0} : QVector<double>{};
     }
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
 

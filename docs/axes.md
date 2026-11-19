@@ -80,8 +80,11 @@ The default is 5 % per side, so a marker or a lollipop disc sitting on an extrem
   `QCPColorMap`, `QCPColorMap2` or `QCPHistogram2D` keeps its data edges on the axes, and a `QCPBars`,
   `QCPHistogram` or an impulse `QCPGraph` keeps its baseline there. A colour map then fills its rect
   edge to edge instead of leaving a blank band, and a bar chart starts on the axis. A plottable
-  reports those values from `stickyValues()`, and a fit only honours the ones of the plottables it
-  includes: a graph that reaches further than the map still gets the margin on its side.
+  reports those values from `stickyValues()`, a list of values rather than a range, so a map and a
+  histogram on one axis each keep their own. A fit only honours the ones of the plottables it
+  includes: a graph that reaches further than the map still gets the margin on its side. On a log
+  axis a baseline of zero is not a value the axis can show, and an impulse graph's stems then run to
+  the axis edge: no margin below, none above the baseline either.
 
 ## Logarithmic axes
 

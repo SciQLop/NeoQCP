@@ -494,7 +494,7 @@ QList<QCPPlottable*> QCPAxisBase::plottablesRaw() const
 */
 void QCPAxisBase::setRescaleMargin(double fraction)
 {
-    QCP_CHECK_OR_RETURN(std::isfinite(fraction) && fraction >= 0.0,
+    QCP_CHECK_OR_RETURN(qcp::validRescaleMargin(fraction),
                         "a rescale margin is a fraction: finite and not negative", );
     if (fraction == mRescaleMargin)
         return;
@@ -515,9 +515,17 @@ void QCPAxisBase::setRescaleMargin(double fraction)
 */
 void QCPAxisBase::rescale(bool onlyVisiblePlottables)
 {
-    // The margin of the axis that receives the range, the source of an identity link.
-    const QCPAxisBase* receiver = isIdentityFollower() ? mLink->source.data() : this;
-    rescale(onlyVisiblePlottables, receiver->mRescaleMargin);
+    rescale(onlyVisiblePlottables, receivingMargin());
+}
+
+/*!
+  The margin of the axis that receives a fit through this one: an identity follower writes its range
+  back to its source (setRange forwards), so the margin is the source's.
+*/
+double QCPAxisBase::receivingMargin() const
+{
+    const QCPAxisBase* source = isIdentityFollower() ? linkSource() : nullptr;
+    return source ? source->mRescaleMargin : mRescaleMargin;
 }
 
 /*! \overload
@@ -527,14 +535,14 @@ void QCPAxisBase::rescale(bool onlyVisiblePlottables)
 */
 void QCPAxisBase::rescale(bool onlyVisiblePlottables, double margin)
 {
-    QCP_CHECK_OR_RETURN(std::isfinite(margin) && margin >= 0.0,
+    QCP_CHECK_OR_RETURN(qcp::validRescaleMargin(margin),
                         "a rescale margin is a fraction: finite and not negative", );
     QCPAxisBase* target = isIdentityFollower() ? mLink->source.data() : this;
     const QCP::SignDomain signDomain = target->mScale.isLog()
         ? (target->mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive)
         : QCP::sdBoth;
     QCPRange unionRange;
-    std::optional<QCPRange> sticky;
+    QVector<double> sticky;
     bool haveRange = false;
     const auto include = [&](const QCPAxisBase* axis)
     {
@@ -583,7 +591,7 @@ bool QCPAxisBase::isIdentityFollower() const
   own dimension.
 */
 bool QCPAxisBase::ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signDomain,
-                               QCPRange& range, std::optional<QCPRange>& sticky) const
+                               QCPRange& range, QVector<double>& sticky) const
 {
     bool haveRange = false;
     // Through the virtual list: a user axis that drops a plottable must be honoured (M1).
@@ -607,7 +615,7 @@ bool QCPAxisBase::ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signD
         else
             range = found;
         haveRange = true;
-        sticky = qcp::stickyUnion(sticky, plottable->stickyValues(side));
+        sticky += plottable->stickyValues(side);
     }
     return haveRange;
 }
@@ -620,7 +628,7 @@ bool QCPAxisBase::ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signD
   axis' own scale.
 */
 void QCPAxisBase::rescaleTo(const QCPRange& range, bool haveRange, double margin,
-                            const std::optional<QCPRange>& sticky)
+                            const QVector<double>& sticky)
 {
     if (!haveRange)
         return;

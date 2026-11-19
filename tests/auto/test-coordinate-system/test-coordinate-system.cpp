@@ -110,6 +110,11 @@ public:
                          QBrush(Qt::darkRed));
             return;
         }
+        if (fromTheCentre)
+        {
+            context.polyline(mFromTheCentre, QPen(Qt::black, 2));
+            return;
+        }
         context.polyline(mLine, QPen(Qt::black, 2));
     }
 
@@ -140,6 +145,9 @@ public:
     bool coversItsClip = false;
     bool ratioRect = false;
     bool mixedRect = false;
+    //! A recording that starts at the centre: radius 0, the one a fit must not leave a margin
+    //! below.
+    bool fromTheCentre = false;
 
 private:
     int mSystemChanges = 0;
@@ -148,6 +156,9 @@ private:
     std::shared_ptr<const std::vector<QPointF>> mLine
         = std::make_shared<const std::vector<QPointF>>(
             std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
+    std::shared_ptr<const std::vector<QPointF>> mFromTheCentre
+        = std::make_shared<const std::vector<QPointF>>(
+            std::initializer_list<QPointF> { { 0, 0 }, { 9, 9 } });
 };
 
 QColor pixelAt(QCustomPlot& plot, QPoint pos)
@@ -1079,4 +1090,21 @@ void TestCoordinateSystem::aBracketDecorationNeedsAKeyAxis()
     bracket->drawDecoration(&painter, arc->selection());
     painter.end();
     QVERIFY(picture.boundingRect().isEmpty());
+}
+
+// A radius has no negative side: a fit of data that reaches the centre keeps 0 on the axis instead
+// of leaving the margin below it.
+void TestCoordinateSystem::aRadialFitDoesNotGoBelowZero()
+{
+    QCustomPlot plot;
+    QCPPolarArea* area = polarArea(plot);
+    auto* plottable = area->add<RecordingPlottable>().get();
+    plottable->fromTheCentre = true;
+    settle(plot);
+
+    plot.rescaleAxes();
+
+    QCOMPARE(area->radialAxis()->range().lower, 0.0);
+    QVERIFY(area->radialAxis()->range().upper > 9.0);
+    QVERIFY(area->radialAxis()->range().upper < 9.5);
 }

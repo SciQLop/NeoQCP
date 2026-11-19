@@ -272,6 +272,18 @@ protected:
     // The area as the polar one it always is: the base stores it as a plain QCPArea.
     QCPPolarArea* polarArea() const { return static_cast<QCPPolarArea*>(mArea); }
 
+    //! A radius starts at the centre: a fit of data that reaches it keeps 0 on the axis, where the
+    //! margin would otherwise push the range below a radius that does not exist.
+    bool ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signDomain, QCPRange& range,
+                      QVector<double>& sticky) const override
+    {
+        if (!QCPAxisBase::ownDataRange(onlyVisiblePlottables, signDomain, range, sticky))
+            return false;
+        if (range.lower <= 0.0)
+            sticky.append(0.0);
+        return true;
+    }
+
     // property members:
     // axis base:
     double mAngle;

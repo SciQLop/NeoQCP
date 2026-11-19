@@ -15,6 +15,9 @@ private slots:
   void channelFill();
   void aTangentBracketPrintsNothing();
   void anImpulseGraphFitsItsBaseline();
+  void anImpulseGraphOnALogAxisFitsItsData();
+  void aComponentDrawingImpulsesFitsItsBaseline();
+  void aGraphWhoseVisibleComponentsDrawLinesTakesNoBaseline();
   
 private:
   QCustomPlot *mPlot;

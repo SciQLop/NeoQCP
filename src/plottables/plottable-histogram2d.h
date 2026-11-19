@@ -135,7 +135,7 @@ public Q_SLOTS:
     QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override;
     //! A histogram image's four edges are sticky, as a colour map's are.
-    std::optional<QCPRange> stickyValues(QCPDrawnSide side) const override
+    QVector<double> stickyValues(QCPDrawnSide side) const override
     {
         return stickyDataRange(side);
     }

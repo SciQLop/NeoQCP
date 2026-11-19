@@ -13,25 +13,17 @@
 namespace
 {
 int gMisuses = 0;
-
-void record(const char*, const char*)
-{
-    ++gMisuses;
-}
+void record(const char*, const char*) { ++gMisuses; }
 
 const auto twice = [](double x) { return 2.0 * x; };
 const auto half = [](double x) { return x / 2.0; };
 const auto reciprocal = [](double x) { return 1.0 / x; };
 
-bool near(double a, double b)
-{
-    return std::abs(a - b) <= 1e-9;
-}
+bool near(double a, double b) { return std::abs(a - b) <= 1e-9; }
 
 void sendDrag(QCustomPlot& plot, const QPoint& from, const QPoint& to)
 {
-    auto send = [&plot](QEvent::Type type, const QPoint& pos, Qt::MouseButtons buttons)
-    {
+    auto send = [&plot](QEvent::Type type, const QPoint& pos, Qt::MouseButtons buttons) {
         QMouseEvent e(type, pos, plot.mapToGlobal(pos), Qt::LeftButton, buttons, Qt::NoModifier);
         QCoreApplication::sendEvent(&plot, &e);
     };
@@ -131,7 +123,7 @@ void TestLinkedAxes::linkedPixelsMatchTheSourceOnOneRect()
     plot.xAxis->setRange(1, 10);
     plot.xAxis2->linkTo(plot.xAxis, twice, half);
     plot.replot();
-    for (const double v : { 1.0, 3.3, 10.0 })
+    for (const double v : {1.0, 3.3, 10.0})
     {
         QVERIFY2(near(plot.xAxis2->coordToPixel(2 * v), plot.xAxis->coordToPixel(v)),
                  "a linear 2x link maps where its source maps");
@@ -141,7 +133,7 @@ void TestLinkedAxes::linkedPixelsMatchTheSourceOnOneRect()
 
     plot.xAxis->setScale(QCPScale::log());
     plot.xAxis->setRange(1, 100);
-    for (const double v : { 1.0, 3.3, 10.0 })
+    for (const double v : {1.0, 3.3, 10.0})
         QVERIFY2(near(plot.xAxis2->coordToPixel(2 * v), plot.xAxis->coordToPixel(v)),
                  "a link on a log source maps where its source maps");
 
@@ -149,7 +141,7 @@ void TestLinkedAxes::linkedPixelsMatchTheSourceOnOneRect()
     plot.xAxis->setRange(1, 10);
     plot.xAxis->setRangeReversed(true);
     QVERIFY2(plot.xAxis2->rangeReversed(), "the link follows the source's reversal");
-    for (const double v : { 1.0, 3.3, 10.0 })
+    for (const double v : {1.0, 3.3, 10.0})
         QVERIFY2(near(plot.xAxis2->coordToPixel(2 * v), plot.xAxis->coordToPixel(v)),
                  "a link on a reversed source maps where its source maps");
     QCOMPARE(gMisuses, 0);
@@ -210,7 +202,7 @@ void TestLinkedAxes::barsOnADecreasingLink()
     bars->setPen(Qt::NoPen);
     bars->setBrush(Qt::red);
     bars->setWidth(0.5);
-    bars->setData({ 2.0 }, { 5.0 });
+    bars->setData({2.0}, {5.0});
     plot.replot();
 
     const QImage image = plot.toPixmap().toImage();
@@ -293,13 +285,13 @@ void TestLinkedAxes::dataOnALinkedAxisMapsThroughTheLink()
     const QCPTransform again(plot.xAxis2, plot.yAxis);
     QVERIFY2(linked == again, "two snapshots of one link compare equal");
 
-    const QVector<double> linkedKeys { 2.0, 6.6, 20.0 };
-    const QVector<double> plainKeys { 1.0, 3.3, 10.0 };
-    const QVector<double> values { 0.0, 2.5, 5.0 };
+    const QVector<double> linkedKeys {2.0, 6.6, 20.0};
+    const QVector<double> plainKeys {1.0, 3.3, 10.0};
+    const QVector<double> values {0.0, 2.5, 5.0};
     for (int i = 0; i < linkedKeys.size(); ++i)
     {
-        const QCP::Pixels throughLink = linked.map({ linkedKeys.at(i), values.at(i) });
-        const QCP::Pixels direct = plain.map({ plainKeys.at(i), values.at(i) });
+        const QCP::Pixels throughLink = linked.map({linkedKeys.at(i), values.at(i)});
+        const QCP::Pixels direct = plain.map({plainKeys.at(i), values.at(i)});
         QVERIFY2(near(throughLink.x, direct.x) && near(throughLink.y, direct.y),
                  "a linked key maps where its source maps");
     }
@@ -310,7 +302,7 @@ void TestLinkedAxes::dataOnALinkedAxisMapsThroughTheLink()
                std::span<QPointF>(mapped.data(), mapped.size()));
     for (int i = 0; i < mapped.size(); ++i)
     {
-        const QCP::Pixels one = linked.map({ linkedKeys.at(i), values.at(i) });
+        const QCP::Pixels one = linked.map({linkedKeys.at(i), values.at(i)});
         QVERIFY2(near(mapped.at(i).x(), one.x) && near(mapped.at(i).y(), one.y),
                  "the bulk map agrees with map()");
     }
@@ -409,7 +401,7 @@ void TestLinkedAxes::refusedLinks()
     QCOMPARE(gMisuses, 4);
     QVERIFY(!plot.xAxis2->linkSource());
 
-    plot.xAxis2->linkTo(plot.xAxis, twice, { }); // one function empty
+    plot.xAxis2->linkTo(plot.xAxis, twice, {}); // one function empty
     QCOMPARE(gMisuses, 5);
     QVERIFY(!plot.xAxis2->linkSource());
 
@@ -604,9 +596,10 @@ void TestLinkedAxes::aSpanOnALinkedAxisLandsAtItsCoordToPixel()
     QVERIFY2(!redColumns.isEmpty(), "the span was not drawn");
     const double expected = linked->coordToPixel(2.0) * scale;
     const double middle = (redColumns.first() + redColumns.last()) / 2.0;
-    QVERIFY2(
-        std::abs(middle - expected) <= 2.0,
-        qPrintable(QStringLiteral("span middle at %1, coordToPixel %2").arg(middle).arg(expected)));
+    QVERIFY2(std::abs(middle - expected) <= 2.0,
+             qPrintable(QStringLiteral("span middle at %1, coordToPixel %2")
+                            .arg(middle)
+                            .arg(expected)));
 }
 
 void TestLinkedAxes::aLinkedAxisGridLineLandsAtItsTick()
@@ -640,10 +633,10 @@ void TestLinkedAxes::aLinkedAxisGridLineLandsAtItsTick()
         double nearest = std::numeric_limits<double>::max();
         for (double tick : linked->tickVector())
             nearest = std::min(nearest, std::abs(column - linked->coordToPixel(tick) * scale));
-        QVERIFY2(
-            nearest <= 2.0,
-            qPrintable(
-                QStringLiteral("grid line at %1 is not at a tick (%2)").arg(column).arg(nearest)));
+        QVERIFY2(nearest <= 2.0,
+                 qPrintable(QStringLiteral("grid line at %1 is not at a tick (%2)")
+                                .arg(column)
+                                .arg(nearest)));
     }
 }
 
@@ -669,7 +662,7 @@ void TestLinkedAxes::aVerticalLinkFollowsALogReversedSource()
         const QRect rect = axis->axisRect()->rect();
         return (rect.bottom() - axis->coordToPixel(value)) / double(rect.height());
     };
-    for (double value : { 0.2, 1.0, 10.0, 500.0 })
+    for (double value : {0.2, 1.0, 10.0, 500.0})
     {
         QVERIFY2(std::abs(fraction(plot.yAxis, value) - fraction(linked, value)) < 1e-9,
                  "a vertical link must keep the source's fraction along its own height");
@@ -685,7 +678,6 @@ struct Stacked
     QCustomPlot plot;
     QCPAxisRect* top = nullptr;
     QCPAxisRect* bottom = nullptr;
-
     Stacked()
     {
         plot.setAxisRectGrid(2, 1);
@@ -836,7 +828,7 @@ void TestLinkedAxes::identityLinksFlatten()
     plot2.plotLayout()->addElement(1, 0, other);
     QCPAxis* root = other->axis(QCPAxis::atBottom);
     plot2.xAxis2->linkTo(plot2.xAxis); // xAxis drives an identity follower
-    plot2.xAxis->linkTo(root); // xAxis follows root: its follower moves to root too
+    plot2.xAxis->linkTo(root);         // xAxis follows root: its follower moves to root too
     QCOMPARE(plot2.xAxis->linkSource(), root);
     QCOMPARE(plot2.xAxis2->linkSource(), root);
     root->setRange(3, 4);
@@ -985,5 +977,31 @@ void TestLinkedAxes::constantDataTakesNoMargin()
     plot.xAxis->setRescaleMargin(0.4);
     graph->rescaleKeyAxis();
     QCOMPARE(plot.xAxis->range(), QCPRange(2, 12));
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestLinkedAxes::rescaleMarginOnANegativeLogAxis()
+{
+    // On a negative log range toScale swaps the bounds: the fit has to widen outward on both ends.
+    QCustomPlot plot;
+    plot.xAxis->setScale(QCPScale::log());
+    plot.xAxis->setRange(QCPRange(-1000, -1));
+    plot.axisRect()->line(std::vector<double> { -1000, -100, -10, -1 }, ramp(0, 1, 4));
+    plot.xAxis->rescale();
+    QVERIFY(near(plot.xAxis->range().lower, -std::pow(10.0, 3.15)));
+    QVERIFY(near(plot.xAxis->range().upper, -std::pow(10.0, -0.15)));
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestLinkedAxes::plottableRescaleOnAnIdentityFollowerUsesTheSourceMargin()
+{
+    // setRange on a follower hands the range to the link's source, so a plottable fit reads the
+    // margin that will receive it, as the axis fit does.
+    Stacked s;
+    s.bottom->xAxis()->setRescaleMargin(0.1);
+    s.top->xAxis()->setRescaleMargin(0.5);
+    const auto graph = s.top->line(ramp(0, 10), ramp(0, 1));
+    graph->rescaleKeyAxis();
+    QCOMPARE(s.bottom->xAxis()->range(), QCPRange(-1, 11));
     QCOMPARE(gMisuses, 0);
 }

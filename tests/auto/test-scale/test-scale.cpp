@@ -583,3 +583,20 @@ void TestScale::aDataScaleSetBeforeTheAddWins()
     QVERIFY(joinedScale.get());
     QVERIFY(joinedScale->dataScale().isLinear());
 }
+
+
+// A negative log range comes back from scale space with its bounds swapped (log|v|): the margin has
+// to widen the outer pair, or it moves both data ends inward and cuts what it fits.
+void TestScale::aNegativeLogRangeWidensOutward()
+{
+    const QCPScale scale = QCPScale::log();
+    const QCPRange widened = scale.widened(QCPRange(-1000, -1), 0.05);
+    QVERIFY(close(widened.lower, -std::pow(10.0, 3.15)));
+    QVERIFY(close(widened.upper, -std::pow(10.0, -0.15)));
+
+    // A shift moves value by value: there is no pair to order and no end to cut, so both ends go
+    // to a larger magnitude, as a positive range does.
+    const QCPRange shifted = scale.shifted(QCPRange(-1000, -1), 1);
+    QVERIFY(close(shifted.lower, -10000.0));
+    QVERIFY(close(shifted.upper, -10.0));
+}

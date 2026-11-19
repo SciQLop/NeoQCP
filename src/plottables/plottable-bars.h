@@ -268,10 +268,9 @@ public:
     virtual QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                                    const QCPRange& inKeyRange = QCPRange()) const override;
     //! Bars stand on their base value: no margin below a positive chart, none above a negative one.
-    std::optional<QCPRange> stickyValues(QCPDrawnSide side) const override
+    QVector<double> stickyValues(QCPDrawnSide side) const override
     {
-        return side == QCPDrawnSide::Value ? std::optional<QCPRange>(QCPRange(mBaseValue, mBaseValue))
-                                           : std::nullopt;
+        return side == QCPDrawnSide::Value ? QVector<double>{mBaseValue} : QVector<double>{};
     }
     virtual QPointF dataPixelPosition(int index) const override;
 

@@ -192,7 +192,7 @@ public:
     // non-property methods:
 protected:
     // The angular axis keeps its full turn: it has no data range to fit.
-    bool ownDataRange(bool, QCP::SignDomain, QCPRange&, std::optional<QCPRange>&) const override
+    bool ownDataRange(bool, QCP::SignDomain, QCPRange&, QVector<double>&) const override
     {
         return false;
     }

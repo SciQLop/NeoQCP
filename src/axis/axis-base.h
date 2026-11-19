@@ -171,6 +171,9 @@ public:
     Q_INVOKABLE void rescale(bool onlyVisiblePlottables = false);
     //! rescale(), leaving \a margin on each side instead of this axis' rescaleMargin().
     Q_INVOKABLE void rescale(bool onlyVisiblePlottables, double margin);
+    //! The margin of the axis that receives a fit through this one: an identity follower's source,
+    //! this axis otherwise.
+    [[nodiscard]] double receivingMargin() const;
     //! Whether this axis follows a source through a link with no functions: the two show the same
     //! range in the same units.
     [[nodiscard]] bool isIdentityFollower() const;
@@ -293,13 +296,13 @@ protected:
     // \a sticky values of the fit, or, when it is not usable (a constant plottable has a zero-size
     // range), recentres the current range on it.
     void rescaleTo(const QCPRange& range, bool haveRange, double margin,
-                   const std::optional<QCPRange>& sticky = std::nullopt);
+                   const QVector<double>& sticky);
     // This axis' own data range under signDomain, from its plottables; false when it has none. The
     // drawn data ranges here; a cartesian axis uses its plottables' key and value ranges, and the
     // angular axis has none (it keeps its full turn). \a sticky collects the values of the fitted
     // plottables that take no margin on this side.
     virtual bool ownDataRange(bool onlyVisiblePlottables, QCP::SignDomain signDomain,
-                              QCPRange& range, std::optional<QCPRange>& sticky) const;
+                              QCPRange& range, QVector<double>& sticky) const;
 
     // Takes the source's range, its direction included, through the link's forward function.
     void refreshFromLink();

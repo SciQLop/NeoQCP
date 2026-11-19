@@ -41,5 +41,6 @@ private slots:
     void aTakenPlottableFollowsItsNewPlot();
     void aBracketDecorationNeedsAKeyAxis();
     void rescaleAxesVisitsEveryArea();
+    void aRadialFitDoesNotGoBelowZero();
     void axisPlottablesKeepTheirOrder();
 };

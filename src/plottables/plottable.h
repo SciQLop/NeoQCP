@@ -260,7 +260,7 @@ public:
     //! The values of this plottable that take no margin on \a side: a fit keeps them on the axis (a
     //! colour map's edges, a bar's baseline). Empty for a curve or a scatter, which has no side its
     //! fit has to touch.
-    virtual std::optional<QCPRange> stickyValues(QCPDrawnSide side) const;
+    virtual QVector<double> stickyValues(QCPDrawnSide side) const;
 
     // non-property methods:
     void coordsToPixels(double key, double value, double& x, double& y) const;
@@ -353,9 +353,9 @@ protected:
     //! group) unties itself unless \a next keeps it in the same area, while the old system is still
     //! the one it is drawn in.
     virtual void systemWillChange(QCPCoordinateSystem*) {}
-    //! stickyValues() for a plottable whose whole data range is sticky on \a side, empty when it
-    //! has none.
-    [[nodiscard]] std::optional<QCPRange> stickyDataRange(QCPDrawnSide side) const;
+    //! stickyValues() for a plottable whose whole data range is sticky on \a side: its two ends,
+    //! or empty when it has none.
+    [[nodiscard]] QVector<double> stickyDataRange(QCPDrawnSide side) const;
     //! Stores the selection setSelection() was given, already fitted to the selectable type.
     //! Returns whether anything changed. A plottable whose selection lives in parts (a graph's
     //! components) hands it to them.

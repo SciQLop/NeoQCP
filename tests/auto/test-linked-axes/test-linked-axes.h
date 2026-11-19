@@ -39,9 +39,11 @@ private slots:
 
     void rescaleLeavesTheDefaultMargin();
     void rescaleMarginOnALogAxisIsInDecades();
+    void rescaleMarginOnANegativeLogAxis();
     void rescaleMarginZeroFitsExactly();
     void rescaleAxesMarginArgumentOverridesTheAxes();
     void rescaleOfAnIdentityFollowerUsesTheSourceMargin();
+    void plottableRescaleOnAnIdentityFollowerUsesTheSourceMargin();
     void plottableRescaleOnlyEnlargeDoesNotGrow();
     void aNegativeOrNanMarginIsRefused();
     void constantDataTakesNoMargin();

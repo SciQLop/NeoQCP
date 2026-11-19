@@ -3609,6 +3609,9 @@ void QCustomPlot::rescaleAxes(bool onlyVisiblePlottables, double margin)
 
 void QCustomPlot::rescaleAxesWith(bool onlyVisiblePlottables, std::optional<double> margin)
 {
+    // One report for the call, not one per axis: the axes' own rescale() would report it again.
+    QCP_CHECK_OR_RETURN(!margin || qcp::validRescaleMargin(*margin),
+                        "a rescale margin is a fraction: finite and not negative", );
     const QCPEmissionScope scope(this);
     QList<QPointer<QCPAxisBase>> allAxes;
     for (QCPArea* area : areasRaw())
@@ -3623,13 +3626,8 @@ void QCustomPlot::rescaleAxesWith(bool onlyVisiblePlottables, std::optional<doub
     };
     for (const auto& axis : allAxes)
         if (axis && !(axis->isIdentityFollower() && walked(axis->linkSource())))
-        {
             // a rangeChanged slot may delete the others
-            if (margin)
-                axis->rescale(onlyVisiblePlottables, *margin);
-            else
-                axis->rescale(onlyVisiblePlottables);
-        }
+            axis->rescale(onlyVisiblePlottables, margin.value_or(axis->receivingMargin()));
 }
 
 /*!

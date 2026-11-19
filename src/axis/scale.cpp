@@ -150,18 +150,23 @@ QCPRange QCPScale::widened(const QCPRange& range, double fraction) const
     const double upper = toScale(range.upper);
     if (!std::isfinite(lower) || !std::isfinite(upper)) // not a range this scale can widen (0 on a log)
         return range;
+    // Log drops the sign, so a negative range arrives with its bounds swapped: order them by their
+    // scale values, or the margin would move both ends inward.
+    const double from = qMin(lower, upper);
+    const double to = qMax(lower, upper);
     const double sign = isLog() ? rangeSign(range) : 1.0;
-    const double delta = std::abs(upper - lower) * fraction;
-    return QCPRange(sign * fromScale(lower - delta), sign * fromScale(upper + delta));
+    const double delta = (to - from) * fraction;
+    return QCPRange(sign * fromScale(from - delta), sign * fromScale(to + delta));
 }
 
 namespace
 {
 //! matplotlib's sticky edges: a bound the widening pushed past a sticky value goes back to it.
-QCPRange clampedToSticky(const QCPRange& range, const QCPRange& fitted, const QCPRange& sticky)
+QCPRange clampedToSticky(const QCPRange& range, const QCPRange& fitted,
+                        const QVector<double>& sticky)
 {
     QCPRange clamped = range;
-    for (const double value : {sticky.lower, sticky.upper})
+    for (const double value : sticky)
     {
         if (clamped.lower < value && value <= fitted.lower)
             clamped.lower = value;
@@ -173,11 +178,11 @@ QCPRange clampedToSticky(const QCPRange& range, const QCPRange& fitted, const QC
 } // namespace
 
 QCPRange qcp::fittedRange(const QCPScale& scale, const QCPRange& fitted, const QCPRange& current,
-                          double margin, bool onlyEnlarge, const std::optional<QCPRange>& sticky)
+                          double margin, bool onlyEnlarge, const QVector<double>& sticky)
 {
     QCPRange range = scale.widened(fitted, margin);
-    if (sticky)
-        range = clampedToSticky(range, fitted, *sticky);
+    if (!sticky.isEmpty())
+        range = clampedToSticky(range, fitted, sticky);
     if (onlyEnlarge)
         range.expand(current);
     if (QCPRange::validRange(range))
@@ -191,12 +196,7 @@ QCPRange qcp::fittedRange(const QCPScale& scale, const QCPRange& fitted, const Q
                     center * qSqrt(current.upper / current.lower));
 }
 
-std::optional<QCPRange> qcp::stickyUnion(std::optional<QCPRange> sticky,
-                                         const std::optional<QCPRange>& more)
+bool qcp::validRescaleMargin(double fraction)
 {
-    if (!sticky)
-        return more;
-    if (more)
-        sticky->expand(*more);
-    return sticky;
+    return std::isfinite(fraction) && fraction >= 0.0;
 }

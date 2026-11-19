@@ -23,6 +23,7 @@ private slots:
     void setScaleBringsItsTicker();
     void aLogAxisMapsAsBefore();
     void symlogMapsBothSides();
+    void aNegativeLogRangeWidensOutward();
     void dragAndZoomWorkInScaleSpace();
     void aRadialAxisTakesSymlog();
     void aLogColourScaleMapsAsBefore();

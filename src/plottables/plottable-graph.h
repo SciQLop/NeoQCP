@@ -292,7 +292,7 @@ public:
                            QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override;
     //! An impulse graph's stems stand on its baseline: the fit pushes no margin past it.
-    std::optional<QCPRange> stickyValues(QCPDrawnSide side) const override;
+    QVector<double> stickyValues(QCPDrawnSide side) const override;
 
     // Legend
     using QCPPlottable::addToLegend;
@@ -338,6 +338,10 @@ protected:
                                                            QVariant* details) const;
     //! Value 0, or on a log value axis the range bound nearer zero (the 4j baseline).
     [[nodiscard]] double dataSpaceBaseline() const;
+    //! The value the stems of an impulse graph stand on, when that is a fixed value: nullopt when no
+    //! visible component draws impulses, and on a log value axis, where the baseline is the range
+    //! bound the stem reaches rather than a data value.
+    [[nodiscard]] std::optional<double> impulseBaseline() const;
     //! A fill edge: the value itself, or on a log axis the bound on its side of zero.
     [[nodiscard]] double dataSpaceFillValue(double value) const;
     //! Whether the system's area is an axis rect, whose colour scale colour values can join.
