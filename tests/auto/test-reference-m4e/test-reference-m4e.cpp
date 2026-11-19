@@ -605,7 +605,6 @@ QImage userSystemMultiGraphScene()
             graph->setComponentVisible(2, false);
             graph->setComponentVisible(3, false);
             graph->setComponentFill(0, 0.0, QColor(40, 110, 200, 70));
-            graph->setComponentFillBetween(1, 0, QColor(220, 160, 60, 70));
             graph->setComponentErrorBars(1, 2, 3, 6.0);
             graph->setColorValues(std::vector<double> { 0.0, 0.2, 0.4, 0.6, 0.8, 1.0 });
             graph->setName(QStringLiteral("multi"));
@@ -666,8 +665,6 @@ QImage userSystemSkewScene()
             auto* upper = key->axisRect()->add<QCPGraph>(key, value).get();
             upper->setData(keys, QVector<double> { 3, 3.5, 3, 4, 3.5, 4.5 });
             upper->setPen(QPen(QColor(180, 120, 40), 2));
-            upper->setBrush(QColor(220, 160, 60, 70));
-            upper->setComponentFillToGraph(0, lower, 0);
 
             std::vector<double> curveKeys, curveValues;
             for (int i = 0; i <= 24; ++i)

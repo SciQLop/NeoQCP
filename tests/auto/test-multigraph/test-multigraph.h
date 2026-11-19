@@ -84,18 +84,11 @@ private slots:
     void legendCollapsedFitsExpanderMarker();
     void legendOneComponentHasNoExpander();
     void legendIconDrawsScatterMarkers();
-    void legendIconOfABandIsAFilledSwatch();
     void legendIconDrawsTheLineOverTheSwatch();
-    void collapsedLegendRowShowsTheBandSwatch();
     void legendCollapsedFitsBusyIndicator();
 
     // Fills
-    void fillRejectsBadColumns();
-    void fillBeforeDataIsKept();
-    void fillIsDroppedWhenItsColumnDisappears();
     void fillDefaultBrushIsTheOwnerColourAtQuarterAlpha();
-    void fillReplacesAndClears();
-    void fillValidatesAgainstTheStagedSource();
     void fillToZeroColoursBelowTheCurveOnly();
     void hiddenEdgeLinesKeepTheirFill();
     void anAlmostTransparentFillStillPaints();
@@ -104,10 +97,8 @@ private slots:
     void fillBreaksAtAKeyGapPastTheFirstRow();
     void fillOnALogAxisClampsAZeroBaseline();
     void bandEdgeAtZeroOnALogAxisReachesTheEdge();
-    void bandEdgeAtZeroOnALogAxisIsClampedLikeABaseline();
     void fillsFollowTheViewOnTheGpu();
     void bandEdgeAtZeroOnALogAxisStaysPastTheEdgeUnderAGpuPan();
-    void defaultFillFollowsTheOwnerColourOnTheGpu();
     void autoScaleIncludesHiddenLineBandEdges();
     void fillFollowsADownsampledLine();
     void settingAFillRepaintsTheLayer();
@@ -122,26 +113,13 @@ private slots:
     void aFillToAnotherGraphFillsTheBand();
     void aFillToAnotherGraphCropsAndInterpolates();
     void noOverlapNoBand();
-    void theFillDropsWhenThePartnerDies();
-    void aDeadPartnersFillIsGone();
-    void theFillDropsWhenThePartnerLosesTheComponent();
     void aFillToAGraphOfAnotherSystemIsAMisuse();
     void aFillToAGraphOnAnotherValueAxis();
     void theBandFollowsTheOtherValueAxis();
     void aPartnerMovedToAnotherSystemDrawsNoBand();
-    void aSelectedRangeSplitsTheBand();
-    void aDenseFillSelectionUsesItsKeyRange();
-    void aSteppedFillSelectionUsesItsKeyRange();
-    void theFillDoesNotReturnWhenThePartnerComponentComesBack();
     void aPartnerDataChangeRedrawsTheBand();
     void aPartnerOnAnotherLayerRedrawsTheBand();
-    void mutualFillsDoNotRecurse();
-    void clearingAGraphFillDropsThePartnerDependency();
-    void retargetingAGraphFillDropsTheOldPartnerDependency();
     void theBandStaysOnTheGpuRibbon();
-    void fillToGraphSeriesCropsUnequalGrids();
-    void fillToGraphSeriesNoOverlap();
-    void fillToGraphSeriesNaNBreaksRuns();
     void fillsDrawUnderErrorBarsUnderLines();
     void fillsDrawUnderLinesOnTheGpu();
 
@@ -170,7 +148,6 @@ private slots:
     void legendIconOfErrorBarsHasACapAtEachEnd();
     void legendIconOfErrorBarsUsesTheBarsPen();
     void legendIconHasOneSegmentPerComponent();
-    void legendSwatchIsTwelvePixelsTall();
     void errorBarsAreOneCommand();
     void verticalKeyErrorBarsRunAlongTheValue();
     void clickSelectionRedrawsTheComponent();
@@ -268,11 +245,8 @@ private slots:
     // R2: the legend row is a plottable's row
     void itemWithPlottableFindsAGraphRow();
     void aGraphRowCastsToAPlottableRow();
-    // R3: the brush colours a fill to another graph
-    void setBrushBeforeAFillToGraphKeepsTheBand();
-    void setBrushAfterAFillToGraphRecoloursIt();
-    void setBrushKeepsAFillsConstantAndColumnTargets();
-    void aFillToGraphTakesTheGraphBrush();
+    // R3: the brush no longer colours a fill between two lines
+    void setBrushKeepsAFillsConstantTarget();
     // R4: a negative log range closes toward zero
     void aNegativeLogRangeFillsToTheUpperBound();
     void aNegativeLogRangeImpulsesStartAtTheUpperBound();
@@ -283,9 +257,6 @@ private slots:
     void anAdditiveClickOnASelectedRowDeselectsIt();
     void aRectSelectionHonoursStSingleData();
     void makingAGraphUnselectableClearsEveryComponent();
-    void setBrushNoBrushRemovesTheBandToAnotherGraph();
-    void aPartnerMovedToAnotherRectDropsTheBandWithoutACrash();
-    void aPartnerTakenFromThePlotDropsTheFill();
     void theDataAccessorsAnswerZeroOutsideTheData();
     void aBracketOnASelectionBeyondTheDataDoesNotReadPastIt();
     void manySelectedRangesMarkEachRow();
@@ -297,6 +268,5 @@ private slots:
 private:
     // The staged source stays staged, as while its pipeline prepares it: exports commit ready ones.
     static void stillPreparing(QCPGraph* mg);
-    static bool marksOwner(QCPGraph* partner, QCPGraph* owner);
     QCustomPlot* mPlot = nullptr;
 };

@@ -1,8 +1,10 @@
 #include "graph-fill.h"
 #include "../axis/axis.h"
+#include "../coordinate-system.h"
 #include "../handle.h"
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../painting/draw-context.h"
+#include "plottable-graph.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -119,53 +121,26 @@ void appendStrip(std::span<const StripPoint> rows, bool keyIsVertical,
             quad(out, keyIsVertical, rows[i - 1], rows[i], rgba);
 }
 
-std::vector<StripPoint> fillToGraphRows(std::span<const SeriesRow> owner,
-                                        std::span<const SeriesRow> partner)
+bool canFillTo(const QCPGraph& owner, const QCPGraph& partner)
 {
-    std::vector<StripPoint> rows;
-    if (owner.empty() || partner.empty())
-        return rows;
-    const double lower = std::max(owner.front().key, partner.front().key);
-    const double upper = std::min(owner.back().key, partner.back().key);
-    if (!(upper > lower))
-        return rows;
+    const QCPCoordinateSystem* system = owner.system().get();
+    if (&partner == &owner || !system)
+        return false;
+    return partner.system().get() == system || fillsAcrossValueAxes(owner, partner);
+}
 
-    const auto partnerAt = [&partner](double key)
-    {
-        const double nan = std::numeric_limits<double>::quiet_NaN();
-        const auto it = std::lower_bound(
-            partner.begin(), partner.end(), key,
-            [](const SeriesRow& row, double at) { return row.key < at; });
-        if (it != partner.end() && it->key == key)
-            return std::pair<double, bool> { it->value,
-                                             it->breakBefore || !std::isfinite(it->value) };
-        if (it == partner.begin() || it == partner.end())
-            return std::pair<double, bool> { nan, true };
-        const SeriesRow& before = *(it - 1);
-        const SeriesRow& after = *it;
-        if (!std::isfinite(before.value) || !std::isfinite(after.value) || after.breakBefore)
-            return std::pair<double, bool> { nan, true };
-        const double span = after.key - before.key;
-        if (span <= 0.0)
-            return std::pair<double, bool> { after.value, false };
-        const double t = (key - before.key) / span;
-        return std::pair<double, bool> { before.value + t * (after.value - before.value), false };
-    };
-
-    bool pendingBreak = false;
-    for (const SeriesRow& row : owner)
-    {
-        if (row.key < lower)
-            continue;
-        if (row.key > upper)
-            break;
-        const auto [partnerValue, partnerBreak] = partnerAt(row.key);
-        const bool broken = pendingBreak || row.breakBefore || partnerBreak
-            || !std::isfinite(row.value) || !std::isfinite(partnerValue);
-        rows.push_back({ row.key, row.value, partnerValue, broken, row.row });
-        pendingBreak = !std::isfinite(row.value) || !std::isfinite(partnerValue);
-    }
-    return rows;
+bool fillsAcrossValueAxes(const QCPGraph& owner, const QCPGraph& partner)
+{
+    const QCPCoordinateSystem* system = owner.system().get();
+    const QCPCoordinateSystem* partnerSystem = partner.system().get();
+    QCPAxis* key = owner.keyAxis().get();
+    QCPAxis* value = owner.valueAxis().get();
+    QCPAxis* partnerValue = partner.valueAxis().get();
+    // The projections exist only on a cartesian frame; one key axis lives in one area. A graph
+    // whose axes lie in two areas keeps them but has no system: it draws nowhere.
+    return system && partnerSystem && partnerSystem != system && key && value
+        && partner.keyAxis().get() == key && partnerValue && partnerValue != value
+        && partnerValue->orientation() == value->orientation();
 }
 
 namespace

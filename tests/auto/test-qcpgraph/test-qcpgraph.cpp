@@ -123,29 +123,6 @@ void TestQCPGraph::dataManipulation()
     QCOMPARE(mGraph->dataMainValue(i), double(i));
 }
 
-void TestQCPGraph::channelFill()
-{
-  QCPGraph *otherGraph = mPlot->addGraph();
-
-  mGraph->setBrush(Qt::black);
-  QVERIFY(mGraph->setComponentFillToGraph(0, otherGraph, 0));
-  mPlot->replot();
-
-  mGraph->setData(QVector<double>()<<1<<2<<3<<4, QVector<double>()<<4<<2<<2.5<<6);
-  mPlot->replot();
-
-  otherGraph->setData(QVector<double>()<<-2<<-1.5<<-1<<-0.5, QVector<double>()<<1<<1.2<<1.3<<1.4);
-  mPlot->replot();
-
-  mGraph->setData(QVector<double>(), QVector<double>());
-  mPlot->replot();
-
-  QVERIFY(mPlot->removeGraph(otherGraph));
-  // 2.x reset channelFillGraph to null: the fill is gone.
-  QVERIFY(!mGraph->componentFill(0));
-  mPlot->replot();
-}
-
 namespace
 {
 int gDebugMessages = 0;

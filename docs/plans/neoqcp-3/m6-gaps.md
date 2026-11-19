@@ -79,6 +79,8 @@ Counts are `grep -o` hits on the 2026-11-14 tree (`src/`, `tests/`, `examples/` 
 
 1. **Fill between two lines.** Chosen: `QCPFillBetween` is the only one, and the graph's component fills between lines
    are deleted. Alternative: keep `setComponentFillBetween` beside the new plottable.
+   **Done 2026-11-19**; `QCPAxisRect::fillBetween` fills between two lines or two components, and the graph's
+   fills between lines are gone. `setComponentFill(column, value)` stays.
 2. **Scales.** Chosen: a `QCPScale` value type replaces the `ScaleType` enum everywhere. Alternative: keep the enum and
    add `stSymlog` with a threshold setter.
 3. **Scale and ticker.** Chosen: `setScale` also installs the scale's default ticker; a later `setTicker` wins.

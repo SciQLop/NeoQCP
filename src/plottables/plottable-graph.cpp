@@ -123,21 +123,7 @@ quint64 QCPGraph::dependencyRevision() const
 {
     // B4: on the data-space branch the recording reads the system's key window and its baseline,
     // so a mapping change has to make it stale even though no data or style moved.
-    quint64 revision = drawsInDataSpace() ? qHashMulti(0, mRevision, mSystem->revision())
-                                          : mRevision;
-    // B8: a fill to another graph reads that graph's data and system. Its revision moves on both,
-    // so a partner data change or a partner system move makes this recording stale.
-    // Across value axes the band is the partner's pixels on this graph's value axis: it moves with
-    // either value axis, so both systems' revisions count.
-    for (const Fill& fill : mFills)
-        if (const auto* target = std::get_if<FillToGraph>(&fill.target))
-        {
-            const QCPGraph* partner = target->graph.data();
-            revision = qHashMulti(revision, partner ? partner->mRevision : 0);
-            if (partner && fillsAcrossValueAxes(*partner))
-                revision = qHashMulti(revision, mSystem->revision(), partner->mSystem->revision());
-        }
-    return revision;
+    return drawsInDataSpace() ? qHashMulti(0, mRevision, mSystem->revision()) : mRevision;
 }
 
 void QCPGraph::followAxes()
@@ -889,43 +875,7 @@ void QCPGraph::syncComponentCount(const QCPMultiDataSource* source)
 
 void QCPGraph::update()
 {
-    pruneLostPartnerFills();
     QCPLine::update();
-}
-
-bool QCPGraph::partnerDied(const Fill& fill)
-{
-    const auto* target = std::get_if<FillToGraph>(&fill.target);
-    return target && !target->graph;
-}
-
-// M1: a partner that lost the component is not a temporary no-band case: the fill is gone for good,
-// or a later, wider source would revive a band over unrelated data. So is a partner that left this
-// graph's plot or frame: setComponentFillToGraph() would refuse it now. A graph that is itself off
-// any frame (taken, or between two areas) judges nothing until it has one again.
-void QCPGraph::pruneLostPartnerFills()
-{
-    const auto lost = [this](const Fill& fill)
-    {
-        if (partnerDied(fill))
-            return true;
-        const auto* target = std::get_if<FillToGraph>(&fill.target);
-        if (!target)
-            return false;
-        const QCPGraph* partner = target->graph.data();
-        if (mSystem && (partner->mParentPlot != mParentPlot || !canFillTo(*partner)))
-            return true;
-        return partner->mDataSource
-            && target->component >= partner->mDataSource->columnCount();
-    };
-    QVector<Fill> dropped;
-    for (const Fill& fill : mFills)
-        if (lost(fill))
-            dropped.append(fill);
-    if (dropped.isEmpty())
-        return;
-    mFills.erase(std::remove_if(mFills.begin(), mFills.end(), lost), mFills.end());
-    releasePartnerDependencies(dropped);
 }
 
 // A decoration pointing at a column that no longer exists is dropped for good: a later, wider
@@ -933,16 +883,8 @@ void QCPGraph::pruneLostPartnerFills()
 void QCPGraph::dropDecorationsBeyond(int columnCount)
 {
     const auto outside = [columnCount](const Fill& e)
-    {
-        const auto* col = std::get_if<int>(&e.target);
-        return e.owner >= columnCount || (col && *col >= columnCount);
-    };
-    QVector<Fill> droppedFills;
-    for (const Fill& fill : mFills)
-        if (outside(fill))
-            droppedFills.append(fill);
+    { return e.owner >= columnCount; };
     mFills.erase(std::remove_if(mFills.begin(), mFills.end(), outside), mFills.end());
-    releasePartnerDependencies(droppedFills);
     const auto barsOutside = [columnCount](const ErrorBars& e)
     { return std::max({ e.value, e.lower, e.upper }) >= columnCount; };
     QVector<ErrorBars> dropped;
@@ -1000,13 +942,7 @@ void QCPGraph::decorationsChanged()
 
 bool QCPGraph::setFill(Fill fill)
 {
-    const auto* col = std::get_if<int>(&fill.target);
-    if (!isValidColumn(fill.owner) || (col && (!isValidColumn(*col) || *col == fill.owner)))
-        return false;
-    const auto* toGraph = std::get_if<FillToGraph>(&fill.target);
-    if (toGraph
-        && (!toGraph->graph || !canFillTo(*toGraph->graph)
-            || !toGraph->graph->isValidColumn(toGraph->component)))
+    if (!isValidColumn(fill.owner))
         return false;
     clearComponentFill(fill.owner);
     mFills.append(std::move(fill));
@@ -1017,49 +953,6 @@ bool QCPGraph::setFill(Fill fill)
 bool QCPGraph::setComponentFill(int owner, double value, const QBrush& brush)
 {
     return setFill({owner, value, brush});
-}
-
-bool QCPGraph::setComponentFillBetween(int owner, int target, const QBrush& brush)
-{
-    return setFill({owner, target, brush});
-}
-
-bool QCPGraph::canFillTo(const QCPGraph& partner) const
-{
-    if (&partner == this || !mSystem)
-        return false;
-    return partner.mSystem == mSystem || fillsAcrossValueAxes(partner);
-}
-
-bool QCPGraph::fillsAcrossValueAxes(const QCPGraph& partner) const
-{
-    // The projections exist only on a cartesian frame; one key axis lives in one area. A graph
-    // whose axes lie in two areas keeps them but has no system: it draws nowhere.
-    return mSystem && partner.mSystem && partner.mSystem != mSystem && keyAxisRaw() && valueAxisRaw()
-        && partner.keyAxisRaw() == keyAxisRaw()
-        && partner.valueAxisRaw() && partner.valueAxisRaw() != valueAxisRaw()
-        && partner.valueAxisRaw()->orientation() == valueAxisRaw()->orientation();
-}
-
-bool QCPGraph::setComponentFillToGraph(int owner, QCPGraph* other, int otherComponent,
-                                            const QBrush& brush)
-{
-    QCP_CHECK_OR_RETURN(other, "a fill to another graph needs a graph", false);
-    QCP_CHECK_OR_RETURN(other != this, "a fill to another graph needs another graph", false);
-    QCP_CHECK_OR_RETURN(canFillTo(*other),
-                        "a fill to another graph needs both graphs on one system, or on one key "
-                        "axis of a cartesian frame",
-                        false);
-    QCP_CHECK_OR_RETURN(other->isValidColumn(otherComponent),
-                        "the partner component does not exist", false);
-    if (!setFill({owner, FillToGraph { other, otherComponent }, brush}))
-        return false;
-    // B8: the partner's data change repaints this graph wherever its own layer is, and a deleted
-    // partner leaves its QPointer null; mark this graph so the recording drops the band.
-    other->addDependent(this);
-    connect(other, &QObject::destroyed, this, &QCPGraph::partnerGone,
-            Qt::UniqueConnection);
-    return true;
 }
 
 void QCPGraph::setComponentFillBrush(int owner, const QBrush& brush)
@@ -1075,27 +968,18 @@ void QCPGraph::setComponentFillBrush(int owner, const QBrush& brush)
 
 void QCPGraph::clearComponentFill(int owner)
 {
-    QVector<Fill> removed;
-    for (const Fill& fill : mFills)
-        if (fill.owner == owner)
-            removed.append(fill);
     const auto before = mFills.size();
     mFills.erase(std::remove_if(mFills.begin(), mFills.end(),
                                 [owner](const Fill& e) { return e.owner == owner; }),
                  mFills.end());
     if (mFills.size() != before)
-    {
-        releasePartnerDependencies(removed);
         decorationsChanged();
-    }
 }
 
-// A fill whose partner died stays in mFills until the next prune, but it is gone (2.x reset
-// channelFillGraph()).
 std::optional<QCPGraph::Fill> QCPGraph::componentFill(int owner) const
 {
     for (const auto& e : mFills)
-        if (e.owner == owner && !partnerDied(e))
+        if (e.owner == owner)
             return e;
     return std::nullopt;
 }
@@ -1104,11 +988,8 @@ QBrush QCPGraph::effectiveFillBrush(const Fill& fill) const
 {
     if (fill.brush.style() != Qt::NoBrush)
         return fill.brush;
-    // 2.x filled the channel to another graph with the graph's brush.
-    if (std::holds_alternative<FillToGraph>(fill.target) && mBrush.style() != Qt::NoBrush)
-        return mBrush;
-    const QColor c = fill.owner < mComponents.size() ? mComponents[fill.owner].pen.color()
-                                                     : QColor(Qt::gray);
+    const QColor c
+        = fill.owner < mComponents.size() ? mComponents[fill.owner].pen.color() : QColor(Qt::gray);
     return QBrush(QColor(c.red(), c.green(), c.blue(), 64));
 }
 
@@ -1123,36 +1004,6 @@ QBrush QCPGraph::fillRunBrush(const Fill& fill, bool selected) const
         ? mComponents[fill.owner].selectedPen.color()
         : QColor(Qt::gray);
     return QBrush(QColor(base.red(), base.green(), base.blue(), unselected.color().alpha()));
-}
-
-void QCPGraph::partnerGone()
-{
-    decorationsChanged();
-}
-
-void QCPGraph::releasePartnerDependencies(const QVector<Fill>& removed)
-{
-    QVector<QCPGraph*> candidates;
-    for (const Fill& fill : removed)
-    {
-        if (const auto* target = std::get_if<FillToGraph>(&fill.target))
-            if (target->graph && !candidates.contains(target->graph.data()))
-                candidates.append(target->graph.data());
-    }
-    for (QCPGraph* partner : candidates)
-    {
-        const bool stillUsed = std::any_of(
-            mFills.begin(), mFills.end(),
-            [partner](const Fill& fill)
-            {
-                const auto* target = std::get_if<FillToGraph>(&fill.target);
-                return target && target->graph.data() == partner;
-            });
-        if (stillUsed)
-            continue;
-        partner->removeDependent(this);
-        QObject::disconnect(partner, &QObject::destroyed, this, &QCPGraph::partnerGone);
-    }
 }
 
 bool QCPGraph::setComponentErrorBars(int value, int lower, int upper, double capWidthPx,
@@ -2449,24 +2300,12 @@ void QCPGraph::recordSelectionDecoration(QCPDrawContext& context) const
 
 bool QCPGraph::fillDrawable(const Fill& fill, int columnCount) const
 {
-    const auto shown = [&](int column) {
+    const auto shown = [&](int column)
+    {
         return column >= 0 && column < columnCount && column < mComponents.size()
             && mComponents[column].visible;
     };
-    if (!shown(fill.owner) || mComponents[fill.owner].lineStyle == lsImpulse)
-        return false;
-    if (const auto* target = std::get_if<int>(&fill.target))
-        return shown(*target);
-    if (const auto* target = std::get_if<FillToGraph>(&fill.target))
-    {
-        const QCPGraph* partner = target->graph.data();
-        if (!partner || !canFillTo(*partner))
-            return false;
-        return partner->mDataSource
-            && target->component >= 0
-            && target->component < partner->mDataSource->columnCount();
-    }
-    return true;
+    return shown(fill.owner) && mComponents[fill.owner].lineStyle != lsImpulse;
 }
 
 qcp::fill::Step QCPGraph::ownerStep(const QCPGraphComponent& owner)
@@ -2479,24 +2318,19 @@ qcp::fill::Step QCPGraph::ownerStep(const QCPGraphComponent& owner)
     }
 }
 
-std::vector<qcp::fill::StripPoint> QCPGraph::fillRows(const Fill& fill,
-                                                           const QCPMultiDataSource& ds,
-                                                           int begin, int end) const
+std::vector<qcp::fill::StripPoint>
+QCPGraph::fillRows(const Fill& fill, const QCPMultiDataSource& ds, int begin, int end) const
 {
     const QCPScale keyScale = shownKeyScale();
     const auto gaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace(), keyScale);
-    const auto* targetColumn = std::get_if<int>(&fill.target);
     const auto edge = [this](double value)
-    {
-        return drawsInDataSpace() ? dataSpaceFillValue(value) : fillValue(*valueAxisRaw(), value);
-    };
+    { return drawsInDataSpace() ? dataSpaceFillValue(value) : fillValue(*valueAxisRaw(), value); };
     Q_ASSERT(gaps.size() == std::max(0, end - begin)); // gapsBefore() holds one entry per row
-    const double constant = targetColumn ? 0.0 : edge(std::get<double>(fill.target));
+    const double constant = edge(fill.target);
     std::vector<qcp::fill::StripPoint> rows;
     rows.reserve(std::max(0, end - begin));
     for (int i = begin; i < end; ++i)
-        rows.push_back({ ds.keyAt(i), edge(ds.valueAt(fill.owner, i)),
-                         targetColumn ? edge(ds.valueAt(*targetColumn, i)) : constant,
+        rows.push_back({ ds.keyAt(i), edge(ds.valueAt(fill.owner, i)), constant,
                          gaps[i - begin] != 0, i });
     return rows;
 }
@@ -2522,63 +2356,6 @@ std::vector<qcp::fill::StripPoint> QCPGraph::shapeFillRows(
     const QCPScale keyScale = shownKeyScale();
     return qcp::fill::steppedOnScreen(std::move(rows), ownerStep(mComponents[fill.owner]),
                                       keyScale);
-}
-
-std::vector<qcp::fill::StripPoint> QCPGraph::fillToGraphRows(
-    const Fill& fill, const QCPMultiDataSource& ds, int begin, int end) const
-{
-    const auto* target = std::get_if<FillToGraph>(&fill.target);
-    QCPGraph* partner = target ? target->graph.data() : nullptr;
-    if (!partner || !canFillTo(*partner))
-        return {};
-    QCPMultiDataSource* partnerSource = partner->mDataSource.get();
-    if (!partnerSource || target->component < 0
-        || target->component >= partnerSource->columnCount())
-        return {};
-
-    std::vector<qcp::fill::SeriesRow> ownerRows;
-    ownerRows.reserve(std::size_t(std::max(0, end - begin)));
-    const QCPScale partnerScale = partner->shownKeyScale();
-    const QCPScale keyScale = shownKeyScale();
-    const auto ownerGaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace(), keyScale);
-    for (int i = begin; i < end; ++i)
-        ownerRows.push_back({ ds.keyAt(i), ds.valueAt(fill.owner, i),
-                              ownerGaps[i - begin] != 0, i });
-    if (ownerRows.size() < 2)
-        return {};
-
-    // The partner is cropped to the owner's key span, with one row on each side for the
-    // interpolation at the two ends.
-    const double lower = ownerRows.front().key;
-    const double upper = ownerRows.back().key;
-    const int partnerBegin = std::max(0, partnerSource->findBegin(lower) - 1);
-    const int partnerEnd = std::min(partnerSource->size(), partnerSource->findEnd(upper) + 1);
-    const auto partnerGaps = partnerSource->gapsBefore(partnerBegin, partnerEnd,
-                                                       /*cacheGaps=*/!drawsInDataSpace(),
-                                                       partnerScale);
-    // Across value axes the partner's value goes through its pixel onto this graph's value axis,
-    // before the crop and the interpolation: the band is drawn in this graph's frame.
-    const bool across = fillsAcrossValueAxes(*partner);
-    const auto onThisAxis = [&](double value)
-    { return across ? valueAxisRaw()->pixelToCoord(partner->valueAxisRaw()->coordToPixel(value)) : value; };
-    std::vector<qcp::fill::SeriesRow> partnerRows;
-    partnerRows.reserve(std::size_t(std::max(0, partnerEnd - partnerBegin)));
-    for (int i = partnerBegin; i < partnerEnd; ++i)
-        partnerRows.push_back({ partnerSource->keyAt(i),
-                                onThisAxis(partnerSource->valueAt(target->component, i)),
-                                partnerGaps[i - partnerBegin] != 0, i });
-
-    std::vector<qcp::fill::StripPoint> rows
-        = qcp::fill::fillToGraphRows(ownerRows, partnerRows);
-    const bool dataSpace = drawsInDataSpace();
-    const auto edge = [this, dataSpace](double value)
-    { return dataSpace ? dataSpaceFillValue(value) : fillValue(*valueAxisRaw(), value); };
-    for (qcp::fill::StripPoint& row : rows)
-    {
-        row.a = edge(row.a);
-        row.b = edge(row.b);
-    }
-    return rows;
 }
 
 std::vector<qcp::fill::StripPoint> QCPGraph::binnedWhenDense(
@@ -2648,10 +2425,7 @@ void QCPGraph::recordFills(QCPDrawContext& context, const QCPMultiDataSource& ds
     {
         if (!fillDrawable(fill, ds.columnCount()))
             continue;
-        const std::vector<qcp::fill::StripPoint> raw
-            = std::holds_alternative<FillToGraph>(fill.target)
-                ? fillToGraphRows(fill, ds, begin, end)
-                : fillRows(fill, ds, begin, end);
+        const std::vector<qcp::fill::StripPoint> raw = fillRows(fill, ds, begin, end);
         if (raw.empty())
             continue;
 

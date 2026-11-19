@@ -834,13 +834,12 @@ void TestCoordinateSystem::relationshipsAcrossAreasAreRefused()
                                                rect->axis(QCPAxis::atLeft) };
     };
 
-    // A channel fill spans one frame: two areas are refused.
+    // A fill spans one frame: two areas are refused.
     auto [leftKey, leftValue] = pairOf(left);
     auto [rightKey, rightValue] = pairOf(right);
     auto* here = leftKey->axisRect()->add<QCPGraph>(leftKey, leftValue).get();
     auto* there = rightKey->axisRect()->add<QCPGraph>(rightKey, rightValue).get();
-    here->setComponentFillToGraph(0, there, 0);
-    QVERIFY(!here->componentFill(0));
+    QVERIFY(!left->fillBetween(QCPHandle<QCPGraph>(here), QCPHandle<QCPGraph>(there)));
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear();
 
@@ -1014,10 +1013,11 @@ void TestCoordinateSystem::dualValueAxesKeepTheirRelationships()
     auto* there = plot.xAxis->axisRect()->add<QCPGraph>(plot.xAxis, right).get();
     here->setData(QVector<double> { 3.5, 4.5 }, QVector<double> { 0.2, 0.2 });
     there->setData(QVector<double> { 3.5, 4.5 }, QVector<double> { 0.8, 0.8 });
-    QVERIFY(here->setComponentFillToGraph(0, there, 0));
-    const auto fill = here->componentFill(0);
+    const QCPHandle<QCPFillBetween> fill
+        = plot.axisRect()->fillBetween(QCPHandle<QCPGraph>(here), QCPHandle<QCPGraph>(there));
     QVERIFY(fill);
-    QCOMPARE(std::get<QCPGraph::FillToGraph>(fill->target).graph.data(), there);
+    QCOMPARE(fill->firstLine(), here);
+    QCOMPARE(fill->secondLine(), there);
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 
     // Both really paint: the two bar colours beside each other at a bar's key.

@@ -13,6 +13,7 @@
 
 #include "../items/item-ellipse.h"
 #include "../items/item-text.h"
+#include "../plottables/graph-fill.h"
 #include "../plottables/plottable-graph.h"
 #include "../plottables/plottable-fillbetween.h"
 #include "../plottables/plottable-colormap2.h"
@@ -61,7 +62,7 @@ inline QCPHandle<QCPFillBetween> QCPAxisRect::fillBetween(const QCPHandle<QCPGra
                         "a fill of a line with itself needs two components of it", { });
     QCP_CHECK_OR_RETURN(first->keyAxis().get() == second->keyAxis().get(),
                         "the two lines of a fill must share the key axis", { });
-    QCP_CHECK_OR_RETURN(first.get() == second.get() || first->canFillTo(*second),
+    QCP_CHECK_OR_RETURN(first.get() == second.get() || qcp::fill::canFillTo(*first, *second),
                         "the two lines of a fill must fill to each other", { });
     const QList<QCPAxis*> own = axesRaw();
     const auto onThisRect

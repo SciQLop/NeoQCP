@@ -204,11 +204,11 @@ void MainWindow::setupSincScatterDemo(QCustomPlot *customPlot)
   pen.setColor(QColor(180,180,180));
   customPlot->graph(0)->setName("Confidence Band 68%");
   customPlot->graph(0)->setPen(pen);
-  customPlot->graph(0)->setBrush(QBrush(QColor(255,50,30,20)));
   customPlot->add<QCPGraph>();
   customPlot->legend->removeItem(customPlot->legend->itemCount()-1); // don't show two confidence band graphs in legend
   customPlot->graph(1)->setPen(pen);
-  customPlot->graph(0)->setComponentFillToGraph(0, customPlot->graph(1), 0);
+  customPlot->axisRect()->fillBetween(customPlot->graph(0), customPlot->graph(1),
+                                     { .brush = QBrush(QColor(255, 50, 30, 20)) });
   // add theory curve graph:
   customPlot->add<QCPGraph>();
   pen.setStyle(Qt::DashLine);
@@ -486,13 +486,12 @@ void MainWindow::setupTextureBrushDemo(QCustomPlot *customPlot)
   redDotPen.setColor(QColor(170, 100, 100, 180));
   redDotPen.setWidthF(2);
   customPlot->graph(0)->setPen(redDotPen);
-  customPlot->graph(0)->setBrush(QBrush(QPixmap("./balboa.jpg"))); // fill with texture of specified image
-  
   customPlot->add<QCPGraph>();
   customPlot->graph(1)->setPen(QPen(Qt::red));
   
-  // activate channel fill for graph 0 towards graph 1:
-  customPlot->graph(0)->setComponentFillToGraph(0, customPlot->graph(1), 0);
+  // fill the area between graph 0 and graph 1, with the texture of the specified image:
+  customPlot->axisRect()->fillBetween(customPlot->graph(0), customPlot->graph(1),
+                                     { .brush = QBrush(QPixmap("./balboa.jpg")) });
   
   // generate data:
   QVector<double> x(250);
@@ -1088,8 +1087,8 @@ void MainWindow::setupStyledDemo(QCustomPlot *customPlot)
   auto graph2 = customPlot->add<QCPGraph>();
   graph2->setData(x2, y2);
   graph2->setPen(Qt::NoPen);
-  graph2->setBrush(QColor(200, 200, 200, 20));
-  graph2->setComponentFillToGraph(0, graph1.get(), 0);
+  customPlot->axisRect()->fillBetween(graph2, graph1,
+                                      { .brush = QColor(200, 200, 200, 20) });
   
   auto bars1 = customPlot->add<QCPBars>();
   bars1->setWidth(9/(double)x3.size());
@@ -1222,8 +1221,8 @@ void MainWindow::setupAdvancedAxesDemo(QCustomPlot *customPlot)
   mainGraphGauss->setData(gaussKeys, gaussValues);
   mainGraphGauss->setPen(QPen(QColor("#8070B8"), 2));
   mainGraphGauss->setBrush(QColor(110, 170, 110, 30));
-  mainGraphCos->setComponentFillToGraph(0, mainGraphGauss.get(), 0);
-  mainGraphCos->setBrush(QColor(255, 161, 0, 50));
+  wideAxisRect->fillBetween(mainGraphCos, mainGraphGauss,
+                            { .brush = QColor(255, 161, 0, 50) });
   mainGraphGauss->valueAxis()->setRange(0, 1000);
   mainGraphGauss->rescaleKeyAxis();
   

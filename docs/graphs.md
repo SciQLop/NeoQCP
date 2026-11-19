@@ -75,25 +75,6 @@ On a logarithmic value axis, which has no 0, the fill goes to the range bound ne
 
 ![A spectrum filled down to zero](images/graphs-fill-under.png)
 
-## Fill between two graphs
-
-`setComponentFillToGraph(0, other, 0)` fills between this graph and `other`, with this graph's brush.
-The two zeros are the columns: a graph drawn from `setData(keys, values)` has one column, number 0.
-This is how you draw an error band: one graph for the upper edge, one for the lower edge, no pens.
-Both graphs must share their key axis. Their value axes may differ.
-
-```{literalinclude} snippets/graphs.cpp
-:start-after: // [graphs_channel_fill]
-:end-before: // [/graphs_channel_fill]
-:language: cpp
-:dedent:
-```
-
-![A mean curve inside a band](images/graphs-channel-fill.png)
-
-`removeFromLegend()` keeps the helper graph out of the legend.
-When both edges are columns of one graph, use `setComponentFillBetween()` instead, see below.
-
 ## Fill between two lines
 
 `fillBetween(first, second, options)` fills the area between two graphs you already have.
@@ -116,8 +97,22 @@ The first line's step style shapes both edges, and the colours swap where the st
 
 The fill goes just below the lower of its two lines in the layer, so the lines and their markers stay on top.
 It is not selectable: a click inside it reaches the lines, and the drag pans the plot.
-Pass `options.name` to put it in the legend.
+Pass `options.name` to name the row a fill takes in the legend; `removeFromLegend()` takes that row away.
 Calling `fillBetween(graph, graph, options)` with two different components of one graph fills between those two columns.
+
+This is how you draw an error band: one graph for the upper edge, one for the lower edge, both without pens.
+
+```{literalinclude} snippets/graphs.cpp
+:start-after: // [graphs_channel_fill]
+:end-before: // [/graphs_channel_fill]
+:language: cpp
+:dedent:
+```
+
+![A mean curve inside a band](images/graphs-channel-fill.png)
+
+`removeFromLegend()` keeps a helper graph out of the legend; the band above states no name and keeps
+no row of its own either, so the mean curve's row is the one legend row.
 
 ## Plot your own arrays
 
@@ -367,8 +362,8 @@ Before the first data, any column is accepted. A fill on a column that a later d
 
 ### Fill between two components
 
-`setComponentFillBetween(column, other)` fills between two components.
-This is how you draw a band around a model: one column for the model, one for each edge.
+`fillBetween(graph, graph, options)` with two components of one graph fills between them, in that
+graph's frame. This is how you draw a band around a model: one column for the model, one for each edge.
 
 ```{literalinclude} snippets/graphs.cpp
 :start-after: // [graphs_component_band]
@@ -379,18 +374,18 @@ This is how you draw a band around a model: one column for the model, one for ea
 
 ![A model inside a band](images/graphs-component-band.png)
 
-- The fill takes the brush, or the pen colour, of the first column.
-- Where the two edges cross, the fill crosses with them.
-- Both components must be visible for the fill to show.
+- The fill takes `options.brush`, and cuts itself at the exact crossing of the two columns.
+- Both columns must be visible for the fill to show.
 - `setComponentInLegend(column, false)` keeps the edges out of the legend. They are still drawn, and still count for `rescaleAxes()`. `legendComponents()` lists the components that have a row.
 
 Solid brushes are drawn on the GPU. Gradient and pattern brushes are painted with `QPainter`, which is slower.
 
 ### Fill to another graph
 
-`setComponentFillToGraph(column, other, otherColumn)` fills between a component of this graph and a component of another graph.
-The band is cropped to the keys the two graphs share, and the partner is interpolated onto this graph's keys.
-Both edges therefore have the same length, and the band stays on the GPU ribbon.
+`fillBetween(first, second, options)` fills between two graphs, each column named by
+`options.firstComponent` and `options.secondComponent`.
+Rows are the union of both graphs' keys over the key range they share, each graph interpolated at the
+other's keys, so the band is cropped to what both have and stays on the GPU ribbon.
 
 ```{literalinclude} snippets/graphs.cpp
 :start-after: // [graphs_fill_to_graph]
@@ -402,10 +397,9 @@ Both edges therefore have the same length, and the band stays on the GPU ribbon.
 ![A model filled to a coarser reference that stops early](images/graphs-fill-to-graph.png)
 
 - Both graphs must be on the same coordinate system, or share the key axis on the same cartesian area. Another system is a misuse at the call; if they diverge later, the band is not drawn.
-- The partner is held by a `QPointer`. The band disappears when the partner is deleted or loses the component, and the fill is removed so a later, wider source does not bring it back.
-- A change in the partner's data repaints the band, also when the partner is on another layer.
-- This graph's selection splits the band like its line: the selected run takes the selected pen colour.
-- - The partner may be on another value axis, if both graphs share the key axis and the area. The band follows both axes.
+- The fill holds both graphs weakly. A graph that is deleted leaves the fill drawing nothing, and it draws again only when `setLines()` names two live graphs.
+- A change in either graph's data repaints the band, also when that graph is on another layer.
+- The second graph may be on another value axis, if both graphs share the key axis and the area. The band follows both axes.
 - On a logarithmic value axis a fill to zero stops at the range bound nearer zero, as for the other component fills.
 
 ### Error bars

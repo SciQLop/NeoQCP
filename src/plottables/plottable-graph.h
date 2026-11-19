@@ -199,43 +199,24 @@ public:
             keys, values, static_cast<int>(keys.size()), columns, stride));
     }
 
-    struct FillToGraph
-    {
-        QPointer<QCPGraph> graph;
-        int component = 0;
-    };
     struct Fill {
         int owner = -1;
-        std::variant<double, int, FillToGraph> target; // a constant, another column, another graph
-        QBrush brush;                                  // Qt::NoBrush = owner pen colour at alpha 64
+        double target = 0; // the constant the fill reaches
+        QBrush brush;      // Qt::NoBrush = owner pen colour at alpha 64
     };
     //! Fills between a column and a constant. False (nothing changed) for an unknown column.
     bool setComponentFill(int owner, double value, const QBrush& brush = Qt::NoBrush);
-    //! Fills between two columns. One fill per owner: setting again replaces it.
-    bool setComponentFillBetween(int owner, int target, const QBrush& brush = Qt::NoBrush);
-    //! Fills between this column and a component of \a other. Both graphs share the system, or, on
-    //! a cartesian frame, the key axis with another value axis (2.x's channel between y and y2):
-    //! the partner's values then map onto this graph's value axis through pixels. Any other system
-    //! is a misuse. The partner is held by QPointer: the band drops when it or its component goes.
-    bool setComponentFillToGraph(int owner, QCPGraph* other, int otherComponent,
-                                 const QBrush& brush = Qt::NoBrush);
     void setComponentFillBrush(int owner, const QBrush& brush);
     void clearComponentFill(int owner);
     [[nodiscard]] std::optional<Fill> componentFill(int owner) const;
     //! Whether a decoration may name \a column: any column >= 0 before the first data, the
     //! data's columns after.
     [[nodiscard]] bool isValidColumn(int column) const;
-    //! The fill's own brush; for the default brush, the graph's brush on a fill to another graph
-    //! (2.x's channel), else the owner's pen colour at alpha 64.
+    //! The fill's own brush; for the default brush, the owner's pen colour at alpha 64.
     [[nodiscard]] QBrush effectiveFillBrush(const Fill& fill) const;
     //! The fill brush of a selected or unselected run; a selected run takes the user's decorator
     //! brush, or else the selected pen's colour at the fill's alpha.
     [[nodiscard]] QBrush fillRunBrush(const Fill& fill, bool selected) const;
-    //! Whether a fill may reach \a partner: the same system, or across value axes.
-    [[nodiscard]] bool canFillTo(const QCPGraph& partner) const;
-    //! 2.x's channel between y and y2: both cartesian, on one key axis (so one area), with another
-    //! value axis of the same orientation. The partner's values then map through pixels.
-    [[nodiscard]] bool fillsAcrossValueAxes(const QCPGraph& partner) const;
     //! The step shape of \a owner's line, which shapes both edges of a fill that line owns.
     [[nodiscard]] static qcp::fill::Step ownerStep(const QCPGraphComponent& owner);
 
@@ -461,9 +442,6 @@ protected:
     void markPendingReady();
     void onL1Ready(uint64_t generation);
     void syncComponentCount(const QCPMultiDataSource* source);
-    //! Drops FillToGraph entries whose partner is gone or no longer has the named component.
-    void pruneLostPartnerFills();
-    [[nodiscard]] static bool partnerDied(const Fill& fill);
     [[nodiscard]] QCPGraphComponent firstComponentStyle() const;
     [[nodiscard]] std::optional<QBrush> emptyGraphFillBrush() const;
     void drawLegendGlyph(QCPPainter* painter, const QCPGraphComponent& comp,
@@ -480,9 +458,6 @@ protected:
     [[nodiscard]] std::vector<qcp::fill::StripPoint> fillRows(const Fill& fill,
                                                               const QCPMultiDataSource& ds,
                                                               int begin, int end) const;
-    [[nodiscard]] std::vector<qcp::fill::StripPoint>
-    fillToGraphRows(const Fill& fill, const QCPMultiDataSource& ds, int begin,
-                    int end) const;
     [[nodiscard]] std::vector<qcp::fill::StripPoint>
     shapeFillRows(QCPDrawContext& context, const Fill& fill,
                   std::vector<qcp::fill::StripPoint> rows) const;
@@ -514,9 +489,6 @@ protected:
     [[nodiscard]] QCPScatterStyle selectedMarkerStyle(const QCPGraphComponent& comp) const;
     //! A decorator subclass's own decoration (the bracket), after the lines.
     void recordSelectionDecoration(QCPDrawContext& context) const;
-    void partnerGone();
-    //! Drops the dependency and destroyed connection of partners no remaining fill uses.
-    void releasePartnerDependencies(const QVector<Fill>& removed);
     [[nodiscard]] static double fillValue(const QCPAxis& valueAxis, double value);
     void recordFills(QCPDrawContext& context, const QCPMultiDataSource& ds, int begin,
                      int end) const;

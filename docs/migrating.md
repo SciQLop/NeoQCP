@@ -190,8 +190,10 @@ These patterns need a change:
 | `QCPMultiGraph` (a 3.0 preview class) | `QCPGraph`. The helper classes follow: `QCPGraphOps`, `QCPGraphPipeline`, `QCPGraphComponent`. |
 | `QCPGraph2` | `QCPGraph`. `setData()`, `viewData()` and `setDataSource()` keep their calls; the source is a `QCPSoAMultiDataSource`. |
 | `graph->data()`, the shared `QSharedPointer<QCPGraphDataContainer>` | Nothing holds the container any more. Write with `setData()`, `addData()`, `removeDataBefore()`, `removeDataAfter()` and `removeData(from, to)`. Read with `dataSource()`. Share data between graphs with one source and `setDataSource()`. |
-| `graph->setChannelFillGraph(other)` | `graph->setComponentFillToGraph(0, other, 0)`. The graphs must share the key axis; their value axes may differ. |
+| `graph->setChannelFillGraph(other)` | `graph->axisRect()->fillBetween(graph, other, { .brush = brush })`. The graphs must share the key axis; their value axes may differ. 2.x took the graph's brush, so pass it here. |
 | `tracer->setGraph(graph)` and `setLineGraph(graph, component)` | `tracer->setGraph(graph, component)`. `lineGraph()` is `graph()`. |
+| `graph->setComponentFillBetween(a, b, brush)` (a 3.0 preview) | `graph->axisRect()->fillBetween(graph, graph, { .brush = brush, .firstComponent = a, .secondComponent = b })`. |
+| `graph->setComponentFillToGraph(0, other, 0, brush)` (a 3.0 preview) | `graph->axisRect()->fillBetween(graph, other, { .brush = brush })`. |
 | `QCPGraph::LineStyle` | The same names: `QCPGraph::lsLine` and the others compile as before. |
 | A graph that drew with `QCPGraph2::setScatterColorValues()` | `setColorValues()` and `setGradient()`. |
 | `QCPGraph2::setScatterMaxPoints()` | Removed with the class. There is no replacement yet. |
@@ -205,8 +207,8 @@ Behaviour that changed:
 - **Hit details.** `selectTest()` hands a graph's hit back as a `QVariantMap` with `componentIndex` and `dataIndex`, not as a `QCPDataSelection`. `details.value<QCPDataSelection>()` gives an empty selection. Read the row with `qcp::hitDataIndex(details)`, which takes either form.
 - **Legend.** The row of a graph with one column shows the graph's name, unless you named the column yourself. A graph without data shows its pen next to its name.
 - **Logarithmic value axis.** A fill to a value the axis cannot place, and the baseline of impulses, go to the range bound nearer zero.
-- **Brushes.** `setBrush()` fills every column without a fill down to zero. A column that already has a fill keeps where it fills to (a constant, another column, another graph) and takes the new brush. `setBrush(Qt::NoBrush)` removes every fill, the ones to another graph too, as 2.x drew no channel without a brush. A later `setBrush()` fills to zero: call `setComponentFillToGraph()` again to get the band back.
-- **Fill partners.** A fill to another graph goes when that graph leaves the plot or its frame (taken, or moved to another axis rect), as it goes when that graph is deleted.
+- **Brushes.** `setBrush()` fills every column without a fill down to zero, and recolours the fills to a constant. A fill between two lines is a `QCPFillBetween` with its own brush: `setBrush()` on either graph leaves it alone.
+- **Fills between lines.** A fill between two lines or two components is a plottable of its own, made by `axisRect()->fillBetween()`. It stays when a line is deleted, drawing nothing until `setLines()` names live lines again.
 - **Removing points.** `removeData(from, to)` removes nothing when `from >= to`, as 2.x.
 - **Equal values.** `setPen()` with the pen the graph already has does not repaint.
 - **New virtual.** `QCPPlottable::assignSelection(const QCPDataSelection&)` is a new protected virtual, called when the selection is set. A plottable of your own that has a method of that name must rename it.

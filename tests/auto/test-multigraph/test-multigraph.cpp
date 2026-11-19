@@ -2095,36 +2095,6 @@ void TestMultiGraph::legendSelectTestSurvivesNullMultiGraph()
     QCOMPARE(details.toMap().value("componentIndex").toInt(), -1);
 }
 
-void TestMultiGraph::fillRejectsBadColumns()
-{
-    auto* mg = threeColumnGraph(mPlot);
-    QVERIFY(!mg->setComponentFillBetween(1, 1));
-    QVERIFY(!mg->setComponentFillBetween(0, 3));
-    QVERIFY(!mg->setComponentFillBetween(-1, 0));
-    QVERIFY(mg->setComponentFillBetween(1, 2));
-    QCOMPARE(std::get<int>(mg->componentFill(1)->target), 2);
-}
-
-void TestMultiGraph::fillBeforeDataIsKept()
-{
-    auto* mg = mPlot->add<QCPGraph>().get();
-    QVERIFY(mg->setComponentFillBetween(1, 2));
-    mg->setData(std::vector<double>{1, 2, 3},
-                std::vector<std::vector<double>>{{1, 2, 3}, {0, 1, 2}, {2, 3, 4}});
-    QVERIFY(mg->componentFill(1).has_value());
-}
-
-void TestMultiGraph::fillIsDroppedWhenItsColumnDisappears()
-{
-    auto* mg = threeColumnGraph(mPlot);
-    QVERIFY(mg->setComponentFillBetween(1, 2));
-    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{1, 2}, {0, 1}});
-    QVERIFY(!mg->componentFill(1).has_value());
-    mg->setData(std::vector<double>{1, 2},
-                std::vector<std::vector<double>>{{1, 2}, {0, 1}, {3, 4}});
-    QVERIFY(!mg->componentFill(1).has_value()); // shrinking is lossy
-}
-
 void TestMultiGraph::fillDefaultBrushIsTheOwnerColourAtQuarterAlpha()
 {
     auto* mg = threeColumnGraph(mPlot);
@@ -2133,30 +2103,6 @@ void TestMultiGraph::fillDefaultBrushIsTheOwnerColourAtQuarterAlpha()
     const QBrush b = mg->effectiveFillBrush(*mg->componentFill(0));
     QCOMPARE(b.color().rgb(), QColor(Qt::red).rgb());
     QCOMPARE(b.color().alpha(), 64);
-}
-
-void TestMultiGraph::fillReplacesAndClears()
-{
-    auto* mg = threeColumnGraph(mPlot);
-    mg->setComponentFill(0, 1.0);
-    mg->setComponentFillBetween(0, 2);
-    QCOMPARE(std::get<int>(mg->componentFill(0)->target), 2);
-    mg->clearComponentFill(0);
-    QVERIFY(!mg->componentFill(0).has_value());
-}
-
-void TestMultiGraph::fillValidatesAgainstTheStagedSource()
-{
-    using Source = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
-    const auto stage = [](QCPGraph* g, int columns) {
-        g->stagePendingSource(std::make_shared<Source>(
-            std::vector<double>{1, 2}, std::vector<std::vector<double>>(columns, {1, 2})));
-    };
-    auto* mg = threeColumnGraph(mPlot);
-    stage(mg, 2);
-    QVERIFY(!mg->setComponentFillBetween(0, 2));
-    stage(mg, 4);
-    QVERIFY(mg->setComponentFillBetween(0, 3));
 }
 
 static QImage renderOf(QCustomPlot* plot)
@@ -2238,7 +2184,9 @@ void TestMultiGraph::hiddenEdgeLinesKeepTheirFill()
     auto* mg = threeColumnGraph(mPlot);
     mg->setComponentLineStyle(1, QCPGraph::lsNone);
     mg->setComponentLineStyle(2, QCPGraph::lsNone);
-    mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
+    mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(mg), QCPHandle<QCPGraph>(mg),
+                                   { .brush = QBrush(Qt::red), .firstComponent = 1,
+                                     .secondComponent = 2 });
     mPlot->xAxis->setRange(1, 3);
     mPlot->yAxis->setRange(-1, 5);
     const QImage img = renderOf(mPlot);
@@ -2250,7 +2198,9 @@ void TestMultiGraph::hiddenEdgeLinesKeepTheirFill()
 void TestMultiGraph::hidingAnEdgeRemovesTheFillAndShowingBringsItBack()
 {
     auto* mg = threeColumnGraph(mPlot);
-    mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
+    mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(mg), QCPHandle<QCPGraph>(mg),
+                                   { .brush = QBrush(Qt::red), .firstComponent = 1,
+                                     .secondComponent = 2 });
     mPlot->xAxis->setRange(1, 3);
     mPlot->yAxis->setRange(-1, 5);
     renderOf(mPlot); // lays the axis rect out before the probe is placed
@@ -2314,7 +2264,9 @@ static QCPGraph* bandDownToZeroOnALogAxis(QCustomPlot* plot)
     const double nan = std::numeric_limits<double>::quiet_NaN();
     mg->setData(std::vector<double>{1, 2, 3, 4},
                 std::vector<std::vector<double>>{{0, 0, nan, 0}, {10, 10, 10, 10}});
-    mg->setComponentFillBetween(1, 0, QBrush(Qt::red));
+    plot->axisRect()->fillBetween(QCPHandle<QCPGraph>(mg), QCPHandle<QCPGraph>(mg),
+                                  { .brush = QBrush(Qt::red), .firstComponent = 1,
+                                    .secondComponent = 0 });
     plot->yAxis->setScale(QCPScale::log());
     plot->xAxis->setRange(1, 4);
     plot->yAxis->setRange(0.1, 100);
@@ -2331,25 +2283,14 @@ void TestMultiGraph::bandEdgeAtZeroOnALogAxisReachesTheEdge()
     QVERIFY(!isRedish(img.pixelColor(x, int(mPlot->yAxis->coordToPixel(50)))));
 }
 
-// Clamped like a constant baseline at 0, two axis lengths out: a GPU pan translates the cached
-// strip, and an edge only 200 px out (coordToPixel's own guess) can come into view.
-void TestMultiGraph::bandEdgeAtZeroOnALogAxisIsClampedLikeABaseline()
-{
-    auto* mg = bandDownToZeroOnALogAxis(mPlot);
-    renderOf(mPlot); // lays the axis rect out
-    const auto rows = mg->fillRows(*mg->componentFill(1), *mg->dataSource(), 0, 4);
-    QCOMPARE(rows[0].b, 0.1);
-    QCOMPARE(rows[1].b, 0.1);
-    QVERIFY(std::isnan(rows[2].b)); // a NaN row still breaks the strip
-    QCOMPARE(rows[3].b, 0.1);
-}
-
 void TestMultiGraph::fillsFollowTheViewOnTheGpu()
 {
     if (!showWithRhi(mPlot))
         QSKIP("no exposed window with a QRhi in this environment");
     auto* mg = threeColumnGraph(mPlot);
-    mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
+    mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(mg), QCPHandle<QCPGraph>(mg),
+                                   { .brush = QBrush(Qt::red), .firstComponent = 1,
+                                     .secondComponent = 2 });
     mPlot->xAxis->setRange(1, 3);
     mPlot->yAxis->setRange(-1, 5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -2391,31 +2332,6 @@ void TestMultiGraph::bandEdgeAtZeroOnALogAxisStaysPastTheEdgeUnderAGpuPan()
     QVERIFY2(isRedish(c), qPrintable(c.name()));
 }
 
-void TestMultiGraph::defaultFillFollowsTheOwnerColourOnTheGpu()
-{
-    if (!showWithRhi(mPlot))
-        QSKIP("no exposed window with a QRhi in this environment");
-    auto* mg = threeColumnGraph(mPlot);
-    mg->setComponentColors({Qt::black, Qt::red, Qt::red});
-    mg->setComponentFillBetween(1, 2);
-    mPlot->xAxis->setRange(1, 3);
-    mPlot->yAxis->setRange(-1, 5);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    const QPoint inside(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(1.5)));
-    const QColor red = colourAt(mPlot->grabFramebuffer(), inside);
-    QVERIFY2(red.red() > red.blue(), qPrintable(red.name()));
-
-    mg->setComponentColors({Qt::black, Qt::blue, Qt::blue});
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    const QColor blue = colourAt(mPlot->grabFramebuffer(), inside);
-    QVERIFY2(blue.blue() > blue.red(), qPrintable(blue.name()));
-
-    mg->setComponentPens({QPen(Qt::black), QPen(Qt::red), QPen(Qt::red)});
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    const QColor redAgain = colourAt(mPlot->grabFramebuffer(), inside);
-    QVERIFY2(redAgain.red() > redAgain.blue(), qPrintable(redAgain.name()));
-}
-
 void TestMultiGraph::autoScaleIncludesHiddenLineBandEdges()
 {
     auto* mg = threeColumnGraph(mPlot);
@@ -2449,23 +2365,6 @@ void TestMultiGraph::fillFollowsADownsampledLine()
     QVERIFY(!isRedish(img.pixelColor(crest, int(mPlot->yAxis->coordToPixel(1.3)))));
 }
 
-void TestMultiGraph::legendIconOfABandIsAFilledSwatch()
-{
-    auto* mg = mPlot->add<QCPGraph>().get();
-    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{0, 0}, {1, 1}});
-    mg->setComponentLineStyle(0, QCPGraph::lsNone);
-    mg->setComponentLineStyle(1, QCPGraph::lsNone);
-    mg->setComponentInLegend(1, false);
-    mg->setComponentFillBetween(0, 1, QBrush(Qt::red));
-    QImage img(40, 20, QImage::Format_ARGB32);
-    img.fill(Qt::white);
-    QCPPainter p(&img);
-    mg->drawComponentLegendIcon(&p, 0, QLineF(0, 10, 40, 10));
-    p.end();
-    QVERIFY(isRedish(img.pixelColor(20, 6)));
-    QVERIFY(isRedish(img.pixelColor(20, 14)));
-}
-
 void TestMultiGraph::legendIconDrawsTheLineOverTheSwatch()
 {
     auto* mg = mPlot->add<QCPGraph>().get();
@@ -2480,27 +2379,6 @@ void TestMultiGraph::legendIconDrawsTheLineOverTheSwatch()
     const QColor onTheLine = img.pixelColor(20, 10);
     QVERIFY2(onTheLine.blue() > 150 && onTheLine.red() < 100, qPrintable(onTheLine.name()));
     QVERIFY(isRedish(img.pixelColor(20, 6)));
-}
-
-void TestMultiGraph::collapsedLegendRowShowsTheBandSwatch()
-{
-    auto* mg = mPlot->add<QCPGraph>().get();
-    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{0, 0}, {1, 1}});
-    mg->setComponentLineStyle(0, QCPGraph::lsNone);
-    mg->setComponentLineStyle(1, QCPGraph::lsNone);
-    mg->setComponentInLegend(1, false);
-    mg->setComponentFillBetween(0, 1, QBrush(Qt::red));
-    mg->addToLegend(mPlot->legend);
-    mPlot->legend->setVisible(true);
-    mPlot->xAxis->setRange(10, 20); // the band itself stays out of view
-    auto* gi = groupItemOf(mPlot, mg);
-    QVERIFY(gi);
-    QVERIFY(!gi->shownExpanded());
-    const QImage img = renderOf(mPlot);
-    const QRect r = gi->rect();
-    const QColor swatch = img.pixelColor(r.left() + gi->margins().left() + 10,
-                                         r.top() + gi->rowHeight() / 2 - 3);
-    QVERIFY2(isRedish(swatch), qPrintable(swatch.name()));
 }
 
 static QCPGraph* errorBarGraph(QCustomPlot* plot, int n, double spacing)
@@ -2702,7 +2580,9 @@ void TestMultiGraph::anEmptySourceKeepsTheComponents()
     auto* mg = threeColumnGraph(mPlot);
     mg->setComponentColors({Qt::red, Qt::green, Qt::blue});
     mg->setComponentLineStyle(1, QCPGraph::lsNone);
-    mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
+    mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(mg), QCPHandle<QCPGraph>(mg),
+                                   { .brush = QBrush(Qt::red), .firstComponent = 1,
+                                     .secondComponent = 2 });
     mPlot->xAxis->setRange(1, 3);
     mPlot->yAxis->setRange(-1, 5);
     QImage img = renderOf(mPlot);
@@ -2767,7 +2647,6 @@ void TestMultiGraph::keptComponentsStayEditableDuringAnEmptyWindow()
 {
     auto* mg = threeColumnGraph(mPlot);
     QVERIFY(commitEmptyWindow(mPlot, mg));
-    QVERIFY(mg->setComponentFillBetween(1, 2));
     QVERIFY(mg->setComponentErrorBars(0, 1, 2));
     QVERIFY(!mg->setComponentFill(3, 0.0));
 }
@@ -3018,13 +2897,13 @@ void TestMultiGraph::aRebuiltGpuFillIsNotDrawnTwice()
     for (int c = 0; c < 3; ++c)
         mg->setComponentLineStyle(c, QCPGraph::lsNone);
     const QBrush red(QColor(255, 0, 0, 64));
-    mg->setComponentFillBetween(1, 2, red);
+    const QCPHandle<QCPFillBetween> band = mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(mg), QCPHandle<QCPGraph>(mg), { .brush = red, .firstComponent = 1, .secondComponent = 2 });
     mPlot->xAxis->setRange(1, 3);
     mPlot->yAxis->setRange(-1, 5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     const QPoint inside(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(1.5)));
     const QColor once = colourAt(mPlot->grabFramebuffer(), inside);
-    mg->setComponentFillBrush(1, red); // same look, but the geometry is built again
+    band->setBrush(red); // same look, but the geometry is built again
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QCOMPARE(colourAt(mPlot->grabFramebuffer(), inside), once);
 }
@@ -3424,31 +3303,14 @@ void TestMultiGraph::legendIconOfErrorBarsHasACapAtEachEnd()
     }
 }
 
-void TestMultiGraph::legendSwatchIsTwelvePixelsTall()
-{
-    auto* mg = mPlot->add<QCPGraph>().get();
-    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{0, 0}, {1, 1}});
-    mg->setComponentLineStyle(0, QCPGraph::lsNone);
-    mg->setComponentLineStyle(1, QCPGraph::lsNone);
-    mg->setComponentInLegend(1, false);
-    mg->setComponentFillBetween(0, 1, QBrush(Qt::red));
-    QImage img(40, 20, QImage::Format_ARGB32);
-    img.fill(Qt::white);
-    QCPPainter p(&img);
-    mg->drawComponentLegendIcon(&p, 0, QLineF(0, 10, 40, 10));
-    p.end();
-    QCOMPARE(img.pixelColor(20, 3), QColor(Qt::white));
-    QVERIFY(isRedish(img.pixelColor(20, 4)));
-    QVERIFY(isRedish(img.pixelColor(20, 15)));
-    QCOMPARE(img.pixelColor(20, 16), QColor(Qt::white));
-}
-
 void TestMultiGraph::anAlmostTransparentFillStillPaints()
 {
     auto* mg = threeColumnGraph(mPlot);
     mg->setComponentLineStyle(1, QCPGraph::lsNone);
     mg->setComponentLineStyle(2, QCPGraph::lsNone);
-    mg->setComponentFillBetween(1, 2, QBrush(QColor(255, 0, 0, 1)));
+    mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(mg), QCPHandle<QCPGraph>(mg),
+                                   { .brush = QBrush(QColor(255, 0, 0, 1)), .firstComponent = 1,
+                                     .secondComponent = 2 });
     mPlot->xAxis->setRange(1, 3);
     mPlot->yAxis->setRange(-1, 5);
     renderOf(mPlot); // lays the axis rect out
@@ -3891,7 +3753,10 @@ void TestMultiGraph::logKeyAxisBigGraphIsThinned()
 void TestMultiGraph::fillIsOneRibbonCommand()
 {
     auto* mg = threeColumnGraph(mPlot);
-    mg->setComponentFillBetween(1, 2, QBrush(QColor(255, 0, 0, 64)));
+    const QCPHandle<QCPFillBetween> band = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mg), QCPHandle<QCPGraph>(mg),
+        { .brush = QColor(255, 0, 0, 64), .firstComponent = 1, .secondComponent = 2 });
+    QVERIFY(band);
     mPlot->xAxis->setRange(1, 3);
     mPlot->yAxis->setRange(-1, 5);
     renderOf(mPlot);
@@ -3899,9 +3764,9 @@ void TestMultiGraph::fillIsOneRibbonCommand()
     const qcp::FillBetweenCmd* fill = nullptr;
     int fills = 0;
     int painterCommands = 0;
-    for (int i = 0; i < mg->mCore.recordedCommandCount(); ++i)
+    for (int i = 0; i < band->mCore.recordedCommandCount(); ++i)
     {
-        const qcp::QCPDrawCommand& command = mg->mCore.recordedList().commands[i];
+        const qcp::QCPDrawCommand& command = band->mCore.recordedList().commands[i];
         if (const auto* candidate = std::get_if<qcp::FillBetweenCmd>(&command))
         {
             fill = candidate;
@@ -3915,20 +3780,23 @@ void TestMultiGraph::fillIsOneRibbonCommand()
     QCOMPARE(fill->upper->size(), std::size_t(3));
     QCOMPARE(fill->lower->size(), std::size_t(3));
     QCOMPARE(fill->brush.color().alpha(), 64);
-    QVERIFY(qcp::commandKind(mg->mCore.recordedList().commands[0]).gpu);
+    QVERIFY(qcp::commandKind(band->mCore.recordedList().commands[0]).gpu);
 }
 
 // A fill between two components is still one ribbon: both edges are series of the same length.
 void TestMultiGraph::fillBetweenComponentsIsOneRibbon()
 {
     auto* mg = threeColumnGraph(mPlot);
-    mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
+    const QCPHandle<QCPFillBetween> band = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mg), QCPHandle<QCPGraph>(mg),
+        { .brush = QBrush(Qt::red), .firstComponent = 1, .secondComponent = 2 });
+    QVERIFY(band);
     mPlot->xAxis->setRange(1, 3);
     mPlot->yAxis->setRange(-1, 5);
     renderOf(mPlot);
 
     const qcp::FillBetweenCmd* fill = nullptr;
-    for (const qcp::QCPDrawCommand& command : mg->mCore.recordedList().commands)
+    for (const qcp::QCPDrawCommand& command : band->mCore.recordedList().commands)
         if (const auto* candidate = std::get_if<qcp::FillBetweenCmd>(&command))
             fill = candidate;
     QVERIFY(fill);
@@ -3964,7 +3832,9 @@ FillPair twoGraphs(QCustomPlot* plot, const std::vector<double>& keys,
 void TestMultiGraph::aFillToAnotherGraphFillsTheBand()
 {
     FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 2, 1}, {3, 4, 3});
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    QVERIFY(mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(pair.owner),
+                                            QCPHandle<QCPGraph>(pair.partner),
+                                            { .brush = QBrush(Qt::blue) }));
     mPlot->xAxis->setRange(-0.5, 2.5);
     mPlot->yAxis->setRange(0, 5);
 
@@ -3979,7 +3849,9 @@ void TestMultiGraph::aFillToAnotherGraphCropsAndInterpolates()
     FillPair pair = twoGraphs(mPlot, {0, 0.5, 1, 1.5}, {1, 1, 1, 1}, {2, 2, 2, 2});
     // The partner covers 0..1 only: the band must stop where its series ends, not run on to 1.5.
     pair.partner->setData(std::vector<double>{0, 1}, std::vector<std::vector<double>>{{2, 2}});
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    QVERIFY(mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(pair.owner),
+                                            QCPHandle<QCPGraph>(pair.partner),
+                                            { .brush = QBrush(Qt::blue) }));
     mPlot->xAxis->setRange(-0.25, 1.75);
     mPlot->yAxis->setRange(0, 3);
 
@@ -3994,7 +3866,9 @@ void TestMultiGraph::noOverlapNoBand()
 {
     FillPair pair = twoGraphs(mPlot, {0, 1}, {1, 1}, {2, 2});
     pair.partner->setData(std::vector<double>{2, 3}, std::vector<std::vector<double>>{{2, 2}});
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    QVERIFY(mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(pair.owner),
+                                            QCPHandle<QCPGraph>(pair.partner),
+                                            { .brush = QBrush(Qt::blue) }));
     mPlot->xAxis->setRange(-0.5, 3.5);
     mPlot->yAxis->setRange(0, 4);
 
@@ -4002,57 +3876,7 @@ void TestMultiGraph::noOverlapNoBand()
              "a band is drawn with no common key range");
 }
 
-void TestMultiGraph::theFillDropsWhenThePartnerDies()
-{
-    FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {2, 2, 2});
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
-    mPlot->xAxis->setRange(-0.5, 2.5);
-    mPlot->yAxis->setRange(0, 3);
-    QVERIFY2(isBlue(renderOf(mPlot).pixelColor(pixelOf(mPlot, 1, 1.5))), "the band is not drawn");
-
-    delete pair.partner;
-    pair.partner = nullptr;
-    QVERIFY2(!draws(renderOf(mPlot), mPlot->axisRect()->rect(), isBlue),
-             "the band outlived its partner");
-}
-
 // 2.x reset channelFillGraph() to null when the partner died: the fill is gone, not a fill to nothing.
-void TestMultiGraph::aDeadPartnersFillIsGone()
-{
-    FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {2, 2, 2});
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
-    QVERIFY(pair.owner->componentFill(0));
-
-    delete pair.partner;
-    pair.partner = nullptr;
-    QVERIFY2(!pair.owner->componentFill(0), "a fill to a dead graph is still reported");
-
-    auto* second = mPlot->add<QCPGraph>().get();
-    second->setData(QVector<double>{0, 1, 2}, QVector<double>{2, 2, 2});
-    QVERIFY(pair.owner->setComponentFillToGraph(0, second, 0));
-    QVERIFY(mPlot->removeGraph(second));
-    QVERIFY2(!pair.owner->componentFill(0), "a fill to a removed graph is still reported");
-}
-
-void TestMultiGraph::theFillDropsWhenThePartnerLosesTheComponent()
-{
-    QCPGraph* owner = mPlot->add<QCPGraph>().get();
-    QCPGraph* partner = mPlot->add<QCPGraph>().get();
-    owner->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{1, 1, 1}});
-    partner->setData(std::vector<double>{0, 1, 2},
-                     std::vector<std::vector<double>>{{2, 2, 2}, {3, 3, 3}});
-    owner->setComponentPens({QPen(Qt::NoPen)});
-    partner->setComponentPens({QPen(Qt::NoPen), QPen(Qt::NoPen)});
-    QVERIFY(owner->setComponentFillToGraph(0, partner, 1, QBrush(Qt::blue)));
-    mPlot->xAxis->setRange(-0.5, 2.5);
-    mPlot->yAxis->setRange(0, 4);
-    QVERIFY2(isBlue(renderOf(mPlot).pixelColor(pixelOf(mPlot, 1, 2.5))), "the band is not drawn");
-
-    partner->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{2, 2, 2}});
-    QVERIFY2(!draws(renderOf(mPlot), mPlot->axisRect()->rect(), isBlue),
-             "the band survived the partner component disappearing");
-}
-
 void TestMultiGraph::aFillToAGraphOfAnotherSystemIsAMisuse()
 {
     MisuseScope misuse;
@@ -4063,9 +3887,10 @@ void TestMultiGraph::aFillToAGraphOfAnotherSystemIsAMisuse()
             otherRect->axis(QCPAxis::atBottom), otherRect->axis(QCPAxis::atLeft)).get();
     other->setData(std::vector<double>{0, 1}, std::vector<std::vector<double>>{{2, 2}});
 
-    QVERIFY(!pair.owner->setComponentFillToGraph(0, other, 0, QBrush(Qt::blue)));
+    QVERIFY(!mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(pair.owner),
+                                           QCPHandle<QCPGraph>(other),
+                                           { .brush = QBrush(Qt::blue) }));
     QCOMPARE(MisuseScope::count(), std::size_t(1));
-    QVERIFY(!pair.owner->componentFill(0).has_value());
 }
 
 namespace
@@ -4085,7 +3910,9 @@ FillPair graphsOnTwoValueAxes(QCustomPlot* plot)
 void TestMultiGraph::aFillToAGraphOnAnotherValueAxis()
 {
     FillPair pair = graphsOnTwoValueAxes(mPlot);
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    QVERIFY(mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(pair.owner),
+                                            QCPHandle<QCPGraph>(pair.partner),
+                                            { .brush = QBrush(Qt::blue) }));
 
     const QImage image = renderOf(mPlot);
     QVERIFY2(isBlue(image.pixelColor(pixelOf(mPlot, 1, 2))), "the band is not drawn");
@@ -4097,7 +3924,9 @@ void TestMultiGraph::aFillToAGraphOnAnotherValueAxis()
 void TestMultiGraph::theBandFollowsTheOtherValueAxis()
 {
     FillPair pair = graphsOnTwoValueAxes(mPlot);
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    QVERIFY(mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(pair.owner),
+                                            QCPHandle<QCPGraph>(pair.partner),
+                                            { .brush = QBrush(Qt::blue) }));
     QVERIFY(isBlue(renderOf(mPlot).pixelColor(pixelOf(mPlot, 1, 2.5))));
 
     mPlot->yAxis2->setRange(0, 60); // the partner's 30 is now y's 2
@@ -4116,7 +3945,9 @@ void TestMultiGraph::theBandFollowsTheOtherValueAxis()
 void TestMultiGraph::aPartnerMovedToAnotherSystemDrawsNoBand()
 {
     FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {2, 2, 2});
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    QVERIFY(mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(pair.owner),
+                                            QCPHandle<QCPGraph>(pair.partner),
+                                            { .brush = QBrush(Qt::blue) }));
     mPlot->xAxis->setRange(-0.5, 2.5);
     mPlot->yAxis->setRange(0, 3);
     QVERIFY2(isBlue(renderOf(mPlot).pixelColor(pixelOf(mPlot, 1, 1.5))), "the band is not drawn");
@@ -4129,116 +3960,12 @@ void TestMultiGraph::aPartnerMovedToAnotherSystemDrawsNoBand()
              "the band survived the partner moving to another system");
 }
 
-void TestMultiGraph::aSelectedRangeSplitsTheBand()
-{
-    // Dense enough that binnedWhenDense leaves far fewer strip rows than source rows: the split
-    // must follow the source rows, not the shaped strip's indices.
-    constexpr int n = 4000;
-    std::vector<double> keys(n), ownerValues(n, 1.0), partnerValues(n, 3.0);
-    for (int i = 0; i < n; ++i)
-        keys[std::size_t(i)] = i;
-    FillPair pair = twoGraphs(mPlot, keys, ownerValues, partnerValues);
-    pair.owner->component(0).selectedPen = QPen(Qt::green);
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0,
-                                                QBrush(QColor(255, 0, 0, 64))));
-    pair.owner->setSelectable(QCP::stDataRange); // rows: the default stWhole selects everything
-    pair.owner->setComponentSelection(0, QCPDataSelection(QCPDataRange(1000, 2000)));
-    mPlot->xAxis->setRange(-0.5, n - 0.5);
-    mPlot->yAxis->setRange(0, 4);
-
-    const QImage image = renderOf(mPlot);
-    const auto redBand = [](const QColor& c)
-    { return c.red() - std::max(c.green(), c.blue()) > 30; };
-    const auto greenBand = [](const QColor& c)
-    { return c.green() - std::max(c.red(), c.blue()) > 30; };
-    QVERIFY2(redBand(image.pixelColor(pixelOf(mPlot, 500, 2))),
-             "the unselected run does not use the fill brush");
-    QVERIFY2(greenBand(image.pixelColor(pixelOf(mPlot, 1500, 2))),
-             "the selected run does not use the selected pen colour");
-}
-
-void TestMultiGraph::aDenseFillSelectionUsesItsKeyRange()
-{
-    // I1: a dense fill is binned to spans; the selection is in owner rows, at keys 500 and 1500.
-    constexpr int n = 4000;
-    std::vector<double> keys(n), ownerValues(n, 1.0), partnerValues(n, 3.0);
-    for (int i = 0; i < n; ++i)
-        keys[std::size_t(i)] = i;
-    FillPair pair = twoGraphs(mPlot, keys, ownerValues, partnerValues);
-    pair.owner->component(0).selectedPen = QPen(Qt::green);
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0,
-                                                QBrush(QColor(255, 0, 0, 64))));
-    pair.owner->setSelectable(QCP::stDataRange); // rows: the default stWhole selects everything
-    pair.owner->setComponentSelection(0, QCPDataSelection(QCPDataRange(1000, 2000)));
-    mPlot->xAxis->setRange(-0.5, n - 0.5);
-    mPlot->yAxis->setRange(0, 4);
-
-    const QImage image = renderOf(mPlot);
-    const auto greenBand = [](const QColor& c)
-    { return c.green() - std::max(c.red(), c.blue()) > 30; };
-    const auto redBand = [](const QColor& c)
-    { return c.red() - std::max(c.green(), c.blue()) > 30; };
-    QVERIFY2(redBand(image.pixelColor(pixelOf(mPlot, 300, 2))),
-             "the band left of the selection does not use the fill brush");
-    QVERIFY2(greenBand(image.pixelColor(pixelOf(mPlot, 1500, 2))),
-             "the dense selected run did not take the selected colour");
-}
-
-void TestMultiGraph::aSteppedFillSelectionUsesItsKeyRange()
-{
-    // I1: a step style duplicates rows; row 500 of the source must still be the selected one.
-    constexpr int n = 1000;
-    std::vector<double> keys(n), ownerValues(n, 1.0), partnerValues(n, 3.0);
-    for (int i = 0; i < n; ++i)
-        keys[std::size_t(i)] = i;
-    FillPair pair = twoGraphs(mPlot, keys, ownerValues, partnerValues);
-    pair.owner->setComponentLineStyle(0, QCPGraph::lsStepLeft);
-    pair.owner->component(0).selectedPen = QPen(Qt::green);
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0,
-                                                QBrush(QColor(255, 0, 0, 64))));
-    pair.owner->setSelectable(QCP::stDataRange); // rows: the default stWhole selects everything
-    pair.owner->setComponentSelection(0, QCPDataSelection(QCPDataRange(400, 600)));
-    mPlot->xAxis->setRange(-0.5, n - 0.5);
-    mPlot->yAxis->setRange(0, 4);
-
-    const QImage image = renderOf(mPlot);
-    const auto greenBand = [](const QColor& c)
-    { return c.green() - std::max(c.red(), c.blue()) > 30; };
-    const auto redBand = [](const QColor& c)
-    { return c.red() - std::max(c.green(), c.blue()) > 30; };
-    QVERIFY2(redBand(image.pixelColor(pixelOf(mPlot, 100, 2))),
-             "the band left of the step selection does not use the fill brush");
-    QVERIFY2(greenBand(image.pixelColor(pixelOf(mPlot, 500, 2))),
-             "the stepped selected run did not take the selected colour");
-}
-
-void TestMultiGraph::theFillDoesNotReturnWhenThePartnerComponentComesBack()
-{
-    // M1: the partner losing the component drops the fill for good; a later wider source must not
-    // revive a band built from unrelated data.
-    auto* owner = mPlot->add<QCPGraph>().get();
-    auto* partner = mPlot->add<QCPGraph>().get();
-    owner->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{1, 1, 1}});
-    partner->setData(std::vector<double>{0, 1, 2},
-                     std::vector<std::vector<double>>{{2, 2, 2}, {3, 3, 3}});
-    QVERIFY(owner->setComponentFillToGraph(0, partner, 1, QBrush(Qt::blue)));
-
-    partner->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{2, 2, 2}});
-    QVERIFY2(!owner->componentFill(0), "the fill survived the partner losing its component");
-
-    partner->setData(std::vector<double>{0, 1, 2},
-                     std::vector<std::vector<double>>{{2, 2, 2}, {4, 4, 4}});
-    QVERIFY2(!owner->componentFill(0), "the fill came back when the partner regained a column");
-    mPlot->xAxis->setRange(-0.5, 2.5);
-    mPlot->yAxis->setRange(0, 5);
-    QVERIFY2(!draws(renderOf(mPlot), mPlot->axisRect()->rect(), isBlue),
-             "a removed fill still drew a band");
-}
-
 void TestMultiGraph::aPartnerDataChangeRedrawsTheBand()
 {
     FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {3, 3, 3});
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    QVERIFY(mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(pair.owner),
+                                            QCPHandle<QCPGraph>(pair.partner),
+                                            { .brush = QBrush(Qt::blue) }));
     mPlot->xAxis->setRange(-0.5, 2.5);
     mPlot->yAxis->setRange(0, 6);
     QVERIFY2(isBlue(renderOf(mPlot).pixelColor(pixelOf(mPlot, 1, 2))), "the band is not drawn");
@@ -4254,7 +3981,9 @@ void TestMultiGraph::aPartnerOnAnotherLayerRedrawsTheBand()
     QVERIFY(mPlot->addLayer(QStringLiteral("partnerLayer")));
     FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {3, 3, 3});
     pair.partner->setLayer(mPlot->layer(QStringLiteral("partnerLayer")));
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    QVERIFY(mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(pair.owner),
+                                            QCPHandle<QCPGraph>(pair.partner),
+                                            { .brush = QBrush(Qt::blue) }));
     mPlot->xAxis->setRange(-0.5, 2.5);
     mPlot->yAxis->setRange(0, 6);
     QVERIFY2(isBlue(renderOf(mPlot).pixelColor(pixelOf(mPlot, 1, 2))), "the band is not drawn");
@@ -4267,66 +3996,23 @@ void TestMultiGraph::aPartnerOnAnotherLayerRedrawsTheBand()
              "a partner on another layer did not redraw the band");
 }
 
-void TestMultiGraph::mutualFillsDoNotRecurse()
-{
-    FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {3, 3, 3});
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
-    QVERIFY(pair.partner->setComponentFillToGraph(0, pair.owner, 0, QBrush(Qt::blue)));
-
-    // Each graph depends on the other: the dependency walk must mark both once, not follow the
-    // cycle until the stack ends.
-    pair.owner->setComponentPens({QPen(Qt::red)});
-    QVERIFY(pair.owner->componentFill(0).has_value());
-    QVERIFY(pair.partner->componentFill(0).has_value());
-    QVERIFY(!mPlot->layer("main")->canSkipRepaintForTranslation());
-}
-
-void TestMultiGraph::clearingAGraphFillDropsThePartnerDependency()
-{
-    QVERIFY(mPlot->addLayer(QStringLiteral("oldPartnerLayer")));
-    FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {3, 3, 3});
-    pair.partner->setLayer(mPlot->layer(QStringLiteral("oldPartnerLayer")));
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
-    pair.owner->clearComponentFill(0);
-    QVERIFY(!pair.owner->componentFill(0).has_value());
-
-    // The old partner no longer depends on this graph: its change must not move this graph's
-    // content generation.
-    const quint64 generation = pair.owner->mCore.generation();
-    pair.partner->setComponentPens({QPen(Qt::red)});
-    QCOMPARE(pair.owner->mCore.generation(), generation);
-}
-
-void TestMultiGraph::retargetingAGraphFillDropsTheOldPartnerDependency()
-{
-    QVERIFY(mPlot->addLayer(QStringLiteral("oldPartnerLayer")));
-    QVERIFY(mPlot->addLayer(QStringLiteral("newPartnerLayer")));
-    FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {3, 3, 3});
-    pair.partner->setLayer(mPlot->layer(QStringLiteral("oldPartnerLayer")));
-    auto* replacement = mPlot->add<QCPGraph>().get();
-    replacement->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{2, 2, 2}});
-    replacement->setLayer(mPlot->layer(QStringLiteral("newPartnerLayer")));
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
-    QVERIFY(pair.owner->setComponentFillToGraph(0, replacement, 0, QBrush(Qt::blue)));
-
-    const quint64 generation = pair.owner->mCore.generation();
-    pair.partner->setComponentPens({QPen(Qt::red)});
-    QCOMPARE(pair.owner->mCore.generation(), generation);
-}
-
 void TestMultiGraph::theBandStaysOnTheGpuRibbon()
 {
     if (!showWithRhi(mPlot))
         QSKIP("no QRhi available in this environment");
-    FillPair pair = twoGraphs(mPlot, {0, 1, 2, 3, 4}, {1, 1, 1, 1, 1}, {3, 3, 3, 3, 3});
-    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    FillPair pair = twoGraphs(mPlot, { 0, 1, 2, 3, 4 }, { 1, 1, 1, 1, 1 }, { 3, 3, 3, 3, 3 });
+    const QCPHandle<QCPFillBetween> band
+        = mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(pair.owner),
+                                         QCPHandle<QCPGraph>(pair.partner),
+                                         { .brush = QBrush(Qt::blue) });
+    QVERIFY(band);
     mPlot->xAxis->setRange(-0.5, 4.5);
     mPlot->yAxis->setRange(0, 4);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(mPlot->plottableRhiLayer(pair.owner->layer()));
 
     const qcp::FillBetweenCmd* fill = nullptr;
-    for (const qcp::QCPDrawCommand& command : pair.owner->mCore.recordedList().commands)
+    for (const qcp::QCPDrawCommand& command : band->mCore.recordedList().commands)
         if (const auto* candidate = std::get_if<qcp::FillBetweenCmd>(&command))
             fill = candidate;
     QVERIFY(fill);
@@ -4340,74 +4026,46 @@ void TestMultiGraph::theBandStaysOnTheGpuRibbon()
     QVERIFY2(isBlue(frame.pixelColor(probe)), "the GPU frame does not show the band");
 }
 
-void TestMultiGraph::fillToGraphSeriesCropsUnequalGrids()
-{
-    using qcp::fill::SeriesRow;
-    const std::vector<SeriesRow> owner{{0, 0}, {1, 10}, {2, 20}, {3, 30}};
-    const std::vector<SeriesRow> partner{{0, 5}, {2, 15}, {4, 25}};
-    const std::vector<qcp::fill::StripPoint> rows = qcp::fill::fillToGraphRows(owner, partner);
-    QCOMPARE(rows.size(), std::size_t(4));
-    QCOMPARE(rows[0].key, 0.0);
-    QCOMPARE(rows[0].a, 0.0);
-    QCOMPARE(rows[0].b, 5.0);
-    QCOMPARE(rows[1].key, 1.0);
-    QCOMPARE(rows[1].a, 10.0);
-    QCOMPARE(rows[1].b, 10.0); // the partner interpolated at the owner's key
-    QCOMPARE(rows[2].key, 2.0);
-    QCOMPARE(rows[2].a, 20.0);
-    QCOMPARE(rows[2].b, 15.0);
-    QCOMPARE(rows[3].key, 3.0);
-    QCOMPARE(rows[3].a, 30.0);
-    QCOMPARE(rows[3].b, 20.0); // interpolated between the partner's 2 and 4
-}
-
-void TestMultiGraph::fillToGraphSeriesNoOverlap()
-{
-    using qcp::fill::SeriesRow;
-    const std::vector<SeriesRow> owner{{0, 0}, {1, 10}};
-    const std::vector<SeriesRow> partner{{2, 20}, {3, 30}};
-    QVERIFY(qcp::fill::fillToGraphRows(owner, partner).empty());
-}
-
-void TestMultiGraph::fillToGraphSeriesNaNBreaksRuns()
-{
-    using qcp::fill::SeriesRow;
-    const double nan = std::numeric_limits<double>::quiet_NaN();
-    const std::vector<SeriesRow> owner{{0, 0}, {1, nan}, {2, 2}, {3, 3}, {4, 4}};
-    const std::vector<SeriesRow> partner{{0, 1}, {1, 1}, {2, nan}, {3, 3}, {4, 4}};
-    const std::vector<qcp::fill::StripPoint> rows = qcp::fill::fillToGraphRows(owner, partner);
-    QCOMPARE(rows.size(), std::size_t(5));
-    QVERIFY2(std::isnan(rows[1].a), "the owner gap is not a NaN row");
-    QVERIFY2(std::isnan(rows[2].b), "the partner gap is not a NaN row");
-    QVERIFY2(rows[1].breakBefore, "the owner NaN does not start a run");
-    QVERIFY2(rows[2].breakBefore, "the partner NaN does not start a run");
-    QVERIFY2(rows[3].breakBefore, "the row after a NaN does not start a new run");
-}
-
 // The order the drawing API keeps on both replays: fills, then bars, then lines.
+// The order the drawing API keeps on both replays: the fill, then the graph's bars, then its lines.
 void TestMultiGraph::fillsDrawUnderErrorBarsUnderLines()
 {
     auto* mg = errorBarGraph(mPlot, 5, 1.0);
     mg->setComponentPens({ QPen(Qt::red, 3), QPen(Qt::red, 3), QPen(Qt::red, 3) });
     mg->setComponentLineStyle(0, QCPGraph::lsLine);
-    mg->setComponentFillBetween(1, 2, QBrush(Qt::green));
+    const QCPHandle<QCPFillBetween> band = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mg), QCPHandle<QCPGraph>(mg),
+        { .brush = QBrush(Qt::green), .firstComponent = 1, .secondComponent = 2 });
+    QVERIFY(band);
     mPlot->xAxis->setRange(-0.5, 4.5);
     mPlot->yAxis->setRange(0, 10);
     const QImage image = renderOf(mPlot);
 
-    int fill = -1, bars = -1, line = -1;
+    int fills = 0;
+    for (const qcp::QCPDrawCommand& command : band->mCore.recordedList().commands)
+        fills += std::get_if<qcp::FillBetweenCmd>(&command) != nullptr;
+    QVERIFY2(fills >= 1, "the fill recorded no band");
+    int bars = -1, line = -1;
     const auto& commands = mg->mCore.recordedList().commands;
     for (int i = 0; i < int(commands.size()); ++i)
     {
-        if (fill < 0 && std::get_if<qcp::FillBetweenCmd>(&commands[i]))
-            fill = i;
         if (bars < 0 && std::get_if<qcp::ErrorBarsCmd>(&commands[i]))
             bars = i;
         if (line < 0 && std::get_if<qcp::PolylineDataCmd>(&commands[i]))
             line = i;
     }
-    QVERIFY2(fill >= 0 && bars >= 0 && line >= 0, "a command is missing");
-    QVERIFY2(fill < bars && bars < line, "fills and bars must record before the lines");
+    QVERIFY2(bars >= 0 && line >= 0, "a command is missing");
+    QVERIFY2(bars < line, "bars must record before the lines");
+    const auto indexIn = [&](const QCPLayerable* who)
+    {
+        const QList<QCPHandle<QCPLayerable>> drawn = mPlot->layer("main")->children();
+        for (int i = 0; i < drawn.size(); ++i)
+            if (drawn[i].get() == who)
+                return i;
+        return -1;
+    };
+    QVERIFY2(indexIn(band.get()) >= 0 && indexIn(band.get()) < indexIn(mg),
+             "the fill must draw under its lines");
 
     QVERIFY2(isRedish(image.pixelColor(pixelOf(mPlot, 2.5, 5.0))),
              "the line must draw over the fill");
@@ -4423,7 +4081,9 @@ void TestMultiGraph::fillsDrawUnderLinesOnTheGpu()
     auto* mg = errorBarGraph(mPlot, 5, 1.0);
     mg->setComponentPens({ QPen(Qt::red, 3), QPen(Qt::red, 3), QPen(Qt::red, 3) });
     mg->setComponentLineStyle(0, QCPGraph::lsLine);
-    mg->setComponentFillBetween(1, 2, QBrush(Qt::green));
+    mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(mg), QCPHandle<QCPGraph>(mg),
+                                   { .brush = QBrush(Qt::green), .firstComponent = 1,
+                                     .secondComponent = 2 });
     mPlot->xAxis->setRange(-0.5, 4.5);
     mPlot->yAxis->setRange(0, 10);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -4582,19 +4242,6 @@ QCPGraph* selectableLines(QCustomPlot* plot)
 }
 
 //! Two one-column graphs: \a upper at 2 over \a lower at 1, keys 0..4.
-std::pair<QCPGraph*, QCPGraph*> twoBandGraphs(QCustomPlot* plot, bool withData = true)
-{
-    auto* upper = plot->add<QCPGraph>().get();
-    auto* lower = plot->add<QCPGraph>().get();
-    if (withData)
-    {
-        upper->setData(std::vector<double> { 0, 1, 2, 3, 4 }, std::vector<double> { 2, 2, 2, 2, 2 });
-        lower->setData(std::vector<double> { 0, 1, 2, 3, 4 }, std::vector<double> { 1, 1, 1, 1, 1 });
-    }
-    plot->xAxis->setRange(0, 4);
-    plot->yAxis->setRange(0, 3);
-    return { upper, lower };
-}
 } // namespace
 
 // 2.x: setSelection on the graph selects those rows; they draw with the selected pen. The rows are
@@ -4708,77 +4355,22 @@ void TestMultiGraph::aGraphRowCastsToAPlottableRow()
 
 // 2.x order: setBrush, then the channel fill, then the data. The remembered brush reaching the new
 // component must colour the band, not replace it with a fill to zero.
-void TestMultiGraph::setBrushBeforeAFillToGraphKeepsTheBand()
-{
-    auto [upper, lower] = twoBandGraphs(mPlot, /*withData=*/false);
-    const QBrush brush(QColor(0, 160, 255, 120));
-    upper->setBrush(brush);
-    QVERIFY(upper->setComponentFillToGraph(0, lower, 0));
-    upper->setData(std::vector<double> { 0, 1, 2, 3, 4 }, std::vector<double> { 2, 2, 2, 2, 2 });
-    lower->setData(std::vector<double> { 0, 1, 2, 3, 4 }, std::vector<double> { 1, 1, 1, 1, 1 });
-
-    const auto fill = upper->componentFill(0);
-    QVERIFY(fill.has_value());
-    QVERIFY2(std::holds_alternative<QCPGraph::FillToGraph>(fill->target),
-             "the remembered brush replaced the band with a fill to zero");
-    QCOMPARE(upper->effectiveFillBrush(*fill), brush);
-}
-
 // 2.x: setBrush after setChannelFillGraph colours the channel.
-void TestMultiGraph::setBrushAfterAFillToGraphRecoloursIt()
-{
-    auto [upper, lower] = twoBandGraphs(mPlot);
-    QVERIFY(upper->setComponentFillToGraph(0, lower, 0, QBrush(QColor(255, 0, 0, 120))));
-    const QBrush brush(QColor(0, 160, 255, 120));
-    upper->setBrush(brush);
-
-    const auto fill = upper->componentFill(0);
-    QVERIFY(fill.has_value());
-    QVERIFY2(std::holds_alternative<QCPGraph::FillToGraph>(fill->target),
-             "setBrush replaced the band with a fill to zero");
-    QCOMPARE(upper->effectiveFillBrush(*fill), brush);
-    QVERIFY(!lower->componentFill(0).has_value());
-}
-
 // F-3 (overrules 5c R-2): setBrush recolours a fill and keeps where it fills to.
-void TestMultiGraph::setBrushKeepsAFillsConstantAndColumnTargets()
+void TestMultiGraph::setBrushKeepsAFillsConstantTarget()
 {
     auto* mg = redAndBlueHorizontalLines(mPlot);
     QVERIFY(mg->setComponentFill(0, 5.0, QBrush(Qt::green)));
-    QVERIFY(mg->setComponentFillBetween(1, 0, QBrush(Qt::green)));
     const QBrush brush(QColor(255, 0, 0, 120));
     mg->setBrush(brush);
 
     const auto toConstant = mg->componentFill(0);
     QVERIFY(toConstant.has_value());
-    QVERIFY(std::holds_alternative<double>(toConstant->target));
-    QCOMPARE(std::get<double>(toConstant->target), 5.0);
+    QCOMPARE(toConstant->target, 5.0);
     QCOMPARE(mg->effectiveFillBrush(*toConstant), brush);
-
-    const auto toColumn = mg->componentFill(1);
-    QVERIFY(toColumn.has_value());
-    QVERIFY(std::holds_alternative<int>(toColumn->target));
-    QCOMPARE(std::get<int>(toColumn->target), 0);
-    QCOMPARE(mg->effectiveFillBrush(*toColumn), brush);
 }
 
 // A band made with the default brush takes the graph's brush, as 2.x's channel did.
-void TestMultiGraph::aFillToGraphTakesTheGraphBrush()
-{
-    auto [upper, lower] = twoBandGraphs(mPlot);
-    const QBrush brush(QColor(0, 160, 255, 120));
-    upper->setBrush(brush);
-    QVERIFY(upper->setComponentFillToGraph(0, lower, 0));
-
-    const auto fill = upper->componentFill(0);
-    QVERIFY(fill.has_value());
-    QCOMPARE(upper->effectiveFillBrush(*fill), brush);
-    const QImage img = renderOf(mPlot);
-    const QColor inside = img.pixelColor(pixelOf(mPlot, 2, 1.5));
-    QVERIFY2(inside.blue() > 150 && inside.red() < 150,
-             qPrintable(QStringLiteral("the band is not the graph's brush: %1").arg(inside.name())));
-}
-
 // 2.x fills toward zero: on a negative log range zero is beyond the upper bound.
 void TestMultiGraph::aNegativeLogRangeFillsToTheUpperBound()
 {
@@ -4845,13 +4437,6 @@ QVariant clickDetails(QCustomPlot* plot, QCPGraph* mg, double key, double value)
 } // namespace
 
 // Whether a content change of \a partner still dirties \a owner (a registered dependent).
-bool TestMultiGraph::marksOwner(QCPGraph* partner, QCPGraph* owner)
-{
-    const quint64 before = owner->mCore.generation();
-    partner->setPen(QPen(partner->pen().color() == Qt::cyan ? Qt::magenta : Qt::cyan));
-    return owner->mCore.generation() != before;
-}
-
 // C1: 2.x's default selection type is stWhole: a click selects the whole graph, drawn selected.
 void TestMultiGraph::aClickOnADefaultGraphSelectsTheWholeGraph()
 {
@@ -4935,54 +4520,8 @@ void TestMultiGraph::makingAGraphUnselectableClearsEveryComponent()
 }
 
 // I2: 2.x drew no channel without a brush: setBrush(Qt::NoBrush) removes the band.
-void TestMultiGraph::setBrushNoBrushRemovesTheBandToAnotherGraph()
-{
-    auto [upper, lower] = twoBandGraphs(mPlot);
-    QVERIFY(upper->setComponentFillToGraph(0, lower, 0));
-    upper->setBrush(QBrush(Qt::blue));
-    QVERIFY(upper->componentFill(0).has_value());
-
-    upper->setBrush(Qt::NoBrush);
-
-    QVERIFY2(!upper->componentFill(0).has_value(), "the band to the other graph is still there");
-    QVERIFY2(!marksOwner(lower, upper), "the partner still marks the owner");
-}
-
 // I3 + M11: a partner whose value axis moves to another rect has no system: no crash, no band.
-void TestMultiGraph::aPartnerMovedToAnotherRectDropsTheBandWithoutACrash()
-{
-    auto* upper = mPlot->add<QCPGraph>().get();
-    auto* lower = mPlot->xAxis->axisRect()->add<QCPGraph>(mPlot->xAxis, mPlot->yAxis2).get();
-    upper->setData(std::vector<double> { 0, 1, 2 }, std::vector<double> { 2, 2, 2 });
-    lower->setData(std::vector<double> { 0, 1, 2 }, std::vector<double> { 1, 1, 1 });
-    QVERIFY(upper->setComponentFillToGraph(0, lower, 0));
-    renderOf(mPlot);
-    auto* rect2 = new QCPAxisRect(mPlot);
-    mPlot->plotLayout()->addElement(1, 0, rect2);
-
-    lower->setValueAxis(rect2->axis(QCPAxis::atLeft));
-    QVERIFY(lower->system() == nullptr);
-    MisuseScope misuse; // the partner reports that it is not drawn
-    renderOf(mPlot);
-
-    QVERIFY2(!upper->componentFill(0).has_value(), "the band to a partner off the frame stays");
-    QVERIFY2(!marksOwner(lower, upper), "the partner still marks the owner");
-}
-
 // M11: a partner taken from the plot is not this graph's partner any more.
-void TestMultiGraph::aPartnerTakenFromThePlotDropsTheFill()
-{
-    auto [upper, lower] = twoBandGraphs(mPlot);
-    QVERIFY(upper->setComponentFillToGraph(0, lower, 0));
-
-    std::unique_ptr<QCPGraph> taken = mPlot->take(QCPHandle<QCPGraph>(lower));
-    QVERIFY(taken);
-
-    QVERIFY2(!upper->componentFill(0).has_value(), "the band to a taken partner stays");
-    QVERIFY2(!marksOwner(taken.get(), upper), "the taken graph still marks the owner");
-    renderOf(mPlot);
-}
-
 // I4: 2.x's 1D accessors answer 0 outside the data, as the old graph's did.
 void TestMultiGraph::theDataAccessorsAnswerZeroOutsideTheData()
 {

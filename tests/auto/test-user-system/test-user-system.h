@@ -43,8 +43,6 @@ private slots:
     void anAxisRangeChangeRepaintsASkewGraph();
     void aLogImpulseRunsToTheBoundNearerZero();
     void aFillWithAnUnrepresentableInverseStaysFinite();
-    void aSelectedChannelFillSegmentPaintsOnlyItsBand();
-    void aChannelFillAcrossSystemsDrawsNoBand();
     void aCartesianChannelFillPartnerThatLostItsSystemDrawsNoBand();
     void aGraphIsHitAndRectSelectedThroughTheMapping();
     void aCurveHitMapsInOneBatch();
@@ -79,8 +77,6 @@ private slots:
     void aShearChangeRedrawsAMultiGraph();
     void anAxisDeletedMidDragLeavesAMultiGraphInert();
     void aMultiGraphFillFollowsTheSkewMapping();
-    void aMultiGraphFillBetweenColumnsOnASkewRect();
-    void aFillToAnotherGraphOnASkewRect();
     void aMultiGraphFillOnALogAxisStopsAtTheBoundNearerZero();
     void aMultiGraphNaNSplitsLineAndFill();
     void multiGraphErrorBarCapsFollowTheMapping();

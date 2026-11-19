@@ -101,7 +101,7 @@ The tooltip, crosshair and busy colours have no stylesheet property. Set them in
 ## Pens and brushes
 
 Plottables and items take a `QPen` for lines and a `QBrush` for fills, like any Qt drawing.
-A graph with a brush is filled down to the zero line. With `setComponentFillToGraph(0, other, 0)`, it is filled up to another graph instead:
+A graph with a brush is filled down to the zero line. `axisRect()->fillBetween(first, second, { .brush = ... })` fills between two graphs instead:
 
 ```{literalinclude} snippets/styling.cpp
 :start-after: // [styling_pens_brushes]

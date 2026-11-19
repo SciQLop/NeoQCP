@@ -63,7 +63,10 @@ std::vector<qcp::fill::SeriesRow> rowsOf(const QCPMultiDataSource& source, int c
 }
 } // namespace
 
-QCPFillBetween::QCPFillBetween() : QCPPlottable()
+// A fill draws in its lines' frame, so it asks for nothing the lines themselves do not: a
+// system that takes the lines (a user system with a projection, say) takes the fill between
+// them.
+QCPFillBetween::QCPFillBetween() : QCPPlottable(QCP::Capabilities())
 {
     // A click inside the band reaches the lines under it and pans the view (P-5).
     setSelectable(QCP::stNone);
@@ -162,7 +165,8 @@ void QCPFillBetween::draw(QCPDrawContext& context) const
     // drawing nothing until it names lines of this one again.
     if (first->keyAxis().get() != keyAxisRaw() || first->valueAxis().get() != valueAxisRaw())
         return;
-    if (first == second ? mFirstComponent == mSecondComponent : !first->canFillTo(*second))
+    if (first == second ? mFirstComponent == mSecondComponent
+                        : !qcp::fill::canFillTo(*first, *second))
         return;
     if (!componentDraws(*first, mFirstComponent) || !componentDraws(*second, mSecondComponent))
         return;
@@ -171,7 +175,7 @@ void QCPFillBetween::draw(QCPDrawContext& context) const
     if (!shared || !(shared->upper > shared->lower))
         return;
     const QCPScale keyScale = keyAxisRaw()->scale();
-    const bool across = first != second && first->fillsAcrossValueAxes(*second);
+    const bool across = first != second && qcp::fill::fillsAcrossValueAxes(*first, *second);
     std::vector<qcp::fill::SeriesRow> firstRows
         = rowsOf(*first->dataSource(), mFirstComponent, keyScale, *shared, nullptr, nullptr);
     std::vector<qcp::fill::SeriesRow> secondRows
@@ -223,7 +227,7 @@ quint64 QCPFillBetween::dependencyRevision() const
         second ? second->keyAxis().get() : nullptr, second ? second->valueAxis().get() : nullptr,
         mFirstComponent, mSecondComponent);
     // Across two value axes the band reads both systems' pixels: a pan of either moves it.
-    if (first && second && first != second && first->fillsAcrossValueAxes(*second))
+    if (first && second && first != second && qcp::fill::fillsAcrossValueAxes(*first, *second))
         revision = qHashMulti(revision, first->system()->revision(), second->system()->revision());
     return revision;
 }

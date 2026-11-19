@@ -73,9 +73,9 @@ DOC_SNIPPET(styling_pens_brushes, 600, 360)
         .setPen(Qt::NoPen);
     auto high = customPlot->add<QCPGraph>()
         .setData(x, upper)
-        .setPen(Qt::NoPen)
-        .setBrush(QColor(31, 119, 180, 60));
-    high->setComponentFillToGraph(0, low.get(), 0); // fill between high and low
+        .setPen(Qt::NoPen);
+    customPlot->axisRect()->fillBetween(high, low, // fill between high and low
+                                        { .brush = QColor(31, 119, 180, 60) });
     auto centre = customPlot->add<QCPGraph>()
         .setData(x, mid)
         .setPen(QPen(QColor(31, 119, 180), 2));

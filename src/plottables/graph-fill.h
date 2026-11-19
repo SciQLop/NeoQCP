@@ -10,6 +10,7 @@
 
 class QCPAxis;
 class QCPDrawContext;
+class QCPGraph;
 
 namespace qcp::fill {
 
@@ -25,8 +26,8 @@ struct StripPoint
     int sourceRow = -1;
 };
 
-//! One row of a series in data space, for fillToGraphRows: the key, its value, whether a key
-//! gap starts a new run before it, and the owner source row it came from.
+//! One row of a series in data space, for unionRows: the key, its value, whether a key gap starts
+//! a new run before it, and the owner source row it came from.
 struct SeriesRow
 {
     double key;
@@ -35,11 +36,13 @@ struct SeriesRow
     int row = -1;
 };
 
-//! The partner series sampled at the owner's keys over their common key range, ready for
-//! fillSeries: both edges have the same number of rows. A NaN on either side, or a key gap in
-//! either series, marks a break; the row after a NaN starts a new run.
-std::vector<StripPoint> fillToGraphRows(std::span<const SeriesRow> owner,
-                                        std::span<const SeriesRow> partner);
+//! Whether a fill may reach \a partner: the same coordinate system, or, on a cartesian frame,
+//! across value axes.
+bool canFillTo(const QCPGraph& owner, const QCPGraph& partner);
+
+//! 2.x's channel between y and y2: both cartesian, on one key axis (so one area), with another
+//! value axis of the same orientation. The partner's values then map through pixels.
+bool fillsAcrossValueAxes(const QCPGraph& owner, const QCPGraph& partner);
 
 //! The rows of a fill between two lines: the union of both lines' keys over the key range the two
 //! spans share, each line interpolated linearly at the other's keys, with rows at the crop ends.

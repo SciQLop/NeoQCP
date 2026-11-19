@@ -64,6 +64,7 @@ protected:
 
 private:
     friend class TestFillBetween; //!< reads the recording count: a stale band is that bug
+    friend class TestMultiGraph;  //!< reads the ribbon command, as it did on the graph's fill
 
     void detachLines();
     void attachLines();

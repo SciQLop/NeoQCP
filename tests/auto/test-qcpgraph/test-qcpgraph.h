@@ -12,7 +12,6 @@ private slots:
   void multiColumnAndWaterfallGraphsAreListed();
   void selectedGraphsAndAxisGraphsListTheMultigraph();
   void dataManipulation();
-  void channelFill();
   void aTangentBracketPrintsNothing();
   void anImpulseGraphFitsItsBaseline();
   void anImpulseGraphOnALogAxisFitsItsData();

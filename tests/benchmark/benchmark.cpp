@@ -1565,7 +1565,8 @@ void Benchmark::QCPGraph_FillToGraphPan10k()
     }
     owner->setData(keys, ownerValues);
     partner->setData(keys, partnerValues);
-    owner->setComponentFillToGraph(0, partner, 0, QBrush(QColor(0, 0, 255, 80)));
+    mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(owner), QCPHandle<QCPGraph>(partner),
+                                  { .brush = QBrush(QColor(0, 0, 255, 80)) });
     mPlot->xAxis->setRange(50, 51);
     mPlot->yAxis->setRange(0, 1);
     mPlot->replot();

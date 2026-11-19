@@ -528,7 +528,8 @@ that no section above lists, and the behaviour changes of 5f.
 
 - `draw(QCPDrawContext&)` is pure on `QCPAbstractPlottable` and on `QCPAbstractItem`. A subclass without it no
   longer compiles; before, it drew nothing.
-- `setBrush` on a graph keeps each fill's target (a constant or another column) and changes only its brush.
+- `setBrush` on a graph keeps each fill to a constant and changes only its brush. A fill between two lines
+  is `QCPAxisRect::fillBetween` / `QCPFillBetween`, with its own brush and no graph brush to follow.
 - A legend row reads its legend from the layout it sits in. `parentLegend()` is null until the row is added to a
   legend.
 - A curve given data of another size (`setData`, `addData`, a container edit) drops its colour values and leaves
