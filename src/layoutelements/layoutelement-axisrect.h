@@ -42,9 +42,8 @@ namespace qcp
 // The first argument of QCPAxisRect::add<T>() is an axis pair when it converts to QCPAxis*: the
 // two-axis overload must take that call, not the data pack (a handle converts, H-8).
 template <typename... Args>
-concept FirstArgumentIsNotAnAxis
-    = sizeof...(Args) == 0
-      || !std::convertible_to<std::tuple_element_t<0, std::tuple<Args...>>, QCPAxis*>;
+concept FirstArgumentIsNotAnAxis = sizeof...(Args) == 0
+    || !std::convertible_to<std::tuple_element_t<0, std::tuple<Args...>>, QCPAxis*>;
 } // namespace qcp
 
 class QCPPainter;
@@ -58,6 +57,7 @@ class QCPItemText;
 class QCPColorScale;
 class QCPTextElement;
 class QCPColorMap2;
+class QCPFillBetween;
 
 template <typename T, typename Self = void>
 class QCPColorScaleOps;
@@ -75,6 +75,23 @@ struct QCPLineOptions
     QPen pen;
     QString name;
     QCPScatterStyle scatterStyle;
+};
+
+/*!
+  How QCPAxisRect::fillBetween() styles the fill it makes: the brush of the side where the first
+  line is above the second, the brush of the side where it is below, which components of each line
+  bound the band, and its name in the legend.
+
+  \a belowBrush unset fills both sides with \a brush; a \c Qt::NoBrush leaves that side empty. The
+  same graph may be named twice, with two components: that is a fill between two columns.
+*/
+struct QCPFillOptions
+{
+    QBrush brush;
+    std::optional<QBrush> belowBrush;
+    int firstComponent = 0;
+    int secondComponent = 0;
+    QString name;
 };
 
 /*!
@@ -102,7 +119,7 @@ struct QCPColorMapOptions
     QCPScale dataScale = QCPScale::linear();
     bool colorBar = true;
     std::optional<QCPRange> dataRange = std::nullopt;
-    QString name = {};
+    QString name = { };
 };
 
 class QCP_LIB_DECL QCPAxisRect : public QCPArea
@@ -173,8 +190,7 @@ public:
     // plottable's constructor arguments (its data, for the built-in types). Defined in construct.h,
     // where the construction rules live.
     template <typename T, typename... Args>
-        requires std::derived_from<T, QCPPlottable>
-              && qcp::FirstArgumentIsNotAnAxis<Args...>
+        requires std::derived_from<T, QCPPlottable> && qcp::FirstArgumentIsNotAnAxis<Args...>
     qcp::HandleFor<T> add(Args&&... args);
 
     template <typename T, typename... Args>
@@ -191,8 +207,14 @@ public:
     // graph's data constructor, and \a options feeds its pen, name and scatter style. Defined in
     // axisrect-shortcuts.h, after the graph and the items exist.
     template <QCPNumberRange K, QCPNumbersOnly V>
-    QCPHandle<QCPGraph> line(const K& keys, const V& values,
-                             const QCPLineOptions& options = { });
+    QCPHandle<QCPGraph> line(const K& keys, const V& values, const QCPLineOptions& options = { });
+    // The area between \a first and \a second, in one call: the fill draws under both lines and
+    // takes \a options' brushes, components and name. Lines on another rect's axes, or on systems
+    // that cannot fill to each other, are misuse: one report and an empty handle. Defined in
+    // axisrect-shortcuts.h, after the fill exists.
+    QCPHandle<QCPFillBetween> fillBetween(const QCPHandle<QCPGraph>& first,
+                                          const QCPHandle<QCPGraph>& second,
+                                          const QCPFillOptions& options = { });
     // A text item at \a at, in whatever space \a at names, carrying \a text and \a style.
     QCPHandle<QCPItemText> text(QCP::Position at, const QString& text,
                                 const QCPTextStyle& style = { });
@@ -242,6 +264,7 @@ public:
     //! rect ((0, 0) top left), with its own four axes, drawn above everything of this rect. It
     //! follows this rect and goes with it.
     QCPHandle<QCPAxisRect> addInset(const QRectF& axisRatio);
+
     //! Whether addInset() made this rect (it has layers of its own and is not a cell of a grid).
     [[nodiscard]] bool isInset() const { return mIsInset; }
 
@@ -306,6 +329,7 @@ protected:
     // Kept apart from mOwnLayers, which a user's removeLayer() empties: whether a rect is an inset
     // stays true while its layers can still be made again or its background still follows the plot.
     bool mIsInset = false;
+
     // An inset's own layers, right above the plot's axes layer: its background and grids, its
     // plottables and items, its axes. Empty for a rect that is not an inset.
     struct OwnLayers
@@ -350,15 +374,20 @@ private:
     // inset's, and moves its rect, grids and axes there. False, with nothing left behind, when a
     // layer of that name already exists.
     bool makeOwnLayers(const QCPAxisRect* container);
+
     // The topmost of an inset's own layers.
     QCPLayer* ownTopLayer() const { return mOwnLayers.axes.data(); }
-    // The topmost layer of this rect's inset subtree: its own, and those of the insets nested in it.
+
+    // The topmost layer of this rect's inset subtree: its own, and those of the insets nested in
+    // it.
     QCPLayer* subtreeTopLayer() const;
     // Where a rect's own title and colour scale go: an inset's axes layer, the plot's otherwise.
     QCPLayer* decorationLayer() const;
     void removeOwnLayers();
+
     // Where a plottable or an item added to this rect goes: its own data layer, if it has one.
     QCPLayer* ownDataLayer() const { return mOwnLayers.data.data(); }
+
     // The scale gained or lost a user, or changed the side or width it needs: the margin moves.
     void colorScaleUsersChanged();
     // The axes raw, for the rect's own layout and range passes (K8): the public lists hand out

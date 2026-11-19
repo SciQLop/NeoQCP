@@ -91,6 +91,7 @@
 #include "plottables/plottable-colormapped.h"
 #include "plottables/plottable-curve.h"
 #include "plottables/plottable-errorbar.h"
+#include "plottables/plottable-fillbetween.h"
 #include "plottables/plottable-financial.h"
 #include "plottables/graph-data.h"
 #include "plottables/plottable-graph.h"

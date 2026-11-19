@@ -125,6 +125,24 @@ DOC_SNIPPET(graphs_channel_fill, 600, 360)
     // [/graphs_channel_fill]
 }
 
+DOC_CODE(fill_between_lines)
+{
+    // [fill_between_lines]
+    const std::vector<double> keys { 0.0, 1.0, 2.0, 3.0 };
+    auto ax = customPlot->axisRect();
+    auto first = ax->line(keys, std::vector<double> { 0.8, 0.8, 0.2, 0.2 },
+                          { .pen = QPen(QColor(31, 119, 180), 1.5, Qt::DashLine),
+                            .scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, 6) });
+    auto second = ax->line(keys, std::vector<double> { 0.0, 0.0, 1.0, 1.0 },
+                           { .pen = QPen(QColor(255, 127, 14), 1.5, Qt::DashLine),
+                             .scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, 6) });
+    ax->fillBetween(first, second,
+                    { .brush = QColor(44, 160, 44, 76), // first line above second
+                      .belowBrush = QColor(214, 39, 40, 76) });
+    customPlot->yAxis->setRange(-0.1, 1.1);
+    // [/fill_between_lines]
+}
+
 DOC_SNIPPET(graphs_owning, 600, 360)
 {
     // [graphs_owning]

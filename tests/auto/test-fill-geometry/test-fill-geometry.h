@@ -22,4 +22,12 @@ private slots:
     void steppedMovesBothEdgesAndKeepsBreaks();
     void baselinePixelPastTheEdgeOnALogAxis();
     void baselinePixelOnALogAxisBelowOne();
+    void binnedWhenDenseIsAPixelDecision();
+    void unionRowsInterpolatesBothLines();
+    void unionRowsCropToTheSharedRange();
+    void unionRowsBreakAtANaN();
+    void splitAtCrossingsCutsAtTheExactPoint();
+    void aCrossingOnAKeyMakesNoSliver();
+    void touchingLinesStayOneRun();
+    void aBreakEndsTheRunWithoutACrossing();
 };

@@ -1,8 +1,11 @@
 #include "graph-fill.h"
 #include "../axis/axis.h"
+#include "../handle.h"
+#include "../layoutelements/layoutelement-axisrect.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <utility>
 
 namespace qcp::fill {
@@ -164,6 +167,157 @@ std::vector<StripPoint> fillToGraphRows(std::span<const SeriesRow> owner,
     return rows;
 }
 
+namespace
+{
+
+    //! One line sampled at the keys a fill between it and another line uses.
+    using Sampling = std::pair<double, bool>;
+
+    /*!
+      A line's rows, read at arbitrary keys. Fewer than two rows is a constant: it repeats its value
+      and does not limit the key range. Sampling outside the rows, on a gap, or next to a NaN, is a
+      break.
+    */
+    struct Line
+    {
+        std::span<const SeriesRow> rows;
+
+        bool spans() const { return rows.size() >= 2; }
+
+        Sampling at(double key) const
+        {
+            const double nan = std::numeric_limits<double>::quiet_NaN();
+            if (rows.size() == 1)
+                return { rows.front().value, !std::isfinite(rows.front().value) };
+            const auto it
+                = std::lower_bound(rows.begin(), rows.end(), key,
+                                   [](const SeriesRow& row, double at) { return row.key < at; });
+            if (it != rows.end() && it->key == key)
+                return { it->value, it->breakBefore || !std::isfinite(it->value) };
+            if (it == rows.begin() || it == rows.end())
+                return { nan, true };
+            const SeriesRow& before = *(it - 1);
+            const SeriesRow& after = *it;
+            if (!std::isfinite(before.value) || !std::isfinite(after.value) || after.breakBefore)
+                return { nan, true };
+            const double span = after.key - before.key;
+            if (span <= 0.0)
+                return { after.value, false };
+            const double t = (key - before.key) / span;
+            return { before.value + t * (after.value - before.value), false };
+        }
+
+        int rowAt(double key) const
+        {
+            const auto it
+                = std::lower_bound(rows.begin(), rows.end(), key,
+                                   [](const SeriesRow& row, double at) { return row.key < at; });
+            return it != rows.end() && it->key == key ? it->row : -1;
+        }
+    };
+
+    std::vector<double> unionKeys(const Line& first, const Line& second, double lower, double upper)
+    {
+        std::vector<double> keys { lower };
+        for (const Line* line : { &first, &second })
+            for (const SeriesRow& row : line->rows)
+                if (row.key > lower && row.key < upper)
+                    keys.push_back(row.key);
+        keys.push_back(upper);
+        std::sort(keys.begin(), keys.end());
+        keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
+        return keys;
+    }
+
+} // namespace
+
+std::vector<StripPoint> unionRows(std::span<const SeriesRow> first,
+                                  std::span<const SeriesRow> second)
+{
+    if (first.empty() || second.empty())
+        return { };
+    const Line lines[] { { first }, { second } };
+    double lower = -std::numeric_limits<double>::infinity();
+    double upper = std::numeric_limits<double>::infinity();
+    for (const Line& line : lines)
+        if (line.spans())
+        {
+            lower = std::max(lower, line.rows.front().key);
+            upper = std::min(upper, line.rows.back().key);
+        }
+    if (!(upper > lower))
+        return { };
+
+    std::vector<StripPoint> rows;
+    bool pendingBreak = false;
+    for (double key : unionKeys(lines[0], lines[1], lower, upper))
+    {
+        const auto [a, aBreak] = lines[0].at(key);
+        const auto [b, bBreak] = lines[1].at(key);
+        const bool broken
+            = pendingBreak || aBreak || bBreak || !std::isfinite(a) || !std::isfinite(b);
+        rows.push_back({ key, a, b, broken, lines[0].rowAt(key) });
+        pendingBreak = !std::isfinite(a) || !std::isfinite(b);
+    }
+    return rows;
+}
+
+std::vector<SideRun> splitAtCrossings(std::span<const StripPoint> rows)
+{
+    std::vector<SideRun> runs;
+    SideRun run;
+    const auto startRun = [&run](const StripPoint& row)
+    {
+        run.rows.assign(1, row);
+        run.firstAbove = row.a >= row.b;
+    };
+
+    for (const StripPoint& row : rows)
+    {
+        if (!std::isfinite(row.a) || !std::isfinite(row.b) || row.breakBefore || run.rows.empty())
+        {
+            if (!run.rows.empty())
+                runs.push_back(std::move(run));
+            run = SideRun { };
+            if (std::isfinite(row.a) && std::isfinite(row.b))
+                startRun(row);
+            continue;
+        }
+        const StripPoint prev = run.rows.back();
+        const double d0 = prev.a - prev.b, d1 = row.a - row.b;
+        const bool above = d1 >= 0.0;
+        if ((d0 >= 0.0) == above)
+        {
+            run.rows.push_back(row);
+            continue;
+        }
+        // The two runs meet at the crossing: on the row before, on this row, or between them.
+        std::optional<StripPoint> meeting;
+        if (d0 == 0.0)
+            meeting = prev;
+        else if (d1 == 0.0)
+        {
+            run.rows.push_back(row);
+            meeting = row;
+        }
+        else
+        {
+            const double t = d0 / (d0 - d1);
+            const double key = prev.key + t * (row.key - prev.key);
+            const double value = prev.a + t * (row.a - prev.a);
+            meeting = StripPoint { key, value, value, false, -1 };
+            run.rows.push_back(*meeting);
+        }
+        runs.push_back(std::move(run));
+        run = SideRun { { *meeting }, above };
+        if (meeting->key != row.key)
+            run.rows.push_back(row);
+    }
+    if (!run.rows.empty())
+        runs.push_back(std::move(run));
+    return runs;
+}
+
 std::vector<StripPoint> binToSpans(std::span<const StripPoint> rows, double binWidthPx)
 {
     Q_ASSERT(binWidthPx > 0);
@@ -211,8 +365,7 @@ std::vector<StripPoint> stepped(std::span<const StripPoint> rows, Step step)
 
 // simplify: a value <= 0 is taken as invalid on every log axis, but on an all-negative range the
 // invalid values are the ones >= 0. Callers then push valid negative values to the edge. Upgrade:
-// test the value's sign against the range's sign in baselinePixel, as QCPGraph::fillValue
-// does.
+// test the value's sign against the range's sign in baselinePixel, as fillValue does.
 std::pair<double, double> logZeroSideEdges(const QCPAxis& valueAxis)
 {
     const QCPRange range = valueAxis.range();
@@ -230,6 +383,130 @@ double baselinePixel(const QCPAxis& valueAxis, double value)
         return valueAxis.coordToPixel(value);
     const auto [edge, other] = logZeroSideEdges(valueAxis);
     return edge + 2.0 * (edge - other);
+}
+
+double fillValue(const QCPAxis& valueAxis, double value)
+{
+    if (!valueAxis.scale().isLog() || std::isnan(value))
+        return value;
+    const QCPRange range = valueAxis.range();
+    if (range.upper < 0)
+        return value < 0 ? value : range.upper;
+    return value > 0 ? value : range.lower;
+}
+
+std::vector<StripPoint> steppedOnScreen(std::vector<StripPoint> rows, Step step,
+                                        const QCPScale& keyScale)
+{
+    if (keyScale.isLinear() || step != Step::Center)
+        return stepped(rows, step);
+    const auto position = [&](double key)
+    {
+        if (keyScale.isLog())
+            return key > 0.0 ? std::log10(key) : qQNaN();
+        return keyScale.toScale(key);
+    };
+    const auto back = [&](double mapped)
+    { return keyScale.isLog() ? std::pow(10.0, mapped) : keyScale.fromScale(mapped); };
+    for (StripPoint& row : rows)
+        row.key = position(row.key);
+    std::vector<StripPoint> shaped = stepped(rows, step);
+    for (StripPoint& row : shaped)
+        row.key = back(row.key);
+    return shaped;
+}
+
+std::vector<StripPoint> binnedWhenDense(const QCPAxis& keyAxis, std::vector<StripPoint> rows)
+{
+    const QCPHandle<QCPAxisRect> axisRect = keyAxis.axisRect();
+    if (!axisRect)
+        return rows;
+    const QRect rect = axisRect->rect();
+    const int pixelLength = keyAxis.orientation() == Qt::Vertical ? rect.height() : rect.width();
+    // No layout yet (a range query runs first): there is no pixel to bin into, and a bin width
+    // taken from a zero-length rect would shape rows the picture will never match.
+    if (pixelLength <= 0)
+        return rows;
+    if (rows.size() <= 4 * std::size_t(pixelLength))
+        return rows;
+    const double quarterPixel = 4.0 * std::max(1, pixelLength);
+    if (keyAxis.scale().isLog())
+    {
+        const QCPRange range = keyAxis.range();
+        if (range.lower <= 0.0 || range.upper <= 0.0)
+            return rows;
+        const double width = std::log10(range.upper / range.lower) / quarterPixel;
+        if (!(width > 0.0))
+            return rows;
+        for (StripPoint& row : rows)
+            row.key = row.key > 0.0 && std::isfinite(row.key) ? std::log10(row.key) : std::nan("");
+        std::vector<StripPoint> spans = binToSpans(rows, width);
+        for (StripPoint& span : spans)
+            span.key = std::pow(10.0, span.key);
+        return spans;
+    }
+    if (keyAxis.scale().isSymlog())
+    {
+        const QCPScale scale = keyAxis.scale();
+        const QCPRange range = keyAxis.range();
+        const double width
+            = (scale.toScale(range.upper) - scale.toScale(range.lower)) / quarterPixel;
+        if (!(width > 0.0))
+            return rows;
+        for (StripPoint& row : rows)
+            row.key = std::isfinite(row.key) ? scale.toScale(row.key) : std::nan("");
+        std::vector<StripPoint> spans = binToSpans(rows, width);
+        for (StripPoint& span : spans)
+            span.key = scale.fromScale(span.key);
+        return spans;
+    }
+    const double width = std::abs(keyAxis.range().size()) / quarterPixel;
+    if (!(width > 0.0))
+        return rows;
+    return binToSpans(rows, width);
+}
+
+std::vector<StripPoint> shapedForAxis(const QCPAxis& keyAxis, std::vector<StripPoint> rows,
+                                      Step step)
+{
+    rows = binnedWhenDense(keyAxis, std::move(rows));
+    return steppedOnScreen(std::move(rows), step, keyAxis.scale());
+}
+
+FillSeries fillSeries(std::span<const StripPoint> rows)
+{
+    std::vector<QPointF> upper, lower;
+    upper.reserve(rows.size());
+    lower.reserve(rows.size());
+    bool havePrevious = false;
+    bool pendingBreak = false;
+    double previousKey = 0.0;
+    double previousLower = 0.0;
+    for (const StripPoint& row : rows)
+    {
+        if (!std::isfinite(row.key) || !std::isfinite(row.a) || !std::isfinite(row.b))
+        {
+            pendingBreak = true;
+            continue;
+        }
+        if ((row.breakBefore || pendingBreak) && havePrevious)
+        {
+            upper.emplace_back(previousKey, previousLower);
+            lower.emplace_back(previousKey, previousLower);
+            upper.emplace_back(row.key, row.b);
+            lower.emplace_back(row.key, row.b);
+        }
+        pendingBreak = false;
+        upper.emplace_back(row.key, row.a);
+        lower.emplace_back(row.key, row.b);
+        previousKey = row.key;
+        previousLower = row.b;
+        havePrevious = true;
+    }
+    if (upper.size() < 2)
+        return { };
+    return { std::make_shared<const std::vector<QPointF>>(std::move(upper)),
+             std::make_shared<const std::vector<QPointF>>(std::move(lower)) };
 }
 
 } // namespace qcp::fill

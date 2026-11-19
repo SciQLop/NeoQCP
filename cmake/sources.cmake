@@ -80,6 +80,7 @@ set(NEOQCP_SOURCES
     src/plottables/plottable-colormap.cpp
     src/plottables/plottable-curve.cpp
     src/plottables/plottable-errorbar.cpp
+    src/plottables/plottable-fillbetween.cpp
     src/plottables/plottable-financial.cpp
     src/plottables/plottable-draw-utils.cpp
     src/plottables/plottable-graph.cpp
@@ -178,6 +179,7 @@ set(NEOQCP_MOC_HEADERS
     src/plottables/plottable-colormap.h
     src/plottables/plottable-curve.h
     src/plottables/plottable-errorbar.h
+    src/plottables/plottable-fillbetween.h
     src/plottables/plottable-financial.h
     src/plottables/graph-data.h
     src/plottables/plottable-graph.h

@@ -259,3 +259,147 @@ void TestFillGeometry::baselinePixelOnALogAxisBelowOne()
     LogAxisPlot p(0.001, 0.5);
     QCOMPARE(qcp::fill::baselinePixel(p.axis(), 0.0), pastTheEdge(p.axis(), 0.001, 0.5));
 }
+
+namespace
+{
+using qcp::fill::SeriesRow;
+
+std::vector<SeriesRow> series(std::initializer_list<double> keys,
+                              std::initializer_list<double> values)
+{
+    std::vector<SeriesRow> rows;
+    int row = 0;
+    for (auto k = keys.begin(), v = values.begin(); k != keys.end() && v != values.end(); ++k, ++v)
+        rows.push_back({ *k, *v, false, row++ });
+    return rows;
+}
+
+QByteArray describeRun(const qcp::fill::SideRun& run)
+{
+    QByteArray out = run.firstAbove ? "above [" : "below [";
+    for (const StripPoint& row : run.rows)
+        out += describe(row) + " ";
+    return out + "]";
+}
+
+// The keys of a run, so a split is read at a glance.
+QList<double> keysOf(const qcp::fill::SideRun& run)
+{
+    QList<double> keys;
+    for (const StripPoint& row : run.rows)
+        keys << row.key;
+    return keys;
+}
+}
+
+void TestFillGeometry::unionRowsInterpolatesBothLines()
+{
+    const auto first = series({ 0, 2 }, { 0, 2 });
+    const std::vector<StripPoint> expected { { 0, 0, 5 }, { 1, 1, 5 }, { 2, 2, 5 } };
+    // A line of one point is a constant: it does not limit the range, it repeats its value.
+    for (const auto& second : { series({ 1 }, { 5 }), series({ 0, 1, 2 }, { 5, 5, 5 }) })
+    {
+        const auto rows = qcp::fill::unionRows(first, second);
+        QCOMPARE(rows.size(), expected.size());
+        for (std::size_t i = 0; i < rows.size(); ++i)
+            QVERIFY2(samePoint(rows[i], expected[i]), describe(rows[i]).constData());
+    }
+}
+
+void TestFillGeometry::unionRowsCropToTheSharedRange()
+{
+    const auto rows = qcp::fill::unionRows(series({ 0, 1, 2, 3 }, { 0, 10, 20, 30 }),
+                                           series({ 1, 2 }, { 1, 2 }));
+    QCOMPARE(rows.size(), std::size_t(2));
+    QCOMPARE(rows[0].key, 1.0);
+    QCOMPARE(rows[0].a, 10.0);
+    QCOMPARE(rows[0].b, 1.0);
+    QCOMPARE(rows[1].key, 2.0);
+    QCOMPARE(rows[1].a, 20.0);
+    QCOMPARE(rows[1].b, 2.0);
+    // The crop ends are rows too, interpolated on the line that has no key there.
+    const auto cropped = qcp::fill::unionRows(series({ 0, 1, 2, 3 }, { 0, 10, 20, 30 }),
+                                              series({ 1.5, 2.5 }, { -5, 5 }));
+    QCOMPARE(cropped.size(), std::size_t(3));
+    QCOMPARE(cropped[0].key, 1.5);
+    QCOMPARE(cropped[0].a, 15.0);
+    QCOMPARE(cropped[0].b, -5.0);
+    QCOMPARE(cropped[1].key, 2.0);
+    QCOMPARE(cropped[2].key, 2.5);
+    QCOMPARE(cropped[2].a, 25.0);
+    QCOMPARE(cropped[2].b, 5.0);
+}
+
+void TestFillGeometry::unionRowsBreakAtANaN()
+{
+    const auto rows = qcp::fill::unionRows(series({ 0, 1, 2, 3 }, { 0, kNan, 1, 1 }),
+                                           series({ 0, 1, 2, 3 }, { 0, 0, 0, 0 }));
+    QCOMPARE(rows.size(), std::size_t(4));
+    QVERIFY(!rows[0].breakBefore);
+    QVERIFY(rows[1].breakBefore);
+    QVERIFY(std::isnan(rows[1].a));
+    QVERIFY(rows[2].breakBefore);
+    QVERIFY(!rows[3].breakBefore);
+}
+
+void TestFillGeometry::splitAtCrossingsCutsAtTheExactPoint()
+{
+    const std::vector<StripPoint> rows {
+        { 0, 0.8, 0 }, { 1, 0.8, 0 }, { 2, 0.2, 1 }, { 3, 0.2, 1 }
+    };
+    const auto runs = qcp::fill::splitAtCrossings(rows);
+    QCOMPARE(runs.size(), std::size_t(2));
+    QVERIFY2(runs[0].firstAbove, describeRun(runs[0]).constData());
+    QCOMPARE(keysOf(runs[0]), (QList<double> { 0, 1, 1.5 }));
+    QCOMPARE(runs[0].rows[2].sourceRow, -1);
+    QCOMPARE(runs[0].rows[2].a, runs[0].rows[2].b);
+    QVERIFY(std::abs(runs[0].rows[2].a - 0.5) < 1e-12);
+    QVERIFY2(!runs[1].firstAbove, describeRun(runs[1]).constData());
+    QCOMPARE(keysOf(runs[1]), (QList<double> { 1.5, 2, 3 }));
+    QCOMPARE(runs[1].rows[0].key, runs[0].rows[2].key);
+}
+
+void TestFillGeometry::aCrossingOnAKeyMakesNoSliver()
+{
+    const std::vector<StripPoint> rows { { 0, 1, 0 }, { 1, 0, 0 }, { 2, -1, 0 } };
+    const auto runs = qcp::fill::splitAtCrossings(rows);
+    QCOMPARE(runs.size(), std::size_t(2));
+    QVERIFY2(runs[0].firstAbove, describeRun(runs[0]).constData());
+    QCOMPARE(keysOf(runs[0]), (QList<double> { 0, 1 }));
+    QVERIFY2(!runs[1].firstAbove, describeRun(runs[1]).constData());
+    QCOMPARE(keysOf(runs[1]), (QList<double> { 1, 2 }));
+}
+
+void TestFillGeometry::touchingLinesStayOneRun()
+{
+    const std::vector<StripPoint> rows { { 0, 1, 0 }, { 1, 0, 0 }, { 2, 1, 0 } };
+    const auto runs = qcp::fill::splitAtCrossings(rows);
+    QCOMPARE(runs.size(), std::size_t(1));
+    QVERIFY(runs[0].firstAbove);
+    QCOMPARE(keysOf(runs[0]), (QList<double> { 0, 1, 2 }));
+}
+
+void TestFillGeometry::aBreakEndsTheRunWithoutACrossing()
+{
+    const std::vector<StripPoint> rows { { 0, 1, 0 }, { 1, 1, 0 }, { 2, 1, 0, true }, { 3, 1, 0 } };
+    const auto runs = qcp::fill::splitAtCrossings(rows);
+    QCOMPARE(runs.size(), std::size_t(2));
+    QCOMPARE(keysOf(runs[0]), (QList<double> { 0, 1 }));
+    QCOMPARE(keysOf(runs[1]), (QList<double> { 2, 3 }));
+    QVERIFY(runs[1].firstAbove);
+}
+
+// A range query runs before the first layout, when the axis rect has no pixel to bin into: the rows
+// must come back as they are, or the fill records bins its own layout will never match.
+void TestFillGeometry::binnedWhenDenseIsAPixelDecision()
+{
+    QCustomPlot plot;
+    plot.yAxis->setRange(0.0, 1000.0);
+    std::vector<qcp::fill::StripPoint> rows;
+    for (int i = 0; i < 100; ++i)
+        rows.push_back({ double(i) * 10.0, 0.0, 1.0, false, i });
+
+    const std::vector<qcp::fill::StripPoint> kept
+        = qcp::fill::binnedWhenDense(*plot.yAxis, std::move(rows));
+    QCOMPARE(kept.size(), std::size_t(100));
+}

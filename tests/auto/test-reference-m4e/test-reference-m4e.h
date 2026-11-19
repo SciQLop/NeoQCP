@@ -74,6 +74,7 @@ private slots:
     void brickBreakerTarget();
     void asteroidsTarget();
     void asteroidsOverTarget();
+    void fillBetweenTarget();
 };
 
 #endif // TEST_REFERENCE_M4E_H

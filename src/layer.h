@@ -387,6 +387,9 @@ protected:
     void initializeParentPlot(QCustomPlot* parentPlot);
     void setParentLayerable(QCPLayerable* parentLayerable);
     bool moveToLayer(QCPLayer* layer, bool prepend);
+    //! Moves this layerable to just below \a other in its layer, so \a other draws over it. False
+    //! when the two are not on one layer.
+    bool moveBelow(const QCPLayerable* other);
     void emitLayerChanged();
     //! Leaves the layer without a signal: for a destructor, where nothing may listen any more.
     void leaveLayerSilently();

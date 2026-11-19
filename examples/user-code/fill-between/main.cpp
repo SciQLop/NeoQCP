@@ -1,4 +1,4 @@
-// Target program (milestone 6): a fill between two lines, coloured by which is on top. Does not compile yet.
+// Target program (milestone 6): a fill between two lines, coloured by which is on top.
 // https://matplotlib.org/stable/gallery/lines_bars_and_markers/fill_between_demo.html
 // (section "Selectively filling horizontal regions", the interpolate=True panel)
 

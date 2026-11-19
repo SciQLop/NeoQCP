@@ -20,6 +20,7 @@
 #include "test-draw-context/test-draw-context.h"
 #include "test-drawable/test-drawable.h"
 #include "test-errorbar-geometry/test-errorbar-geometry.h"
+#include "test-fill-between/test-fill-between.h"
 #include "test-fill-geometry/test-fill-geometry.h"
 #include "test-gestures/test-gestures.h"
 #include "test-gradient-presets/test-gradient-presets.h"
@@ -184,6 +185,7 @@ int main(int argc, char** argv)
     QCPTEST(TestMultiDataSource);
     QCPTEST(TestMultiGraph);
     QCPTEST(TestFillGeometry);
+    QCPTEST(TestFillBetween);
     QCPTEST(TestHistogram1D);
     QCPTEST(TestHistogramPlottable);
     QCPTEST(TestErrorBarGeometry);

@@ -21,10 +21,11 @@ namespace
 {
 const QString kDir = QStringLiteral("test-reference-m4e");
 
-QImage render(const std::function<void(QCustomPlot&)>& setup)
+QImage render(const std::function<void(QCustomPlot&)>& setup,
+              const QSize& size = QSize(400, 300))
 {
     QCustomPlot plot;
-    plot.resize(400, 300);
+    plot.resize(size);
     QFont font = qcp::test::referenceFont();
     font.setPixelSize(10);
     plot.setFont(font);
@@ -35,7 +36,9 @@ QImage render(const std::function<void(QCustomPlot&)>& setup)
     }
     setup(plot);
     plot.replot();
-    return plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    return plot.toPixmap(size.width(), size.height())
+        .toImage()
+        .convertToFormat(QImage::Format_ARGB32);
 }
 
 void check(const QImage& image, const char* name)
@@ -1776,4 +1779,32 @@ void TestReferenceM4e::asteroidsTarget()
 void TestReferenceM4e::asteroidsOverTarget()
 {
     check(asteroidsScene(true), "asteroids-over-target.png");
+}
+
+void TestReferenceM4e::fillBetweenTarget()
+{
+    check(render(
+              [](QCustomPlot& plot)
+              {
+                  const std::vector<double> keys { 0, 1, 2, 3 };
+                  const std::vector<double> upper { 0.8, 0.8, 0.2, 0.2 };
+                  const std::vector<double> lower { 0, 0, 1, 1 };
+                  const QColor first(31, 119, 180), second(255, 127, 14);
+                  const QCPHandle<QCPAxisRect> rect = plot.axisRect();
+                  const auto upperLine = rect->line(
+                      keys, upper,
+                      { .pen = QPen(first, 1.5, Qt::DashLine),
+                        .scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, first, 7) });
+                  const auto lowerLine = rect->line(
+                      keys, lower,
+                      { .pen = QPen(second, 1.5, Qt::DashLine),
+                        .scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, second, 7) });
+                  rect->fillBetween(upperLine, lowerLine,
+                                    { .brush = QColor(44, 160, 44, 76),
+                                      .belowBrush = QColor(214, 39, 40, 76) });
+                  rect->setTitle(QStringLiteral("interpolation=True"));
+                  plot.rescaleAxes();
+              },
+              QSize(640, 400)),
+          "fill-between-target.png");
 }

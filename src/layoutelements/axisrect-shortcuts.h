@@ -14,6 +14,7 @@
 #include "../items/item-ellipse.h"
 #include "../items/item-text.h"
 #include "../plottables/plottable-graph.h"
+#include "../plottables/plottable-fillbetween.h"
 #include "../plottables/plottable-colormap2.h"
 #include "construct.h"
 #include "layoutelement-axisrect.h"
@@ -36,6 +37,56 @@ QCPHandle<QCPGraph> QCPAxisRect::line(const K& keys, const V& values, const QCPL
     graph->setName(options.name);
     graph->setScatterStyle(options.scatterStyle);
     return graph;
+}
+
+/*!
+  The area between \a first and \a second on this rect, styled by \a options.
+
+  The fill draws under the lower of its two lines: the two lines keep the order they were added in,
+  and the fill goes just below whichever of them draws first.
+
+  Both lines must be on this rect's axes, and must fill to each other: the same system, or 2.x's
+  channel between y and y2 (one key axis, two value axes). Anything else is misuse, reported once,
+  and gives an empty handle.
+*/
+inline QCPHandle<QCPFillBetween> QCPAxisRect::fillBetween(const QCPHandle<QCPGraph>& first,
+                                                          const QCPHandle<QCPGraph>& second,
+                                                          const QCPFillOptions& options)
+{
+    QCP_CHECK_OR_RETURN(first && second, "a fill needs two lines", { });
+    QCP_CHECK_OR_RETURN(first.get() == second.get() || first->canFillTo(*second),
+                        "the two lines of a fill must fill to each other", { });
+    const QList<QCPAxis*> own = axesRaw();
+    const auto onThisRect
+        = [&own](const QCPAxis* axis) { return axis && own.contains(const_cast<QCPAxis*>(axis)); };
+    QCP_CHECK_OR_RETURN(onThisRect(first->keyAxis().get()) && onThisRect(first->valueAxis().get())
+                            && onThisRect(second->keyAxis().get())
+                            && onThisRect(second->valueAxis().get()),
+                        "the two lines of a fill must be on this rect's axes", { });
+
+    const QCPHandle<QCPFillBetween> fill
+        = add<QCPFillBetween>(first->keyAxis().get(), first->valueAxis().get());
+    if (!fill)
+        return fill;
+    fill->setLines(first.get(), options.firstComponent, second.get(), options.secondComponent);
+    fill->setBrush(options.brush);
+    fill->setBelowBrush(options.belowBrush);
+    fill->setName(options.name);
+
+    const auto drawOrder = [](const QCPLayerable* child)
+    {
+        if (!child || !child->layer())
+            return -1;
+        const auto siblings = child->layer()->children();
+        for (int i = 0; i < siblings.size(); ++i)
+            if (siblings.at(i).get() == child)
+                return i;
+        return -1;
+    };
+    const QCPGraph* lower
+        = drawOrder(first.get()) <= drawOrder(second.get()) ? first.get() : second.get();
+    fill->moveBelow(lower);
+    return fill;
 }
 
 /*!

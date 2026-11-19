@@ -231,6 +231,13 @@ public:
     //! The fill brush of a selected or unselected run; a selected run takes the user's decorator
     //! brush, or else the selected pen's colour at the fill's alpha.
     [[nodiscard]] QBrush fillRunBrush(const Fill& fill, bool selected) const;
+    //! Whether a fill may reach \a partner: the same system, or across value axes.
+    [[nodiscard]] bool canFillTo(const QCPGraph& partner) const;
+    //! 2.x's channel between y and y2: both cartesian, on one key axis (so one area), with another
+    //! value axis of the same orientation. The partner's values then map through pixels.
+    [[nodiscard]] bool fillsAcrossValueAxes(const QCPGraph& partner) const;
+    //! The step shape of \a owner's line, which shapes both edges of a fill that line owns.
+    [[nodiscard]] static qcp::fill::Step ownerStep(const QCPGraphComponent& owner);
 
     struct ErrorBars {
         int value = -1, lower = -1, upper = -1;
@@ -467,15 +474,9 @@ protected:
     void hideErrorBound(int column);
     void releaseErrorBounds(const ErrorBars& removed);
     bool setFill(Fill fill);
-    //! Whether a fill may reach \a partner: the same system, or across value axes.
-    [[nodiscard]] bool canFillTo(const QCPGraph& partner) const;
-    //! 2.x's channel between y and y2: both cartesian, on one key axis (so one area), with another
-    //! value axis of the same orientation. The partner's values then map through pixels.
-    [[nodiscard]] bool fillsAcrossValueAxes(const QCPGraph& partner) const;
     [[nodiscard]] bool isErrorBound(int column) const;
     void decorationsChanged();
     [[nodiscard]] bool fillDrawable(const Fill& fill, int columnCount) const;
-    [[nodiscard]] static qcp::fill::Step ownerStep(const QCPGraphComponent& owner);
     [[nodiscard]] std::vector<qcp::fill::StripPoint> fillRows(const Fill& fill,
                                                               const QCPMultiDataSource& ds,
                                                               int begin, int end) const;

@@ -94,6 +94,31 @@ Both graphs must share their key axis. Their value axes may differ.
 `removeFromLegend()` keeps the helper graph out of the legend.
 When both edges are columns of one graph, use `setComponentFillBetween()` instead, see below.
 
+## Fill between two lines
+
+`fillBetween(first, second, options)` fills the area between two graphs you already have.
+`options.brush` fills where the first line is above the second, `options.belowBrush` where it is below.
+
+```{literalinclude} snippets/graphs.cpp
+:start-after: // [fill_between_lines]
+:end-before: // [/fill_between_lines]
+:language: cpp
+:dedent:
+```
+
+The two edges swap colours at the exact crossing, halfway between the two keys that bracket it, so no sliver of the wrong colour is left behind.
+Leave `belowBrush` unset to fill both sides with `brush`, or set it to `Qt::NoBrush` to leave that side empty.
+
+The fill owns no data. Each time it is drawn it reads both lines again, so `setData` on either one moves the fill too.
+Rows are the union of both lines' keys over the key range they share, each line interpolated at the other's keys (in the snippet above `first` at key 1 reads the midpoint of its own 0.8 and 0.2).
+A NaN, or a skipped key, in either line breaks the fill there.
+The first line's step style shapes both edges.
+
+The fill goes just below the lower of its two lines in the layer, so the lines and their markers stay on top.
+It is not selectable: a click inside it reaches the lines, and the drag pans the plot.
+Pass `options.name` to put it in the legend.
+Calling `fillBetween(graph, graph, options)` with two different components of one graph fills between those two columns.
+
 ## Plot your own arrays
 
 The `QVector<double>` form copies your points into the graph.

@@ -3,8 +3,8 @@
 The programs a user should be able to write with NeoQCP 3.0. The library changes until they compile (spec
 `docs/specs/2026-11-14-neoqcp-3-milestone-6-design.md`). Since milestones 6d and 6e, `lollipop`, `shared-x`, `symlog`,
 `spectrogram`, `callout`, `peak-fit`, `brick-breaker` and `asteroids` compile and are built with the examples
-(`-Dwith_examples=true`, `examples/user-code/meson.build`); the others wait for 6g (fill between, zoom indicator) and
-6h (annotations). Every name they assume that does not exist today is
+(`-Dwith_examples=true`, `examples/user-code/meson.build`), and since 6g so does `fill-between`; the others wait
+for 6g (zoom indicator) and 6h (annotations). Every name they assume that does not exist today is
 in `docs/plans/neoqcp-3/m6-vocabulary.md`. Each folder has the C++ target and a Python sketch of the same program.
 
 | Target | What it shows | Survey row it answers |

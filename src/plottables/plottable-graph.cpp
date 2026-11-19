@@ -2046,74 +2046,10 @@ QVector<QPointF> stepCentreLines(QVector<QPointF> points, const QCPScale& keySca
     return vertices;
 }
 
-std::vector<qcp::fill::StripPoint> steppedOnScreen(std::vector<qcp::fill::StripPoint> rows,
-                                                   qcp::fill::Step step,
-                                                   const QCPScale& keyScale)
-{
-    if (keyScale.isLinear() || step != qcp::fill::Step::Center)
-        return qcp::fill::stepped(rows, step);
-    const auto position = [&](double key)
-    {
-        if (keyScale.isLog()) return key > 0.0 ? std::log10(key) : qQNaN();
-        return keyScale.toScale(key);
-    };
-    const auto back = [&](double mapped)
-    { return keyScale.isLog() ? std::pow(10.0, mapped) : keyScale.fromScale(mapped); };
-    for (qcp::fill::StripPoint& row : rows)
-        row.key = position(row.key);
-    std::vector<qcp::fill::StripPoint> stepped = qcp::fill::stepped(rows, step);
-    for (qcp::fill::StripPoint& row : stepped)
-        row.key = back(row.key);
-    return stepped;
-}
-
 std::shared_ptr<const std::vector<QPointF>> sharedPoints(const QVector<QPointF>& points)
 {
     return std::make_shared<const std::vector<QPointF>>(points.begin(), points.end());
 }
-
-using FillSeries = std::pair<std::shared_ptr<const std::vector<QPointF>>,
-                             std::shared_ptr<const std::vector<QPointF>>>;
-
-// The two edges of a fill, as equal-length series. A gap pinches them together at the row before
-// it and the row after it: the polygon and the ribbon then add no triangles across the break, and
-// one fill stays one command.
-FillSeries fillSeries(std::span<const qcp::fill::StripPoint> rows)
-{
-    std::vector<QPointF> upper, lower;
-    upper.reserve(rows.size());
-    lower.reserve(rows.size());
-    bool havePrevious = false;
-    bool pendingBreak = false;
-    double previousKey = 0.0;
-    double previousLower = 0.0;
-    for (const qcp::fill::StripPoint& row : rows)
-    {
-        if (!std::isfinite(row.key) || !std::isfinite(row.a) || !std::isfinite(row.b))
-        {
-            pendingBreak = true;
-            continue;
-        }
-        if ((row.breakBefore || pendingBreak) && havePrevious)
-        {
-            upper.emplace_back(previousKey, previousLower);
-            lower.emplace_back(previousKey, previousLower);
-            upper.emplace_back(row.key, row.b);
-            lower.emplace_back(row.key, row.b);
-        }
-        pendingBreak = false;
-        upper.emplace_back(row.key, row.a);
-        lower.emplace_back(row.key, row.b);
-        previousKey = row.key;
-        previousLower = row.b;
-        havePrevious = true;
-    }
-    if (upper.size() < 2)
-        return { };
-    return { std::make_shared<const std::vector<QPointF>>(std::move(upper)),
-             std::make_shared<const std::vector<QPointF>>(std::move(lower)) };
-}
-
 
 } // namespace
 
@@ -2570,12 +2506,7 @@ std::vector<qcp::fill::StripPoint> QCPGraph::fillRows(const Fill& fill,
 // recording then follows that bound, so it is transform-dependent.
 double QCPGraph::fillValue(const QCPAxis& valueAxis, double value)
 {
-    if (!valueAxis.scale().isLog() || std::isnan(value))
-        return value;
-    const QCPRange range = valueAxis.range();
-    if (range.upper < 0)
-        return value < 0 ? value : range.upper;
-    return value > 0 ? value : range.lower;
+    return qcp::fill::fillValue(valueAxis, value);
 }
 
 // Binned when the rows outnumber 4 per pixel, the lines' own L2 density (kLevel2PixelMultiplier).
@@ -2588,7 +2519,8 @@ std::vector<qcp::fill::StripPoint> QCPGraph::shapeFillRows(
         rows = binnedWhenDense(std::move(rows));
     // A straight-segment frame spaces its corners in the space its reader sees.
     const QCPScale keyScale = shownKeyScale();
-    return steppedOnScreen(std::move(rows), ownerStep(mComponents[fill.owner]), keyScale);
+    return qcp::fill::steppedOnScreen(std::move(rows), ownerStep(mComponents[fill.owner]),
+                                      keyScale);
 }
 
 std::vector<qcp::fill::StripPoint> QCPGraph::fillToGraphRows(
@@ -2651,45 +2583,7 @@ std::vector<qcp::fill::StripPoint> QCPGraph::fillToGraphRows(
 std::vector<qcp::fill::StripPoint> QCPGraph::binnedWhenDense(
     std::vector<qcp::fill::StripPoint> rows) const
 {
-    const QRect rect = axisRectOf(keyAxisRaw())->rect();
-    const int pixelLength = keyAxisRaw()->orientation() == Qt::Vertical ? rect.height() : rect.width();
-    if (rows.size() <= 4 * std::size_t(std::max(0, pixelLength)))
-        return rows;
-    const double quarterPixel = 4.0 * std::max(1, pixelLength);
-    if (keyAxisRaw()->scale().isLog())
-    {
-        const QCPRange range = keyAxisRaw()->range();
-        if (range.lower <= 0.0 || range.upper <= 0.0)
-            return rows;
-        const double width = std::log10(range.upper / range.lower) / quarterPixel;
-        if (!(width > 0.0))
-            return rows;
-        for (qcp::fill::StripPoint& row : rows)
-            row.key = row.key > 0.0 && std::isfinite(row.key) ? std::log10(row.key) : std::nan("");
-        std::vector<qcp::fill::StripPoint> spans = qcp::fill::binToSpans(rows, width);
-        for (qcp::fill::StripPoint& span : spans)
-            span.key = std::pow(10.0, span.key);
-        return spans;
-    }
-    if (keyAxisRaw()->scale().isSymlog())
-    {
-        const QCPScale scale = keyAxisRaw()->scale();
-        const QCPRange range = keyAxisRaw()->range();
-        const double width
-            = (scale.toScale(range.upper) - scale.toScale(range.lower)) / quarterPixel;
-        if (!(width > 0.0))
-            return rows;
-        for (qcp::fill::StripPoint& row : rows)
-            row.key = std::isfinite(row.key) ? scale.toScale(row.key) : std::nan("");
-        std::vector<qcp::fill::StripPoint> spans = qcp::fill::binToSpans(rows, width);
-        for (qcp::fill::StripPoint& span : spans)
-            span.key = scale.fromScale(span.key);
-        return spans;
-    }
-    const double width = std::abs(keyAxisRaw()->range().size()) / quarterPixel;
-    if (!(width > 0.0))
-        return rows;
-    return qcp::fill::binToSpans(rows, width);
+    return qcp::fill::binnedWhenDense(*keyAxisRaw(), std::move(rows));
 }
 
 // The selection is simplified (sorted, disjoint): a binary search finds the one range that can
@@ -2773,7 +2667,7 @@ void QCPGraph::recordFills(QCPDrawContext& context, const QCPMultiDataSource& ds
             const std::vector<qcp::fill::StripPoint> rows = shapeFillRows(fill, std::move(run));
             if (rows.empty())
                 return;
-            const auto [upper, lower] = fillSeries(rows);
+            const auto [upper, lower] = qcp::fill::fillSeries(rows);
             if (!upper)
                 return;
             context.fillBetween(upper, lower, brush);
@@ -2924,7 +2818,7 @@ void QCPGraph::recordErrorBars(QCPDrawContext& context, const QCPMultiDataSource
         const bool band = !rawRows || !errorBarsFitInView(bars, 3.0 * spec.capWidthPx);
         if (band)
         {
-            const auto [upper, lower] = fillSeries(errorBandRows(spec, ds, begin, end));
+            const auto [upper, lower] = qcp::fill::fillSeries(errorBandRows(spec, ds, begin, end));
             if (!upper)
                 continue;
             QColor color = errorBarPen(spec).color();

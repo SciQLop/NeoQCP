@@ -1179,6 +1179,25 @@ bool QCPLayerable::moveToLayer(QCPLayer* layer, bool prepend)
     return true;
 }
 
+// The z order within one layer: the fill a line owns draws under that line, whatever order the two
+// were added in (P-3). An index in the layer is a draw order, so inserting at other's index puts
+// this object immediately below it.
+bool QCPLayerable::moveBelow(const QCPLayerable* other)
+{
+    if (!other || !mLayer || other->mLayer != mLayer)
+        return false;
+    QList<QCPLayerable*>& children = mLayer->mChildren;
+    const int otherIndex = children.indexOf(const_cast<QCPLayerable*>(other));
+    const int currentIndex = children.indexOf(this);
+    if (otherIndex < 0 || currentIndex < 0 || currentIndex == otherIndex - 1)
+        return false;
+    children.removeAt(currentIndex);
+    children.insert(children.indexOf(const_cast<QCPLayerable*>(other)), this);
+    mLayer->childrenChanged();
+    mLayer->invalidatePaintBuffer();
+    return true;
+}
+
 // qobject_cast: null when the plot is down to ~QObject, where nothing of it may be touched.
 void QCPLayerable::emitLayerChanged()
 {
