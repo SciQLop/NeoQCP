@@ -408,6 +408,40 @@ void TestFillGeometry::aBreakEndsTheRunWithoutACrossing()
     QVERIFY(runs[1].firstAbove);
 }
 
+// A run that opens on a tie takes its side from its first non-tie row, not from the tie.
+void TestFillGeometry::aRunStartingOnATieTakesTheNextSide()
+{
+    const std::vector<StripPoint> rows { { 0, 0, 0 }, { 1, 1, 0 } };
+    const auto runs = qcp::fill::splitAtCrossings(rows);
+    QCOMPARE(runs.size(), std::size_t(1));
+    QVERIFY2(runs[0].firstAbove, "a run that starts on a tie reported below");
+    QCOMPARE(keysOf(runs[0]), (QList<double> { 0, 1 }));
+}
+
+// A run of nothing but ties has no side to take: it is above, as the header documents.
+void TestFillGeometry::anAllTieRunIsAbove()
+{
+    const std::vector<StripPoint> rows { { 0, 1, 1 }, { 1, 2, 2 } };
+    const auto runs = qcp::fill::splitAtCrossings(rows);
+    QCOMPARE(runs.size(), std::size_t(1));
+    QVERIFY(runs[0].firstAbove);
+    QCOMPARE(keysOf(runs[0]), (QList<double> { 0, 1 }));
+}
+
+// The same, for a run the break starts: the row after the break is a tie, and the one after it says
+// which side the run is on.
+void TestFillGeometry::aRunRestartingOnATieAfterABreakIsAbove()
+{
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const std::vector<StripPoint> rows { { 0, 1, 0 }, { 1, nan, nan }, { 2, 0, 0 }, { 3, 1, 0 } };
+    const auto runs = qcp::fill::splitAtCrossings(rows);
+    QCOMPARE(runs.size(), std::size_t(2));
+    QVERIFY(runs[0].firstAbove);
+    QCOMPARE(keysOf(runs[0]), (QList<double> { 0 }));
+    QVERIFY(runs[1].firstAbove);
+    QCOMPARE(keysOf(runs[1]), (QList<double> { 2, 3 }));
+}
+
 // A range query runs before the first layout, when the axis rect has no pixel to bin into: the rows
 // must come back as they are, or the fill records bins its own layout will never match.
 void TestFillGeometry::binnedWhenDenseIsAPixelDecision()

@@ -1,5 +1,4 @@
 #include "plottable-graph.h"
-#include "plottable-graph.h"
 #include "../axis/axis.h"
 #include "../core.h"
 #include "../datasource/graph-resampler.h"

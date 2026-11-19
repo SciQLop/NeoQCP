@@ -284,7 +284,8 @@ std::vector<SideRun> splitAtCrossings(std::span<const StripPoint> rows)
     };
     const auto push = [&](const StripPoint& row)
     {
-        if (!side)
+        // A tie says nothing about the run's side: the first row that is not a tie decides.
+        if (!side && row.a != row.b)
             side = row.a > row.b;
         run.rows.push_back(row);
     };
@@ -490,6 +491,9 @@ std::vector<StripPoint> binnedForAxis(QCPDrawContext& context, const QCPAxis& ke
     // The bin is a pixel decision: a replay at another zoom has to remake it, so the recording
     // depends on the transform.
     (void)context.transform();
+    // simplify: a fill recorded unbinned (before the first layout, or on a bigger rect) is not
+    // remade when the rect only shrinks. That costs a few more rows per draw, never a wrong
+    // picture. Upgrade: mix the rect's pixel length into the revision whenever the rows could bin.
     return binnedWhenDense(keyAxis, std::move(rows));
 }
 

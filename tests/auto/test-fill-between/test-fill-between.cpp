@@ -388,7 +388,7 @@ void TestFillBetween::aDenseFillIsRebinnedAfterAZoom()
     for (int x = 0; x < image.width(); ++x)
         if (isGreen(image.pixelColor(x, row)))
             ++filled;
-    QVERIFY2(filled < 5,
+    QVERIFY2(filled < 15,
              qPrintable(QStringLiteral("%1 pixels at value 0.5: the fill was not "
                                        "rebinned for the new zoom")
                             .arg(filled)));

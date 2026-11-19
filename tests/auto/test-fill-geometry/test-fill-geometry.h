@@ -32,4 +32,7 @@ private slots:
     void touchingFromBelowStaysOneRun();
     void aFlatTouchStaysOneRun();
     void aBreakEndsTheRunWithoutACrossing();
+    void aRunStartingOnATieTakesTheNextSide();
+    void anAllTieRunIsAbove();
+    void aRunRestartingOnATieAfterABreakIsAbove();
 };
