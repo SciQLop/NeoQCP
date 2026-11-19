@@ -937,6 +937,9 @@ QCPColorScaleOps<QCPColorScale> QCPAxisRect::colorScale()
         mColorScale = new QCPColorScale(mParentPlot);
         mColorScale->mOwnerRect = this;
         mColorScale->setParentLayerable(this); // hidden with the rect, as its axes are
+        // The rect hands the scale the data area's extent: the free scale's 6 px of room at the
+        // bar's ends would make the bar shorter than the data it colours.
+        mColorScale->setMinimumMargins(QMargins());
         // Off the data layer: a visible bar there would make every pan repaint that layer instead
         // of shifting it. The axes layer repaints on a pan anyway, for its ticks. An inset's own
         // scale goes on its own axes layer, above its data, like its title.

@@ -389,6 +389,28 @@ void TestQCPAxisRect::aTitleSitsAboveATopColourScale()
              "the title is drawn above the bar");
 }
 
+void TestQCPAxisRect::aColourBarSpansTheDataArea()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* rect = plot.axisRect().get();
+    auto map = rect->colorMap(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 },
+                              std::vector<double> { 0, 1, 2, 3 });
+    QCPColorScale* scale = map->colorScale().get();
+    QVERIFY(scale);
+
+    exported(plot);
+    const QRect bar = scale->axis()->axisRect()->rect();
+    QCOMPARE(bar.top(), rect->rect().top());
+    QCOMPARE(bar.bottom(), rect->rect().bottom());
+
+    rect->colorScale().setType(QCPAxis::atTop);
+    exported(plot);
+    const QRect topBar = scale->axis()->axisRect()->rect();
+    QCOMPARE(topBar.left(), rect->rect().left());
+    QCOMPARE(topBar.right(), rect->rect().right());
+}
+
 void TestQCPAxisRect::aTitleTakesTheTopAxisLabelColour()
 {
     QCustomPlot plot;

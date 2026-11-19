@@ -29,6 +29,7 @@ private slots:
   void aTitleSitsAboveTheTopAxis();
   void aHiddenRectHidesItsTitleAndColourScale();
   void aTitleSitsAboveATopColourScale();
+  void aColourBarSpansTheDataArea();
   void aTitleTakesTheTopAxisLabelColour();
   void aCentredTextIsHitWhereItIsDrawn();
   void titlesInARowAlign();
