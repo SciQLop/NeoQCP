@@ -379,6 +379,25 @@ void TestFillGeometry::touchingLinesStayOneRun()
     QCOMPARE(keysOf(runs[0]), (QList<double> { 0, 1, 2 }));
 }
 
+// A row where the lines are equal belongs to the run it lands in, whichever side that run is on.
+void TestFillGeometry::touchingFromBelowStaysOneRun()
+{
+    const std::vector<StripPoint> rows { { 0, -1, 0 }, { 1, 0, 0 }, { 2, -1, 0 } };
+    const auto runs = qcp::fill::splitAtCrossings(rows);
+    QCOMPARE(runs.size(), std::size_t(1));
+    QVERIFY2(!runs[0].firstAbove, "a touch from below made the run above");
+    QCOMPARE(keysOf(runs[0]), (QList<double> { 0, 1, 2 }));
+}
+
+void TestFillGeometry::aFlatTouchStaysOneRun()
+{
+    const std::vector<StripPoint> rows { { 0, -1, 0 }, { 1, 0, 0 }, { 2, 0, 0 }, { 3, -1, 0 } };
+    const auto runs = qcp::fill::splitAtCrossings(rows);
+    QCOMPARE(runs.size(), std::size_t(1));
+    QVERIFY2(!runs[0].firstAbove, "a flat touch made the run above");
+    QCOMPARE(keysOf(runs[0]), (QList<double> { 0, 1, 2, 3 }));
+}
+
 void TestFillGeometry::aBreakEndsTheRunWithoutACrossing()
 {
     const std::vector<StripPoint> rows { { 0, 1, 0 }, { 1, 1, 0 }, { 2, 1, 0, true }, { 3, 1, 0 } };

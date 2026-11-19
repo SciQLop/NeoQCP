@@ -1,4 +1,5 @@
 #include "plottable-graph.h"
+#include "plottable-graph.h"
 #include "../axis/axis.h"
 #include "../core.h"
 #include "../datasource/graph-resampler.h"
@@ -2509,15 +2510,16 @@ double QCPGraph::fillValue(const QCPAxis& valueAxis, double value)
     return qcp::fill::fillValue(valueAxis, value);
 }
 
-// Binned when the rows outnumber 4 per pixel, the lines' own L2 density (kLevel2PixelMultiplier).
+// A straight-segment frame spaces its corners in the space its reader sees. Binned when the rows
+// outnumber 4 per pixel, the lines' own L2 density (kLevel2PixelMultiplier), and then the recording
+// depends on the transform: a replay at another zoom remakes its bins.
 std::vector<qcp::fill::StripPoint> QCPGraph::shapeFillRows(
-    const Fill& fill, std::vector<qcp::fill::StripPoint> rows) const
+    QCPDrawContext& context, const Fill& fill, std::vector<qcp::fill::StripPoint> rows) const
 {
-    // The binning is a pixel decision, and the data-space branch has no key pixel: it keeps every
-    // row (the simplify note in drawInDataSpace names the ceiling).
+    // The data-space branch has no key pixel: it keeps every row (the simplify note in
+    // drawInDataSpace names the ceiling).
     if (!drawsInDataSpace())
-        rows = binnedWhenDense(std::move(rows));
-    // A straight-segment frame spaces its corners in the space its reader sees.
+        rows = qcp::fill::binnedForAxis(context, *keyAxisRaw(), std::move(rows));
     const QCPScale keyScale = shownKeyScale();
     return qcp::fill::steppedOnScreen(std::move(rows), ownerStep(mComponents[fill.owner]),
                                       keyScale);
@@ -2664,7 +2666,8 @@ void QCPGraph::recordFills(QCPDrawContext& context, const QCPMultiDataSource& ds
                 return;
             std::vector<qcp::fill::StripPoint> run(raw.begin() + std::ptrdiff_t(first),
                                                    raw.begin() + std::ptrdiff_t(last));
-            const std::vector<qcp::fill::StripPoint> rows = shapeFillRows(fill, std::move(run));
+            const std::vector<qcp::fill::StripPoint> rows
+                = shapeFillRows(context, fill, std::move(run));
             if (rows.empty())
                 return;
             const auto [upper, lower] = qcp::fill::fillSeries(rows);

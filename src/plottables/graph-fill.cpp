@@ -2,6 +2,7 @@
 #include "../axis/axis.h"
 #include "../handle.h"
 #include "../layoutelements/layoutelement-axisrect.h"
+#include "../painting/draw-context.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -184,14 +185,19 @@ namespace
 
         bool spans() const { return rows.size() >= 2; }
 
+        //! The first row at or after \a key.
+        auto seek(double key) const
+        {
+            return std::lower_bound(rows.begin(), rows.end(), key,
+                                    [](const SeriesRow& row, double at) { return row.key < at; });
+        }
+
         Sampling at(double key) const
         {
             const double nan = std::numeric_limits<double>::quiet_NaN();
             if (rows.size() == 1)
                 return { rows.front().value, !std::isfinite(rows.front().value) };
-            const auto it
-                = std::lower_bound(rows.begin(), rows.end(), key,
-                                   [](const SeriesRow& row, double at) { return row.key < at; });
+            const auto it = seek(key);
             if (it != rows.end() && it->key == key)
                 return { it->value, it->breakBefore || !std::isfinite(it->value) };
             if (it == rows.begin() || it == rows.end())
@@ -209,9 +215,7 @@ namespace
 
         int rowAt(double key) const
         {
-            const auto it
-                = std::lower_bound(rows.begin(), rows.end(), key,
-                                   [](const SeriesRow& row, double at) { return row.key < at; });
+            const auto it = seek(key);
             return it != rows.end() && it->key == key ? it->row : -1;
         }
     };
@@ -266,41 +270,46 @@ std::vector<SideRun> splitAtCrossings(std::span<const StripPoint> rows)
 {
     std::vector<SideRun> runs;
     SideRun run;
-    const auto startRun = [&run](const StripPoint& row)
+    // Which way round the current run is, once a row that is not a tie has said so.
+    std::optional<bool> side;
+
+    const auto flush = [&]
     {
-        run.rows.assign(1, row);
-        run.firstAbove = row.a >= row.b;
+        if (run.rows.empty())
+            return;
+        run.firstAbove = side.value_or(true);
+        runs.push_back(std::move(run));
+        run = SideRun { };
+        side.reset();
+    };
+    const auto push = [&](const StripPoint& row)
+    {
+        if (!side)
+            side = row.a > row.b;
+        run.rows.push_back(row);
     };
 
     for (const StripPoint& row : rows)
     {
-        if (!std::isfinite(row.a) || !std::isfinite(row.b) || row.breakBefore || run.rows.empty())
+        if (!std::isfinite(row.a) || !std::isfinite(row.b) || row.breakBefore)
         {
-            if (!run.rows.empty())
-                runs.push_back(std::move(run));
-            run = SideRun { };
+            flush();
             if (std::isfinite(row.a) && std::isfinite(row.b))
-                startRun(row);
+                push(row);
             continue;
         }
-        const StripPoint prev = run.rows.back();
-        const double d0 = prev.a - prev.b, d1 = row.a - row.b;
-        const bool above = d1 >= 0.0;
-        if ((d0 >= 0.0) == above)
+        const double d1 = row.a - row.b;
+        // Equal values belong to the run they are in: only a row strictly on the other side cuts.
+        if (run.rows.empty() || d1 == 0.0 || !side || (d1 > 0.0) == *side)
         {
-            run.rows.push_back(row);
+            push(row);
             continue;
         }
         // The two runs meet at the crossing: on the row before, on this row, or between them.
-        std::optional<StripPoint> meeting;
-        if (d0 == 0.0)
-            meeting = prev;
-        else if (d1 == 0.0)
-        {
-            run.rows.push_back(row);
-            meeting = row;
-        }
-        else
+        const StripPoint prev = run.rows.back();
+        const double d0 = prev.a - prev.b;
+        std::optional<StripPoint> meeting = prev;
+        if (d0 != 0.0)
         {
             const double t = d0 / (d0 - d1);
             const double key = prev.key + t * (row.key - prev.key);
@@ -308,13 +317,12 @@ std::vector<SideRun> splitAtCrossings(std::span<const StripPoint> rows)
             meeting = StripPoint { key, value, value, false, -1 };
             run.rows.push_back(*meeting);
         }
-        runs.push_back(std::move(run));
-        run = SideRun { { *meeting }, above };
-        if (meeting->key != row.key)
-            run.rows.push_back(row);
+        flush();
+        run.rows.assign(1, *meeting);
+        side = d1 > 0.0;
+        run.rows.push_back(row);
     }
-    if (!run.rows.empty())
-        runs.push_back(std::move(run));
+    flush();
     return runs;
 }
 
@@ -416,19 +424,27 @@ std::vector<StripPoint> steppedOnScreen(std::vector<StripPoint> rows, Step step,
     return shaped;
 }
 
-std::vector<StripPoint> binnedWhenDense(const QCPAxis& keyAxis, std::vector<StripPoint> rows)
+bool binsWhenDense(const QCPAxis& keyAxis, std::size_t rowCount)
 {
     const QCPHandle<QCPAxisRect> axisRect = keyAxis.axisRect();
     if (!axisRect)
-        return rows;
+        return false;
     const QRect rect = axisRect->rect();
     const int pixelLength = keyAxis.orientation() == Qt::Vertical ? rect.height() : rect.width();
     // No layout yet (a range query runs first): there is no pixel to bin into, and a bin width
     // taken from a zero-length rect would shape rows the picture will never match.
     if (pixelLength <= 0)
+        return false;
+    return rowCount > 4 * std::size_t(pixelLength);
+}
+
+std::vector<StripPoint> binnedWhenDense(const QCPAxis& keyAxis, std::vector<StripPoint> rows)
+{
+    if (!binsWhenDense(keyAxis, rows.size()))
         return rows;
-    if (rows.size() <= 4 * std::size_t(pixelLength))
-        return rows;
+    const QCPHandle<QCPAxisRect> axisRect = keyAxis.axisRect();
+    const QRect rect = axisRect->rect();
+    const int pixelLength = keyAxis.orientation() == Qt::Vertical ? rect.height() : rect.width();
     const double quarterPixel = 4.0 * std::max(1, pixelLength);
     if (keyAxis.scale().isLog())
     {
@@ -466,11 +482,15 @@ std::vector<StripPoint> binnedWhenDense(const QCPAxis& keyAxis, std::vector<Stri
     return binToSpans(rows, width);
 }
 
-std::vector<StripPoint> shapedForAxis(const QCPAxis& keyAxis, std::vector<StripPoint> rows,
-                                      Step step)
+std::vector<StripPoint> binnedForAxis(QCPDrawContext& context, const QCPAxis& keyAxis,
+                                      std::vector<StripPoint> rows)
 {
-    rows = binnedWhenDense(keyAxis, std::move(rows));
-    return steppedOnScreen(std::move(rows), step, keyAxis.scale());
+    if (!binsWhenDense(keyAxis, rows.size()))
+        return rows;
+    // The bin is a pixel decision: a replay at another zoom has to remake it, so the recording
+    // depends on the transform.
+    (void)context.transform();
+    return binnedWhenDense(keyAxis, std::move(rows));
 }
 
 FillSeries fillSeries(std::span<const StripPoint> rows)

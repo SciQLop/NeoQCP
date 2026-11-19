@@ -29,5 +29,7 @@ private slots:
     void splitAtCrossingsCutsAtTheExactPoint();
     void aCrossingOnAKeyMakesNoSliver();
     void touchingLinesStayOneRun();
+    void touchingFromBelowStaysOneRun();
+    void aFlatTouchStaysOneRun();
     void aBreakEndsTheRunWithoutACrossing();
 };

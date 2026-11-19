@@ -9,6 +9,7 @@
 #include <vector>
 
 class QCPAxis;
+class QCPDrawContext;
 
 namespace qcp::fill {
 
@@ -94,13 +95,19 @@ double fillValue(const QCPAxis& valueAxis, double value);
 std::vector<StripPoint> steppedOnScreen(std::vector<StripPoint> rows, Step step,
                                         const QCPScale& keyScale);
 
-//! Rows binned when they outnumber four per pixel of \a keyAxis' axis rect (the lines' own L2
-//! density), the bin a quarter pixel wide in the axis' scale.
+//! Whether \a rowCount rows outnumber four per pixel of \a keyAxis' axis rect (the lines' own L2
+//! density), i.e. whether binning narrows them at all.
+bool binsWhenDense(const QCPAxis& keyAxis, std::size_t rowCount);
+
+//! Rows binned when they outnumber four per pixel of \a keyAxis' axis rect, the bin a quarter
+//! pixel wide in the axis' scale.
 std::vector<StripPoint> binnedWhenDense(const QCPAxis& keyAxis, std::vector<StripPoint> rows);
 
-//! The rows of one run ready to draw: binned when dense, then \a step in the axis' own scale.
-std::vector<StripPoint> shapedForAxis(const QCPAxis& keyAxis, std::vector<StripPoint> rows,
-                                      Step step);
+//! binnedWhenDense(), for a recording that then depends on the transform: the bin still comes from
+//! the axis' range, but a replay at another zoom has to remake it, so the transform is read when
+//! and only when it bins.
+std::vector<StripPoint> binnedForAxis(QCPDrawContext& context, const QCPAxis& keyAxis,
+                                      std::vector<StripPoint> rows);
 
 //! The two edges of a fill, as the equal-length data-space series a recording takes. A gap pinches
 //! them together at the rows either side of it, so the fill crosses no break. Both are null when

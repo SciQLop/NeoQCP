@@ -21,8 +21,15 @@ private slots:
     void aFillOnALogAxisClosesAtTheBound();
     void aFillDrawsUnderItsLines();
     void aFillWhoseLineIsDeletedDrawsNothing();
+    void aFillDrawsAgainWhenSetLinesNamesLiveLines();
     void linesOfTwoRectsAreRefused();
+    void aFillOfLinesOnAnotherKeyAxisIsReported();
+    void aFillOfALineWithItselfIsReported();
+    void aFillOfAMissingComponentIsReported();
     void aFillIsNotSelectableByDefault();
+    void aFillAcrossTwoValueAxesFollowsTheSecondAxis();
+    void aDenseFillIsRebinnedAfterAZoom();
+    void aSteppedFillSwapsColourWhereTheLinesSwap();
 
 private:
     QCustomPlot* mPlot = nullptr;

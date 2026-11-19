@@ -3,7 +3,9 @@
 #include "misuse-recorder.h"
 #include "qcustomplot.h"
 
+#include <algorithm>
 #include <cmath>
+#include <string>
 #include <vector>
 
 namespace
@@ -225,7 +227,7 @@ void TestFillBetween::aFillWhoseLineIsDeletedDrawsNothing()
     QObject::connect(mFirst, &QCPPlottable::selectionChanged, mPlot,
                      [this]
                      {
-                         mPlot->removePlottable(mSecond);
+                         (void) mPlot->removePlottable(mSecond);
                          mSecond = nullptr;
                      });
     mFirst->setSelection(QCPDataSelection(QCPDataRange(0, 4)));
@@ -236,6 +238,25 @@ void TestFillBetween::aFillWhoseLineIsDeletedDrawsNothing()
     QVERIFY2(fill, "the fill went away with its line");
     QVERIFY2(!isGreen(pixelAt(image, *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.4)),
              "the fill still drew after its line was deleted");
+}
+
+void TestFillBetween::aFillDrawsAgainWhenSetLinesNamesLiveLines()
+{
+    const QCPHandle<QCPFillBetween> fill = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(mSecond), greenAbove());
+    QVERIFY(fill);
+    (void) mPlot->removePlottable(mSecond);
+    mSecond = nullptr;
+    mPlot->replot();
+    QVERIFY2(!isGreen(pixelAt(rendered(*mPlot), *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.4)),
+             "the fill drew with a deleted line");
+
+    auto* fresh = mPlot->add<QCPGraph>().get();
+    fresh->setData(kKeys, std::vector<double> { 0.2, 0.2, 0.2, 0.2 });
+    fill->setLines(mFirst, 0, fresh, 0);
+    mPlot->replot();
+    QVERIFY2(isGreen(pixelAt(rendered(*mPlot), *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.5)),
+             "the fill did not draw again for the live lines it was given");
 }
 
 void TestFillBetween::linesOfTwoRectsAreRefused()
@@ -254,6 +275,142 @@ void TestFillBetween::linesOfTwoRectsAreRefused()
 
     QVERIFY2(!fill, "a fill between two rects was made");
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+}
+
+void TestFillBetween::aFillOfLinesOnAnotherKeyAxisIsReported()
+{
+    auto* onTheTopAxis = mPlot->add<QCPGraph>().get();
+    onTheTopAxis->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setRange(0, 3);
+    onTheTopAxis->setData(kKeys, kLower);
+
+    const auto previous = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    const QCPHandle<QCPFillBetween> fill = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(onTheTopAxis), greenAbove());
+    qcp::setMisuseHandler(previous);
+
+    QVERIFY2(!fill, "a fill between two key axes was made");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QVERIFY2(test_misuse::calls.front().what.find("key axis") != std::string::npos,
+             test_misuse::calls.front().what.c_str());
+}
+
+void TestFillBetween::aFillOfALineWithItselfIsReported()
+{
+    const auto previous = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    const QCPHandle<QCPFillBetween> fill = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(mFirst), greenAbove());
+    qcp::setMisuseHandler(previous);
+
+    QVERIFY2(!fill, "a fill of a line with itself, both components default, was made");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+}
+
+void TestFillBetween::aFillOfAMissingComponentIsReported()
+{
+    QCPFillOptions options = greenAbove();
+    options.secondComponent = 4;
+
+    const auto previous = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    const QCPHandle<QCPFillBetween> fill = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(mSecond), options);
+    qcp::setMisuseHandler(previous);
+
+    QVERIFY2(!fill, "a fill of a component the line does not have was made");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+}
+
+void TestFillBetween::aFillAcrossTwoValueAxesFollowsTheSecondAxis()
+{
+    mPlot->yAxis->setRange(0, 1);
+    mPlot->yAxis2->setRange(0, 1);
+    mSecond->setValueAxis(mPlot->yAxis2);
+    mSecond->setData(kKeys, std::vector<double> { 1.0, 1.0, 1.0, 1.0 });
+    const QCPHandle<QCPFillBetween> fill = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(mSecond), greenAbove());
+    QVERIFY(fill);
+    mPlot->replot();
+    QVERIFY2(isGreen(pixelAt(rendered(*mPlot), *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.85)),
+             "the band does not reach the second line on y2");
+
+    mPlot->replot();
+    const int recorded = fill->mCore.recordingCount();
+    mPlot->replot();
+    QCOMPARE(fill->mCore.recordingCount(), recorded);
+
+    // The band is the second line's pixels on the first line's value axis: it moves with both.
+    mPlot->yAxis2->setRange(0, 2);
+    mPlot->replot();
+    QVERIFY2(fill->mCore.recordingCount() > recorded, "moving y2 kept the band's recording");
+
+    const QImage image = rendered(*mPlot);
+    QVERIFY2(!isGreen(pixelAt(image, *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.85)),
+             "the band kept the old range of y2");
+    QVERIFY2(isGreen(pixelAt(image, *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.6)),
+             "the band did not follow the new range of y2");
+}
+
+void TestFillBetween::aDenseFillIsRebinnedAfterAZoom()
+{
+    const int count = 10000;
+    std::vector<double> keys;
+    std::vector<double> upper(std::size_t(count), 0.0);
+    std::vector<double> lower(std::size_t(count), 0.0);
+    keys.reserve(std::size_t(count));
+    for (int i = 0; i < count; ++i)
+        keys.push_back(3.0 * i / (count - 1));
+    upper[std::size_t(std::lower_bound(keys.begin(), keys.end(), 2.4) - keys.begin())] = 1.0;
+    mFirst->setData(keys, upper);
+    mSecond->setData(keys, lower);
+    mPlot->yAxis->setRange(-0.1, 1.1);
+    const QCPHandle<QCPFillBetween> fill = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(mSecond), greenAbove());
+    QVERIFY(fill);
+    mPlot->replot();
+
+    mPlot->replot();
+    const int recorded = fill->mCore.recordingCount();
+    mPlot->replot();
+    QCOMPARE(fill->mCore.recordingCount(), recorded);
+
+    // The bins are pixels of the frame that made them: another frame must bin again.
+    mPlot->xAxis->setRange(2.39, 2.41);
+    mPlot->replot();
+    QVERIFY2(fill->mCore.recordingCount() > recorded,
+             "a binned fill kept its recording for another zoom");
+
+    const QImage image = rendered(*mPlot);
+    const int row = qRound(mPlot->yAxis->coordToPixel(0.5));
+    int filled = 0;
+    for (int x = 0; x < image.width(); ++x)
+        if (isGreen(image.pixelColor(x, row)))
+            ++filled;
+    QVERIFY2(filled < 5,
+             qPrintable(QStringLiteral("%1 pixels at value 0.5: the fill was not "
+                                       "rebinned for the new zoom")
+                            .arg(filled)));
+}
+
+void TestFillBetween::aSteppedFillSwapsColourWhereTheLinesSwap()
+{
+    mFirst->setLineStyle(QCPGraph::lsStepLeft);
+    QCPFillOptions options = greenAbove();
+    options.belowBrush = kRed;
+    mPlot->axisRect()->fillBetween(QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(mSecond),
+                                   options);
+    mPlot->replot();
+    const QImage image = rendered(*mPlot);
+
+    // Stepped, the first line holds 0.8 up to key 2, so at key 1.6 it is still above the second
+    // line, which is 0.6 there: the colours swap where the drawn lines swap, not at the crossing
+    // of the straight segments, key 1.5.
+    QVERIFY2(isGreen(pixelAt(image, *mPlot->xAxis, *mPlot->yAxis, 1.6, 0.7)),
+             "the fill cut at the linear crossing, not where the stepped lines swap");
+    QVERIFY2(!isRed(pixelAt(image, *mPlot->xAxis, *mPlot->yAxis, 1.6, 0.7)),
+             "the below brush fills the side the stepped first line is above on");
 }
 
 void TestFillBetween::aFillIsNotSelectableByDefault()

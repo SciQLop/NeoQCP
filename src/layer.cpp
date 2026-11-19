@@ -1181,10 +1181,13 @@ bool QCPLayerable::moveToLayer(QCPLayer* layer, bool prepend)
 
 // The z order within one layer: the fill a line owns draws under that line, whatever order the two
 // were added in (P-3). An index in the layer is a draw order, so inserting at other's index puts
-// this object immediately below it.
+// this object immediately below it. A layerable on another layer moves to other's layer first: for
+// two lines on different layers, "below" means below the first line on that line's layer.
 bool QCPLayerable::moveBelow(const QCPLayerable* other)
 {
-    if (!other || !mLayer || other->mLayer != mLayer)
+    if (!other || !other->mLayer)
+        return false;
+    if (mLayer != other->mLayer && !moveToLayer(other->mLayer, false))
         return false;
     QList<QCPLayerable*>& children = mLayer->mChildren;
     const int otherIndex = children.indexOf(const_cast<QCPLayerable*>(other));

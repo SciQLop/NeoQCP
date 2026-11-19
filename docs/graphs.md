@@ -112,7 +112,7 @@ Leave `belowBrush` unset to fill both sides with `brush`, or set it to `Qt::NoBr
 The fill owns no data. Each time it is drawn it reads both lines again, so `setData` on either one moves the fill too.
 Rows are the union of both lines' keys over the key range they share, each line interpolated at the other's keys (in the snippet above `first` at key 1 reads the midpoint of its own 0.8 and 0.2).
 A NaN, or a skipped key, in either line breaks the fill there.
-The first line's step style shapes both edges.
+The first line's step style shapes both edges, and the colours swap where the stepped lines swap: on the riser, not at the crossing of the straight segments the data would draw.
 
 The fill goes just below the lower of its two lines in the layer, so the lines and their markers stay on top.
 It is not selectable: a click inside it reaches the lines, and the drag pans the plot.

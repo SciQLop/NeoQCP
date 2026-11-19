@@ -42,18 +42,25 @@ QCPHandle<QCPGraph> QCPAxisRect::line(const K& keys, const V& values, const QCPL
 /*!
   The area between \a first and \a second on this rect, styled by \a options.
 
-  The fill draws under the lower of its two lines: the two lines keep the order they were added in,
-  and the fill goes just below whichever of them draws first.
+  The fill draws under the lower of its two lines: the fill goes just below whichever of the two
+  draws first, on that line's layer. For two lines on one key axis, the key axis decides the frame,
+  and a fill across two value axes reads both.
 
   Both lines must be on this rect's axes, and must fill to each other: the same system, or 2.x's
-  channel between y and y2 (one key axis, two value axes). Anything else is misuse, reported once,
-  and gives an empty handle.
+  channel between y and y2 (one key axis, two value axes). A fill of a line with itself needs two
+  different components, and a component a line does not have is refused too. Anything else is
+  misuse, reported once, and gives an empty handle.
 */
 inline QCPHandle<QCPFillBetween> QCPAxisRect::fillBetween(const QCPHandle<QCPGraph>& first,
                                                           const QCPHandle<QCPGraph>& second,
                                                           const QCPFillOptions& options)
 {
     QCP_CHECK_OR_RETURN(first && second, "a fill needs two lines", { });
+    QCP_CHECK_OR_RETURN(first.get() != second.get()
+                            || options.firstComponent != options.secondComponent,
+                        "a fill of a line with itself needs two components of it", { });
+    QCP_CHECK_OR_RETURN(first->keyAxis().get() == second->keyAxis().get(),
+                        "the two lines of a fill must share the key axis", { });
     QCP_CHECK_OR_RETURN(first.get() == second.get() || first->canFillTo(*second),
                         "the two lines of a fill must fill to each other", { });
     const QList<QCPAxis*> own = axesRaw();
@@ -63,6 +70,16 @@ inline QCPHandle<QCPFillBetween> QCPAxisRect::fillBetween(const QCPHandle<QCPGra
                             && onThisRect(second->keyAxis().get())
                             && onThisRect(second->valueAxis().get()),
                         "the two lines of a fill must be on this rect's axes", { });
+    const auto namesAColumn = [](const QCPGraph& line, int component)
+    {
+        const QCPMultiDataSource* source = line.dataSource();
+        return !source || source->empty()
+            || (component >= 0 && component < source->columnCount()
+                && component < line.componentCount());
+    };
+    QCP_CHECK_OR_RETURN(namesAColumn(*first, options.firstComponent)
+                            && namesAColumn(*second, options.secondComponent),
+                        "the fill's component does not name a column of its line", { });
 
     const QCPHandle<QCPFillBetween> fill
         = add<QCPFillBetween>(first->keyAxis().get(), first->valueAxis().get());
@@ -73,19 +90,22 @@ inline QCPHandle<QCPFillBetween> QCPAxisRect::fillBetween(const QCPHandle<QCPGra
     fill->setBelowBrush(options.belowBrush);
     fill->setName(options.name);
 
-    const auto drawOrder = [](const QCPLayerable* child)
+    // Whichever line draws first is the lower one, and the fill goes just below it.
+    const QCPHandle<QCPLayer> layer = first->layer();
+    if (layer)
     {
-        if (!child || !child->layer())
-            return -1;
-        const auto siblings = child->layer()->children();
-        for (int i = 0; i < siblings.size(); ++i)
-            if (siblings.at(i).get() == child)
-                return i;
-        return -1;
-    };
-    const QCPGraph* lower
-        = drawOrder(first.get()) <= drawOrder(second.get()) ? first.get() : second.get();
-    fill->moveBelow(lower);
+        const auto siblings = layer->children();
+        const auto indexOf = [&siblings](const QCPLayerable* child)
+        {
+            for (int i = 0; i < siblings.size(); ++i)
+                if (siblings.at(i).get() == child)
+                    return i;
+            return int(siblings.size());
+        };
+        const QCPGraph* lower
+            = indexOf(second.get()) < indexOf(first.get()) ? second.get() : first.get();
+        fill->moveBelow(lower);
+    }
     return fill;
 }
 

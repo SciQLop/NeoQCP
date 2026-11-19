@@ -112,18 +112,16 @@ void QCPFillBetween::setBelowBrush(std::optional<QBrush> brush)
 void QCPFillBetween::attachLines()
 {
     // The same graph twice (two of its components) registers it once: addDependent() ignores a
-    // second registration, and one destroyed connection is enough to forget it.
+    // second registration, and one destroyed connection is enough.
     if (QCPGraph* first = mFirstLine.data())
     {
         first->addDependent(this);
-        mFirstDestroyed
-            = connect(first, &QObject::destroyed, this, [this, first] { forgetLine(first); });
+        mFirstDestroyed = connect(first, &QObject::destroyed, this, [this] { update(); });
     }
     if (QCPGraph* second = mSecondLine.data(); second && second != mFirstLine.data())
     {
         second->addDependent(this);
-        mSecondDestroyed
-            = connect(second, &QObject::destroyed, this, [this, second] { forgetLine(second); });
+        mSecondDestroyed = connect(second, &QObject::destroyed, this, [this] { update(); });
     }
 }
 
@@ -139,17 +137,8 @@ void QCPFillBetween::detachLines()
     mSecondDestroyed = QMetaObject::Connection();
 }
 
-// A line that goes away is forgotten, and the fill stays in the plot drawing nothing (P-4): it
-// draws again when setLines() names live lines.
-void QCPFillBetween::forgetLine(QCPGraph* line)
-{
-    if (mFirstLine == line)
-        mFirstLine = nullptr;
-    if (mSecondLine == line)
-        mSecondLine = nullptr;
-    update();
-}
-
+// A line that goes away leaves the fill in the plot drawing nothing (P-4): its QPointer is already
+// null when the line's destroyed() arrives, so update() is all it takes to draw again.
 bool QCPFillBetween::componentDraws(const QCPGraph& line, int component)
 {
     const QCPMultiDataSource* source = line.dataSource();
@@ -205,14 +194,19 @@ void QCPFillBetween::draw(QCPDrawContext& context) const
     const QBrush above = brush();
     const QBrush below = mBelowBrush ? *mBelowBrush : above;
     const qcp::fill::Step step = QCPGraph::ownerStep(first->component(mFirstComponent));
-    for (const qcp::fill::SideRun& run : qcp::fill::splitAtCrossings(rows))
+    // The lines are shaped first, so the colours swap on the riser of a stepped line, where the
+    // drawn edges swap, not at the crossing of the straight segments the data would draw.
+    const std::vector<qcp::fill::StripPoint> shaped
+        = qcp::fill::steppedOnScreen(std::move(rows), step, keyScale);
+    for (const qcp::fill::SideRun& run : qcp::fill::splitAtCrossings(shaped))
     {
         const QBrush& runBrush = run.firstAbove ? above : below;
         if (runBrush.style() == Qt::NoBrush || runBrush.color().alpha() == 0)
             continue;
-        const std::vector<qcp::fill::StripPoint> shaped
-            = qcp::fill::shapedForAxis(*keyAxisRaw(), run.rows, step);
-        const auto [upper, lower] = qcp::fill::fillSeries(shaped);
+        // Binned per run: a bin keeps one side, where binning the union would merge the two.
+        const std::vector<qcp::fill::StripPoint> binned
+            = qcp::fill::binnedForAxis(context, *keyAxisRaw(), run.rows);
+        const auto [upper, lower] = qcp::fill::fillSeries(binned);
         if (!upper)
             continue;
         context.fillBetween(upper, lower, runBrush);
@@ -223,9 +217,13 @@ quint64 QCPFillBetween::dependencyRevision() const
 {
     const QCPGraph* first = mFirstLine.data();
     const QCPGraph* second = mSecondLine.data();
-    return qHashMulti(
+    quint64 revision = qHashMulti(
         0, qcpDependencyKey(first), qcpDependencyKey(second),
         first ? first->keyAxis().get() : nullptr, first ? first->valueAxis().get() : nullptr,
         second ? second->keyAxis().get() : nullptr, second ? second->valueAxis().get() : nullptr,
         mFirstComponent, mSecondComponent);
+    // Across two value axes the band reads both systems' pixels: a pan of either moves it.
+    if (first && second && first != second && first->fillsAcrossValueAxes(*second))
+        revision = qHashMulti(revision, first->system()->revision(), second->system()->revision());
+    return revision;
 }

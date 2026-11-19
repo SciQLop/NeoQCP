@@ -63,9 +63,10 @@ protected:
     [[nodiscard]] quint64 dependencyRevision() const override;
 
 private:
+    friend class TestFillBetween; //!< reads the recording count: a stale band is that bug
+
     void detachLines();
     void attachLines();
-    void forgetLine(QCPGraph* line);
     //! Whether \a component names a column of \a line and draws; one misuse report when it does
     //! not name one at all.
     [[nodiscard]] static bool componentDraws(const QCPGraph& line, int component);

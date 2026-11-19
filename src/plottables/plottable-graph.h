@@ -484,7 +484,8 @@ protected:
     fillToGraphRows(const Fill& fill, const QCPMultiDataSource& ds, int begin,
                     int end) const;
     [[nodiscard]] std::vector<qcp::fill::StripPoint>
-    shapeFillRows(const Fill& fill, std::vector<qcp::fill::StripPoint> rows) const;
+    shapeFillRows(QCPDrawContext& context, const Fill& fill,
+                  std::vector<qcp::fill::StripPoint> rows) const;
     //! Whether \a row of \a ds is in \a column's selection; a resampled row by its key.
     [[nodiscard]] bool rowIsSelected(int column, const QCPMultiDataSource& ds,
                                      int row) const;
