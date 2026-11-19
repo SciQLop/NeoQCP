@@ -1081,20 +1081,29 @@ private:
     Gaussian mGaussian;
 };
 
+// std::normal_distribution is implementation-defined: libstdc++, libc++ and MSVC draw different
+// numbers from the same engine, so the picture would differ per platform. Box-Muller on the
+// engine's own output, which the standard specifies, gives the same noise everywhere.
+double portableNormal(std::mt19937& rng, double sigma)
+{
+    const double u1 = (rng() + 1.0) / 4294967296.0;
+    const double u2 = rng() / 4294967296.0;
+    return sigma * std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * std::numbers::pi * u2);
+}
+
 QImage peakFitScene()
 {
     QCustomPlot plot;
     targetPlot(plot, 800, 560);
 
     std::mt19937 rng(7);
-    std::normal_distribution<double> noise(0.0, 6.0);
     const std::vector<Gaussian> truth { { 25, 2.5 }, { 48, 4 }, { 70, 3 } };
     const double height[] = { 120, 80, 150 };
     std::vector<double> energy, counts;
     for (int i = 0; i <= 400; ++i)
     {
         energy.push_back(i * 0.25);
-        double c = 12 + noise(rng);
+        double c = 12 + portableNormal(rng, 6.0);
         for (std::size_t k = 0; k < truth.size(); ++k)
             c += height[k] * basis(truth, k + 1, energy.back());
         counts.push_back(c);
