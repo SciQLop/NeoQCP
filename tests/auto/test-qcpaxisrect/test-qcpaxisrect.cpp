@@ -1001,6 +1001,62 @@ void TestQCPAxisRect::anItemFollowsTheAreaItIsIn()
 }
 
 
+void TestQCPAxisRect::aDestroyedSlotMayDeleteThePlotUnderTwoInsets()
+{
+    // The inset layout's own loop takes the insets one at a time. A slot that deletes the plot on the
+    // first of them must not leave the second one naming it: the sweep checks the plot between two.
+    QCustomPlot* plot = new QCustomPlot;
+    plot->resize(400, 300);
+    const QCPHandle<QCPAxisRect> rect = plot->axisRect();
+    const QCPHandle<QCPAxisRect> first = rect->addInset(QRectF(0.05, 0.05, 0.4, 0.4));
+    const QCPHandle<QCPAxisRect> second = rect->addInset(QRectF(0.55, 0.05, 0.4, 0.4));
+    const QCPHandle<QCPGraph> graph
+        = second->add<QCPGraph>(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 });
+    QVERIFY(rect && first && second && graph);
+    connect(graph.get(), &QObject::destroyed, plot,
+            [&plot]
+            {
+                QCustomPlot* const dying = plot;
+                plot = nullptr;
+                delete dying;
+            });
+
+    // The newest inset goes first, and the graph is on it.
+    QCustomPlot* const owner = plot;
+    owner->plotLayout()->remove(rect.get());
+
+    QVERIFY2(!plot, "the slot did not delete the plot");
+    QVERIFY(!rect);
+    QVERIFY(!first);
+    QVERIFY(!second);
+    QVERIFY(!graph);
+}
+
+void TestQCPAxisRect::anAxisDestroyedSlotMayDeleteThePlot()
+{
+    // The axes go one at a time too, so a slot on the first one's destroyed() may take the plot before
+    // the second is removed.
+    QCustomPlot* plot = new QCustomPlot;
+    plot->resize(400, 300);
+    const QCPHandle<QCPAxisRect> rect = plot->axisRect();
+    const QCPHandle<QCPAxis> axis = rect->axis(QCPAxis::atBottom);
+    QVERIFY(rect && axis);
+    connect(axis.get(), &QObject::destroyed, plot,
+            [&plot]
+            {
+                QCustomPlot* const dying = plot;
+                plot = nullptr;
+                delete dying;
+            });
+
+    QCustomPlot* const owner = plot;
+    owner->plotLayout()->remove(rect.get());
+
+    QVERIFY2(!plot, "the slot did not delete the plot");
+    QVERIFY(!rect);
+    QVERIFY(!axis);
+}
+
 void TestQCPAxisRect::aRemovedInsetHandsItsLayerBack()
 {
     // A graph of the parent's, put on the inset's data layer by name, goes back to its default layer

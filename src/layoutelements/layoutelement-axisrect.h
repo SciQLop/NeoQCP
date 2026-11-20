@@ -63,6 +63,15 @@ class QCPItemZoomIndicator;
 template <typename T, typename Self = void>
 class QCPColorScaleOps;
 
+namespace qcp::detail
+{
+// How a rect's owners take it down, and how its destructor takes its insets down: everything it draws
+// first, then the rects, with a check of the plot between every step, since a slot may delete it.
+bool dropElement(const QPointer<QCustomPlot>& plot, QCPLayoutElement* element);
+bool dropRect(const QPointer<QCustomPlot>& plot, QCPAxisRect& rect);
+bool dropInsetChildren(const QPointer<QCustomPlot>& plot, QCPArea& area);
+} // namespace qcp::detail
+
 template <typename T, typename Self = void>
 class QCPAxisRectOps;
 
@@ -358,6 +367,8 @@ protected:
     // non-property methods:
     // The plottables and items drawn in this rect go with it: see the destructor.
     void removeDrawables();
+    //! Gives \a element and everything under it no parent plot: the plot they name is gone.
+    static void forgetParentPlot(QCPLayoutElement* element);
     QList<QCPAxisBase*> allAxesRaw() const override;
     void updateAxesOffset(QCPAxis::AxisType type);
     void zoomAxesAt(const QPointF& pos, double horizontalFactor, double verticalFactor);

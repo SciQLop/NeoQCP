@@ -112,7 +112,8 @@ public:
     //! The group this element's \a side aligns with, if any: an element joins one group per side.
     QPointer<QCPAlignmentGroup> alignmentGroup(QCP::MarginSide side) const;
 
-    //! Whether this element's destructor has started. A slot that runs there must not delete it again.
+    //! Whether this element's destructor has started: a slot that runs there must not free it again,
+    //! and qcp::detail::removeObject() is the one place that asks before a plain delete.
     [[nodiscard]] bool isBeingDestroyed() const { return mBeingDestroyed; }
 
     // setters:

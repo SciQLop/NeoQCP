@@ -16,8 +16,6 @@
 
 namespace
 {
-bool dropElement(const QPointer<QCustomPlot>& plot, QCPLayoutElement* element);
-
 //! True when every factor can reach the layout: a non-positive or NaN one must not.
 bool usableStretch(const QList<double>& factors)
 {
@@ -25,89 +23,6 @@ bool usableStretch(const QList<double>& factors)
         if (!std::isfinite(factor) || factor <= 0.0)
             return false;
     return true;
-}
-
-//! Drops everything an area holds in its inset layout: nested rects take their own insets along.
-bool dropInsetChildren(const QPointer<QCustomPlot>& plot, QCPArea& area)
-{
-    const QCPHandle<QCPLayoutInset> inset = area.insetLayout();
-    if (!inset)
-        return static_cast<bool>(plot);
-    const QList<QCPHandle<QCPLayoutElement>> children = inset->elements(false);
-    for (const QCPHandle<QCPLayoutElement>& child : children)
-    {
-        if (!plot)
-            return false;
-        if (!child)
-            continue;
-        if (!dropElement(plot, child.get()))
-            return false;
-    }
-    return true;
-}
-
-//! Drops a rect the way its owners do: plottables and items first (the legend loses their rows),
-//! then the rect, whose destructor drops its colour scale and inset layout.
-bool dropRect(const QPointer<QCustomPlot>& plot, QCPAxisRect& rect)
-{
-    QCPHandle<QCPAxisRect> alive(&rect);
-    if (!dropInsetChildren(plot, rect))
-        return false;
-    if (!plot || !alive) // a destroyed slot took the rect with its last inset child
-        return static_cast<bool>(plot);
-    const QList<QCPHandle<QCPPlottable>> plottables = rect.plottables();
-    for (const QCPHandle<QCPPlottable>& plottable : plottables)
-    {
-        if (!plot)
-            return false;
-        if (!plottable) // a destroyed slot took it between the listing and here
-            continue;
-        static_cast<void>(plot->removePlottable(plottable.get()));
-    }
-    if (!plot || !alive)
-        return static_cast<bool>(plot);
-    const QList<QCPHandle<QCPItem>> items = rect.items();
-    for (const QCPHandle<QCPItem>& item : items)
-    {
-        if (!plot)
-            return false;
-        if (!item)
-            continue;
-        static_cast<void>(plot->removeItem(item.get()));
-    }
-    if (!plot || !alive)
-        return static_cast<bool>(plot);
-    alive.remove();
-    return static_cast<bool>(plot);
-}
-
-//! Drops a layout element and, for a layout, its children first.
-bool dropElement(const QPointer<QCustomPlot>& plot, QCPLayoutElement* element)
-{
-    if (!plot)
-        return false;
-    if (!element)
-        return true;
-    QCPHandle<QCPLayoutElement> alive(element);
-    if (auto* rect = qobject_cast<QCPAxisRect*>(element))
-        return dropRect(plot, *rect);
-    if (auto* layout = qobject_cast<QCPLayout*>(element))
-    {
-        const QList<QCPHandle<QCPLayoutElement>> children = layout->elements(false);
-        for (const QCPHandle<QCPLayoutElement>& child : children)
-        {
-            if (!plot)
-                return false;
-            if (!child)
-                continue;
-            if (!dropElement(plot, child.get()))
-                return false;
-        }
-        if (!alive)
-            return true;
-    }
-    alive.remove();
-    return static_cast<bool>(plot);
 }
 
 //! A grid is built from axis rects only: a title row or a nested layout is refused (P-6, M8).
@@ -405,7 +320,7 @@ bool qcp::applyAxisRectGrid(QCPLayoutGrid& layout, int rows, int columns,
                 continue;
             if (!layout.hasElement(row, column))
                 continue;
-            if (!dropElement(plot, layout.element(row, column).get()))
+            if (!qcp::detail::dropElement(plot, layout.element(row, column).get()))
                 return false;
         }
 

@@ -746,12 +746,8 @@ void QCPLayout::simplify() { }
 */
 bool QCPLayout::removeAt(int index)
 {
-    // An element whose destructor is running a slot here is going already: a second delete would be a
-    // second free. takeAt is still asked, so a slot cannot leave it in a cell it has left.
     if (QCPLayoutElement* el = takeAt(index))
     {
-        if (el->isBeingDestroyed())
-            return false;
         delete el;
         return true;
     }
@@ -772,10 +768,6 @@ bool QCPLayout::removeAt(int index)
 */
 bool QCPLayout::remove(QCPLayoutElement* element)
 {
-    // An element whose destructor is running must not be freed again, and it has left this layout by
-    // then: asking first is also cheaper than a take that would report it as a stranger.
-    if (!element || element->isBeingDestroyed())
-        return false;
     if (take(element))
     {
         delete element;

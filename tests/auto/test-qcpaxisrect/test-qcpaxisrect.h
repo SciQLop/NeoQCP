@@ -52,6 +52,8 @@ private slots:
   void aRemovedInsetHandsItsLayerBack();
   void aDestroyedSlotMayDeleteThePlotUnderARect();
   void aDestroyedSlotMayRemoveTheRectBeingDeleted();
+  void aDestroyedSlotMayDeleteThePlotUnderTwoInsets();
+  void anAxisDestroyedSlotMayDeleteThePlot();
   void aChosenLayerSurvivesAMoveOntoAnInset();
   void aClearedPixmapLetsTheThemeBack();
   void thePlotBackgroundReachesAnInset();

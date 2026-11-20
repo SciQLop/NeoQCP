@@ -275,7 +275,15 @@ QCPAxisRect::~QCPAxisRect()
             mParentPlot->setNotAntialiasedElements(mNotAADragBackup);
         }
     }
-    // Elements leave the inset layout by emitting, so it goes while the plot still delivers.
+    // Elements leave the inset layout by emitting, so they go while the plot still delivers. They go
+    // one at a time, as the grid's own cell drop takes them: a slot may delete the plot between two.
+    if (!qcp::detail::dropInsetChildren(plot, *this))
+    {
+        // The plot went with one of them: what is left of the inset layout still names it, so it is
+        // given none, recursively, before those destructors read it.
+        forgetParentPlot(mInsetLayout);
+        mParentPlot = nullptr;
+    }
     destroyInsetLayout();
     plotGone();
     // The rect owns what is drawn in it: a plottable or an item left behind would draw into a frame
@@ -299,16 +307,111 @@ QCPAxisRect::~QCPAxisRect()
         removeOwnLayers();
     plotGone();
 
-    // The axes go now, and one that names a plot a slot deleted would read it in its destructor: it is
-    // given none first. Everything else the axis touches is this rect's, which is still here.
-    const QList<QCPAxis*> axes = axesRaw();
+    // The axes go one at a time too: a slot run by one of their destructors may delete the plot, and an
+    // axis that still names a freed plot reads it when it goes.
+    for (const auto& axis : qcp::guarded(axesRaw()))
+    {
+        if (!axis)
+            continue;
+        if (plotGone())
+            axis->mParentPlot = nullptr;
+        removeAxis(axis);
+    }
+}
+
+namespace qcp::detail
+{
+//! Drops everything an area holds in its inset layout: nested rects take their own insets along.
+bool dropInsetChildren(const QPointer<QCustomPlot>& plot, QCPArea& area)
+{
+    const QCPHandle<QCPLayoutInset> inset = area.insetLayout();
+    if (!inset)
+        return static_cast<bool>(plot);
+    const QList<QCPHandle<QCPLayoutElement>> children = inset->elements(false);
+    for (const QCPHandle<QCPLayoutElement>& child : children)
+    {
+        if (!plot)
+            return false;
+        if (!child)
+            continue;
+        if (!dropElement(plot, child.get()))
+            return false;
+    }
+    return true;
+}
+
+//! Drops a rect the way its owners do: plottables and items first (the legend loses their rows),
+//! then the rect, whose destructor drops its colour scale and inset layout.
+bool dropRect(const QPointer<QCustomPlot>& plot, QCPAxisRect& rect)
+{
+    QCPHandle<QCPAxisRect> alive(&rect);
+    if (!dropInsetChildren(plot, rect))
+        return false;
+    if (!plot || !alive) // a destroyed slot took the rect with its last inset child
+        return static_cast<bool>(plot);
+    const QList<QCPHandle<QCPPlottable>> drawn = rect.plottables();
+    for (const QCPHandle<QCPPlottable>& plottable : drawn)
+    {
+        if (!plot)
+            return false;
+        if (!plottable) // a destroyed slot took it between the listing and here
+            continue;
+        static_cast<void>(plot->removePlottable(plottable.get()));
+    }
+    if (!plot || !alive)
+        return static_cast<bool>(plot);
+    const QList<QCPHandle<QCPItem>> bound = rect.items();
+    for (const QCPHandle<QCPItem>& item : bound)
+    {
+        if (!plot)
+            return false;
+        if (!item)
+            continue;
+        static_cast<void>(plot->removeItem(item.get()));
+    }
+    if (!plot || !alive)
+        return static_cast<bool>(plot);
+    alive.remove();
+    return static_cast<bool>(plot);
+}
+
+//! Drops a layout element and, for a layout, its children first.
+bool dropElement(const QPointer<QCustomPlot>& plot, QCPLayoutElement* element)
+{
     if (!plot)
-        for (QCPAxis* axis : axes)
-            if (axis)
-                axis->mParentPlot = nullptr;
-    for (const auto& axis : qcp::guarded(axes))
-        if (axis)
-            removeAxis(axis);
+        return false;
+    if (!element)
+        return true;
+    QCPHandle<QCPLayoutElement> alive(element);
+    if (auto* rect = qobject_cast<QCPAxisRect*>(element))
+        return dropRect(plot, *rect);
+    if (auto* layout = qobject_cast<QCPLayout*>(element))
+    {
+        const QList<QCPHandle<QCPLayoutElement>> children = layout->elements(false);
+        for (const QCPHandle<QCPLayoutElement>& child : children)
+        {
+            if (!plot)
+                return false;
+            if (!child)
+                continue;
+            if (!dropElement(plot, child.get()))
+                return false;
+        }
+        if (!alive)
+            return true;
+    }
+    alive.remove();
+    return static_cast<bool>(plot);
+}
+} // namespace qcp::detail
+
+void QCPAxisRect::forgetParentPlot(QCPLayoutElement* element)
+{
+    if (!element)
+        return;
+    element->mParentPlot = nullptr;
+    for (const QCPHandle<QCPLayoutElement>& child : element->elements(false))
+        forgetParentPlot(child.get());
 }
 
 /*! \internal
