@@ -29,6 +29,7 @@
 #include "../painting/draw-context.h"
 
 #include <algorithm>
+#include <bit>
 #include <utility>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -179,6 +180,15 @@ void QCPItemZoomIndicator::draw(QCPDrawContext& context) const
                          mPen);
 }
 
+namespace
+{
+//! The bits of a range bound: an exact part of the revision, with no floating-point conversion.
+quint64 bitsOf(double value)
+{
+    return std::bit_cast<quint64>(value);
+}
+} // namespace
+
 quint64 QCPItemZoomIndicator::dependencyRevision() const
 {
     const QCPAxisRect* inset = mInset.data();
@@ -186,10 +196,10 @@ quint64 QCPItemZoomIndicator::dependencyRevision() const
         return QCPItem::dependencyRevision();
     const QCPAxis* keyAxis = inset->xAxis().get();
     const QCPAxis* valueAxis = inset->yAxis().get();
+    const QCPRange keys = keyAxis ? keyAxis->range() : QCPRange();
+    const QCPRange values = valueAxis ? valueAxis->range() : QCPRange();
     const QRect rect = inset->rect();
     return qHashMulti(QCPItem::dependencyRevision(), quint64(rect.x()), quint64(rect.y()),
-                      quint64(rect.width()), quint64(rect.height()),
-                      keyAxis ? qHashMulti(keyAxis->range().lower, keyAxis->range().upper) : 0,
-                      valueAxis ? qHashMulti(valueAxis->range().lower, valueAxis->range().upper)
-                                : 0);
+                      quint64(rect.width()), quint64(rect.height()), bitsOf(keys.lower),
+                      bitsOf(keys.upper), bitsOf(values.lower), bitsOf(values.upper));
 }
