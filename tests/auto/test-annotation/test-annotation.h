@@ -16,6 +16,7 @@ private slots:
     void theHeadPointsAlongThePath();
     void aPanMovesTheTipNotTheText();
     void aFarTargetDrawsInBoundedTime();
+    void aLongConnectorSamplesWithinTheCap();
     void theConnectorDrawsUnderTheText();
     void aClickOnTheConnectorSelects();
     void theShortcutAppliesEveryOption();

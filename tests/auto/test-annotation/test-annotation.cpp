@@ -286,6 +286,29 @@ void TestAnnotation::aFarTargetDrawsInBoundedTime()
         }
 }
 
+void TestAnnotation::aLongConnectorSamplesWithinTheCap()
+{
+    QPainterPath path;
+    path.moveTo(0, 0);
+    path.lineTo(10000, 0);
+
+    const qcp::TrimmedConnector trimmed = qcp::trimConnector(path, QRectF(), 0);
+
+    QVERIFY2(trimmed.line.size() <= 4096,
+             "a path longer than the cap is sampled coarser, not unbounded");
+    QCOMPARE(trimmed.line.first(), QPointF(0, 0));
+    QCOMPARE(trimmed.line.last(), QPointF(10000, 0));
+
+    QPainterPath far;
+    far.moveTo(0, 0);
+    far.lineTo(4.4e14, 0);
+    const qcp::TrimmedConnector huge = qcp::trimConnector(far, QRectF(), 0);
+
+    QVERIFY2(huge.line.size() <= 4096,
+             "a path of any length is sampled in a bounded number of points");
+    QVERIFY(huge.line.size() > 1);
+}
+
 void TestAnnotation::theConnectorDrawsUnderTheText()
 {
     QCustomPlot plot;

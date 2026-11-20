@@ -300,18 +300,30 @@ double distance(QPointF a, QPointF b)
     return std::hypot(a.x() - b.x(), a.y() - b.y());
 }
 
+//! How many steps to walk or sample a path of \a span pixels in: one per pixel, and never more than
+//! the cap, so a path of any length costs a bounded amount of work. Clamped in double before the
+//! conversion: a span past a few billion pixels is outside what an int holds, and that conversion
+//! would be undefined.
+//! simplify: a path longer than the cap is walked and sampled coarser than a pixel; upgrade = walk
+//! the path's own elements, which are a handful however long the path.
+int stepsFor(double span)
+{
+    constexpr double cap = 4096;
+    if (!std::isfinite(span))
+        return int(cap);
+    return int(std::clamp(span, 2.0, cap));
+}
+
 //! The first place at or after \a from where \a beyond holds, nothing when it never does. The path
 //! is walked a pixel at a time to find where the answer turns, then that last step is halved: a path
 //! that leaves the box and comes back (an elbow whose corner is past the text) crosses more than
 //! once, and the connector leaves at the first crossing, as matplotlib's split_path_inout does.
-//! simplify: the walk is capped at 4096 steps, so a path longer than that many pixels could have a
-//! crossing missed inside one step; upgrade = walk the path's own elements.
 template <typename Beyond>
 std::optional<double> firstWhere(const QPainterPath& path, double from, Beyond beyond)
 {
     if (beyond(path.pointAtPercent(from)))
         return from;
-    const int steps = int(std::clamp(std::ceil(path.length()), 1.0, 4096.0));
+    const int steps = stepsFor(std::ceil(path.length()));
     double previous = from;
     for (int i = 1; i <= steps; ++i)
     {
@@ -337,7 +349,7 @@ std::optional<double> firstWhere(const QPainterPath& path, double from, Beyond b
 QPolygonF sampled(const QPainterPath& path, double from, double to)
 {
     const double span = (to - from) * path.length();
-    const int steps = std::max(2, int(std::ceil(span)) + 1);
+    const int steps = stepsFor(std::ceil(span) + 1);
     QPolygonF line;
     line.reserve(steps);
     for (int i = 0; i < steps; ++i)
