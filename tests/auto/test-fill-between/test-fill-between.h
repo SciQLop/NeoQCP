@@ -36,6 +36,7 @@ private slots:
     void aCartesianFillIsNotReRecordedByAPan();
     void aFillMadeBeforeTheDataDrawsWhenItComes();
     void aFillOfAColumnThatDisappearsDrawsNothing();
+    void aHiddenLineHidesItsBand();
 
 private:
     QCustomPlot* mPlot = nullptr;

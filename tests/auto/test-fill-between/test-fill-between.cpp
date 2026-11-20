@@ -598,8 +598,8 @@ void TestFillBetween::aFillMadeBeforeTheDataDrawsWhenItComes()
              "the band did not come with the data");
 }
 
-// A column the fill names can disappear under it: the fill draws nothing, and says why once per
-// draw, as a component that never named a column does.
+// A column a fill names can disappear under it: that is a data change, not misuse. The fill draws
+// nothing, as a graph with a missing column does, and draws again when the column comes back.
 void TestFillBetween::aFillOfAColumnThatDisappearsDrawsNothing()
 {
     auto* graph = mPlot->add<QCPGraph>().get();
@@ -616,9 +616,34 @@ void TestFillBetween::aFillOfAColumnThatDisappearsDrawsNothing()
     test_misuse::calls.clear();
     graph->setData(kKeys, std::vector<std::vector<double>> { kUpper }); // the second column goes
     mPlot->replot();
-    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
-    const QImage image = rendered(*mPlot);
     qcp::setMisuseHandler(previous);
-    QVERIFY2(!isGreen(pixelAt(image, *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.4)),
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+    QVERIFY2(!isGreen(pixelAt(rendered(*mPlot), *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.4)),
              "a column that disappeared still draws a band");
+
+    graph->setData(kKeys, std::vector<std::vector<double>> { kUpper, kLower }); // and comes back
+    mPlot->replot();
+    QVERIFY2(isGreen(pixelAt(rendered(*mPlot), *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.4)),
+             "the band did not come back with the column");
+}
+
+// A line hidden the way a column is hides its band, and shows it again when it comes back.
+void TestFillBetween::aHiddenLineHidesItsBand()
+{
+    const QCPHandle<QCPFillBetween> fill = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(mSecond), greenAbove());
+    QVERIFY(fill);
+    mPlot->replot();
+    QVERIFY2(isGreen(pixelAt(rendered(*mPlot), *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.4)),
+             "the band is not drawn");
+
+    mSecond->setVisible(false);
+    mPlot->replot();
+    QVERIFY2(!isGreen(pixelAt(rendered(*mPlot), *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.4)),
+             "a hidden line still fills its band");
+
+    mSecond->setVisible(true);
+    mPlot->replot();
+    QVERIFY2(isGreen(pixelAt(rendered(*mPlot), *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.4)),
+             "the band did not come back with the line");
 }

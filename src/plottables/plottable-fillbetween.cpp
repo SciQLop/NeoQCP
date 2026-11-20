@@ -181,14 +181,17 @@ void QCPFillBetween::detachLines()
 // null when the line's destroyed() arrives, so update() is all it takes to draw again.
 bool QCPFillBetween::componentDraws(const QCPGraph& line, int component)
 {
+    // A hidden line hides its band, as a hidden column does.
+    if (!line.visible())
+        return false;
     const QCPMultiDataSource* source = line.dataSource();
     if (!source || source->empty())
         return false;
+    // A column that went away under a fill is a data change, not misuse: the fill draws nothing,
+    // as a graph with a missing column does, and draws again when the column comes back. The check
+    // that a named component exists belongs to the call that names it, not to every frame.
     if (component < 0 || component >= source->columnCount() || component >= line.componentCount())
-    {
-        qcp::reportMisuse(Q_FUNC_INFO, "the fill's component does not name a column of its line");
         return false;
-    }
     return line.component(component).visible;
 }
 
@@ -292,11 +295,13 @@ quint64 QCPFillBetween::dependencyRevision() const
 {
     const QCPGraph* first = mFirstLine.data();
     const QCPGraph* second = mSecondLine.data();
+    // A hidden line decides whether the band is recorded at all, so its visibility is part of what
+    // the recording read, not only its data.
     quint64 revision = qHashMulti(
         0, qcpDependencyKey(first), qcpDependencyKey(second),
         first ? first->keyAxis().get() : nullptr, first ? first->valueAxis().get() : nullptr,
         second ? second->keyAxis().get() : nullptr, second ? second->valueAxis().get() : nullptr,
-        mFirstComponent, mSecondComponent);
+        mFirstComponent, mSecondComponent, first && first->visible(), second && second->visible());
     // In data space the recording reads the system's mapping, so a shear or a resize makes it stale
     // (the graph's B4 rule). A cartesian band is pixels of its frame: a pan must reuse it.
     if (const QCPCoordinateSystem* frame = system().get();
