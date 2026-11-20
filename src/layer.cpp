@@ -1179,7 +1179,7 @@ bool QCPLayerable::moveToLayer(QCPLayer* layer, bool prepend)
     return true;
 }
 
-// The z order within one layer: the fill a line owns draws under that line, whatever order the two
+// The z order within one layer: an object placed below another draws under it, whatever order the two
 // were added in (P-3). An index in the layer is a draw order, so inserting at other's index puts
 // this object immediately below it. A layerable on another layer moves to other's layer first: for
 // two lines on different layers, "below" means below the first line on that line's layer.

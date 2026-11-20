@@ -87,18 +87,21 @@ On a logarithmic value axis, which has no 0, the fill goes to the range bound ne
 :dedent:
 ```
 
-The two edges swap colours at the exact crossing, halfway between the two keys that bracket it, so no sliver of the wrong colour is left behind.
+The two edges swap colours at the exact crossing of the two lines between the keys that bracket them: the crossing of the straight segments, not the midpoint between two keys, so no sliver of the wrong colour is left behind.
 Leave `belowBrush` unset to fill both sides with `brush`, or set it to `Qt::NoBrush` to leave that side empty.
 
 The fill owns no data. Each time it is drawn it reads both lines again, so `setData` on either one moves the fill too.
-Rows are the union of both lines' keys over the key range they share, each line interpolated at the other's keys (in the snippet above `first` at key 1 reads the midpoint of its own 0.8 and 0.2).
+Rows are the union of both lines' keys over the key range they share, each line interpolated at the other's keys (in the snippet above both lines use the keys 0, 1, 2 and 3, so nothing is interpolated: `first` at key 1 is its own 0.8).
 A NaN, or a skipped key, in either line breaks the fill there.
 The first line's step style shapes both edges, and the colours swap where the stepped lines swap: on the riser, not at the crossing of the straight segments the data would draw.
 
 The fill goes just below the lower of its two lines in the layer, so the lines and their markers stay on top.
 It is not selectable: a click inside it reaches the lines, and the drag pans the plot.
-Lines on a user coordinate system fill like any other: both must be on the same system, and the band
-is drawn through that system's mapping as the lines are.
+Lines on a user coordinate system fill like any other, as long as that system's key and value axes are
+`QCPAxis`s: both lines must be on the same system, and the band is drawn through that system's mapping
+as the lines are.
+A system with axes of another kind, a polar one for instance, takes no fill: `fillBetween()` reports it
+and returns an empty handle.
 Pass `options.name` to name the row a fill takes in the legend; `removeFromLegend()` takes that row away.
 Calling `fillBetween(graph, graph, options)` with two different components of one graph fills between those two columns.
 
@@ -400,6 +403,8 @@ other's keys, so the band is cropped to what both have and stays on the GPU ribb
 
 - Both graphs must be on the same coordinate system, or share the key axis on the same cartesian area. Another system is a misuse at the call; if they diverge later, the band is not drawn.
 - The fill holds both graphs weakly. A graph that is deleted leaves the fill drawing nothing, and it draws again only when `setLines()` names two live graphs.
+- A column a fill names can go away under it and come back. `setData` with fewer columns is a data change, not misuse: the fill draws nothing while the column is missing, as a graph does, and draws again when the column returns.
+- A line hidden with `setVisible(false)` hides its band, as a hidden column does.
 - A change in either graph's data repaints the band, also when that graph is on another layer.
 - The second graph may be on another value axis, if both graphs share the key axis and the area. The band follows both axes.
 - On a logarithmic value axis a fill to zero stops at the range bound nearer zero, as for the other component fills.

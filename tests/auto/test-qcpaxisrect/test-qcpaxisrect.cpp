@@ -1021,7 +1021,8 @@ void TestQCPAxisRect::aDestroyedSlotMayDeleteThePlotUnderTwoInsets()
                 delete dying;
             });
 
-    // The newest inset goes first, and the graph is on it.
+    // The insets go oldest first, so the graph's inset is the last one dropped: the plot goes with it,
+    // and the two insets are left to the plot's own sweep.
     QCustomPlot* const owner = plot;
     owner->plotLayout()->remove(rect.get());
 
