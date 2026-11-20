@@ -17,7 +17,7 @@
   `ConnectionStyle` classes, each named as the vocabulary names it:
 
   - \ref arc, a quadratic curve whose control point sits \a bend times the start→end distance off
-    the middle, to the left of the direction for a positive bend (matplotlib `arc3`);
+    the middle, to the right of the start→end direction for a positive bend (matplotlib `arc3`);
   - \ref curve, a quadratic curve through the corner where the two lines leave the ends at the
     given angles (matplotlib `angle3`);
   - \ref elbow, two straight lines through that corner, rounded with a radius (matplotlib `angle`);
@@ -28,27 +28,29 @@
 
   Angles are degrees counter-clockwise from +x, in the y-up frame the formulas are written in, so
   `curve(90, 0)` leaves the start upwards whatever the widget's y axis does. A connector with no
-  answer is a straight line: parallel directions for \ref curve and \ref elbow, a start equal to
-  the end, a position that is not finite.
+  answer is a straight line: parallel directions for \ref curve and \ref elbow (angles 180 degrees
+  apart included), a start equal to the end. A connector that would hold a coordinate that is not
+  finite draws nothing.
 */
 class QCP_LIB_DECL QCPConnector
 {
 public:
     /*! The quadratic curve of matplotlib's `arc3`: \a bend is how far the control point is off the
-      middle of the start→end line, in units of its length, positive bowing to the left. */
+      middle of the start→end line, in units of its length, positive bowing to the right. */
     static QCPConnector arc(double bend = 0);
 
-    /*! The quadratic curve of matplotlib's `angle3`: it leaves the start along \a startAngle, meets
-      the end along `-endAngle`, and the corner where those lines cross is its control point. */
+    /*! The quadratic curve of matplotlib's `angle3`: it leaves the start along \a startAngle and
+      reaches the end along a line of \a endAngle, so it arrives there travelling along
+      \a endAngle + 180. The corner where those two lines cross is its control point. */
     static QCPConnector curve(double startAngle, double endAngle);
 
     /*! The two straight lines of matplotlib's `angle`: one leaves the start along \a startAngle,
-      the other reaches the end along `-endAngle`, and they meet in a corner rounded with \a radius.
-    */
+      the other reaches the end along a line of \a endAngle, and they meet in a corner rounded with
+      \a radius. */
     static QCPConnector elbow(double startAngle, double endAngle, QCP::PixelLength radius = { });
 
     /*! matplotlib's `arc`: a \a startArm long arm leaves the start along \a startAngle, a \a endArm
-      long one leaves the end along `-endAngle`, and the two are joined through the corner where
+      long one leaves the end along \a endAngle, and the two are joined through the corner where
       their lines cross, the corners rounded with \a radius. A zero-length arm is no arm. */
     static QCPConnector arms(double startAngle, QCP::PixelLength startArm, double endAngle,
                              QCP::PixelLength endArm, QCP::PixelLength radius = { });

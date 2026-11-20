@@ -12,6 +12,7 @@ private slots:
     void arcZeroIsStraight();
     void parallelDirectionsGiveAStraightPath();
     void aZeroLengthConnectorIsEmpty();
+    void aNonFiniteConnectorIsEmpty();
     void connectorsCompareEqual();
 };
 

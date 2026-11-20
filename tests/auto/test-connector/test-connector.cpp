@@ -8,6 +8,8 @@
 #include <QPointF>
 
 #include <array>
+#include <limits>
+#include <utility>
 
 using namespace QCP::Literals;
 
@@ -88,6 +90,12 @@ void TestConnector::connectorPathsMatchMatplotlib_data()
                                                  .lineTo({ 200, 295 })
                                                  .quadTo({ 200, 300 }, { 195, 300 })
                                                  .lineTo(kEnd);
+    QTest::newRow("elbow(-90, 180, -5px)") << QCPConnector::elbow(-90, 180, QCP::PixelLength { -5 })
+                                           << ExpectedPath { }
+                                                  .moveTo(kStart)
+                                                  .lineTo({ 200, 305 })
+                                                  .quadTo({ 200, 300 }, { 205, 300 })
+                                                  .lineTo(kEnd);
     QTest::newRow("arms(-90, 30px, 0, 30px)") << QCPConnector::arms(-90, 30_px, 0, 30_px)
                                               << ExpectedPath { }
                                                      .moveTo(kStart)
@@ -110,6 +118,20 @@ void TestConnector::connectorPathsMatchMatplotlib_data()
                                                     .lineTo({ 90, 300 })
                                                     .quadTo({ 90, 300 }, { 90, 300 })
                                                     .lineTo(kEnd);
+    QTest::newRow("arms(-90, -30px, 0, 30px, 5px)")
+        << QCPConnector::arms(-90, QCP::PixelLength { -30 }, 0, 30_px, 5_px)
+        << ExpectedPath { }
+               .moveTo(kStart)
+               .lineTo({ 200, 65 })
+               .quadTo({ 200, 70 }, { 197.6872, 74.4329 })
+               .lineTo({ 82.3128, 295.5671 })
+               .quadTo({ 80, 300 }, { 75, 300 })
+               .lineTo(kEnd);
+    // A zero fraction leaves both runs where they are, so each of the two corners coincides with
+    // the point it was pushed from: matplotlib draws all four vertices.
+    const ExpectedPath unmovedBracket
+        = ExpectedPath { }.moveTo(kStart).lineTo(kStart).lineTo(kEnd).lineTo(kEnd);
+    QTest::newRow("bracket(0)") << QCPConnector::bracket(0) << unmovedBracket;
     QTest::newRow("bracket(0.3)")
         << QCPConnector::bracket(0.3)
         << ExpectedPath { }.moveTo(kStart).lineTo({ 140, 55 }).lineTo({ -10, 255 }).lineTo(kEnd);
@@ -147,34 +169,65 @@ void TestConnector::parallelDirectionsGiveAStraightPath()
 {
     const QPointF start { 0, 0 };
     const QPointF end { 100, 0 };
+    // The last three pairs point opposite ways: their directions' cross product is close to zero
+    // (sin of 180 degrees is ~1e-16), not exactly zero.
+    const std::array<std::pair<double, double>, 4> anglePairs {
+        std::pair { 90.0, 90.0 },
+        std::pair { 0.0, 180.0 },
+        std::pair { -90.0, 90.0 },
+        std::pair { 45.0, 225.0 },
+    };
 
-    for (const QCPConnector& connector :
-         { QCPConnector::curve(90, 90), QCPConnector::elbow(90, 90) })
-    {
-        const QPainterPath path = connector.path(start, end);
-        QCOMPARE(path.elementCount(), 2);
-        QCOMPARE(int(path.elementAt(0).type), int(QPainterPath::MoveToElement));
-        QCOMPARE(int(path.elementAt(1).type), int(QPainterPath::LineToElement));
-        QCOMPARE(QPointF(path.elementAt(0)), start);
-        QCOMPARE(QPointF(path.elementAt(1)), end);
-    }
+    for (const auto& [startAngle, endAngle] : anglePairs)
+        for (const QCPConnector& connector : { QCPConnector::curve(startAngle, endAngle),
+                                               QCPConnector::elbow(startAngle, endAngle) })
+        {
+            const QPainterPath path = connector.path(start, end);
+            QVERIFY2(path.elementCount() == 2,
+                     qPrintable(QStringLiteral("angles %1 and %2 give %3 elements")
+                                    .arg(startAngle)
+                                    .arg(endAngle)
+                                    .arg(path.elementCount())));
+            QCOMPARE(int(path.elementAt(0).type), int(QPainterPath::MoveToElement));
+            QCOMPARE(int(path.elementAt(1).type), int(QPainterPath::LineToElement));
+            QCOMPARE(QPointF(path.elementAt(0)), start);
+            QCOMPARE(QPointF(path.elementAt(1)), end);
+        }
 }
 
 void TestConnector::aZeroLengthConnectorIsEmpty()
 {
     const QPointF at { 120, 80 };
-    const std::array<QCPConnector, 7> connectors {
+    const std::array<QCPConnector, 9> connectors {
         QCPConnector { },
         QCPConnector::arc(0.3),
         QCPConnector::curve(90, 0),
+        QCPConnector::curve(0, 180),
         QCPConnector::elbow(-90, 180),
         QCPConnector::elbow(-90, 180, 5_px),
         QCPConnector::arms(-90, 30_px, 0, 30_px, 5_px),
         QCPConnector::bracket(0.3),
+        QCPConnector::bracket(0.3, 45),
     };
 
     for (const QCPConnector& connector : connectors)
         QVERIFY(connector.path(at, at).isEmpty());
+}
+
+void TestConnector::aNonFiniteConnectorIsEmpty()
+{
+    const QPointF start { 200, 100 };
+    const QPointF end { 50, 300 };
+    const double notANumber = std::numeric_limits<double>::quiet_NaN();
+
+    QVERIFY(QCPConnector::arc(0.3).path(QPointF { notANumber, 100 }, end).isEmpty());
+    QVERIFY(QCPConnector::arc(0.3).path(start, QPointF { 50, notANumber }).isEmpty());
+    QVERIFY(QCPConnector::arc(notANumber).path(start, end).isEmpty());
+    QVERIFY(QCPConnector::curve(notANumber, 0).path(start, end).isEmpty());
+    QVERIFY(QCPConnector::elbow(-90, notANumber).path(start, end).isEmpty());
+    QVERIFY(QCPConnector::arms(notANumber, 30_px, 0, 30_px, 5_px).path(start, end).isEmpty());
+    QVERIFY(QCPConnector::bracket(notANumber).path(start, end).isEmpty());
+    QVERIFY(QCPConnector::bracket(0.3, notANumber).path(start, end).isEmpty());
 }
 
 void TestConnector::connectorsCompareEqual()

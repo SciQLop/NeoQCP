@@ -6,15 +6,14 @@
 
 /*
   Each shape's formula is matplotlib 3.11's ConnectionStyle.connect(), ported as it is written:
-  matplotlib/patches.py, classes Arc3 (our arc), Angle3 (curve), Angle (elbow), Arc (arms) and Bar
-  (bracket). They are written in matplotlib's y-up frame, so path() negates the y of both points
-  before the shape is built and of every point it produces after.
+  https://github.com/matplotlib/matplotlib/blob/v3.11.0/lib/matplotlib/patches.py
+  (classes Arc3 = our arc, Angle3 = curve, Angle = elbow, Arc = arms, Bar = bracket). They are
+  written in matplotlib's y-up frame, so path() negates the y of both points before the shape is
+  built and of every point it produces after.
 */
 
 namespace
 {
-// One step of a connector, in matplotlib's frame: a move, a line, or the control point and the end
-// point of one quadratic.
 struct Step
 {
     enum class Kind
@@ -68,12 +67,13 @@ QPointF pointTowards(QPointF from, QPointF to, double distance)
     return span > 0 ? from + (to - from) * (distance / span) : from;
 }
 
-//! Where the line through \a a along \a alongA meets the line through \a b along \a alongB, if the
-// two are not parallel.
+//! Where the line through \a a along \a alongA meets the line through \a b along \a alongB, or
+//! nothing when they are parallel: matplotlib's test, on the cross product.
 std::optional<QPointF> intersection(QPointF a, QPointF alongA, QPointF b, QPointF alongB)
 {
     const double denominator = alongA.x() * alongB.y() - alongA.y() * alongB.x();
-    if (denominator == 0)
+    // Opposite directions are parallel too: sin(180 degrees) is 1.2e-16, not 0.
+    if (std::abs(denominator) < 1e-12)
         return { };
     const double along
         = ((b.x() - a.x()) * alongB.y() - (b.y() - a.y()) * alongB.x()) / denominator;
@@ -108,8 +108,6 @@ Steps elbowSteps(double startAngle, double endAngle, double radius, QPointF a, Q
              quadTo(*corner, pointTowards(*corner, b, radius)), lineTo(b) };
 }
 
-// The three points of one rounded corner: the path reaches \a lineTo, then quads through \a control
-// to \a end (matplotlib's `rounded` list).
 struct Corner
 {
     QPointF lineTo;
@@ -132,8 +130,9 @@ Steps armsSteps(double startAngle, double startArm, double endAngle, double endA
 
     if (startArm != 0)
     {
-        const QPointF armEnd = a + direction(startAngle) * startArm;
-        corner = Corner { pointTowards(a, armEnd, startArm - radius), armEnd, armEnd };
+        const QPointF along = direction(startAngle);
+        const QPointF armEnd = a + along * startArm;
+        corner = Corner { a + along * (startArm - radius), armEnd, armEnd };
     }
 
     if (endArm != 0)
@@ -179,6 +178,8 @@ Steps bracketSteps(double fraction, std::optional<double> angle, QPointF a, QPoi
 
     const QPointF leg = stop - a;
     const double legSpan = std::hypot(leg.x(), leg.y());
+    // simplify: matplotlib divides by this length, so an angle that lands the projected run on the
+    // start point is a NaN there; here it draws a straight line.
     if (legSpan == 0)
         return straight(a, b);
     const QPointF perpendicular { leg.y(), -leg.x() };
@@ -187,8 +188,20 @@ Steps bracketSteps(double fraction, std::optional<double> angle, QPointF a, QPoi
     return { moveTo(a), lineTo(a + offset), lineTo(stop + offset), lineTo(b) };
 }
 
+bool isFinite(QPointF point)
+{
+    return std::isfinite(point.x()) && std::isfinite(point.y());
+}
+
+//! The steps as a path, or nothing when one of them holds a coordinate that is not finite (a NaN
+//! bend, angle, arm, radius or fraction, say): a path of NaN would poison the painter.
 QPainterPath buildPath(const Steps& steps)
 {
+    const bool finite = std::ranges::all_of(
+        steps, [](const Step& step) { return isFinite(step.control) && isFinite(step.point); });
+    if (!finite)
+        return { };
+
     QPainterPath path;
     for (const Step& step : steps)
     {
@@ -206,11 +219,6 @@ QPainterPath buildPath(const Steps& steps)
         }
     }
     return path;
-}
-
-bool isFinite(QPointF point)
-{
-    return std::isfinite(point.x()) && std::isfinite(point.y());
 }
 
 template <typename... Functions>
@@ -261,7 +269,7 @@ QCPConnector QCPConnector::bracket(double fraction, std::optional<double> angle)
 
 QPainterPath QCPConnector::path(QPointF start, QPointF end) const
 {
-    if (start == end || !isFinite(start) || !isFinite(end))
+    if (start == end)
         return { };
 
     const QPointF a = flipY(start);
