@@ -5,6 +5,7 @@
 #include "../global.h"
 #include "../lineending.h"
 #include "../painting/draw-context.h"
+#include "../painting/text-cache.h"
 #include "connector.h"
 #include "item.h"
 
@@ -87,25 +88,27 @@ signals:
     void shrinkChanged(QCP::PixelLength shrink);
 
 protected:
-    //! The text's measured glyphs, re-measured only when the text, the font or mathText changes.
+    //! The text's measured glyphs, re-measured only when an input of the measurement changes.
     QSize glyphSize(const QCPTextStyle& style) const;
     bool hiddenForItsTarget() const;
-    //! The pen the connector is drawn with: the selected one while the item is selected.
-    QPen mainPen() const;
+    //! The pen the connector is drawn with: the selected one while selected, else the one set, or
+    //! the theme's foreground while no pen was ever set.
+    QPen mainPen(const QColor& foreground) const;
+    //! Records the connector and its head: the part of \a path between the box and the target.
+    void recordConnector(QCPDrawContext& context, const QTransform& frame, const QPainterPath& path,
+                         const QRectF& box, double rotationDegrees, const QPen& pen) const;
 
     // property members:
     QString mText;
     QCPTextStyle mTextStyle;
     QCPConnector mConnector;
     QPen mPen, mSelectedPen;
+    //! Whether \ref mPen is still the constructor's default, and so the theme's foreground to fill.
+    bool mPenFromTheme = true;
     QCPLineEnding mHead;
     QCP::PixelLength mShrink;
 
-    mutable QSize mGlyphSize;
-    mutable QString mGlyphText;
-    mutable QFont mGlyphFont;
-    mutable bool mGlyphMath = false;
-    mutable bool mGlyphValid = false;
+    mutable qcp::TextGlyphCache mGlyphs;
 
     friend class TestAnnotation; // reads the recording's count
     friend struct AnnotationRecording; // reads the recording's commands

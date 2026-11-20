@@ -16,6 +16,11 @@ private slots:
     void theHeadPointsAlongThePath();
     void aPanMovesTheTipNotTheText();
     void aFarPixelTargetDrawsInBoundedTime();
+    void aSelectedFarTargetDrawsInBoundedTime();
+    void aLongArcTrimsInLinearTime();
+    void changingTextFlagsRemeasuresTheText();
+    void changingTextFlagsRemeasuresTheAnnotation();
+    void aDefaultPenTakesTheThemeForeground();
     void aFarDataTargetRecordsNothing();
     void aLongConnectorSamplesWithinTheCap();
     void theTargetCutIsAtTheFirstApproach();

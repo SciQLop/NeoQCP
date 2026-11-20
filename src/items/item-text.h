@@ -29,6 +29,7 @@
 #include "../drawable.h"
 #include "../global.h"
 #include "../painting/draw-context.h"
+#include "../painting/text-cache.h"
 #include "item.h"
 
 class QCPPainter;
@@ -163,12 +164,8 @@ protected:
     QMargins mPadding;
     //! Measured and drawn through the label renderer; off, the font's own metrics measure it.
     bool mMathText = true;
-    //! The measurement the box queries reuse; text and font are the only inputs it depends on.
-    mutable QSize mGlyphSize;
-    mutable QString mGlyphText;
-    mutable QFont mGlyphFont;
-    mutable bool mGlyphMath = false;
-    mutable bool mGlyphValid = false;
+    //! The measurement the box queries reuse; its inputs are the text and the style's metrics.
+    mutable qcp::TextGlyphCache mGlyphs;
 
     // reimplemented virtual methods:
     void draw(QCPDrawContext& context) const override;

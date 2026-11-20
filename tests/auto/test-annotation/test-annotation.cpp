@@ -1,10 +1,13 @@
 #include "test-annotation.h"
 
+#include <construct.h>
 #include <core.h>
 #include <items/connector.h>
 #include <items/item-annotation.h>
+#include <items/item-text.h>
 #include <layoutelements/layoutelement-axisrect.h>
 #include <painting/draw-commands.h>
+#include <theme.h>
 
 #include <QElapsedTimer>
 #include <QLineF>
@@ -151,9 +154,8 @@ void TestAnnotation::trimCutsAtTheBoxAndShrinks()
     QVERIFY2(qAbs(lastOf(trimmed).x() - 95) < 0.01 && qAbs(lastOf(trimmed).y()) < 0.01,
              "the line ends 5 px short of the path's end");
     QVERIFY2(qAbs(trimmed.endAngleDegrees) < 0.01, "a run along +x ends at 0 degrees");
-    for (std::size_t i = 1; i < trimmed.line.size(); ++i)
-        QVERIFY2(QLineF(trimmed.line[i - 1], trimmed.line[i]).length() <= 1.05,
-                 "the kept path is sampled at most a pixel apart");
+    QVERIFY2(trimmed.line.size() == 2,
+             "a straight path keeps its own two vertices between the cuts, not a sample per pixel");
 }
 
 void TestAnnotation::theCutIsAtTheFirstExit()
@@ -299,6 +301,134 @@ void TestAnnotation::aFarPixelTargetDrawsInBoundedTime()
         QVERIFY2(std::isfinite(pixel.x()) && std::isfinite(pixel.y()),
                  "every sampled point of a huge connector is a number");
     }
+}
+
+void TestAnnotation::aSelectedFarTargetDrawsInBoundedTime()
+{
+    // The selected pen is two pixels wide, so the recording also carries a head and a thick outline
+    // built from a trillion-pixel direction: both still have to be numbers, and the replot bounded.
+    QCustomPlot plot;
+    preparePlot(plot);
+    plot.setInteractions(QCP::iSelectItems);
+    const QCPHandle<QCPItemAnnotation> item = plot.axisRect()->annotation(
+        QCP::Pixels { 1e12, 1e12 }, QCP::Pixels { 100, 100 }, QStringLiteral("label"),
+        { .head = QCPLineEnding::esLineArrow });
+    QVERIFY(item);
+    item->setSelectable(QCP::stWhole);
+    item->setSelected(true);
+
+    QElapsedTimer timer;
+    timer.start();
+    plot.replot();
+    QVERIFY2(timer.elapsed() < 1000,
+             "a selected connector to a trillion-pixel target costs no time");
+
+    const Recorded recorded = scan(*item);
+    QVERIFY2(recorded.line, "a selected annotation to a pixel target draws");
+    QCOMPARE(recorded.line->pen, item->selectedPen());
+    for (const QCP::Position& point : recorded.line->points)
+    {
+        const QPointF pixel = pixelOf(point);
+        QVERIFY2(std::isfinite(pixel.x()) && std::isfinite(pixel.y()),
+                 "every point of a selected huge connector is a number");
+    }
+    QVERIFY2(recorded.head, "the head of a selected far connector is recorded");
+    const QPointF tip = pixelOf(recorded.head->origin);
+    QVERIFY(std::isfinite(tip.x()) && std::isfinite(tip.y()));
+    const QRectF head = recorded.head->path.boundingRect();
+    QVERIFY(std::isfinite(head.width()) && std::isfinite(head.height()));
+}
+
+void TestAnnotation::aLongArcTrimsInLinearTime()
+{
+    // A trim walks the path's own flattened polyline, not one point per pixel: a 20000 px arc is a
+    // few hundred vertices, where sampling the path per pixel would be 20000 twice per call.
+    const QPainterPath arc = QCPConnector::arc(0.3).path(QPointF(0, 0), QPointF(20000, 0));
+    const QRectF box(-20, -20, 40, 40);
+
+    qcp::TrimmedConnector trimmed;
+    QElapsedTimer timer;
+    timer.start();
+    for (int i = 0; i < 50; ++i)
+        trimmed = qcp::trimConnector(arc, box, 5);
+    const qint64 elapsed = timer.elapsed();
+
+    QVERIFY2(trimmed.line.size() > 1, "the long arc keeps a run past the box");
+    QVERIFY2(elapsed < 100,
+             qPrintable(QStringLiteral("50 trims of a 20000 px arc took %1 ms").arg(elapsed)));
+    for (const QPointF& point : trimmed.line)
+        QVERIFY2(std::isfinite(point.x()) && std::isfinite(point.y()),
+                 "every kept point of the long arc is a number");
+
+    const QPainterPath far = QCPConnector::arc(0.3).path(QPointF(0, 0), QPointF(1e12, 1e12));
+    const qcp::TrimmedConnector huge = qcp::trimConnector(far, box, 5);
+    QVERIFY(huge.line.size() > 1);
+    for (const QPointF& point : huge.line)
+        QVERIFY2(std::isfinite(point.x()) && std::isfinite(point.y()),
+                 "a far pixel target keeps every point finite");
+}
+
+void TestAnnotation::changingTextFlagsRemeasuresTheText()
+{
+    // Both items share one glyph cache, keyed on everything qcpMeasureText reads: the text's flags
+    // can change the size, so a new alignment must measure again.
+    QCustomPlot plot;
+    preparePlot(plot);
+    const QCPHandle<QCPItemText> text = plot.add<QCPItemText>();
+    text->setPosition(QCP::Pixels { 100, 100 });
+    text->setText(QStringLiteral("a\tb"));
+    text->setMathText(false);
+    text->setTextAlignment(Qt::AlignLeft);
+    plot.replot();
+
+    const quint64 measured = qcpTextMeasureCount();
+    text->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    plot.replot();
+    QVERIFY2(qcpTextMeasureCount() > measured, "another alignment re-measures the text");
+}
+
+void TestAnnotation::changingTextFlagsRemeasuresTheAnnotation()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    const QCPHandle<QCPItemAnnotation> item = plot.axisRect()->annotation(
+        QCP::Data { 0.3, 0.2 }, QCP::Data { 0.8, 0.6 }, QStringLiteral("a\tb"),
+        { .textStyle = { .textFlags = int(Qt::AlignLeft), .mathText = false } });
+    QVERIFY(item);
+    plot.replot();
+
+    const quint64 measured = qcpTextMeasureCount();
+    item->setTextStyle(
+        QCPTextStyle { .textFlags = int(Qt::AlignLeft | Qt::TextExpandTabs), .mathText = false });
+    plot.replot();
+    QVERIFY2(qcpTextMeasureCount() > measured, "another textFlags re-measures the label");
+}
+
+void TestAnnotation::aDefaultPenTakesTheThemeForeground()
+{
+    // An annotation on a dark theme has no colour of its own: the label takes the theme's
+    // foreground, and so does the connector, or a black arrow would come with light text.
+    QCustomPlot plot;
+    preparePlot(plot);
+    QCPTheme* theme = QCPTheme::dark();
+    plot.setTheme(theme);
+    const QCPHandle<QCPItemAnnotation> plain = plot.axisRect()->annotation(
+        QCP::Data { 0.3, 0.2 }, QCP::Data { 0.8, 0.6 }, QStringLiteral("label"));
+    const QCPHandle<QCPItemAnnotation> explicitPen
+        = plot.axisRect()->annotation(QCP::Data { 0.3, 0.75 }, QCP::Data { 0.8, 0.95 },
+                                      QStringLiteral("label"), { .pen = QPen(Qt::darkGreen) });
+    QVERIFY(plain);
+    QVERIFY(explicitPen);
+    QCOMPARE(plain->pen(), QPen()); // the shortcut's default pen, no colour asked for
+    plot.replot();
+
+    const Recorded plainLine = scan(*plain);
+    QVERIFY2(plainLine.line, "a default annotation draws its connector on a dark theme");
+    QCOMPARE(plainLine.line->pen.color(), theme->foreground());
+
+    const Recorded kept = scan(*explicitPen);
+    QVERIFY(kept.line);
+    QCOMPARE(kept.line->pen.color(), QColor(Qt::darkGreen));
 }
 
 void TestAnnotation::aFarDataTargetRecordsNothing()
@@ -602,12 +732,17 @@ void TestAnnotation::settersRecordAgain()
     QCOMPARE(recordings(), initial + 5);
     item->setShrink(2_px);
     QCOMPARE(recordings(), initial + 5);
-    item->setSelectedPen(QPen(Qt::magenta));
+    const double none = std::numeric_limits<double>::quiet_NaN();
+    item->setShrink(QCP::PixelLength { none });
     QCOMPARE(recordings(), initial + 6);
+    item->setShrink(QCP::PixelLength { none });
+    QCOMPARE(recordings(), initial + 6); // NaN equals itself here: the same value again
     item->setSelectedPen(QPen(Qt::magenta));
-    QCOMPARE(recordings(), initial + 6);
-    item->setTextStyle(QCPTextStyle { .pen = QPen(Qt::blue) });
+    QCOMPARE(recordings(), initial + 7);
+    item->setSelectedPen(QPen(Qt::magenta));
     QCOMPARE(recordings(), initial + 7);
     item->setTextStyle(QCPTextStyle { .pen = QPen(Qt::blue) });
-    QCOMPARE(recordings(), initial + 7);
+    QCOMPARE(recordings(), initial + 8);
+    item->setTextStyle(QCPTextStyle { .pen = QPen(Qt::blue) });
+    QCOMPARE(recordings(), initial + 8);
 }

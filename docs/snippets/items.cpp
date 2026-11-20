@@ -51,11 +51,12 @@ DOC_SNIPPET(items_annotation, 600, 360)
         x[i] = -3 + i * 6.0 / 199;
         y[i] = std::exp(-x[i] * x[i]);
     }
-    customPlot->addGraph()->setData(x, y);
-    customPlot->xAxis->setRange(-3, 3);
-    customPlot->yAxis->setRange(-0.1, 1.2);
+    auto ax = customPlot->axisRect();
+    auto graph = ax->line(x, y);
+    ax->xAxis()->setRange(-3, 3);
+    ax->yAxis()->setRange(-0.1, 1.2);
 
-    customPlot->axisRect()->annotation(
+    ax->annotation(
         QCP::Data { 0.0, 1.0 },  // the target: the peak's tip
         QCP::Data { 1.2, 0.5 },  // the text: where the label sits
         QStringLiteral("the only peak"),

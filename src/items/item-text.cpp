@@ -443,16 +443,7 @@ QCPTextStyle QCPItemText::textStyle() const
 */
 QSize QCPItemText::glyphSize(const QCPTextStyle& style) const
 {
-    if (!mGlyphValid || mGlyphText != mText || mGlyphFont != style.font
-        || mGlyphMath != style.mathText)
-    {
-        mGlyphText = mText;
-        mGlyphFont = style.font;
-        mGlyphMath = style.mathText;
-        mGlyphSize = qcpMeasureText(style, mText);
-        mGlyphValid = true;
-    }
-    return mGlyphSize;
+    return mGlyphs.size(style, mText);
 }
 
 QRectF QCPItemText::textBoxAtOrigin() const

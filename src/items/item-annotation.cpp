@@ -43,6 +43,34 @@ QCPVector2D headDirection(double degrees)
     const double radians = qDegreesToRadians(degrees);
     return { std::cos(radians), -std::sin(radians) };
 }
+
+//! The text's frame: anchored on the position, turned with the text, y still down the screen.
+QTransform textFrame(const QPointF& anchor, double rotationDegrees)
+{
+    QTransform frame;
+    frame.translate(anchor.x(), anchor.y());
+    frame.rotate(rotationDegrees);
+    return frame;
+}
+
+//! \a style with the theme's foreground filled in when it names no colour of its own.
+QCPTextStyle themedTextStyle(const QCPTextStyle& style, const QColor& foreground)
+{
+    if (style.color.isValid())
+        return style;
+    QCPTextStyle themed = style;
+    themed.color = foreground;
+    return themed;
+}
+
+std::vector<QCP::Position> pixelPositions(const QPolygonF& line)
+{
+    std::vector<QCP::Position> points;
+    points.reserve(std::size_t(line.size()));
+    for (const QPointF& point : line)
+        points.push_back(QCP::Pixels { point.x(), point.y() });
+    return points;
+}
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,8 +130,8 @@ QCPVector2D headDirection(double degrees)
 */
 
 /*!
-  Creates an annotation with no text and both ends at the origin, a straight connector in a plain
-  black line, and a selected look of a blue line two pixels wide. The text takes the drawing
+  Creates an annotation with no text and both ends at the origin, a straight connector in the
+  theme's foreground, and a selected look of a blue line two pixels wide. The text takes the drawing
   context's defaults: no box, the plot's own font and colour.
 */
 QCPItemAnnotation::QCPItemAnnotation()
@@ -111,7 +139,6 @@ QCPItemAnnotation::QCPItemAnnotation()
         , target(createPosition(QLatin1String("target")))
         , position(createPosition(QLatin1String("position")))
 {
-    setPen(QPen(Qt::black));
     setSelectedPen(QPen(Qt::blue, 2));
     // An annotation is not clipped to its rect, as matplotlib's annotate is not: a label may hang
     // past the edge, so the recording is clipped to the viewport instead.
@@ -160,7 +187,9 @@ void QCPItemAnnotation::setConnector(const QCPConnector& connector)
 }
 
 /*!
-  Sets the pen of the connector and of its head; the default is a plain black line.
+  Sets the pen of the connector and of its head. A pen equal to a default-constructed QPen() - a
+  plain black one-pixel line - counts as unset and takes the theme's foreground; any other pen is
+  used as given.
 */
 void QCPItemAnnotation::setPen(const QPen& pen)
 {
@@ -168,6 +197,7 @@ void QCPItemAnnotation::setPen(const QPen& pen)
         return;
     update();
     mPen = pen;
+    mPenFromTheme = (pen == QPen());
     qcpEmit(this, mParentPlot, &QCPItemAnnotation::penChanged, this->pen());
 }
 
@@ -199,11 +229,11 @@ void QCPItemAnnotation::setHead(const QCPLineEnding& head)
 
 /*!
   Sets how many pixels short of the text box and of the target the connector stops, both ends from
-  the one value. The default is zero, a line that touches both.
+  the one value. A negative length counts as zero. The default is zero, a line that touches both.
 */
 void QCPItemAnnotation::setShrink(QCP::PixelLength shrink)
 {
-    if (shrink.px == mShrink.px)
+    if (shrink.px == mShrink.px || (std::isnan(shrink.px) && std::isnan(mShrink.px)))
         return;
     update();
     mShrink = shrink;
@@ -212,30 +242,27 @@ void QCPItemAnnotation::setShrink(QCP::PixelLength shrink)
 
 /*! \internal
 
-  The text's measured glyphs, measured again only when the string, the font or mathText changes: a
+  The text's measured glyphs, measured again only when an input of the measurement changes: a
   recording asks on every frame, and measuring is the expensive part.
 */
 QSize QCPItemAnnotation::glyphSize(const QCPTextStyle& style) const
 {
-    if (!mGlyphValid || mGlyphText != mText || mGlyphFont != style.font
-        || mGlyphMath != style.mathText)
-    {
-        mGlyphText = mText;
-        mGlyphFont = style.font;
-        mGlyphMath = style.mathText;
-        mGlyphSize = qcpMeasureText(style, mText);
-        mGlyphValid = true;
-    }
-    return mGlyphSize;
+    return mGlyphs.size(style, mText);
 }
 
 /*! \internal
 
   Returns the pen that should be used for drawing the connector.
 */
-QPen QCPItemAnnotation::mainPen() const
+QPen QCPItemAnnotation::mainPen(const QColor& foreground) const
 {
-    return mSelected ? mSelectedPen : mPen;
+    if (mSelected)
+        return mSelectedPen;
+    if (!mPenFromTheme)
+        return mPen;
+    QPen themed = mPen;
+    themed.setColor(foreground);
+    return themed;
 }
 
 /*! \internal
@@ -262,8 +289,6 @@ bool QCPItemAnnotation::hiddenForItsTarget() const
 /* inherits documentation from base class */
 void QCPItemAnnotation::draw(QCPDrawContext& context) const
 {
-    // The connector and the text's box are laid out in pixels, so the recording is remade whenever
-    // the view changes, a pan included (P-6).
     (void)context.transform();
 
     if (hiddenForItsTarget())
@@ -271,49 +296,48 @@ void QCPItemAnnotation::draw(QCPDrawContext& context) const
 
     bool snapshot = false;
     const QCP::Position at = position->asPosition(&snapshot);
-    if (snapshot) // the position's space had to become pixels: they go stale without a new read
+    if (snapshot)
         context.recordEveryFrame();
 
-    // A style with no colour of its own takes the theme's foreground, as QCPItemText does: left
-    // invalid, the replay would take the painter's pen, which the connector has just set.
-    QCPTextStyle style = mTextStyle;
-    if (!style.color.isValid())
-        style.color = context.theme().foreground();
-
+    const QColor foreground = context.theme().foreground();
+    const QCPTextStyle style = themedTextStyle(mTextStyle, foreground);
     const bool hasText = !mText.isEmpty();
     const QSize glyphs = hasText ? glyphSize(style) : QSize();
     const QRectF box = hasText ? QRectF(qcpTextLayout(style, glyphs).box) : QRectF();
-
-    // The text's box is axis aligned in the text's own frame, which is turned with the text: the
-    // connector is built in screen space, as matplotlib builds it, then mapped into that frame so
-    // the cut can be taken against the box.
-    QTransform frame;
     const QPointF anchor = position->pixelPosition();
-    frame.translate(anchor.x(), anchor.y());
-    frame.rotate(style.rotationDegrees);
+    const QTransform frame = textFrame(anchor, style.rotationDegrees);
     const QPointF start = hasText ? frame.map(box.center()) : anchor;
-    const QPainterPath path = mConnector.path(start, target->pixelPosition());
-    const qcp::TrimmedConnector trimmed
-        = qcp::trimConnector(frame.inverted().map(path), box, mShrink.px);
+    const QPen pen = mainPen(foreground);
 
-    const QPen pen = mainPen();
-    if (trimmed.line.size() > 1)
-    {
-        const QPolygonF pixels = frame.map(trimmed.line);
-        std::vector<QCP::Position> points;
-        points.reserve(std::size_t(pixels.size()));
-        for (const QPointF& point : pixels)
-            points.push_back(QCP::Pixels { point.x(), point.y() });
-        context.polyline(points, pen);
-
-        const QPointF tip = pixels.back();
-        const QPainterPath head
-            = mHead.path(headDirection(trimmed.endAngleDegrees - style.rotationDegrees), pen.widthF());
-        if (!head.isEmpty())
-            context.path(QCP::Pixels { tip.x(), tip.y() }, head, mHead.penFor(pen),
-                         mHead.brushFor(pen));
-    }
+    recordConnector(context, frame, mConnector.path(start, target->pixelPosition()), box,
+                    style.rotationDegrees, pen);
 
     if (hasText)
         context.text(at, mText, style, glyphs);
+}
+
+/*! \internal
+
+  Records the part of \a path that runs from the edge of \a box to the target, then the head at its
+  tip. \a frame is the text's own frame, \a rotationDegrees its turn: the box is axis aligned there,
+  and the path is cut in that frame.
+*/
+void QCPItemAnnotation::recordConnector(QCPDrawContext& context, const QTransform& frame,
+                                        const QPainterPath& path, const QRectF& box,
+                                        double rotationDegrees, const QPen& pen) const
+{
+    const qcp::TrimmedConnector trimmed
+        = qcp::trimConnector(frame.inverted().map(path), box, mShrink.px);
+    if (trimmed.line.size() <= 1)
+        return;
+
+    const QPolygonF pixels = frame.map(trimmed.line);
+    context.polyline(pixelPositions(pixels), pen);
+
+    const QPointF tip = pixels.back();
+    const QPainterPath head
+        = mHead.path(headDirection(trimmed.endAngleDegrees - rotationDegrees), pen.widthF());
+    if (!head.isEmpty())
+        context.path(QCP::Pixels { tip.x(), tip.y() }, head, mHead.penFor(pen),
+                     mHead.brushFor(pen));
 }

@@ -61,9 +61,9 @@ A <a href="api/classQCPLineEnding.html">QCPLineEnding</a> is a style plus a size
   | `arc()` | `arc3` | the bend, 0 for a straight line, positive and negative bending opposite ways |
   | `curve()` | `angle3` | a line of the first angle through the text, a line of the second through the target |
   | `elbow()` | `angle` | the same two angles, met in a corner rounded by the radius |
-  | `arms()` | `arc` | the two angles and the length of each arm, joined through the corner where they cross |
-  | `bracket()` | `bar` | where along the line the bar sits, 0 to 1, and the angle it makes with it |
-- `setShrink()` stops the connector that many pixels short of both ends, the text's box and the target.
+  | `arms()` | `arc` | the two angles and the length of each arm, the two arm ends joined by one straight segment |
+  | `bracket()` | `bar` | how far sideways the bar is pushed, as a share of the start-end distance (may be negative), and the bar's own direction in degrees |
+- `setShrink()` stops the connector that many pixels short of both ends, the text's box and the target; a negative length counts as zero.
 - `setHead()` puts a line ending at the target, turned along the path where it arrives. There is no tail.
 - `setTextStyle()` takes the same `QCPTextStyle` as `QCPAxisRect::text()`; its padding is inside the box the connector leaves.
 

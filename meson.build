@@ -138,6 +138,7 @@ neoqcp_moc_headers = [
             'src/painting/paintbuffer.h',
             'src/painting/painter.h',
             'src/painting/draw-commands.h',
+            'src/painting/text-cache.h',
             'src/painting/draw-context.h',
             'src/painting/command-replay-rhi.h',
             'src/painting/paintbuffer-pixmap.h',

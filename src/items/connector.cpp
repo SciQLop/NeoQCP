@@ -300,99 +300,115 @@ double distance(QPointF a, QPointF b)
     return std::hypot(a.x() - b.x(), a.y() - b.y());
 }
 
-//! How many steps to walk or sample a path of \a span pixels in: one per pixel, and never more than
-//! the cap, so a path of any length costs a bounded amount of work. Clamped in double before the
-//! conversion: a span past a few billion pixels is outside what an int holds, and that conversion
-//! would be undefined.
-//! simplify: a path longer than the cap is walked and sampled coarser than a pixel; upgrade = walk
-//! the path's own elements, which are a handful however long the path.
-int stepsFor(double span)
+//! \a path's elements as one polyline, flattened by Qt once: nothing below re-measures the path, so
+//! a trim costs its own walk and no more, however long or curved the path is. A connector is one
+//! subpath; several are walked in the order the path holds them.
+QPolygonF flattened(const QPainterPath& path)
 {
-    constexpr double cap = 4096;
-    if (!std::isfinite(span))
-        return int(cap);
-    return int(std::clamp(span, 2.0, cap));
+    QPolygonF line;
+    for (const QPolygonF& subpath : path.toSubpathPolygons())
+        line += subpath;
+    return line;
 }
 
-//! The first place at or after \a from where \a beyond holds, nothing when it never does. The path
-//! is walked a pixel at a time to find where the answer turns, then that last step is halved: a path
-//! that leaves the box and comes back (an elbow whose corner is past the text) crosses more than
-//! once, and the connector leaves at the first crossing, as matplotlib's split_path_inout does.
-template <typename Beyond>
-std::optional<double> firstWhere(const QPainterPath& path, double from, Beyond beyond)
+//! The point \a index vertices along \a line: 1.5 is half way from the second vertex to the third.
+QPointF pointAt(const QPolygonF& line, double index)
 {
-    if (beyond(path.pointAtPercent(from)))
+    const int vertex = std::clamp(int(std::floor(index)), 0, int(line.size()) - 1);
+    if (vertex >= int(line.size()) - 1)
+        return line.back();
+    return line[vertex] + (line[vertex + 1] - line[vertex]) * (index - vertex);
+}
+
+//! The first place at or after \a from where \a beyond holds, found inside the segment that crosses
+//! it, nothing when it never turns. The walk is over the polyline's own vertices, so it costs a
+//! comparison per vertex and a halving per crossing: a path that leaves the box and comes back (an
+//! elbow whose corner is past the text) crosses more than once, and the connector leaves at the
+//! first crossing, as matplotlib's split_path_inout does.
+template <typename Beyond>
+std::optional<double> firstWhere(const QPolygonF& line, double from, Beyond beyond)
+{
+    if (beyond(pointAt(line, from)))
         return from;
-    const int steps = stepsFor(std::ceil(path.length()));
-    double previous = from;
-    for (int i = 1; i <= steps; ++i)
+    for (int vertex = int(std::floor(from)) + 1; vertex < int(line.size()); ++vertex)
     {
-        const double t = from + (1 - from) * i / steps;
-        if (!beyond(path.pointAtPercent(t)))
-        {
-            previous = t;
+        if (!beyond(line[vertex]))
             continue;
-        }
-        double inside = previous;
-        double outside = t;
-        for (int j = 0; j < 32; ++j)
+        double inside = std::max(from, double(vertex - 1));
+        double outside = double(vertex);
+        for (int step = 0; step < 64; ++step)
         {
             const double middle = (inside + outside) / 2;
-            (beyond(path.pointAtPercent(middle)) ? outside : inside) = middle;
+            (beyond(pointAt(line, middle)) ? outside : inside) = middle;
         }
         return outside;
     }
     return std::nullopt;
 }
 
-//! The path between \a from and \a to, as a polyline of points at most one pixel apart.
-QPolygonF sampled(const QPainterPath& path, double from, double to)
+//! The polyline between \a from and \a to: the vertices strictly between them, and each cut.
+QPolygonF kept(const QPolygonF& line, double from, double to)
 {
-    const double span = (to - from) * path.length();
-    const int steps = stepsFor(std::ceil(span) + 1);
-    QPolygonF line;
-    line.reserve(steps);
-    for (int i = 0; i < steps; ++i)
-        line << path.pointAtPercent(from + (to - from) * i / (steps - 1));
-    return line;
+    QPolygonF keptLine;
+    keptLine << pointAt(line, from);
+    for (int vertex = int(std::floor(from)) + 1; double(vertex) < to; ++vertex)
+        keptLine << line[vertex];
+    keptLine << pointAt(line, to);
+    return keptLine;
+}
+
+//! The direction of the last segment of \a line, in QPainterPath's degrees: counter-clockwise with
+//! y up the screen.
+double endAngle(const QPolygonF& line)
+{
+    for (int vertex = int(line.size()) - 1; vertex > 0; --vertex)
+    {
+        const QPointF delta = line[vertex] - line[vertex - 1];
+        if (delta.x() != 0 || delta.y() != 0)
+            return qRadiansToDegrees(std::atan2(-delta.y(), delta.x()));
+    }
+    return 0;
 }
 } // namespace
 
 TrimmedConnector trimConnector(const QPainterPath& path, const QRectF& startBox, double shrink)
 {
     TrimmedConnector trimmed;
-    // A path of one point has no direction and no length: nothing to sample or to turn a head along.
+    // A path of one point has no direction and no length: nothing to walk or to turn a head along.
     if (path.isEmpty() || !(path.length() > 0))
+        return trimmed;
+    const QPolygonF line = flattened(path);
+    if (line.size() < 2)
         return trimmed;
     const double cut = std::max(0.0, shrink);
 
     double from = 0;
     if (!startBox.isNull())
     {
-        const std::optional<double> exit = firstWhere(
-            path, 0, [&startBox](QPointF point) { return !startBox.contains(point); });
+        const std::optional<double> exit
+            = firstWhere(line, 0, [&startBox](QPointF point) { return !startBox.contains(point); });
         if (!exit)
             return trimmed; // the whole path stays in the box: the target is inside the text
         from = *exit;
     }
     if (cut > 0)
     {
-        const QPointF start = path.pointAtPercent(from);
-        const std::optional<double> away = firstWhere(path, from, [&](QPointF point)
-                                                      { return distance(point, start) >= cut; });
+        const QPointF start = pointAt(line, from);
+        const std::optional<double> away
+            = firstWhere(line, from, [&](QPointF point) { return distance(point, start) >= cut; });
         if (!away)
             return trimmed; // shorter than the start's cut
         from = *away;
     }
 
-    double to = 1;
+    double to = double(line.size() - 1);
     if (cut > 0)
     {
         // Forward from the start, as matplotlib's split_path_inout walks: the cut is where the path
         // first comes within \a cut of its own end, not where it last leaves it.
-        const QPointF end = path.pointAtPercent(1);
-        const std::optional<double> away = firstWhere(
-            path, from, [&](QPointF point) { return distance(point, end) <= cut; });
+        const QPointF end = line.back();
+        const std::optional<double> away
+            = firstWhere(line, from, [&](QPointF point) { return distance(point, end) <= cut; });
         if (!away)
             return trimmed; // shorter than the target's cut
         to = *away;
@@ -400,8 +416,8 @@ TrimmedConnector trimConnector(const QPainterPath& path, const QRectF& startBox,
     if (!(to > from))
         return trimmed;
 
-    trimmed.line = sampled(path, from, to);
-    trimmed.endAngleDegrees = path.angleAtPercent(to);
+    trimmed.line = kept(line, from, to);
+    trimmed.endAngleDegrees = endAngle(trimmed.line);
     return trimmed;
 }
 } // namespace qcp

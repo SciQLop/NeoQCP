@@ -3,6 +3,7 @@
 #include "draw-context.h"
 #include "painter.h"
 #include "raster-fallback.h"
+#include "text-cache.h"
 
 #include "../axis/labelrenderer.h"
 #include "../plottables/plottable-draw-utils.h"
@@ -65,6 +66,21 @@ QSize qcpMeasureText(const QCPTextStyle& style, const QString& text)
 quint64 qcpTextMeasureCount()
 {
     return gTextMeasures.load(std::memory_order_relaxed);
+}
+
+QSize qcp::TextGlyphCache::size(const QCPTextStyle& style, const QString& text) const
+{
+    if (!mValid || mText != text || mFont != style.font || mMathText != style.mathText
+        || mTextFlags != style.textFlags)
+    {
+        mText = text;
+        mFont = style.font;
+        mMathText = style.mathText;
+        mTextFlags = style.textFlags;
+        mSize = qcpMeasureText(style, text);
+        mValid = true;
+    }
+    return mSize;
 }
 
 qcp::QCPTextLayout qcpTextLayout(const QCPTextStyle& style, const QSize& glyphSize)

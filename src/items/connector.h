@@ -23,8 +23,8 @@
   - \ref curve, a quadratic curve through the corner where the two lines leave the ends at the
     given angles (matplotlib `angle3`);
   - \ref elbow, two straight lines through that corner, rounded with a radius (matplotlib `angle`);
-  - \ref arms, one arm of a given length from each end at the given angles, joined through that
-    corner (matplotlib `arc`);
+  - \ref arms, one arm of a given length from each end at the given angles, the two arm ends joined
+    by one straight segment (matplotlib `arc`);
   - \ref bracket, a straight run offset to one side of the start→end line, joined to both ends
     (matplotlib `bar`).
 
@@ -53,14 +53,16 @@ public:
     static QCPConnector elbow(double startAngle, double endAngle, QCP::PixelLength radius = { });
 
     /*! matplotlib's `arc`: a \a startArm long arm leaves the start along \a startAngle, a \a endArm
-      long one leaves the end along \a endAngle, and the two are joined through the corner where
-      their lines cross, the corners rounded with \a radius. A zero-length arm is no arm. */
+      long one leaves the end along \a endAngle, and one straight segment joins their two ends, the
+      corners at those ends rounded with \a radius. It does not pass through the corner where the
+      two lines cross: that is \ref elbow. A zero-length arm is no arm. */
     static QCPConnector arms(double startAngle, QCP::PixelLength startArm, double endAngle,
                              QCP::PixelLength endArm, QCP::PixelLength radius = { });
 
-    /*! matplotlib's `bar`: the run between the two points is pushed \a fraction of their distance
-      to one side, and both ends are joined to it. \a angle turns that run away from the
-      start→end direction: it is the angle of the line the two arms reach, in degrees. */
+    /*! matplotlib's `bar`: a straight bar runs beside the start→end line, pushed sideways from it
+      by \a fraction of the start→end distance, negative pushing the other way, and both ends are
+      joined to it. \a angle, when given, is the bar's own direction in degrees, absolute rather
+      than relative to the start→end line: `bracket(-0.2, 180)` draws a horizontal bar. */
     static QCPConnector bracket(double fraction, std::optional<double> angle = { });
 
     //! A straight line: \ref arc with a bend of zero.
@@ -125,10 +127,10 @@ namespace qcp
 /*!
   \brief What is left of a connector after the text's box and the two shrink lengths have cut it.
 
-  \a line is the kept part, in pixels, sampled at most one pixel apart; an empty \a line is nothing
-  to draw, which is what a target inside the text box and a path shorter than its two cuts give.
-  \a endAngleDegrees is QPainterPath::angleAtPercent's angle of the whole path where it was cut at
-  the target end, so the head at the target can be turned along it.
+  \a line is the kept part, in pixels: the path's own flattened vertices between the two cuts, one
+  point wherever a cut falls. An empty \a line is nothing to draw, which is what a target inside the
+  text box and a path shorter than its two cuts give. \a endAngleDegrees is the direction of the
+  last kept segment, in QPainterPath's degrees, so the head at the target can be turned along it.
 */
 struct QCP_LIB_DECL TrimmedConnector
 {
@@ -138,14 +140,14 @@ struct QCP_LIB_DECL TrimmedConnector
 
 /*!
   Cuts \a path where it first leaves \a startBox, then \a shrink pixels along from each of its two
-  ends, and samples what is left. A null \a startBox cuts nothing at the start: a text with no box
-  has no edge to leave. A path that never leaves the box leaves nothing, and so does one shorter
-  than its two cuts.
+  ends, and keeps what is between the cuts. A null \a startBox cuts nothing at the start: a text
+  with no box has no edge to leave. A path that never leaves the box leaves nothing, and so does one
+  shorter than its two cuts.
 
-  Each cut is found by halving the span between a point on one side of it and one on the other, the
-  way matplotlib's split_path_inout does.
-  simplify: the kept part is a sampled polyline, not the path's own Bézier pieces; upgrade = split
-  the quads with de Casteljau if a thick pen on a very curved connector ever shows the facets.
+  The path is flattened once, by Qt, and the three cuts walk that polyline: a comparison per vertex,
+  and a halving of the one segment each cut falls in, the way matplotlib's split_path_inout does.
+  simplify: the kept part is the flattened polyline, not the path's own Bézier pieces; upgrade =
+  split the quads with de Casteljau if a thick pen on a very curved connector ever shows the facets.
 */
 [[nodiscard]] QCP_LIB_DECL TrimmedConnector trimConnector(const QPainterPath& path,
                                                           const QRectF& startBox, double shrink);
