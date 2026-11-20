@@ -193,7 +193,7 @@ These patterns need a change:
 | `graph->setChannelFillGraph(other)` | `graph->axisRect()->fillBetween(graph, other, { .brush = brush })`. The graphs must share the key axis; their value axes may differ. 2.x took the graph's brush, so pass it here. |
 | `tracer->setGraph(graph)` and `setLineGraph(graph, component)` | `tracer->setGraph(graph, component)`. `lineGraph()` is `graph()`. |
 | `graph->setComponentFillBetween(a, b, brush)` (a 3.0 preview) | `graph->axisRect()->fillBetween(graph, graph, { .brush = brush, .firstComponent = a, .secondComponent = b })`. |
-| `graph->setComponentFillToGraph(0, other, 0, brush)` (a 3.0 preview) | `graph->axisRect()->fillBetween(graph, other, { .brush = brush })`. |
+| `graph->setComponentFillToGraph(a, other, b, brush)` (a 3.0 preview) | `graph->axisRect()->fillBetween(graph, other, { .brush = brush, .firstComponent = a, .secondComponent = b })`. |
 | `QCPGraph::LineStyle` | The same names: `QCPGraph::lsLine` and the others compile as before. |
 | A graph that drew with `QCPGraph2::setScatterColorValues()` | `setColorValues()` and `setGradient()`. |
 | `QCPGraph2::setScatterMaxPoints()` | Removed with the class. There is no replacement yet. |

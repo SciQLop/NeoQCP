@@ -113,6 +113,7 @@ DOC_SNIPPET(graphs_channel_fill, 600, 360)
     auto high = customPlot->add<QCPGraph>()
         .setData(t, upper)
         .setPen(Qt::NoPen);
+    high->removeFromLegend();   // the band is the legend row, not its upper edge
     customPlot->axisRect()->fillBetween(high, low,
                                         { .brush = QColor(255, 127, 14, 70), // high over low
                                           .name = QStringLiteral("±1σ") });

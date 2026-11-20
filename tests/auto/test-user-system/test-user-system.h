@@ -52,6 +52,7 @@ private slots:
     void aMultiGraphFillBetweenColumnsOnASkewRect();
     void aFillToAnotherGraphOnASkewRect();
     void aChannelFillAcrossSystemsDrawsNoBand();
+    void aFillOnAUserSystemOfTheTopRightPairPaints();
     void aCartesianChannelFillAcrossValueAxesStillWorks();
     void aResizeMovesTheRevision();
 

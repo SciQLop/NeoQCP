@@ -202,13 +202,14 @@ void MainWindow::setupSincScatterDemo(QCustomPlot *customPlot)
   pen.setStyle(Qt::DotLine);
   pen.setWidth(1);
   pen.setColor(QColor(180,180,180));
-  customPlot->graph(0)->setName("Confidence Band 68%");
   customPlot->graph(0)->setPen(pen);
   customPlot->add<QCPGraph>();
-  customPlot->legend->removeItem(customPlot->legend->itemCount()-1); // don't show two confidence band graphs in legend
   customPlot->graph(1)->setPen(pen);
+  customPlot->graph(0)->removeFromLegend(); // the band is the legend row, not its edges
+  customPlot->graph(1)->removeFromLegend();
   customPlot->axisRect()->fillBetween(customPlot->graph(0), customPlot->graph(1),
-                                     { .brush = QBrush(QColor(255, 50, 30, 20)) });
+                                     { .brush = QBrush(QColor(255, 50, 30, 20)),
+                                       .name = QStringLiteral("Confidence Band 68%") });
   // add theory curve graph:
   customPlot->add<QCPGraph>();
   pen.setStyle(Qt::DashLine);

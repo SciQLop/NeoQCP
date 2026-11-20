@@ -31,6 +31,9 @@ private slots:
     void aDenseFillIsRebinnedAfterAZoom();
     void aSteppedFillSwapsColourWhereTheLinesSwap();
     void aFillsLegendIconShowsItsBrushes();
+    void aCartesianFillIsNotReRecordedByAPan();
+    void aFillMadeBeforeTheDataDrawsWhenItComes();
+    void aFillOfAColumnThatDisappearsDrawsNothing();
 
 private:
     QCustomPlot* mPlot = nullptr;

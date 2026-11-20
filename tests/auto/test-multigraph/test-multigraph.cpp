@@ -3876,7 +3876,6 @@ void TestMultiGraph::noOverlapNoBand()
              "a band is drawn with no common key range");
 }
 
-// 2.x reset channelFillGraph() to null when the partner died: the fill is gone, not a fill to nothing.
 void TestMultiGraph::aFillToAGraphOfAnotherSystemIsAMisuse()
 {
     MisuseScope misuse;
@@ -4026,7 +4025,6 @@ void TestMultiGraph::theBandStaysOnTheGpuRibbon()
     QVERIFY2(isBlue(frame.pixelColor(probe)), "the GPU frame does not show the band");
 }
 
-// The order the drawing API keeps on both replays: fills, then bars, then lines.
 // The order the drawing API keeps on both replays: the fill, then the graph's bars, then its lines.
 void TestMultiGraph::fillsDrawUnderErrorBarsUnderLines()
 {
@@ -4241,7 +4239,6 @@ QCPGraph* selectableLines(QCustomPlot* plot)
     return mg;
 }
 
-//! Two one-column graphs: \a upper at 2 over \a lower at 1, keys 0..4.
 } // namespace
 
 // 2.x: setSelection on the graph selects those rows; they draw with the selected pen. The rows are
@@ -4353,9 +4350,6 @@ void TestMultiGraph::aGraphRowCastsToAPlottableRow()
     QCOMPARE(row->plottable().get(), static_cast<QCPPlottable*>(mg));
 }
 
-// 2.x order: setBrush, then the channel fill, then the data. The remembered brush reaching the new
-// component must colour the band, not replace it with a fill to zero.
-// 2.x: setBrush after setChannelFillGraph colours the channel.
 // F-3 (overrules 5c R-2): setBrush recolours a fill and keeps where it fills to.
 void TestMultiGraph::setBrushKeepsAFillsConstantTarget()
 {
@@ -4519,9 +4513,6 @@ void TestMultiGraph::makingAGraphUnselectableClearsEveryComponent()
     QVERIFY2(redNear(img, pixelOf(mPlot, 2, 1)), "the red line is still drawn selected");
 }
 
-// I2: 2.x drew no channel without a brush: setBrush(Qt::NoBrush) removes the band.
-// I3 + M11: a partner whose value axis moves to another rect has no system: no crash, no band.
-// M11: a partner taken from the plot is not this graph's partner any more.
 // I4: 2.x's 1D accessors answer 0 outside the data, as the old graph's did.
 void TestMultiGraph::theDataAccessorsAnswerZeroOutsideTheData()
 {

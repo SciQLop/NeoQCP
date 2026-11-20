@@ -45,11 +45,12 @@ std::optional<Interval> sharedKeys(const QCPMultiDataSource& first,
 // \a toValue, exactly as a graph-to-graph fill reads its partner.
 std::vector<qcp::fill::SeriesRow> rowsOf(const QCPMultiDataSource& source, int component,
                                          const QCPScale& keyScale, const Interval& shared,
-                                         const QCPAxis* fromValue, const QCPAxis* toValue)
+                                         bool dataSpace, const QCPAxis* fromValue,
+                                         const QCPAxis* toValue)
 {
     const int begin = std::max(0, source.findBegin(shared.lower) - 1);
     const int end = std::min(source.size(), source.findEnd(shared.upper) + 1);
-    const auto gaps = source.gapsBefore(begin, end, /*cacheGaps=*/true, keyScale);
+    const auto gaps = source.gapsBefore(begin, end, /*cacheGaps=*/!dataSpace, keyScale);
     std::vector<qcp::fill::SeriesRow> rows;
     rows.reserve(std::size_t(std::max(0, end - begin)));
     for (int i = begin; i < end; ++i)
@@ -66,7 +67,7 @@ std::vector<qcp::fill::SeriesRow> rowsOf(const QCPMultiDataSource& source, int c
 // A fill draws in its lines' frame, so it asks for nothing the lines themselves do not: a
 // system that takes the lines (a user system with a projection, say) takes the fill between
 // them.
-QCPFillBetween::QCPFillBetween() : QCPPlottable(QCP::Capabilities())
+QCPFillBetween::QCPFillBetween() : QCPPlottable(QCP::capStraightSegments)
 {
     // A click inside the band reaches the lines under it and pans the view (P-5).
     setSelectable(QCP::stNone);
@@ -176,11 +177,13 @@ void QCPFillBetween::draw(QCPDrawContext& context) const
     if (!shared || !(shared->upper > shared->lower))
         return;
     const QCPScale keyScale = keyBase->scale();
+    const bool dataSpace = system()->kind() != QCPTransform::Kind::Cartesian;
     const bool across = first != second && qcp::fill::fillsAcrossValueAxes(*first, *second);
     std::vector<qcp::fill::SeriesRow> firstRows
-        = rowsOf(*first->dataSource(), mFirstComponent, keyScale, *shared, nullptr, nullptr);
+        = rowsOf(*first->dataSource(), mFirstComponent, keyScale, *shared, dataSpace, nullptr,
+                 nullptr);
     std::vector<qcp::fill::SeriesRow> secondRows
-        = rowsOf(*second->dataSource(), mSecondComponent, keyScale, *shared,
+        = rowsOf(*second->dataSource(), mSecondComponent, keyScale, *shared, dataSpace,
                  across ? second->valueAxis().get() : nullptr, across ? valueAxisRaw() : nullptr);
 
     std::vector<qcp::fill::StripPoint> rows = qcp::fill::unionRows(firstRows, secondRows);
@@ -230,13 +233,13 @@ void QCPFillBetween::drawLegendIcon(QCPDrawContext& icon) const
     const QCP::AxisRatio right { 0.835, 0.835 };
     if (!mBelowBrush)
     {
-        icon.rect(left, right, QPen(), brush());
+        icon.rect(left, right, QPen(Qt::NoPen), brush());
         return;
     }
     const QCP::AxisRatio lowerLeft { 0.165, 0.5 };
     const QCP::AxisRatio lowerRight { 0.835, 0.5 };
-    icon.rect(left, lowerRight, QPen(), brush());
-    icon.rect(lowerLeft, right, QPen(), *mBelowBrush);
+    icon.rect(left, lowerRight, QPen(Qt::NoPen), brush());
+    icon.rect(lowerLeft, right, QPen(Qt::NoPen), *mBelowBrush);
 }
 
 quint64 QCPFillBetween::dependencyRevision() const
@@ -248,8 +251,10 @@ quint64 QCPFillBetween::dependencyRevision() const
         first ? first->keyAxis().get() : nullptr, first ? first->valueAxis().get() : nullptr,
         second ? second->keyAxis().get() : nullptr, second ? second->valueAxis().get() : nullptr,
         mFirstComponent, mSecondComponent);
-    // The band is drawn in its system's frame: a mapping change (a shear, a resize) moves it.
-    if (const QCPCoordinateSystem* frame = system().get())
+    // In data space the recording reads the system's mapping, so a shear or a resize makes it stale
+    // (the graph's B4 rule). A cartesian band is pixels of its frame: a pan must reuse it.
+    if (const QCPCoordinateSystem* frame = system().get();
+        frame && frame->kind() != QCPTransform::Kind::Cartesian)
         revision = qHashMulti(revision, frame->revision());
     // Across two value axes the band reads both systems' pixels: a pan of either moves it.
     if (first && second && first != second && qcp::fill::fillsAcrossValueAxes(*first, *second))

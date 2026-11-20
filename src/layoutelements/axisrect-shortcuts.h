@@ -68,8 +68,8 @@ inline QCPHandle<QCPFillBetween> QCPAxisRect::fillBetween(const QCPHandle<QCPGra
     const QList<QCPAxis*> own = axesRaw();
     const auto onThisRect = [this, &own](const QCPGraph& line)
     {
-        const QCPCoordinateSystem* frame = line.system().get();
-        if (!frame || const_cast<QCPCoordinateSystem*>(frame)->area().get() != this)
+        QCPCoordinateSystem* frame = line.system().get();
+        if (!frame || frame->area().get() != this)
             return false;
         const QCPAxis* key = line.keyAxis().get();
         const QCPAxis* value = line.valueAxis().get();
@@ -90,21 +90,23 @@ inline QCPHandle<QCPFillBetween> QCPAxisRect::fillBetween(const QCPHandle<QCPGra
                             && namesAColumn(*second, options.secondComponent),
                         "the fill's component does not name a column of its line", { });
 
-    // The fill joins the frame the lines draw in: their own axis pair when they have one, else this
-    // rect's bottom and left pair, whose system must be theirs.
+    // The fill joins the frame the lines draw in: their own axis pair when they have one, else the
+    // axes their system maps through. No system(...) lookup: the lines already carry the system.
+    QCPCoordinateSystem* frame = first->system().get();
     QCPAxis* keyAxis = first->keyAxis().get();
     QCPAxis* valueAxis = first->valueAxis().get();
     if (!keyAxis || !valueAxis)
     {
-        keyAxis = xAxis();
-        valueAxis = yAxis();
-        QCP_CHECK_OR_RETURN(keyAxis && valueAxis
-                                && this->system(keyAxis, valueAxis).get() == first->system().get(),
+        keyAxis = qobject_cast<QCPAxis*>(frame ? frame->keyAxis().get() : nullptr);
+        valueAxis = qobject_cast<QCPAxis*>(frame ? frame->valueAxis().get() : nullptr);
+        QCP_CHECK_OR_RETURN(keyAxis && valueAxis && axesRaw().contains(keyAxis)
+                                && axesRaw().contains(valueAxis),
                             "the two lines of a fill must draw in this rect's system", { });
     }
     const QCPHandle<QCPFillBetween> fill = add<QCPFillBetween>(keyAxis, valueAxis);
     if (!fill)
         return fill;
+    fill->setSystem(frame); // the lines' own system, whatever pair its axes are on
     fill->setLines(first.get(), options.firstComponent, second.get(), options.secondComponent);
     fill->setBrush(options.brush);
     fill->setBelowBrush(options.belowBrush);

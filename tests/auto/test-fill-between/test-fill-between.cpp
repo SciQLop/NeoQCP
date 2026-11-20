@@ -460,3 +460,66 @@ void TestFillBetween::aFillsLegendIconShowsItsBrushes()
     QVERIFY2(isGreen(plain.pixelColor(20, 6)), "the icon's upper half is not the fill's brush");
     QVERIFY2(isGreen(plain.pixelColor(20, 14)), "one brush fills both halves of the icon");
 }
+
+// A cartesian fill is a pixel recording: panning inside the data must reuse it, as the graph's own
+// fills did, so the GPU can shift the band instead of rebuilding it.
+void TestFillBetween::aCartesianFillIsNotReRecordedByAPan()
+{
+    const QCPHandle<QCPFillBetween> fill = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(mSecond), greenAbove());
+    QVERIFY(fill);
+    mPlot->replot();
+    mPlot->replot();
+    const int recorded = fill->mCore.recordingCount();
+    mPlot->replot();
+    QCOMPARE(fill->mCore.recordingCount(), recorded);
+
+    mPlot->xAxis->setRange(0.2, 2.6); // a pan and a zoom-out, inside the lines' own keys
+    mPlot->replot();
+    QCOMPARE(fill->mCore.recordingCount(), recorded);
+}
+
+// Before the first data neither line has a column to fill to: the call is kept, as the graph's fills
+// were, and the band appears with the data.
+void TestFillBetween::aFillMadeBeforeTheDataDrawsWhenItComes()
+{
+    auto* first = mPlot->add<QCPGraph>().get();
+    auto* second = mPlot->add<QCPGraph>().get();
+    const QCPHandle<QCPFillBetween> fill = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(first), QCPHandle<QCPGraph>(second), greenAbove());
+    QVERIFY2(fill, "a fill made before the data was refused");
+    mPlot->replot();
+    QVERIFY2(!isGreen(pixelAt(rendered(*mPlot), *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.4)),
+             "a band is drawn before the lines have data");
+
+    first->setData(kKeys, kUpper);
+    second->setData(kKeys, kLower);
+    mPlot->replot();
+    QVERIFY2(isGreen(pixelAt(rendered(*mPlot), *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.4)),
+             "the band did not come with the data");
+}
+
+// A column the fill names can disappear under it: the fill draws nothing, and says why once per
+// draw, as a component that never named a column does.
+void TestFillBetween::aFillOfAColumnThatDisappearsDrawsNothing()
+{
+    auto* graph = mPlot->add<QCPGraph>().get();
+    graph->setData(kKeys, std::vector<std::vector<double>> { kUpper, kLower });
+    const QCPHandle<QCPFillBetween> fill = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(graph), QCPHandle<QCPGraph>(graph),
+        { .brush = kGreen, .firstComponent = 0, .secondComponent = 1 });
+    QVERIFY(fill);
+    mPlot->replot();
+    QVERIFY2(isGreen(pixelAt(rendered(*mPlot), *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.4)),
+             "the band between the two columns is not drawn");
+
+    const auto previous = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    graph->setData(kKeys, std::vector<std::vector<double>> { kUpper }); // the second column goes
+    mPlot->replot();
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    const QImage image = rendered(*mPlot);
+    qcp::setMisuseHandler(previous);
+    QVERIFY2(!isGreen(pixelAt(image, *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.4)),
+             "a column that disappeared still draws a band");
+}

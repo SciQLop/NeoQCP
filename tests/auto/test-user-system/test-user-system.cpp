@@ -1314,9 +1314,10 @@ void TestUserSystem::aFillToAnotherGraphOnASkewRect()
     partner->setComponentPens({ QPen(Qt::NoPen) });
 
     const QColor brush(40, 220, 40, 80);
-    QVERIFY2(rect->fillBetween(QCPHandle<QCPGraph>(owner), QCPHandle<QCPGraph>(partner),
-                               { .brush = brush }),
-             "a fill to another graph was refused on a skew rect");
+    const QCPHandle<QCPFillBetween> fill
+        = rect->fillBetween(QCPHandle<QCPGraph>(owner), QCPHandle<QCPGraph>(partner),
+                            { .brush = brush });
+    QVERIFY2(fill, "a fill to another graph was refused on a skew rect");
     settle(plot);
 
     const QImage image = render(plot);
@@ -1326,6 +1327,12 @@ void TestUserSystem::aFillToAnotherGraphOnASkewRect()
              "the band to another graph is not drawn on the skew mapping");
     QCOMPARE(lightnessAt(image, pixelOf(system->pixelOf(4, 0.5))), 255);
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+
+    // A user system draws in data space: a mapping change must record the band again.
+    const int recorded = fill->mCore.recordingCount();
+    rect->setShear(0.8);
+    settle(plot);
+    QVERIFY2(fill->mCore.recordingCount() > recorded, "a shear change kept the band's recording");
 }
 
 void TestUserSystem::aChannelFillAcrossSystemsDrawsNoBand()
@@ -1350,6 +1357,39 @@ void TestUserSystem::aChannelFillAcrossSystemsDrawsNoBand()
     settle(plot);
     QCOMPARE(lightnessAt(render(plot), inside), 255);
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
+// A user system is not tied to the bottom/left pair: a fill on the top/right pair must be made
+// without asking the rect for a system it may create on the way.
+void TestUserSystem::aFillOnAUserSystemOfTheTopRightPairPaints()
+{
+    QCustomPlot plot;
+    plot.setBackground(Qt::white);
+    plot.plotLayout()->clear();
+    auto* rect = new SkewRect(&plot);
+    plot.plotLayout()->addElement(0, 0, rect);
+    QCPAxis* key = rect->addAxis(QCPAxis::atTop).get();
+    QCPAxis* value = rect->addAxis(QCPAxis::atRight).get();
+    key->setRange(0, 10);
+    value->setRange(0, 10);
+    settle(plot);
+
+    auto* first = rect->add<QCPGraph>(key, value).get();
+    auto* second = rect->add<QCPGraph>(key, value).get();
+    first->setData(QVector<double> { 2, 8 }, QVector<double> { 2, 2 });
+    second->setData(QVector<double> { 2, 8 }, QVector<double> { 8, 8 });
+    const QCPHandle<QCPFillBetween> fill
+        = rect->fillBetween(QCPHandle<QCPGraph>(first), QCPHandle<QCPGraph>(second),
+                            { .brush = QColor(255, 0, 0) });
+    QVERIFY2(fill, "a fill on a user system of the top/right pair was refused");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+    settle(plot);
+
+    auto* system = static_cast<SkewSystem*>(rect->system(key, value).get());
+    QVERIFY(system);
+    const QPointF inside = pixelOf(system->pixelOf(5, 5));
+    QVERIFY2(rect->rect().contains(inside.toPoint()), "the sample lies outside the rect");
+    QVERIFY2(isRed(render(plot), inside), "the band on the top/right pair is not drawn");
 }
 
 void TestUserSystem::aCartesianChannelFillPartnerThatLostItsSystemDrawsNoBand()
