@@ -501,7 +501,11 @@ void TestItemRecording::aPixelOnlyItemDrawsWithoutAxes()
     pixmap->topLeft->setCoords(0.5, 0.5);
     pixmap->bottomRight->setType(QCPItemPosition::ptViewportRatio);
     pixmap->bottomRight->setCoords(0.9, 0.9);
-    plot.plotLayout()->clear(); // the plot loses its axes after the items were placed on it
+    // The items keep the rect they were placed in, which loses every axis: no transform is left.
+    const QList<QCPHandle<QCPAxis>> axes = plot.axisRect()->axes();
+    for (const QCPHandle<QCPAxis>& axis : axes)
+        if (axis)
+            plot.axisRect()->removeAxis(axis.get());
     plot.replot();
     QVERIFY2(rect->recordings() > 0, "the pixel rectangle has no recording without axes");
     QVERIFY2(pixmap->recordings() > 0, "the viewport ratio pixmap has no recording without axes");
@@ -520,7 +524,11 @@ void TestItemRecording::aDataItemWithoutAxesDrawsNothing()
     QCustomPlot plot;
     plot.resize(400, 300);
     auto rect = plot.add<RecordingItem<QCPItemRect>>();
-    plot.plotLayout()->clear(); // the plot loses its axes after the items were placed on it
+    // The items keep the rect they were placed in, which loses every axis: no transform is left.
+    const QList<QCPHandle<QCPAxis>> axes = plot.axisRect()->axes();
+    for (const QCPHandle<QCPAxis>& axis : axes)
+        if (axis)
+            plot.axisRect()->removeAxis(axis.get());
     rect->topLeft->setType(QCPItemPosition::ptPlotCoords);
     rect->topLeft->setCoords(1, 1);
     rect->bottomRight->setType(QCPItemPosition::ptPlotCoords);

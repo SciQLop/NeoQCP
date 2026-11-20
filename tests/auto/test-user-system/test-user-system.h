@@ -63,7 +63,7 @@ private slots:
     void theTracerFollowsAMultiGraphOnASkewRect();
     void takeAndAdoptAGraphAndAnItemOnASkewRect();
     void anAxisDeletedMidDragLeavesThemInert();
-    void deletingTheSkewRectLeavesThemInert();
+    void deletingTheSkewRectTakesWhatIsDrawnInIt();
     void switchingBetweenCartesianAndSkewReRecords();
     void theLegendIconOfASkewGraphDraws();
     void aSkewItemIsAlwaysAnIndexCandidate();

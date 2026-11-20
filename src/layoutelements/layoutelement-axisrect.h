@@ -356,6 +356,8 @@ protected:
     virtual void wheelEvent(QWheelEvent* event) override;
 
     // non-property methods:
+    // The plottables and items drawn in this rect go with it: see the destructor.
+    void removeDrawables();
     QList<QCPAxisBase*> allAxesRaw() const override;
     void updateAxesOffset(QCPAxis::AxisType type);
     void zoomAxesAt(const QPointF& pos, double horizontalFactor, double verticalFactor);

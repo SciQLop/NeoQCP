@@ -265,6 +265,9 @@ QCPAxisRect::~QCPAxisRect()
     }
     // Elements leave the inset layout by emitting, so it goes while the plot still delivers.
     destroyInsetLayout();
+    // The rect owns what is drawn in it: a plottable or an item left behind would draw into a frame
+    // whose area is gone.
+    removeDrawables();
     // The rect owns its scale: it goes with the rect, and its users detach (they emit inside the
     // scope above).
     if (mColorScale)
@@ -280,6 +283,37 @@ QCPAxisRect::~QCPAxisRect()
     for (const auto& axis : qcp::guarded(axesRaw()))
         if (axis)
             removeAxis(axis);
+}
+
+/*! \internal
+
+  Removes the plottables whose frame is this rect and the items bound to it, the way the grid's own
+  cell drop does before it deletes a cell.
+
+  Nothing is removed from a plot that is going: the plot deletes its plottables and items itself, and
+  QCustomPlot::removePlottable refuses the call while that happens.
+*/
+void QCPAxisRect::removeDrawables()
+{
+    const QPointer<QCustomPlot> plot(mParentPlot);
+    if (!plot || plot->isBeingDestroyed())
+        return;
+    for (const QCPHandle<QCPPlottable>& plottable : plottables())
+    {
+        if (!plottable)
+            continue;
+        if (!plot || plot->isBeingDestroyed()) // a destroyed slot took the plot
+            return;
+        static_cast<void>(plot->removePlottable(plottable.get()));
+    }
+    for (const QCPHandle<QCPItem>& item : items())
+    {
+        if (!item)
+            continue;
+        if (!plot || plot->isBeingDestroyed())
+            return;
+        static_cast<void>(plot->removeItem(item.get()));
+    }
 }
 
 void QCPAxisRect::detachFromOwners()

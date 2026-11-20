@@ -63,6 +63,71 @@ QPoint onConnectorNear(const QPointF& insetCorner, const QPointF& boxCorner, dou
     const double length = std::hypot(direction.x(), direction.y());
     return (insetCorner + direction / length * distance).toPoint();
 }
+
+// The image with the indicator hidden: what the scene draws without it. A pixel that differs from
+// it by more than \a drop grey levels is drawn by the indicator, antialiasing included.
+bool differsNear(const QImage& image, const QImage& control, const QPoint& at, int radius)
+{
+    for (int dy = -radius; dy <= radius; ++dy)
+        for (int dx = -radius; dx <= radius; ++dx)
+        {
+            const QPoint there(at.x() + dx, at.y() + dy);
+            if (qGray(image.pixel(there)) + 30 < qGray(control.pixel(there)))
+                return true;
+        }
+    return false;
+}
+
+QImage withoutTheIndicator(QCustomPlot& plot, const QCPHandle<QCPItemZoomIndicator>& indicator)
+{
+    indicator->setVisible(false);
+    plot.replot();
+    const QImage image = rendered(plot);
+    indicator->setVisible(true);
+    plot.replot();
+    return image;
+}
+
+//! A probe \a distance pixels along the segment that joins \a from to \a to.
+QPoint onSegment(const QPointF& from, const QPointF& to, double distance)
+{
+    const QPointF direction = to - from;
+    const double length = std::hypot(direction.x(), direction.y());
+    return (from + direction / length * distance).toPoint();
+}
+
+//! The box of the test scene's inset ranges in the parent's pixels, whichever way its axes run.
+QRectF targetBoxPixels(const QCPAxis& keyAxis, const QCPAxis& valueAxis)
+{
+    return QRectF(QPointF(keyAxis.coordToPixel(-1.5), valueAxis.coordToPixel(-1.9)),
+                  QPointF(keyAxis.coordToPixel(-0.9), valueAxis.coordToPixel(-2.5)))
+        .normalized();
+}
+
+//! \a box's four corners in pixels, in the visibility rule's order: bottom-left, top-left,
+//! bottom-right, top-right.
+std::array<QPointF, 4> cornersInPixels(const QRectF& box)
+{
+    return { box.bottomLeft(), box.topLeft(), box.bottomRight(), box.topRight() };
+}
+
+//! Where the test scene's four data corners of the box land in pixels, in the same order.
+std::array<QPointF, 4> dataCornersInPixels(const QCPAxis& keyAxis, const QCPAxis& valueAxis)
+{
+    const auto at = [&](double key, double value)
+    { return QPointF(keyAxis.coordToPixel(key), valueAxis.coordToPixel(value)); };
+    return { at(-1.5, -2.5), at(-1.5, -1.9), at(-0.9, -2.5), at(-0.9, -1.9) };
+}
+
+//! The index of \a inset in \a layout, or -1: the legend may be element 0.
+int indexIn(const QCPHandle<QCPLayoutInset>& layout, const QCPAxisRect* inset)
+{
+    const QList<QCPHandle<QCPLayoutElement>> elements = layout->elements(false);
+    for (int i = 0; i < elements.size(); ++i)
+        if (elements.at(i).get() == inset)
+            return i;
+    return -1;
+}
 } // namespace
 
 void TestZoomIndicator::init()
@@ -121,6 +186,68 @@ void TestZoomIndicator::connectorsForAnInsetDownRight()
              "an inset down and to the right of the box took the wrong connectors");
 }
 
+void TestZoomIndicator::connectorsKeepTheirPixelCornersOnAReversedKeyAxis()
+{
+    mAx->xAxis()->setRangeReversed(true);
+    mPlot->replot();
+    const QImage image = rendered(*mPlot);
+    const QImage control = withoutTheIndicator(*mPlot, mIndicator);
+    const QRectF boxPixels = targetBoxPixels(*mAx->xAxis(), *mAx->yAxis());
+    const QRectF insetPixels(mInset->rect());
+    const std::array<QPointF, 4> box = cornersInPixels(boxPixels);
+    const std::array<QPointF, 4> inset = cornersInPixels(insetPixels);
+    const std::array<QPointF, 4> data = dataCornersInPixels(*mAx->xAxis(), *mAx->yAxis());
+    const std::array<bool, 4> shown = qcp::zoomConnectorVisibility(boxPixels, insetPixels);
+
+    // The rule picks corners of the box as it is drawn, whatever the key axis says, and the
+    // connectors leave them. A connector taken from a data corner instead leaves another one.
+    bool aDataCornerMoved = false;
+    for (std::size_t i = 0; i < box.size(); ++i)
+    {
+        if (!shown[i])
+            continue;
+        QVERIFY2(differsNear(image, control, onSegment(box[i], inset[i], 12), 2),
+                 "a connector does not leave the box corner the rule picked");
+        if (data[i] != box[i])
+        {
+            aDataCornerMoved = true;
+            QVERIFY2(!differsNear(image, control, onSegment(data[i], inset[i], 12), 1),
+                     "a connector leaves a data corner of the box, not its pixel corner");
+        }
+    }
+    QVERIFY2(aDataCornerMoved, "a reversed key axis did not turn the data corners round");
+}
+
+void TestZoomIndicator::connectorsKeepTheirPixelCornersOnAReversedValueAxis()
+{
+    mAx->yAxis()->setRangeReversed(true);
+    mPlot->replot();
+    const QImage image = rendered(*mPlot);
+    const QImage control = withoutTheIndicator(*mPlot, mIndicator);
+    const QRectF boxPixels = targetBoxPixels(*mAx->xAxis(), *mAx->yAxis());
+    const QRectF insetPixels(mInset->rect());
+    const std::array<QPointF, 4> box = cornersInPixels(boxPixels);
+    const std::array<QPointF, 4> inset = cornersInPixels(insetPixels);
+    const std::array<QPointF, 4> data = dataCornersInPixels(*mAx->xAxis(), *mAx->yAxis());
+    const std::array<bool, 4> shown = qcp::zoomConnectorVisibility(boxPixels, insetPixels);
+
+    bool aDataCornerMoved = false;
+    for (std::size_t i = 0; i < box.size(); ++i)
+    {
+        if (!shown[i])
+            continue;
+        QVERIFY2(differsNear(image, control, onSegment(box[i], inset[i], 12), 2),
+                 "a connector does not leave the box corner the rule picked");
+        if (data[i] != box[i])
+        {
+            aDataCornerMoved = true;
+            QVERIFY2(!differsNear(image, control, onSegment(data[i], inset[i], 12), 1),
+                     "a connector leaves a data corner of the box, not its pixel corner");
+        }
+    }
+    QVERIFY2(aDataCornerMoved, "a reversed value axis did not turn the data corners round");
+}
+
 void TestZoomIndicator::theBoxCoversTheInsetRanges()
 {
     mPlot->replot();
@@ -153,6 +280,9 @@ void TestZoomIndicator::theBoxFollowsThePannedInset()
 
 void TestZoomIndicator::aPlainReplotKeepsTheRecording()
 {
+    // The first replot settles the layout: the inset's margins are computed there and its rect moves
+    // once, which is a reason to remake the recording.
+    mPlot->replot();
     mPlot->replot();
     const int recorded = mIndicator->mCore.recordingCount();
     mPlot->replot();
@@ -189,6 +319,30 @@ void TestZoomIndicator::connectorsEndAtTheInsetCorners()
              "the bottom-right connector did not follow the resize");
 }
 
+void TestZoomIndicator::theBoxFollowsAnInsetThatMovesInItsLayout()
+{
+    mPlot->replot();
+    const QRectF before(mInset->rect());
+    const int index = indexIn(mAx->insetLayout(), mInset);
+    QVERIFY2(index >= 0, "the inset is not in its rect's inset layout");
+    const int recorded = mIndicator->mCore.recordingCount();
+
+    mAx->insetLayout()->setInsetRect(index, QRectF(0.6, 0.03, 0.35, 0.35));
+    mPlot->replot();
+
+    const QRectF after(mInset->rect());
+    QVERIFY2(after != before, "the inset did not move in its layout");
+    QVERIFY2(mIndicator->mCore.recordingCount() > recorded,
+             "a moved inset did not remake the connectors");
+
+    const QImage image = rendered(*mPlot);
+    const QRectF box = targetBoxPixels(*mAx->xAxis(), *mAx->yAxis());
+    QVERIFY2(hasInkNear(image, onSegment(box.topLeft(), QRectF(after).topLeft(), 4), 1),
+             "the top-left connector did not follow the inset's new corner");
+    QVERIFY2(hasInkNear(image, onSegment(box.bottomRight(), QRectF(after).bottomRight(), 4), 1),
+             "the bottom-right connector did not follow the inset's new corner");
+}
+
 void TestZoomIndicator::aHiddenInsetHidesTheIndicator()
 {
     mPlot->replot();
@@ -220,9 +374,8 @@ void TestZoomIndicator::anIndicatorOutlivesItsInset()
     mIndicator = mAx->zoomIndicator(QCPHandle<QCPAxisRect>(mInset));
     mPlot->replot();
     QVERIFY2(hasInkNear(rendered(*mPlot), edge), "the remade indicator does not draw");
-    // A rect leaves its plottables behind, so the inset's own colour map goes first.
-    mInsetMap.remove();
     QVERIFY2(mAx->insetLayout()->remove(mInset), "the inset is not in its rect's inset layout");
+    QVERIFY2(!mInsetMap, "the inset's colour map outlived the inset");
     mInset = nullptr;
     mPlot->replot();
     QVERIFY2(!hasInkNear(rendered(*mPlot), edge), "the indicator outlived its inset's ink");
@@ -256,4 +409,103 @@ void TestZoomIndicator::aRectThatIsNotAnInsetIsRefused()
     qcp::setMisuseHandler(again);
     QVERIFY2(!onAnotherRectsInset, "an inset of another rect was accepted");
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+
+    // A rect of another plot: its pixels are another widget's.
+    QCustomPlot foreignPlot;
+    foreignPlot.resize(300, 200);
+    const QCPHandle<QCPAxisRect> foreignParent = foreignPlot.axisRect();
+    const QCPHandle<QCPAxisRect> foreignInset = foreignParent->addInset(QRectF(0.1, 0.1, 0.2, 0.2));
+    QVERIFY(foreignInset);
+    const auto third = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    const QCPHandle<QCPItemZoomIndicator> onAnotherPlot = parent->zoomIndicator(foreignInset);
+    qcp::setMisuseHandler(third);
+    QVERIFY2(!onAnotherPlot, "an inset of another plot was accepted");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+
+    // setInset() is the check, so a caller that goes round the one-call helper is refused as well,
+    // and the inset the item had stays.
+    const QCPHandle<QCPAxisRect> ownInset = parent->addInset(QRectF(0.5, 0.05, 0.4, 0.4));
+    const QCPHandle<QCPItemZoomIndicator> indicator = parent->zoomIndicator(ownInset);
+    QVERIFY(indicator);
+    const auto fourth = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    indicator->setInset(cell.get());
+    qcp::setMisuseHandler(fourth);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QCOMPARE(indicator->inset(), ownInset.get());
+}
+
+void TestZoomIndicator::aNullInsetIsNoInset()
+{
+    const auto previous = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    mIndicator->setInset(nullptr);
+    qcp::setMisuseHandler(previous);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+    QVERIFY(!mIndicator->inset());
+    mPlot->replot();
+    QVERIFY2(!hasInkNear(rendered(*mPlot), pointIn(*mAx->xAxis(), *mAx->yAxis(), -1.5, -2.2)),
+             "an indicator with no inset drew a box");
+
+    // The one-call helper takes null too: it makes the item, and the item draws nothing.
+    const auto again = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    const QCPHandle<QCPItemZoomIndicator> empty = mAx->zoomIndicator(QCPHandle<QCPAxisRect>());
+    qcp::setMisuseHandler(again);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+    QVERIFY(empty);
+    QVERIFY(!empty->inset());
+}
+
+void TestZoomIndicator::aRectGoesWithWhatIsDrawnInIt()
+{
+    // The scene's inset holds a colour map, as the target program's does: the inset takes it.
+    QVERIFY(mInsetMap);
+    QVERIFY2(mAx->insetLayout()->remove(mInset), "the inset is not in its rect's inset layout");
+    mInset = nullptr;
+    QVERIFY2(!mInsetMap, "the inset's colour map outlived the inset");
+
+    const auto previous = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    mPlot->replot();
+    qcp::setMisuseHandler(previous);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+    QVERIFY(!hasInkNear(rendered(*mPlot), pointIn(*mAx->xAxis(), *mAx->yAxis(), -1.5, -2.2)));
+
+    // And a grid cell goes with its line.
+    QCustomPlot grid;
+    grid.resize(400, 300);
+    grid.setAxisRectGrid(1, 2);
+    const QCPHandle<QCPAxisRect> cell = grid.axisRect(0, 1);
+    const QCPHandle<QCPGraph> line = cell->line(std::vector<double> { 0, 1, 2 },
+                                                std::vector<double> { 0, 1, 0 });
+    QVERIFY(cell && line);
+    const auto again = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    QVERIFY(cell->layout()->remove(cell.get()));
+    QVERIFY2(!line, "the cell's line outlived its rect");
+    grid.replot();
+    qcp::setMisuseHandler(again);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
+void TestZoomIndicator::theIndicatorGoesWithItsRect()
+{
+    // The item lives in its rect's coordinate system, so the rect takes it, both ways round.
+    QCustomPlot grid;
+    grid.resize(400, 300);
+    grid.setAxisRectGrid(1, 2);
+    const QCPHandle<QCPAxisRect> cell = grid.axisRect(0, 0);
+    const QCPHandle<QCPAxisRect> inset = cell->addInset(QRectF(0.2, 0.2, 0.4, 0.4));
+    const QCPHandle<QCPItemZoomIndicator> indicator = cell->zoomIndicator(inset);
+    QVERIFY(cell && inset && indicator);
+
+    const auto previous = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    QVERIFY(cell->layout()->remove(cell.get()));
+    QVERIFY2(!indicator, "the indicator outlived the rect it is drawn in");
+    grid.replot();
+    qcp::setMisuseHandler(previous);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 }

@@ -586,15 +586,13 @@ void TestCoordinateSystem::theAxisPairFollowsEveryFrame()
     QCOMPARE(pairOf(plottable), Pair(nullptr, nullptr));
     QCOMPARE(plottable->rawPair(), Pair(nullptr, nullptr));
 
-    // An axis rect deleted under a plottable takes its system and its pair with it.
+    // An axis rect takes the plottable drawn in it with it, so no pair outlives its system.
     auto* doomed = new QCPAxisRect(&plot);
     plot.plotLayout()->addElement(2, 0, doomed);
-    auto* orphan = doomed->add<RecordingPlottable>().get();
+    const QCPHandle<RecordingPlottable> orphan = doomed->add<RecordingPlottable>();
     QVERIFY(orphan->system());
     delete doomed;
-    QVERIFY(!orphan->system());
-    QCOMPARE(pairOf(orphan), Pair(nullptr, nullptr));
-    QCOMPARE(orphan->rawPair(), Pair(nullptr, nullptr));
+    QVERIFY2(!orphan, "the plottable outlived the rect that held its system");
 }
 
 void TestCoordinateSystem::twoAddsOnOnePairShareTheSystem()

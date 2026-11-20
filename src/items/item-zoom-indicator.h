@@ -57,18 +57,10 @@ namespace qcp
 /*!
   \brief The box an inset's ranges cover in its parent, and the connectors that join it to the inset.
 
-  Makes one with QCPAxisRect::zoomIndicator() on the parent of an inset, which is where the box and
-  the connectors belong:
+  Makes one with QCPAxisRect::zoomIndicator() on the parent of an inset: that is where the box and
+  the connectors belong.
 
-  \snippet layout.cpp layout_zoom_indicator
-
-  The box runs from the inset's bottom axis range to its left axis range, in this rect's bottom and
-  left axes. Each of the four corners may carry a connector to the same corner of the inset's data
-  rect, chosen by qcp::zoomConnectorVisibility().
-
-  The box and the connectors are remade whenever the inset's ranges change, and whenever the frame
-  moves under them, so panning the inset, panning this rect, or resizing the widget all keep the
-  picture true. Nothing is drawn while the inset is hidden or after it has been deleted.
+  \see QCPAxisRect::zoomIndicator
 */
 class QCP_LIB_DECL QCPItemZoomIndicator : public QCPItem
 {
@@ -105,16 +97,13 @@ signals:
     void insetChanged(QCPAxisRect* inset);
 
 protected:
-    // The connectors end on the inset's pixel rect, which a layout can move without moving this
-    // rect's frame: the recording is remade when it does.
-    [[nodiscard]] quint64 dependencyRevision() const override;
-
     // property members:
     QPen mPen;
     QBrush mBrush;
 
     QPointer<QCPAxisRect> mInset;
-    //! The inset's two axes and its visibility, each one a reason to remake the recording.
+    //! The inset's two ranges, its geometry, its visibility: each one a reason to remake the
+    //! recording.
     QList<QMetaObject::Connection> mInsetLinks;
 
     friend class TestZoomIndicator; // reads the recording's count

@@ -29,8 +29,31 @@
 #include "../painting/draw-context.h"
 
 #include <algorithm>
-#include <bit>
 #include <utility>
+
+namespace
+{
+//! The box the two ranges cover, in data.
+QRectF boxOf(const QCPRange& keys, const QCPRange& values)
+{
+    const double keyLow = std::min(keys.lower, keys.upper);
+    const double keyHigh = std::max(keys.lower, keys.upper);
+    const double valueLow = std::min(values.lower, values.upper);
+    const double valueHigh = std::max(values.lower, values.upper);
+    return QRectF(keyLow, valueLow, keyHigh - keyLow, valueHigh - valueLow);
+}
+
+//! \a box in this rect's pixels, its corners in reading order whichever way the axes run.
+QRectF pixelsOf(const QCPTransform& transform, const QRectF& box)
+{
+    const auto at = [&transform](double key, double value)
+    {
+        const QCP::Pixels pixels = transform.map(QCP::Data { key, value });
+        return QPointF(pixels.x, pixels.y);
+    };
+    return QRectF(at(box.left(), box.bottom()), at(box.right(), box.top())).normalized();
+}
+} // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemZoomIndicator
@@ -39,7 +62,7 @@
 /*! \class QCPItemZoomIndicator
   \brief The box an inset's ranges cover in its parent, and the connectors that join it to the inset.
 
-  \image html QCPItemZoomIndicator.png
+  \snippet docs/snippets/layout.cpp layout_zoom_indicator
 
   The box runs from the inset's bottom axis range to its left axis range, in this rect's bottom and
   left axes. Each of the four corners may carry a connector to the same corner of the inset's data
@@ -102,12 +125,26 @@ void QCPItemZoomIndicator::setBrush(const QBrush& brush)
 }
 
 /*!
-  Sets the inset whose ranges the box covers, to null for none. An inset of another rect draws no
-  box here: the item is meant for one made by QCPAxisRect::addInset() on the rect it belongs to.
+  Sets the inset whose ranges the box covers, to null for none.
+
+  A rect that is not an inset of this item's own rect, in the same plot, is misuse: one report, and
+  the inset stays as it was. The item's own rect is the one it was added to, the area its positions
+  and its clip area are measured in.
 */
 void QCPItemZoomIndicator::setInset(QCPAxisRect* inset)
 {
+    const QCPAxisRect* frame = clipAxisRect().get();
+    QCP_CHECK_OR_RETURN(!inset
+                            || (frame && inset->parentPlot() == mParentPlot && inset->isInset()
+                                && inset->layout().get() == frame->insetLayout().get()),
+                        "the rect a zoom indicator points at must be an inset of this item's rect");
     if (inset == mInset.data())
+        return;
+    // First, and alone on its own this: a slot a connection below runs may delete this item, and
+    // nothing may touch it afterwards.
+    const QPointer<QCPItemZoomIndicator> alive(this);
+    update();
+    if (!alive)
         return;
     for (const QMetaObject::Connection& link : std::exchange(mInsetLinks, { }))
         disconnect(link);
@@ -116,27 +153,25 @@ void QCPItemZoomIndicator::setInset(QCPAxisRect* inset)
     {
         for (QCPAxis* axis : { inset->xAxis().get(), inset->yAxis().get() })
             if (axis)
-            {
-                mInsetLinks << connect(axis, &QCPAxis::rangeChanged, this,
-                                       [this] { update(); });
-                mInsetLinks << connect(axis, &QCPAxis::scaleChanged, this,
-                                       [this] { update(); });
-            }
+                mInsetLinks << connect(axis, &QCPAxis::rangeChanged, this, [this] { update(); });
+        // The connectors end on the inset's rect: a layout that moves it must remake them.
+        mInsetLinks << connect(inset, &QCPLayoutElement::outerRectChanged, this,
+                               [this] { update(); });
+        mInsetLinks << connect(inset, &QCPLayoutElement::marginsChanged, this, [this] { update(); });
         mInsetLinks << connect(inset, &QCPLayerable::visibleChanged, this, [this] { update(); });
         // A deleted inset leaves the box empty, and the replot that follows draws nothing.
         mInsetLinks << connect(inset, &QObject::destroyed, this, [this] { update(); });
     }
-    update();
     qcpEmit(this, mParentPlot, &QCPItemZoomIndicator::insetChanged, inset);
 }
 
 /*!
-  Records the box in this rect's data, then the connectors, from a box corner in data to the same
-  corner of the inset's data rect in pixels.
+  Records the box in this rect's data, then the connectors, from a box corner in pixels to the same
+  corner of the inset's data rect.
 
-  The connectors end on the inset's pixel rect, so the transform and the inset's rect are part of
-  what the recording holds: this reads the transform to say so, and dependencyRevision() watches the
-  rect.
+  Both ends of a connector are pixels: the visibility rule picks a corner of the box as it is drawn,
+  which is the box's pixel corner, and a reversed axis turns the data corners round. That is also why
+  this reads the transform: the recording holds pixel positions, so a moved frame remakes it.
 */
 void QCPItemZoomIndicator::draw(QCPDrawContext& context) const
 {
@@ -149,57 +184,20 @@ void QCPItemZoomIndicator::draw(QCPDrawContext& context) const
         return;
 
     const QCPTransform& transform = context.transform();
-    const QCPRange keys = keyAxis->range(), values = valueAxis->range();
-    const double keyLow = std::min(keys.lower, keys.upper);
-    const double keyHigh = std::max(keys.lower, keys.upper);
-    const double valueLow = std::min(values.lower, values.upper);
-    const double valueHigh = std::max(values.lower, values.upper);
-
-    const auto pixels = [&transform](double key, double value)
-    {
-        const QCP::Pixels at = transform.map(QCP::Data { key, value });
-        return QPointF(at.x, at.y);
-    };
-    const QRectF boxPixels = QRectF(pixels(keyLow, valueHigh), pixels(keyHigh, valueLow))
-                                 .normalized();
+    const QRectF box = boxOf(keyAxis->range(), valueAxis->range());
+    const QRectF boxPixels = pixelsOf(transform, box);
     const QRectF insetPixels(inset->rect());
     const std::array<bool, 4> shown = qcp::zoomConnectorVisibility(boxPixels, insetPixels);
 
-    context.rect(QRectF(keyLow, valueLow, keyHigh - keyLow, valueHigh - valueLow), mPen, mBrush);
+    context.rect(box, mPen, mBrush);
 
-    const std::array<QCP::Data, 4> boxCorners { QCP::Data { keyLow, valueLow },
-                                                QCP::Data { keyLow, valueHigh },
-                                                QCP::Data { keyHigh, valueLow },
-                                                QCP::Data { keyHigh, valueHigh } };
+    const std::array<QPointF, 4> boxCorners { boxPixels.bottomLeft(), boxPixels.topLeft(),
+                                              boxPixels.bottomRight(), boxPixels.topRight() };
     const std::array<QPointF, 4> insetCorners { insetPixels.bottomLeft(), insetPixels.topLeft(),
                                                 insetPixels.bottomRight(),
                                                 insetPixels.topRight() };
-    for (std::size_t i = 0; i < insetCorners.size(); ++i)
+    for (std::size_t i = 0; i < boxCorners.size(); ++i)
         if (shown[i])
-            context.line(boxCorners[i], QCP::Pixels { insetCorners[i].x(), insetCorners[i].y() },
-                         mPen);
-}
-
-namespace
-{
-//! The bits of a range bound: an exact part of the revision, with no floating-point conversion.
-quint64 bitsOf(double value)
-{
-    return std::bit_cast<quint64>(value);
-}
-} // namespace
-
-quint64 QCPItemZoomIndicator::dependencyRevision() const
-{
-    const QCPAxisRect* inset = mInset.data();
-    if (!inset)
-        return QCPItem::dependencyRevision();
-    const QCPAxis* keyAxis = inset->xAxis().get();
-    const QCPAxis* valueAxis = inset->yAxis().get();
-    const QCPRange keys = keyAxis ? keyAxis->range() : QCPRange();
-    const QCPRange values = valueAxis ? valueAxis->range() : QCPRange();
-    const QRect rect = inset->rect();
-    return qHashMulti(QCPItem::dependencyRevision(), quint64(rect.x()), quint64(rect.y()),
-                      quint64(rect.width()), quint64(rect.height()), bitsOf(keys.lower),
-                      bitsOf(keys.upper), bitsOf(values.lower), bitsOf(values.upper));
+            context.line(QCP::Pixels { boxCorners[i].x(), boxCorners[i].y() },
+                         QCP::Pixels { insetCorners[i].x(), insetCorners[i].y() }, mPen);
 }

@@ -1135,11 +1135,10 @@ void TestHandle::removeAxisRectThroughHandle()
     QVERIFY(!rect);
     QVERIFY(!axis);
     QVERIFY(!plot.plotLayout()->element(1, 0));
-    QVERIFY(graph);
-    QVERIFY(!graph->keyAxis());
+    // The rect takes what is drawn in it, so the graph goes with it.
+    QVERIFY2(!graph, "the graph outlived the rect it was drawn in");
     QCOMPARE(gMisuses, 0);
 
-    graph.remove();
     plot.replot();
 }
 

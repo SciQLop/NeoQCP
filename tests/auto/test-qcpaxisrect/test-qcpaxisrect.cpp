@@ -1578,71 +1578,58 @@ void TestQCPAxisRect::axisRemovalConsequencesToItems()
 
 void TestQCPAxisRect::axisRectRemovalConsequencesToPlottables()
 {
-  // test consequences to plottables when the axis rect is removed:
-  QCPGraph *graph = mPlot->addGraph(mPlot->xAxis, mPlot->yAxis);
+  // A rect owns what is drawn in it: removing the rect takes the graph whose frame it was.
+  const QCPHandle<QCPGraph> graph = mPlot->addGraph(mPlot->xAxis, mPlot->yAxis);
   graph->setData(QVector<double>() << 1 << 2 << 3, QVector<double>() << 1 << 0 << -1);
   mPlot->replot();
 
   QVERIFY(mPlot->plotLayout()->removeAt(0));
   mPlot->plotLayout()->simplify();
   QCOMPARE(mPlot->plotLayout()->elementCount(), 0);
+  QVERIFY2(!graph, "the graph outlived the rect it was drawn in");
   gMisuses = 0;
   const auto previous = qcp::setMisuseHandler(countMisuse);
   mPlot->layer("main")->markDirty();
   mPlot->replot();
   qcp::setMisuseHandler(previous);
-  QCOMPARE(gMisuses, 1); // the graph without axes is not drawn
-  mPlot->rescaleAxes();
-  // A frame that lost its axes rescales quietly: the plottable is inert, and saying so once is
-  // drawableAxes()'s job, not the rescale's.
-  graph->rescaleAxes();
-  
-  // test replacement of previously removed axis:
+  QCOMPARE(gMisuses, 0); // nothing was left behind to report
+
+  // A rect added afterwards draws its own graph.
   qobject_cast<QCPLayoutGrid*>(mPlot->plotLayout())->addElement(0, 0, new QCPAxisRect(mPlot));
-  mPlot->axisRect()->addAxes(QCPAxis::atBottom|QCPAxis::atLeft);
-  graph->setKeyAxis(mPlot->axisRect()->axis(QCPAxis::atBottom));
-  graph->setValueAxis(mPlot->axisRect()->axis(QCPAxis::atLeft));
+  const QCPHandle<QCPGraph> fresh = mPlot->axisRect()->line(QVector<double>() << 1 << 2 << 3,
+                                                            QVector<double>() << 1 << 0 << -1);
+  QVERIFY(fresh);
   mPlot->replot();
   mPlot->rescaleAxes();
-  graph->rescaleAxes();
 }
 
 void TestQCPAxisRect::axisRectRemovalConsequencesToItems()
 {
-  // test consequences to items when their axes are removed:
-  QCPItemLine *item = mPlot->add<QCPItemLine>();
+  // A rect owns the items bound to it, as it does its plottables.
+  const QCPHandle<QCPItemLine> item = mPlot->add<QCPItemLine>();
   item->setClipAxisRect(mPlot->axisRect());
   item->setClipToAxisRect(true);
   item->start->setAxisRect(mPlot->axisRect());
   item->start->setType(QCPItemPosition::ptAxisRectRatio);
   mPlot->replot();
-  
+
   QVERIFY(mPlot->plotLayout()->removeAt(0));
   mPlot->plotLayout()->simplify();
   QCOMPARE(mPlot->plotLayout()->elementCount(), 0);
-  // Both positions lost their axis rect and their axes: the recording is refused, once.
-  expectMissingAxis();
-  mPlot->layer("main")->markDirty();
-  mPlot->replot();
-  
+  QVERIFY2(!item, "the item outlived the rect it was drawn in");
+
   gMisuses = 0;
-  const auto previousHandler = qcp::setMisuseHandler(countMisuse);
-  item->start->setPixelPosition(QPointF(1, 2));
-  qcp::setMisuseHandler(previousHandler);
-  QCOMPARE(gMisuses, 1); // one report for the position, not one per slot
-  
-  // change type to axisRect-independent coordinates:
-  item->start->setType(QCPItemPosition::ptAbsolute);
-  item->end->setType(QCPItemPosition::ptAbsolute);
-  mPlot->replot(); // shouldn't output any debug messages now because we've changed the type to be independent of axesRect
-  // change back to axisRect-dependent coordinates:
-  item->start->setType(QCPItemPosition::ptAxisRectRatio);
-  item->end->setType(QCPItemPosition::ptPlotCoords);
-  // test replacement of previously removed axis:
+  const auto previous = qcp::setMisuseHandler(countMisuse);
+  mPlot->replot(); // nothing left in a frame, nothing to report
+  qcp::setMisuseHandler(previous);
+  QCOMPARE(gMisuses, 0);
+
+  // A rect added afterwards draws its own items.
   qobject_cast<QCPLayoutGrid*>(mPlot->plotLayout())->addElement(0, 0, new QCPAxisRect(mPlot));
-  mPlot->axisRect()->addAxes(QCPAxis::atBottom|QCPAxis::atLeft);
-  item->start->setAxisRect(mPlot->axisRect());
-  item->end->setAxes(mPlot->axisRect()->axis(QCPAxis::atBottom), mPlot->axisRect()->axis(QCPAxis::atLeft));
+  const QCPHandle<QCPItemLine> fresh = mPlot->add<QCPItemLine>();
+  fresh->start->setAxisRect(mPlot->axisRect());
+  fresh->start->setType(QCPItemPosition::ptAxisRectRatio);
+  QVERIFY(fresh);
   mPlot->replot();
 }
 
@@ -2507,10 +2494,9 @@ void TestQCPAxisRect::columnsOfTheWrongLengthAreRefused()
     QVERIFY2(gLastMisuse.contains("one value per y value"), gLastMisuse.constData());
 }
 
-void TestQCPAxisRect::aRemovedInsetHandsItsDataBack()
+void TestQCPAxisRect::aRemovedInsetTakesItsDataWithIt()
 {
-    // A graph and an item left on an inset removed through its handle go back to their default
-    // layers, not to whatever layer sat under the inset's.
+    // A rect owns what is drawn in it: an inset takes the graph on its axes and the item bound to it.
     QCustomPlot plot;
     plot.resize(400, 300);
     auto inset = plot.axisRect()->addInset(QRectF(0.25, 0.25, 0.5, 0.5));
@@ -2523,9 +2509,13 @@ void TestQCPAxisRect::aRemovedInsetHandsItsDataBack()
     }
     QCOMPARE(graph->layer()->name(), QStringLiteral("inset 1 data"));
     QCOMPARE(item->layer()->name(), QStringLiteral("inset 1 data"));
+
     inset.remove();
-    QVERIFY(graph);
-    QCOMPARE(graph->layer()->name(), QStringLiteral("main"));
-    QVERIFY(item);
-    QCOMPARE(item->layer()->name(), QStringLiteral("annotations"));
+    QVERIFY2(!graph, "the inset's graph outlived it");
+    QVERIFY2(!item, "the item drawn in the inset outlived it");
+    gMisuses = 0;
+    const auto previous = qcp::setMisuseHandler(countMisuse);
+    plot.replot();
+    qcp::setMisuseHandler(previous);
+    QCOMPARE(gMisuses, 0);
 }

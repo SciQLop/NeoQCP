@@ -638,22 +638,17 @@ void TestItemSystem::setSystemTwiceRetakesTheArea()
     QVERIFY2(position->area() == area, "a repeated setSystem did not retake the system's area");
 }
 
-// The cached projections go with the axis rect they came from, and an item moved to another plot
-// takes that plot's default axes and rect.
+// An item that names an axis rect in its positions goes with that rect, and an item moved to
+// another plot takes that plot's default axes and rect.
 void TestItemSystem::theProjectionsFollowDeletionAndAMoveToAnotherPlot()
 {
     auto* lower = new QCPAxisRect(mPlot);
     mPlot->plotLayout()->addElement(1, 0, lower);
-    auto item = mPlot->add<QCPItemTracer>();
-    QCPItemPosition* position = item->position;
-    position->setAxes(lower->axis(QCPAxis::atBottom), lower->axis(QCPAxis::atLeft));
-    QCOMPARE(position->axisRect(), lower);
+    const QCPHandle<QCPItemTracer> item = mPlot->add<QCPItemTracer>();
+    item->position->setAxes(lower->axis(QCPAxis::atBottom), lower->axis(QCPAxis::atLeft));
+    QCOMPARE(item->position->axisRect(), lower);
     delete lower;
-    QCOMPARE(position->keyAxis(), nullptr);
-    QCOMPARE(position->valueAxis(), nullptr);
-    QCOMPARE(position->axisRect(), nullptr);
-    QCOMPARE(position->area(), nullptr);
-    QCOMPARE(position->system(), nullptr);
+    QVERIFY2(!item, "the item outlived the rect its position named");
 
     QCustomPlot other;
     auto handle = mPlot->add<QCPItemEllipse>();

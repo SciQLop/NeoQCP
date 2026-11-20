@@ -16,13 +16,19 @@ private slots:
 
     void connectorsForAnInsetUpRight();
     void connectorsForAnInsetDownRight();
+    void connectorsKeepTheirPixelCornersOnAReversedKeyAxis();
+    void connectorsKeepTheirPixelCornersOnAReversedValueAxis();
     void theBoxCoversTheInsetRanges();
     void theBoxFollowsThePannedInset();
     void aPlainReplotKeepsTheRecording();
     void connectorsEndAtTheInsetCorners();
+    void theBoxFollowsAnInsetThatMovesInItsLayout();
     void aHiddenInsetHidesTheIndicator();
     void anIndicatorOutlivesItsInset();
     void aRectThatIsNotAnInsetIsRefused();
+    void aNullInsetIsNoInset();
+    void aRectGoesWithWhatIsDrawnInIt();
+    void theIndicatorGoesWithItsRect();
 
 private:
     QCustomPlot* mPlot = nullptr;

@@ -1732,31 +1732,32 @@ void TestUserSystem::anAxisDeletedMidDragLeavesThemInert()
     test_misuse::calls.clear();
 }
 
-void TestUserSystem::deletingTheSkewRectLeavesThemInert()
+void TestUserSystem::deletingTheSkewRectTakesWhatIsDrawnInIt()
 {
+    // A rect owns what is drawn in it: the plottables in its systems and the item bound to it go with
+    // it, so nothing is left inert in a frame that is gone.
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
     InspectableMultiGraph* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
     InspectableCurve* curve = curveOn(rect);
     curve->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
-    auto text = plot.add<QCPItemText>();
+    const QCPHandle<QCPItemText> text = plot.add<QCPItemText>();
     text->position->setSystem(rect->skew());
     text->position->setType(QCPItemPosition::ptPlotCoords);
     text->position->setCoords(5, 5);
     settle(plot);
 
+    const QPointer<InspectableMultiGraph> graphWatch(graph);
+    const QPointer<InspectableCurve> curveWatch(curve);
     delete plot.plotLayout()->takeAt(0); // the rect, with its axes and its systems
 
-    QVERIFY(!graph->system());
-    QVERIFY(!curve->system());
-    QVERIFY(!text->position->system());
-    settle(plot);
-    // One report per plottable: the graph and the curve. The inert item is silent, as a pixel
-    // read of a position without a frame is.
-    QCOMPARE(test_misuse::calls.size(), std::size_t(2));
+    QVERIFY2(!graphWatch, "the graph outlived the rect it was drawn in");
+    QVERIFY2(!curveWatch, "the curve outlived the rect it was drawn in");
+    QVERIFY2(!text, "the item outlived the rect it was drawn in");
     test_misuse::calls.clear();
-    QCOMPARE(text->position->pixelPosition(), QPointF(0, 0));
+    settle(plot); // nothing left to draw, nothing to report
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 }
 
 void TestUserSystem::switchingBetweenCartesianAndSkewReRecords()
