@@ -55,6 +55,19 @@ DOC_CODE(layout_inset)
     // [/layout_inset]
 }
 
+DOC_CODE(layout_zoom_indicator)
+{
+    // [layout_zoom_indicator]
+    auto main = customPlot->axisRect();
+    main->line(std::vector<double> { 0, 1, 2, 3 }, std::vector<double> { 0.2, 1.4, 1.1, 2.0 });
+    auto inset = main->addInset(QRectF(0.55, 0.05, 0.42, 0.42)); // x, y, width, height of main's data rect
+    inset->line(std::vector<double> { 0, 1, 2, 3 }, std::vector<double> { 0.2, 1.4, 1.1, 2.0 });
+    inset->xAxis()->setRange(0.5, 2.5); // the part of the data the inset zooms on
+    inset->yAxis()->setRange(0.8, 1.6);
+    main->zoomIndicator(inset); // that box in the main rect, and the connectors to the inset
+    // [/layout_zoom_indicator]
+}
+
 DOC_SNIPPET(layout_legend_inside, 600, 360)
 {
     // [layout_legend_inside]

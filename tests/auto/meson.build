@@ -83,6 +83,7 @@ test_srcs = [
     'test-transform/test-transform.cpp',
     'test-user-system/test-user-system.cpp',
     'test-meta-surface/test-meta-surface.cpp',
+    'test-zoom-indicator/test-zoom-indicator.cpp',
 ]
 
 test_headers = [
@@ -165,6 +166,7 @@ test_headers = [
     'test-user-system/test-user-system.h',
     'test-user-system/skew-system.h',
     'test-meta-surface/test-meta-surface.h',
+    'test-zoom-indicator/test-zoom-indicator.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 

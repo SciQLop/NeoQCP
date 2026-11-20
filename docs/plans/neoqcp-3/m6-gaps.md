@@ -134,6 +134,7 @@ Counts are `grep -o` hits on the 2026-11-14 tree (`src/`, `tests/`, `examples/` 
    `setAxisRectGrid`).
 7. **6g, fill and zoom indicator:** `QCPFillBetween` (deleting the component fills), `zoomIndicator`. Fill-between
    and inset-zoom compile.
+   **Done 2026-11-20**; fill-between and inset-zoom compile and both have reference pictures.
 8. **6h, annotations:** `QCPItemAnnotation` and `QCPConnector`. Annotations compiles.
 
 ## Gate (2026-11-14)

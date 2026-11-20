@@ -189,6 +189,22 @@ A drag or a wheel zoom inside it moves the inset, not the parent.
 It follows the parent when the plot resizes and is deleted with it.
 `axisRects()` lists it after the grid's cells; it is not a cell.
 
+`zoomIndicator(inset)` is matplotlib's zoom inset: the box the inset's ranges cover in the parent, and the connectors that join the box to the inset's corners.
+
+```{literalinclude} snippets/layout.cpp
+:start-after: // [layout_zoom_indicator]
+:end-before: // [/layout_zoom_indicator]
+:language: cpp
+:dedent:
+```
+
+The box runs from the inset's bottom axis range to its left axis range, in the parent's bottom and left axes.
+The connectors are the two that reach the inset from the corners of the box, chosen by `qcp::zoomConnectorVisibility()`: an inset above and to the right of the box is joined at the box's top-left and bottom-right corners, so no connector crosses the inset.
+The indicator is an item of the parent's, so it draws on the parent's `"annotations"` layer, above the inset, and `setPen` and `setBrush` style the box and the connectors.
+It is remade when the inset's ranges change and when the frame moves under it, so dragging or zooming the inset, panning the parent or resizing the plot all leave the box on the data and the connectors on the inset's corners.
+A hidden inset draws no indicator, and deleting the inset, or the indicator, leaves the other drawing nothing and crashing nothing.
+A rect that is not an inset of this one, a grid cell or an inset of another rect, is misuse: one report and an empty handle.
+
 ## Align edges with an alignment group
 
 A <a href="api/classQCPAlignmentGroup.html">QCPAlignmentGroup</a> lines up the inner edges of its members.

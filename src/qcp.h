@@ -69,6 +69,7 @@
 #include "items/item-tracer.h"
 #include "items/item-rspan.h"
 #include "items/item-span.h"
+#include "items/item-zoom-indicator.h"
 #include "layer.h"
 #include "overlay.h"
 #include "alignment-group.h"

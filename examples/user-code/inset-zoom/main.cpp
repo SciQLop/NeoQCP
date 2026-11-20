@@ -1,4 +1,4 @@
-// Target program (milestone 6): an inset zoomed on a sub-range, with its indicator. Does not compile yet.
+// Target program (milestone 6): an inset zoomed on a sub-range, with its indicator.
 // https://matplotlib.org/stable/gallery/subplots_axes_and_figures/zoom_inset_axes.html
 
 #include <qcustomplot.h>

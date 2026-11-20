@@ -55,6 +55,7 @@ set(NEOQCP_SOURCES
     src/items/item-bracket.cpp
     src/items/item-curve.cpp
     src/items/item-ellipse.cpp
+    src/items/item-zoom-indicator.cpp
     src/items/item-line.cpp
     src/items/item-pixmap.cpp
     src/items/item-rect.cpp
@@ -138,6 +139,7 @@ set(NEOQCP_MOC_HEADERS
     src/items/item-bracket.h
     src/items/item-curve.h
     src/items/item-ellipse.h
+    src/items/item-zoom-indicator.h
     src/items/item-line.h
     src/items/item-pixmap.h
     src/items/item-rect.h

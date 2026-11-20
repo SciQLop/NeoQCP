@@ -48,6 +48,20 @@ void check(const QImage& image, const char* name)
              qPrintable(QStringLiteral("%1: %2").arg(QLatin1String(name), why)));
 }
 
+//! The inset-zoom target program's sample: matplotlib's axes_grid/bivariate_normal.npy, pasted at
+//! row 30, column 30 of a 150 x 150 zero image.
+double zoomSampleImage(int column, int row)
+{
+    const int i = column - 30, j = row - 30;
+    if (i < 0 || i >= 15 || j < 0 || j >= 15)
+        return 0;
+    const double x = -3 + 0.5 * i, y = -4 + 0.5 * j;
+    const double u = x, v = y, u1 = (x - 1) / 1.5, v1 = (y - 1) / 0.5;
+    const double first = std::exp(-0.5 * (u * u + v * v)) / (2 * std::numbers::pi);
+    const double second = std::exp(-0.5 * (u1 * u1 + v1 * v1)) / (2 * std::numbers::pi * 1.5 * 0.5);
+    return 10 * (first - second);
+}
+
 QVector<double> sampleKeys()
 {
     return QVector<double> { 0.5, 1.5, 2.5, 3.5, 4.5, 5.5 };
@@ -1809,4 +1823,36 @@ void TestReferenceM4e::fillBetweenTarget()
               },
               QSize(640, 400)),
           "fill-between-target.png");
+}
+
+void TestReferenceM4e::insetZoomTarget()
+{
+    check(render(
+              [](QCustomPlot& plot)
+              {
+                  std::vector<double> x, y, z;
+                  for (int i = 0; i < 150; ++i)
+                  {
+                      x.push_back(-3 + (i + 0.5) * 7.0 / 150);
+                      y.push_back(-4 + (i + 0.5) * 7.0 / 150);
+                  }
+                  for (int column = 0; column < 150; ++column)
+                      for (int row = 0; row < 150; ++row)
+                          z.push_back(zoomSampleImage(column, row));
+                  const QCPColorMapOptions look { .gradient = QCPColorGradient::gpViridis,
+                                                  .colorBar = false };
+                  const QCPHandle<QCPAxisRect> ax = plot.axisRect();
+                  ax->colorMap(x, y, z, look);
+                  ax->xAxis()->setRange(-3, 4);
+                  ax->yAxis()->setRange(-4, 3);
+                  const QCPHandle<QCPAxisRect> inset = ax->addInset(QRectF(0.5, 0.03, 0.47, 0.47));
+                  inset->colorMap(x, y, z, look);
+                  inset->xAxis()->setRange(-1.5, -0.9);
+                  inset->yAxis()->setRange(-2.5, -1.9);
+                  inset->xAxis()->setTickLabels(false);
+                  inset->yAxis()->setTickLabels(false);
+                  ax->zoomIndicator(inset, { .pen = QPen(Qt::black) });
+              },
+              QSize(560, 540)),
+          "inset-zoom-target.png");
 }

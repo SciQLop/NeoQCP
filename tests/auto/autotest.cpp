@@ -76,6 +76,7 @@
 #include "test-transform/test-transform.h"
 #include "test-user-system/test-user-system.h"
 #include "test-waterfall/test-waterfall.h"
+#include "test-zoom-indicator/test-zoom-indicator.h"
 
 #include "reference-image.h"
 
@@ -243,6 +244,7 @@ QCPTEST(TestPlottableWithoutAxes);
     QCPTEST(TestAxisBase);
     QCPTEST(TestUserSystem);
     QCPTEST(TestMetaSurface);
+    QCPTEST(TestZoomIndicator);
 
     return failures == 0 ? 0 : 1;
 }

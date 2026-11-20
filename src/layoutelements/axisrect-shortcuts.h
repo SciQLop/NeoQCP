@@ -13,6 +13,7 @@
 
 #include "../items/item-ellipse.h"
 #include "../items/item-text.h"
+#include "../items/item-zoom-indicator.h"
 #include "../plottables/graph-fill.h"
 #include "../plottables/plottable-graph.h"
 #include "../plottables/plottable-fillbetween.h"
@@ -258,6 +259,27 @@ inline QCPHandle<QCPItemEllipse> QCPAxisRect::ellipse(QCP::Position a, QCP::Posi
     item->bottomRight->set(b);
     item->setPen(options.pen);
     item->setBrush(options.brush);
+    return item;
+}
+
+/*!
+  The zoom indicator of \a inset: the box its bottom and left axis ranges cover in this rect, and
+  the connectors that join the box to the inset's corners, styled by \a options.
+
+  A rect that was not made by addInset() on this rect, a layout cell or an inset of another rect, is
+  misuse: one report and an empty handle.
+*/
+inline QCPHandle<QCPItemZoomIndicator>
+QCPAxisRect::zoomIndicator(const QCPHandle<QCPAxisRect>& inset, const QCPShapeOptions& options)
+{
+    QCP_CHECK_OR_RETURN(inset && inset->isInset() && inset->layout().get() == mInsetLayout,
+                        "the rect a zoom indicator points at must be an inset of this rect", { });
+    const QCPHandle<QCPItemZoomIndicator> item = add<QCPItemZoomIndicator>();
+    if (!item)
+        return item;
+    item->setPen(options.pen);
+    item->setBrush(options.brush);
+    item->setInset(inset.get());
     return item;
 }
 

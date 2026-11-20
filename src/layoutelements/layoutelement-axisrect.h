@@ -58,6 +58,7 @@ class QCPColorScale;
 class QCPTextElement;
 class QCPColorMap2;
 class QCPFillBetween;
+class QCPItemZoomIndicator;
 
 template <typename T, typename Self = void>
 class QCPColorScaleOps;
@@ -221,6 +222,11 @@ public:
     // The built-in ellipse item between the corners \a a and \a b, each in its own space.
     QCPHandle<QCPItemEllipse> ellipse(QCP::Position a, QCP::Position b,
                                       const QCPShapeOptions& options = { });
+    // The zoom indicator of \a inset: the box its ranges cover in this rect, and the connectors that
+    // join the box to the inset's corners. A rect that is not an inset of this one is misuse: one
+    // report and an empty handle. Defined in axisrect-shortcuts.h.
+    QCPHandle<QCPItemZoomIndicator> zoomIndicator(const QCPHandle<QCPAxisRect>& inset,
+                                                  const QCPShapeOptions& options = { });
 
     // A colour map of \a z over the grid of \a x and \a y, in one call: the ranges go through
     // qcp::toDoubles into the map's own storage, and \a options feeds its gradient, data scale,
