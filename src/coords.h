@@ -79,6 +79,13 @@ struct PixelLength
     double px = 0;
 };
 
+//! A length the other way: `-5_px` is a negative length, so a shape can measure one without spelling
+//! the struct out. Unary minus, and constexpr like the literal that builds it.
+[[nodiscard]] constexpr PixelLength operator-(PixelLength length)
+{
+    return PixelLength { -length.px };
+}
+
 //! Pixels relative to an anchor: the item position type ptAbsolute with a parent anchor.
 struct AnchorOffset
 {

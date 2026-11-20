@@ -3,6 +3,7 @@
 #include <QImage>
 #include <QPixmap>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <complex>
 #include <functional>
@@ -1855,4 +1856,90 @@ void TestReferenceM4e::insetZoomTarget()
               },
               QSize(560, 540)),
           "inset-zoom-target.png");
+}
+
+void TestReferenceM4e::annotationsTarget()
+{
+    // The annotations target: matplotlib's fourteen connector styles, one panel each, and the spare
+    // cell with a text and its arrow as one annotation.
+    check(render(
+              [](QCustomPlot& plot)
+              {
+                  plot.setAxisRectGrid(3, 5);
+                  const QCP::Data point { 0.3, 0.2 }, label { 0.8, 0.6 };
+                  const QColor blue(31, 119, 180), grey(128, 128, 128);
+                  const auto showPanel = [&](QCPAxisRect* ax)
+                  {
+                      ax->line(std::array { point.x, label.x }, std::array { point.y, label.y },
+                               { .pen = Qt::NoPen,
+                                 .scatterStyle
+                                 = QCPScatterStyle(QCPScatterStyle::ssDisc, blue, 5) });
+                      ax->xAxis()->setRange(0, 1);
+                      ax->yAxis()->setRange(0, 1.25);
+                      for (const auto& axis : ax->axes())
+                      {
+                          axis->setVisible(true);
+                          axis->setTicks(false);
+                          axis->grid()->setVisible(false);
+                      }
+                  };
+                  const struct
+                  {
+                      int row, column;
+                      QCPConnector connector;
+                      QString name;
+                  } demos[] = {
+                      { 0, 0, QCPConnector::curve(90, 0), QStringLiteral("curve(90, 0)") },
+                      { 1, 0, QCPConnector::curve(0, 90), QStringLiteral("curve(0, 90)") },
+                      { 0, 1, QCPConnector::arc(0), QStringLiteral("arc(0)") },
+                      { 1, 1, QCPConnector::arc(0.3), QStringLiteral("arc(0.3)") },
+                      { 2, 1, QCPConnector::arc(-0.3), QStringLiteral("arc(-0.3)") },
+                      { 0, 2, QCPConnector::elbow(-90, 180), QStringLiteral("elbow(-90, 180)") },
+                      { 1, 2, QCPConnector::elbow(-90, 180, QCP::PixelLength { 5 }),
+                        QStringLiteral("elbow(-90, 180,\n5 px)") },
+                      { 2, 2, QCPConnector::elbow(-90, 10, QCP::PixelLength { 5 }),
+                        QStringLiteral("elbow(-90, 10,\n5 px)") },
+                      { 0, 3,
+                        QCPConnector::arms(-90, QCP::PixelLength { 30 }, 0,
+                                           QCP::PixelLength { 30 }),
+                        QStringLiteral("arms(-90, 30 px,\n0, 30 px)") },
+                      { 1, 3,
+                        QCPConnector::arms(-90, QCP::PixelLength { 30 }, 0,
+                                           QCP::PixelLength { 30 }, QCP::PixelLength { 5 }),
+                        QStringLiteral("arms(-90, 30 px,\n0, 30 px, 5 px)") },
+                      { 2, 3,
+                        QCPConnector::arms(-90, QCP::PixelLength { 0 }, 0,
+                                           QCP::PixelLength { 40 }),
+                        QStringLiteral("arms(-90, 0 px,\n0, 40 px)") },
+                      { 0, 4, QCPConnector::bracket(0.3), QStringLiteral("bracket(0.3)") },
+                      { 1, 4, QCPConnector::bracket(-0.3), QStringLiteral("bracket(-0.3)") },
+                      { 2, 4, QCPConnector::bracket(-0.2, 180), QStringLiteral("bracket(-0.2, 180)") },
+                  };
+                  for (const auto& demo : demos)
+                  {
+                      QCPAxisRect* ax = plot.axisRect(demo.row, demo.column);
+                      showPanel(ax);
+                      ax->annotation(point, label, QString(),
+                                     { .connector = demo.connector, .pen = QPen(grey),
+                                       .head = QCPLineEnding::esLineArrow,
+                                       .shrink = QCP::PixelLength { 5 } });
+                      ax->text(QCP::AxisRatio { 0.05, 0.05 }, demo.name);
+                  }
+
+                  // matplotlib leaves this cell empty; it shows the text and its arrow as one
+                  // annotation.
+                  QCPAxisRect* spare = plot.axisRect(2, 0);
+                  showPanel(spare);
+                  spare->annotation(
+                      point, label, QStringLiteral("text and\narrow"),
+                      { .connector = QCPConnector::elbow(-90, 180, QCP::PixelLength { 5 }),
+                        .pen = QPen(grey),
+                        .head = QCPLineEnding::esLineArrow,
+                        .shrink = QCP::PixelLength { 5 },
+                        .textStyle = { .pen = QPen(grey),
+                                       .brush = Qt::white,
+                                       .padding = QMarginsF(4, 2, 4, 2) } });
+              },
+              QSize(700, 630)),
+          "annotations-target.png");
 }

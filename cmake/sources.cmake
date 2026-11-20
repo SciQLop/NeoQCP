@@ -53,6 +53,7 @@ set(NEOQCP_SOURCES
     src/item-creation-state.cpp
     src/items/connector.cpp
     src/items/item.cpp
+    src/items/item-annotation.cpp
     src/items/item-bracket.cpp
     src/items/item-curve.cpp
     src/items/item-ellipse.cpp
@@ -138,6 +139,7 @@ set(NEOQCP_MOC_HEADERS
     src/item-creation-state.h
     src/items/connector.h
     src/items/item.h
+    src/items/item-annotation.h
     src/items/item-bracket.h
     src/items/item-curve.h
     src/items/item-ellipse.h

@@ -36,6 +36,29 @@ Its `startDir` and `endDir` positions are the control points: the curve leaves `
 Both take line endings with `setHead()` and `setTail()`.
 A <a href="api/classQCPLineEnding.html">QCPLineEnding</a> is a style plus a size: `esSpikeArrow`, `esFlatArrow`, `esLineArrow`, `esDisc`, `esSquare`, `esDiamond`, `esBar`, `esHalfBar`, `esSkewedBar`.
 
+## Annotations
+
+```{literalinclude} snippets/items.cpp
+:start-after: // [items_annotation]
+:end-before: // [/items_annotation]
+:language: cpp
+:dedent:
+```
+
+![A peak labelled by a text whose elbow connector ends in an arrow at the peak](images/items-annotation.png)
+
+<a href="api/classQCPItemAnnotation.html">QCPItemAnnotation</a> is a text and the line from it to a target, as one item:
+`position` is the text, `target` is what it points at, and each names its own space, so a label pinned in pixels can point at a point that follows the data.
+
+- The connector starts at the centre of the text box and leaves it where its path crosses the box's edge, so the text never has a line drawn through it. An empty text has no box, and the connector starts at `position`.
+- `setConnector()` picks the shape: `QCPConnector::arc()`, `curve()`, `elbow()`, `arms()` and `bracket()` are matplotlib's `arc3`, `angle3`, `angle`, `arc` and `bar`. Angles are degrees counter-clockwise from +x, so `curve(90, 0)` leaves upwards.
+- `setShrink()` stops the connector that many pixels short of both ends, the text's box and the target.
+- `setHead()` puts a line ending at the target, turned along the path where it arrives. There is no tail.
+- `setTextStyle()` takes the same `QCPTextStyle` as `QCPAxisRect::text()`; its padding is inside the box the connector leaves.
+
+`axisRect->annotation(target, at, text, options)` makes one in a call: `QCPAnnotationOptions` has a field per setter.
+A target inside the text box draws no connector, and the text still draws.
+
 ## Tracers and brackets
 
 ```{literalinclude} snippets/items.cpp

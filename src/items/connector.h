@@ -5,6 +5,8 @@
 
 #include <QPainterPath>
 #include <QPointF>
+#include <QPolygonF>
+#include <QRectF>
 
 #include <optional>
 #include <variant>
@@ -40,8 +42,8 @@ public:
     static QCPConnector arc(double bend = 0);
 
     /*! The quadratic curve of matplotlib's `angle3`: it leaves the start along \a startAngle and
-      reaches the end along a line of \a endAngle, so it arrives there travelling along
-      \a endAngle + 180. The corner where those two lines cross is its control point. */
+      reaches the end along a line of \a endAngle. The corner where those two lines cross is its
+      control point. */
     static QCPConnector curve(double startAngle, double endAngle);
 
     /*! The two straight lines of matplotlib's `angle`: one leaves the start along \a startAngle,
@@ -116,5 +118,36 @@ private:
     // std::variant's default constructor cannot name a private alternative.
     std::variant<Arc, Curve, Elbow, Arms, Bracket> mShape = Arc { };
 };
+
+namespace qcp
+{
+/*!
+  \brief What is left of a connector after the text's box and the two shrink lengths have cut it.
+
+  \a line is the kept part, in pixels, sampled at most one pixel apart; an empty \a line is nothing
+  to draw, which is what a target inside the text box and a path shorter than its two cuts give.
+  \a endAngleDegrees is QPainterPath::angleAtPercent's angle of the whole path where it was cut at
+  the target end, so the head at the target can be turned along it.
+*/
+struct QCP_LIB_DECL TrimmedConnector
+{
+    QPolygonF line;
+    double endAngleDegrees = 0;
+};
+
+/*!
+  Cuts \a path where it first leaves \a startBox, then \a shrink pixels along from each of its two
+  ends, and samples what is left. A null \a startBox cuts nothing at the start: a text with no box
+  has no edge to leave. A path that never leaves the box leaves nothing, and so does one shorter
+  than its two cuts.
+
+  Each cut is found by halving the span between a point on one side of it and one on the other, the
+  way matplotlib's split_path_inout does.
+  simplify: the kept part is a sampled polyline, not the path's own Bézier pieces; upgrade = split
+  the quads with de Casteljau if a thick pen on a very curved connector ever shows the facets.
+*/
+[[nodiscard]] QCP_LIB_DECL TrimmedConnector trimConnector(const QPainterPath& path,
+                                                          const QRectF& startBox, double shrink);
+} // namespace qcp
 
 #endif

@@ -58,7 +58,7 @@ Counts are `grep -o` hits on the 2026-11-14 tree (`src/`, `tests/`, `examples/` 
 | Keys as plot signals; the plottable key virtual goes | `QCustomPlot::keyPress`, `keyRelease` | asteroids, brick-breaker, fill-between | M | Yes: `QCPAbstractPlottable::keyPress` is deleted. `QCPIntervals` uses it today (11 hits over 7 files) and must move to the signal or to its own handling |
 | The plot takes keys without a click | `QCustomPlot` focus policy | asteroids, brick-breaker | S | Behaviour: `Qt::ClickFocus` (one line, `core.cpp:619`) becomes `Qt::StrongFocus`; the plot joins the Tab chain |
 | Zoom inset indicator: a box over the inset's ranges and two connectors to its nearest corners, read at draw time | `QCPAxisRect::zoomIndicator`, `QCPItemZoomIndicator`, `QCPShapeOptions` | inset-zoom | M | No |
-| One annotation item: text plus a connector to a target, with head, shrink and five connector shapes | `QCPAxisRect::annotation`, `QCPItemAnnotation`, `QCPAnnotationOptions`, `QCPConnector` | annotations | L | No. Five path builders (arc, curve, elbow, arms, bracket), rounded corners, shrink at both ends, a box-edge start |
+| **Done 2026-11-20.** One annotation item: text plus a connector to a target, with head, shrink and five connector shapes | `QCPAxisRect::annotation`, `QCPItemAnnotation`, `QCPAnnotationOptions`, `QCPConnector` | annotations | L | No. Five path builders (arc, curve, elbow, arms, bracket), rounded corners, shrink at both ends, a box-edge start |
 
 ## 5. Call-site friction
 
@@ -136,6 +136,7 @@ Counts are `grep -o` hits on the 2026-11-14 tree (`src/`, `tests/`, `examples/` 
    and inset-zoom compile.
    **Done 2026-11-20**; fill-between and inset-zoom compile and both have reference pictures.
 8. **6h, annotations:** `QCPItemAnnotation` and `QCPConnector`. Annotations compiles.
+   **Done 2026-11-20**; annotations compiles and has a reference picture.
 
 ## Gate (2026-11-14)
 

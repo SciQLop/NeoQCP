@@ -76,6 +76,7 @@ private slots:
     void asteroidsOverTarget();
     void fillBetweenTarget();
     void insetZoomTarget();
+    void annotationsTarget();
 };
 
 #endif // TEST_REFERENCE_M4E_H

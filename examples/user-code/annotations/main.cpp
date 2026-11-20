@@ -1,4 +1,4 @@
-// Target program (milestone 6): annotation connectors, one style per panel. Does not compile yet.
+// Target program (milestone 6): annotation connectors, one style per panel.
 // https://matplotlib.org/stable/gallery/userdemo/connectorstyle_demo.html
 
 #include <qcustomplot.h>

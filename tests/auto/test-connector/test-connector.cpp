@@ -90,7 +90,7 @@ void TestConnector::connectorPathsMatchMatplotlib_data()
                                                  .lineTo({ 200, 295 })
                                                  .quadTo({ 200, 300 }, { 195, 300 })
                                                  .lineTo(kEnd);
-    QTest::newRow("elbow(-90, 180, -5px)") << QCPConnector::elbow(-90, 180, QCP::PixelLength { -5 })
+    QTest::newRow("elbow(-90, 180, -5px)") << QCPConnector::elbow(-90, 180, -5_px)
                                            << ExpectedPath { }
                                                   .moveTo(kStart)
                                                   .lineTo({ 200, 305 })
@@ -119,7 +119,7 @@ void TestConnector::connectorPathsMatchMatplotlib_data()
                                                     .quadTo({ 90, 300 }, { 90, 300 })
                                                     .lineTo(kEnd);
     QTest::newRow("arms(-90, -30px, 0, 30px, 5px)")
-        << QCPConnector::arms(-90, QCP::PixelLength { -30 }, 0, 30_px, 5_px)
+        << QCPConnector::arms(-90, -30_px, 0, 30_px, 5_px)
         << ExpectedPath { }
                .moveTo(kStart)
                .lineTo({ 200, 65 })

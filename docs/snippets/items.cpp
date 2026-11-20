@@ -41,6 +41,30 @@ DOC_SNIPPET(items_annotations, 600, 360)
     // [/items_annotations]
 }
 
+DOC_SNIPPET(items_annotation, 600, 360)
+{
+    // [items_annotation]
+    using namespace QCP::Literals;
+    QVector<double> x(200), y(200);
+    for (int i = 0; i < 200; ++i)
+    {
+        x[i] = -3 + i * 6.0 / 199;
+        y[i] = std::exp(-x[i] * x[i]);
+    }
+    customPlot->addGraph()->setData(x, y);
+    customPlot->xAxis->setRange(-3, 3);
+    customPlot->yAxis->setRange(-0.1, 1.2);
+
+    customPlot->axisRect()->annotation(
+        QCP::Data { 0.0, 1.0 },  // the target: the peak's tip
+        QCP::Data { 1.2, 0.5 },  // the text: where the label sits
+        QStringLiteral("the only peak"),
+        { .connector = QCPConnector::elbow(-90, 180, 5_px), .pen = QPen(Qt::gray),
+          .head = QCPLineEnding::esSpikeArrow, .shrink = 3_px,
+          .textStyle = { .brush = Qt::white, .padding = QMarginsF(6, 3, 6, 3) } });
+    // [/items_annotation]
+}
+
 DOC_SNIPPET(items_tracer_bracket, 600, 360)
 {
     // [items_tracer_bracket]

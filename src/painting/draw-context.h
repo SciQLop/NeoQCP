@@ -55,6 +55,8 @@ struct QCP_LIB_DECL QCPTextStyle
     double rotationDegrees = 0.0;
     QMarginsF padding;
     bool mathText = false;
+
+    bool operator==(const QCPTextStyle&) const = default;
 };
 
 /*!

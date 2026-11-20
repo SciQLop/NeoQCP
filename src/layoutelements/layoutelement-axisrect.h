@@ -30,6 +30,8 @@
 #include "../colorgradient.h"
 #include "../coords.h"
 #include "../global.h"
+#include "../items/connector.h"
+#include "../lineending.h"
 #include "../painting/draw-context.h"
 #include "../scatterstyle.h"
 #include "area.h"
@@ -58,6 +60,7 @@ class QCPColorScale;
 class QCPTextElement;
 class QCPColorMap2;
 class QCPFillBetween;
+class QCPItemAnnotation;
 class QCPItemZoomIndicator;
 
 template <typename T, typename Self = void>
@@ -123,6 +126,24 @@ struct QCPShapeOptions
   and an unused bar takes no room. \a dataRange unset fits the range on the data given, as
   rescaleDataRange() does.
 */
+/*!
+  How QCPAxisRect::annotation() styles the annotation it makes: the connector's shape, the pen and
+  the head of its line, how far it stops short of both ends, and the text's own style. Each field is
+  named after the setter it feeds, so a designated initialiser list reads as the setters it
+  replaces.
+
+  \a shrink applies to both ends, the text's box and the target. \a textStyle is the same
+  QCPTextStyle the drawing context takes; its padding is inside the box the connector leaves.
+*/
+struct QCPAnnotationOptions
+{
+    QCPConnector connector;
+    QPen pen;
+    QCPLineEnding head;
+    QCP::PixelLength shrink;
+    QCPTextStyle textStyle;
+};
+
 struct QCPColorMapOptions
 {
     QCPColorGradient gradient = QCPColorGradient::gpViridis;
@@ -228,6 +249,12 @@ public:
     // A text item at \a at, in whatever space \a at names, carrying \a text and \a style.
     QCPHandle<QCPItemText> text(QCP::Position at, const QString& text,
                                 const QCPTextStyle& style = { });
+    // The text at \a at joined to \a target by a connector, each end in its own space: one
+    // annotation item, styled by \a options. Defined in axisrect-shortcuts.h, after the item
+    // exists.
+    QCPHandle<QCPItemAnnotation> annotation(QCP::Position target, QCP::Position at,
+                                            const QString& text,
+                                            const QCPAnnotationOptions& options = { });
     // The built-in ellipse item between the corners \a a and \a b, each in its own space.
     QCPHandle<QCPItemEllipse> ellipse(QCP::Position a, QCP::Position b,
                                       const QCPShapeOptions& options = { });

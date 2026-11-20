@@ -58,6 +58,7 @@
 #include "items/connector.h"
 #include "items/item-mouse-event.h"
 #include "items/item.h"
+#include "items/item-annotation.h"
 #include "items/item-bracket.h"
 #include "items/item-curve.h"
 #include "items/item-ellipse.h"

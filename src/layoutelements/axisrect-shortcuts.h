@@ -1,8 +1,8 @@
 /*!
-  The one-call annotations of an axis rect: a line of data, a colour map, a text and an ellipse,
-  each in the space it is given. They are add<T>() with the styling a caller would apply right
-  after, so a call site reads as the picture it makes. Included by qcp.h after construct.h, where
-  add<T>() lives.
+  The one-call annotations of an axis rect: a line of data, a colour map, a text, an ellipse, a zoom
+  indicator, and a text joined to its target by a connector, each in the space it is given. They are
+  add<T>() with the styling a caller would apply right after, so a call site reads as the picture it
+  makes. Included by qcp.h after construct.h, where add<T>() lives.
 */
 
 #ifndef QCP_LAYOUTELEMENT_AXISRECT_SHORTCUTS_H
@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "../items/item-annotation.h"
 #include "../items/item-ellipse.h"
 #include "../items/item-text.h"
 #include "../items/item-zoom-indicator.h"
@@ -245,6 +246,33 @@ inline QCPHandle<QCPItemText> QCPAxisRect::text(QCP::Position at, const QString&
     item->setRotation(style.rotationDegrees);
     item->setPadding(style.padding.toMargins());
     item->setMathText(style.mathText);
+    return item;
+}
+
+/*!
+  \a text at \a at, joined to \a target by a connector: one QCPItemAnnotation, each end in whatever
+  space it names, styled by \a options.
+
+  The connector starts at the centre of the text's box and leaves it where its path crosses the
+  box's edge, so the text never has a line drawn through it; it stops \a options.shrink pixels short
+  of both ends, and \a options.head turns along the path at the target. A text with no box starts at
+  \a at, and a target inside the box draws no connector while the text still draws.
+*/
+inline QCPHandle<QCPItemAnnotation>
+QCPAxisRect::annotation(QCP::Position target, QCP::Position at, const QString& text,
+                        const QCPAnnotationOptions& options)
+{
+    const QCPHandle<QCPItemAnnotation> item = add<QCPItemAnnotation>();
+    if (!item)
+        return item;
+    item->position->set(at);
+    item->target->set(target);
+    item->setText(text);
+    item->setConnector(options.connector);
+    item->setPen(options.pen);
+    item->setHead(options.head);
+    item->setShrink(options.shrink);
+    item->setTextStyle(options.textStyle);
     return item;
 }
 
