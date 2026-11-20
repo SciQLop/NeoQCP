@@ -51,6 +51,7 @@ set(NEOQCP_SOURCES
     src/axis/scale.cpp
     src/axis/labelpainter.cpp
     src/item-creation-state.cpp
+    src/items/connector.cpp
     src/items/item.cpp
     src/items/item-bracket.cpp
     src/items/item-curve.cpp
@@ -135,6 +136,7 @@ set(NEOQCP_MOC_HEADERS
     src/global.h
     src/overlay.h
     src/item-creation-state.h
+    src/items/connector.h
     src/items/item.h
     src/items/item-bracket.h
     src/items/item-curve.h

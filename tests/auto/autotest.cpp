@@ -8,6 +8,7 @@
 #include "test-color-by-scalar/test-color-by-scalar.h"
 #include "test-colormap/test-colormap.h"
 #include "test-colorscale/test-colorscale.h"
+#include "test-connector/test-connector.h"
 #include "test-coordinate-system/test-coordinate-system.h"
 #include "test-coords/test-coords.h"
 #include "test-creation-mode/test-creation-mode.h"
@@ -233,6 +234,7 @@ QCPTEST(TestPlottableWithoutAxes);
     QCPTEST(TestBuilder);
     QCPTEST(TestSpatialIndex);
     QCPTEST(TestItemIndex);
+    QCPTEST(TestConnector);
     QCPTEST(TestCoords);
     QCPTEST(TestCoordinateSystem);
     QCPTEST(TestTransform);
