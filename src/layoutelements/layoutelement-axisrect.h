@@ -117,16 +117,6 @@ struct QCPShapeOptions
 };
 
 /*!
-  How QCPAxisRect::colorMap() styles the map it makes: its gradient and data scale, whether it takes
-  the rect's colour bar, the range there, and its name. Each field is named after the setter it
-  feeds, so a designated initialiser list reads as the setters it replaces.
-
-  \a colorBar is \c true for the rect's shared colour scale, which the add joins by itself, and
-  \c false for no colour scale at all: the map is then coloured by its own gradient and data scale,
-  and an unused bar takes no room. \a dataRange unset fits the range on the data given, as
-  rescaleDataRange() does.
-*/
-/*!
   How QCPAxisRect::annotation() styles the annotation it makes: the connector's shape, the pen and
   the head of its line, how far it stops short of both ends, and the text's own style. Each field is
   named after the setter it feeds, so a designated initialiser list reads as the setters it
@@ -144,6 +134,16 @@ struct QCPAnnotationOptions
     QCPTextStyle textStyle;
 };
 
+/*!
+  How QCPAxisRect::colorMap() styles the map it makes: its gradient and data scale, whether it takes
+  the rect's colour bar, the range there, and its name. Each field is named after the setter it
+  feeds, so a designated initialiser list reads as the setters it replaces.
+
+  \a colorBar is \c true for the rect's shared colour scale, which the add joins by itself, and
+  \c false for no colour scale at all: the map is then coloured by its own gradient and data scale,
+  and an unused bar takes no room. \a dataRange unset fits the range on the data given, as
+  rescaleDataRange() does.
+*/
 struct QCPColorMapOptions
 {
     QCPColorGradient gradient = QCPColorGradient::gpViridis;

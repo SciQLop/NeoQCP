@@ -345,6 +345,36 @@ std::optional<double> firstWhere(const QPainterPath& path, double from, Beyond b
     return std::nullopt;
 }
 
+//! The last place at or before the path's end where \a since holds, nothing when it never does:
+//! the same walk as firstWhere, from the end backwards. The target's cut is measured this way
+//! because matplotlib measures it from the end: a path that passes within the cut of its own end
+//! on the way and then leaves again is cut at its last approach, not at its first.
+template <typename Since>
+std::optional<double> lastWhere(const QPainterPath& path, double from, Since since)
+{
+    if (since(path.pointAtPercent(1)))
+        return 1.0; // the end itself is past the cut: nothing to take off
+    const int steps = stepsFor(std::ceil(path.length()));
+    double failed = 1.0;
+    for (int i = 1; i <= steps; ++i)
+    {
+        const double t = 1 - (1 - from) * i / steps;
+        if (!since(path.pointAtPercent(t)))
+        {
+            failed = t;
+            continue;
+        }
+        double held = t;
+        for (int j = 0; j < 32; ++j)
+        {
+            const double middle = (held + failed) / 2;
+            (since(path.pointAtPercent(middle)) ? held : failed) = middle;
+        }
+        return held;
+    }
+    return std::nullopt;
+}
+
 //! The path between \a from and \a to, as a polyline of points at most one pixel apart.
 QPolygonF sampled(const QPainterPath& path, double from, double to)
 {
@@ -389,11 +419,11 @@ TrimmedConnector trimConnector(const QPainterPath& path, const QRectF& startBox,
     if (cut > 0)
     {
         const QPointF end = path.pointAtPercent(1);
-        const std::optional<double> near = firstWhere(
-            path, from, [&](QPointF point) { return distance(point, end) <= cut; });
-        if (!near)
+        const std::optional<double> away = lastWhere(
+            path, from, [&](QPointF point) { return distance(point, end) >= cut; });
+        if (!away)
             return trimmed; // shorter than the target's cut
-        to = *near;
+        to = *away;
     }
     if (!(to > from))
         return trimmed;

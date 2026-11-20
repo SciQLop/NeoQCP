@@ -51,13 +51,26 @@ A <a href="api/classQCPLineEnding.html">QCPLineEnding</a> is a style plus a size
 `position` is the text, `target` is what it points at, and each names its own space, so a label pinned in pixels can point at a point that follows the data.
 
 - The connector starts at the centre of the text box and leaves it where its path crosses the box's edge, so the text never has a line drawn through it. An empty text has no box, and the connector starts at `position`.
-- `setConnector()` picks the shape: `QCPConnector::arc()`, `curve()`, `elbow()`, `arms()` and `bracket()` are matplotlib's `arc3`, `angle3`, `angle`, `arc` and `bar`. Angles are degrees counter-clockwise from +x, so `curve(90, 0)` leaves upwards.
+- `setConnector()` picks the shape, one call each. Angles are degrees counter-clockwise from +x and
+  name lines through the ends, not directions: `curve(90, 0)` passes a vertical line through the text
+  and a horizontal one through the target, and the corner where the two cross is what bends it, so
+  the curve can leave the text the other way round.
+
+  | Ours | matplotlib | Arguments |
+  |---|---|---|
+  | `arc()` | `arc3` | the bend, 0 for a straight line, positive and negative bending opposite ways |
+  | `curve()` | `angle3` | a line of the first angle through the text, a line of the second through the target |
+  | `elbow()` | `angle` | the same two angles, met in a corner rounded by the radius |
+  | `arms()` | `arc` | the two angles and the length of each arm, joined through the corner where they cross |
+  | `bracket()` | `bar` | where along the line the bar sits, 0 to 1, and the angle it makes with it |
 - `setShrink()` stops the connector that many pixels short of both ends, the text's box and the target.
 - `setHead()` puts a line ending at the target, turned along the path where it arrives. There is no tail.
 - `setTextStyle()` takes the same `QCPTextStyle` as `QCPAxisRect::text()`; its padding is inside the box the connector leaves.
 
 `axisRect->annotation(target, at, text, options)` makes one in a call: `QCPAnnotationOptions` has a field per setter.
 A target inside the text box draws no connector, and the text still draws.
+An annotation is not clipped to its rect, so a label may hang past the edge; a target given in data
+space that falls outside the rect hides the whole annotation, as matplotlib's `annotation_clip` does.
 
 ## Tracers and brackets
 

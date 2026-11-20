@@ -89,6 +89,7 @@ signals:
 protected:
     //! The text's measured glyphs, re-measured only when the text, the font or mathText changes.
     QSize glyphSize(const QCPTextStyle& style) const;
+    bool hiddenForItsTarget() const;
     //! The pen the connector is drawn with: the selected one while the item is selected.
     QPen mainPen() const;
 

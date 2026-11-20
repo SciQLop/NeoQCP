@@ -13,6 +13,7 @@
 #include <QPointF>
 #include <QPolygonF>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <vector>
@@ -97,6 +98,16 @@ QPointF secondToLastOf(const qcp::PolylinePositionsCmd& line)
     return pixelOf(line.points[line.points.size() - 2]);
 }
 
+//! The first recorded point at least \a distance away from \a from: a leg's direction needs a
+//! baseline longer than one sample step to be read off.
+QPointF firstPointAway(const qcp::PolylinePositionsCmd& line, QPointF from, double distance)
+{
+    for (const QCP::Position& position : line.points)
+        if (QLineF(from, pixelOf(position)).length() >= distance)
+            return pixelOf(position);
+    return pixelOf(line.points.back());
+}
+
 QPointF firstOf(const qcp::TrimmedConnector& trimmed)
 {
     return trimmed.line.first();
@@ -140,6 +151,9 @@ void TestAnnotation::trimCutsAtTheBoxAndShrinks()
     QVERIFY2(qAbs(lastOf(trimmed).x() - 95) < 0.01 && qAbs(lastOf(trimmed).y()) < 0.01,
              "the line ends 5 px short of the path's end");
     QVERIFY2(qAbs(trimmed.endAngleDegrees) < 0.01, "a run along +x ends at 0 degrees");
+    for (std::size_t i = 1; i < trimmed.line.size(); ++i)
+        QVERIFY2(QLineF(trimmed.line[i - 1], trimmed.line[i]).length() <= 1.05,
+                 "the kept path is sampled at most a pixel apart");
 }
 
 void TestAnnotation::theCutIsAtTheFirstExit()
@@ -215,7 +229,7 @@ void TestAnnotation::theHeadPointsAlongThePath()
     preparePlot(plot);
     const QCPHandle<QCPItemAnnotation> item = plot.axisRect()->annotation(
         QCP::Data { 0.2, 0.2 }, QCP::Data { 0.8, 0.7 }, QStringLiteral("label"),
-        { .connector = QCPConnector::curve(90, 0),
+        { .connector = QCPConnector::elbow(-90, 45),
           .head = QCPLineEnding(QCPLineEnding::esSpikeArrow) });
     QVERIFY(item);
     plot.replot();
@@ -275,15 +289,8 @@ void TestAnnotation::aFarTargetDrawsInBoundedTime()
     plot.replot();
     QVERIFY2(timer.elapsed() < 1000, "a target far outside the frame costs no time");
 
-    const Recorded recorded = scan(*item);
-    QVERIFY(recorded.text);
-    if (recorded.line)
-        for (const QCP::Position& position : recorded.line->points)
-        {
-            const QPointF point = pixelOf(position);
-            QVERIFY2(std::isfinite(point.x()) && std::isfinite(point.y()),
-                     "no coordinate that is not finite reaches the recording");
-        }
+    QVERIFY2(AnnotationRecording::commands(*item).empty(),
+             "a target a trillion units away is outside the rect, so nothing is recorded");
 }
 
 void TestAnnotation::aLongConnectorSamplesWithinTheCap()
@@ -307,6 +314,114 @@ void TestAnnotation::aLongConnectorSamplesWithinTheCap()
     QVERIFY2(huge.line.size() <= 4096,
              "a path of any length is sampled in a bounded number of points");
     QVERIFY(huge.line.size() > 1);
+}
+
+void TestAnnotation::theTargetCutMeasuresBackFromTheEnd()
+{
+    // The path passes within the cut of its own end half way along, then leaves and comes back.
+    // Measured forward from the start, the cut would be taken at that first approach and the last
+    // leg thrown away; matplotlib measures back from the end.
+    QPainterPath path;
+    path.moveTo(0, 0);
+    path.lineTo(0, 20);
+    path.lineTo(20, 20);
+    path.lineTo(2, 2);
+    path.lineTo(20, 2);
+    path.lineTo(2, 0);
+
+    const QPointF end(2, 0);
+    const qcp::TrimmedConnector trimmed = qcp::trimConnector(path, QRectF(), 3);
+
+    QVERIFY2(trimmed.line.size() > 1, "the run survives the cuts");
+    QVERIFY2(QLineF(lastOf(trimmed), end).length() > 2.95,
+             qPrintable(QStringLiteral("the line stops 3 px from the end, not %1")
+                            .arg(QLineF(lastOf(trimmed), end).length())));
+    QVERIFY2(QLineF(lastOf(trimmed), end).length() < 3.05, "and no further than the cut");
+    const bool keptTheReturn = std::any_of(trimmed.line.cbegin(), trimmed.line.cend(),
+                                           [](QPointF point)
+                                           { return point.x() > 15 && qAbs(point.y() - 2) < 0.5; });
+    QVERIFY2(keptTheReturn, "the leg back along the end is part of the connector");
+}
+
+void TestAnnotation::aTargetOutsideTheRectHidesTheAnnotation()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    const QCPHandle<QCPItemAnnotation> item = plot.axisRect()->annotation(
+        QCP::Data { 1.5, 0.5 }, QCP::Data { 0.5, 0.5 }, QStringLiteral("label"),
+        { .head = QCPLineEnding::esLineArrow });
+    QVERIFY(item);
+    plot.replot();
+
+    QVERIFY2(AnnotationRecording::commands(*item).empty(),
+             "a data target outside the rect hides the annotation, text and all");
+}
+
+void TestAnnotation::aLabelPastTheEdgeDrawsWhole()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    plot.replot();
+    const double edge = plot.axisRect()->rect().right() - 4;
+    const double middle = plot.axisRect()->rect().center().y();
+    const QCPHandle<QCPItemAnnotation> item = plot.axisRect()->annotation(
+        QCP::Data { 0.2, 0.5 }, QCP::Pixels { edge, middle }, QStringLiteral("a long label"));
+    QVERIFY(item);
+    plot.replot();
+
+    const Recorded recorded = scan(*item);
+    QVERIFY2(recorded.text, "the label hangs past the rect edge and still draws");
+    QVERIFY2(recorded.line, "and so does its connector, uncut by the rect");
+    const QPointF target(plot.xAxis->coordToPixel(0.2), plot.yAxis->coordToPixel(0.5));
+    QVERIFY2(QLineF(lastOf(*recorded.line), target).length() < 0.5,
+             "the connector runs all the way to its target");
+}
+
+void TestAnnotation::theTextTakesTheThemeColour()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    const QCPHandle<QCPItemAnnotation> item
+        = plot.axisRect()->annotation(QCP::Data { 0.3, 0.2 }, QCP::Data { 0.8, 0.6 },
+                                      QStringLiteral("label"), { .pen = QPen(Qt::darkGreen) });
+    QVERIFY(item);
+    plot.replot();
+
+    const Recorded plain = scan(*item);
+    QVERIFY(plain.text);
+    QCOMPARE(plain.text->style->color, plot.theme()->foreground());
+
+    plot.setInteractions(QCP::iSelectItems);
+    item->setSelectable(QCP::stWhole);
+    item->setSelected(true);
+    plot.replot();
+
+    const Recorded selected = scan(*item);
+    QVERIFY(selected.text);
+    QCOMPARE(selected.line->pen, item->selectedPen());
+    QVERIFY2(selected.text->style->color != item->selectedPen().color(),
+             "the label keeps its own colour when the connector turns to the selected pen");
+}
+
+void TestAnnotation::rotatedTextKeepsTheConnectorInScreenSpace()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    const QCPHandle<QCPItemAnnotation> item = plot.axisRect()->annotation(
+        QCP::Data { 0.3, 0.2 }, QCP::Data { 0.8, 0.7 }, QStringLiteral("label"),
+        { .connector = QCPConnector::elbow(-90, 180), .textStyle = { .rotationDegrees = 30 } });
+    QVERIFY(item);
+    plot.replot();
+
+    const Recorded recorded = scan(*item);
+    QVERIFY(recorded.line);
+    QVERIFY2(recorded.line->points.size() > 2, "an elbow has two legs to tell apart");
+    const QPointF first = firstOf(*recorded.line);
+    const QPointF second = firstPointAway(*recorded.line, first, 5);
+    QVERIFY2(qAbs(first.x() - second.x()) < 0.5,
+             qPrintable(QStringLiteral("the first leg leaves straight up on screen, not %1 degrees "
+                                       "around with the text")
+                            .arg(angleOf(second - first))));
 }
 
 void TestAnnotation::theConnectorDrawsUnderTheText()
@@ -401,14 +516,26 @@ void TestAnnotation::settersRecordAgain()
     QCOMPARE(recordings(), initial + 1); // the same value again: nothing to redraw
     item->setText(QStringLiteral("other"));
     QCOMPARE(recordings(), initial + 2);
+    item->setText(QStringLiteral("other"));
+    QCOMPARE(recordings(), initial + 2);
+    item->setConnector(QCPConnector::arc(0.2));
+    QCOMPARE(recordings(), initial + 3);
     item->setConnector(QCPConnector::arc(0.2));
     QCOMPARE(recordings(), initial + 3);
     item->setHead(QCPLineEnding::esLineArrow);
     QCOMPARE(recordings(), initial + 4);
+    item->setHead(QCPLineEnding::esLineArrow);
+    QCOMPARE(recordings(), initial + 4);
+    item->setShrink(2_px);
+    QCOMPARE(recordings(), initial + 5);
     item->setShrink(2_px);
     QCOMPARE(recordings(), initial + 5);
     item->setSelectedPen(QPen(Qt::magenta));
     QCOMPARE(recordings(), initial + 6);
+    item->setSelectedPen(QPen(Qt::magenta));
+    QCOMPARE(recordings(), initial + 6);
+    item->setTextStyle(QCPTextStyle { .pen = QPen(Qt::blue) });
+    QCOMPARE(recordings(), initial + 7);
     item->setTextStyle(QCPTextStyle { .pen = QPen(Qt::blue) });
     QCOMPARE(recordings(), initial + 7);
 }

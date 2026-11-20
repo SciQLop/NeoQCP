@@ -17,6 +17,11 @@ private slots:
     void aPanMovesTheTipNotTheText();
     void aFarTargetDrawsInBoundedTime();
     void aLongConnectorSamplesWithinTheCap();
+    void theTargetCutMeasuresBackFromTheEnd();
+    void aTargetOutsideTheRectHidesTheAnnotation();
+    void aLabelPastTheEdgeDrawsWhole();
+    void theTextTakesTheThemeColour();
+    void rotatedTextKeepsTheConnectorInScreenSpace();
     void theConnectorDrawsUnderTheText();
     void aClickOnTheConnectorSelects();
     void theShortcutAppliesEveryOption();

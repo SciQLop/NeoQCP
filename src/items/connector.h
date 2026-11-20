@@ -41,14 +41,15 @@ public:
       middle of the start→end line, in units of its length, positive bowing to the right. */
     static QCPConnector arc(double bend = 0);
 
-    /*! The quadratic curve of matplotlib's `angle3`: it leaves the start along \a startAngle and
-      reaches the end along a line of \a endAngle. The corner where those two lines cross is its
-      control point. */
+    /*! The quadratic curve of matplotlib's `angle3`: a line of \a startAngle through the start and a
+      line of \a endAngle through the end. The corner where those two lines cross is its control
+      point, so the curve runs from the one to the other and may well leave the start the other way
+      round: the angles name lines, not directions. */
     static QCPConnector curve(double startAngle, double endAngle);
 
-    /*! The two straight lines of matplotlib's `angle`: one leaves the start along \a startAngle,
-      the other reaches the end along a line of \a endAngle, and they meet in a corner rounded with
-      \a radius. */
+    /*! The two straight lines of matplotlib's `angle`: one runs along a line of \a startAngle through
+      the start, the other along a line of \a endAngle through the end, and they meet in a corner
+      rounded with \a radius. */
     static QCPConnector elbow(double startAngle, double endAngle, QCP::PixelLength radius = { });
 
     /*! matplotlib's `arc`: a \a startArm long arm leaves the start along \a startAngle, a \a endArm

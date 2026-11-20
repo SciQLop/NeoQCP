@@ -1895,21 +1895,21 @@ void TestReferenceM4e::annotationsTarget()
                       { 1, 1, QCPConnector::arc(0.3), QStringLiteral("arc(0.3)") },
                       { 2, 1, QCPConnector::arc(-0.3), QStringLiteral("arc(-0.3)") },
                       { 0, 2, QCPConnector::elbow(-90, 180), QStringLiteral("elbow(-90, 180)") },
-                      { 1, 2, QCPConnector::elbow(-90, 180, QCP::PixelLength { 5 }),
+                      { 1, 2, QCPConnector::elbow(-90, 180, 5_px),
                         QStringLiteral("elbow(-90, 180,\n5 px)") },
-                      { 2, 2, QCPConnector::elbow(-90, 10, QCP::PixelLength { 5 }),
+                      { 2, 2, QCPConnector::elbow(-90, 10, 5_px),
                         QStringLiteral("elbow(-90, 10,\n5 px)") },
                       { 0, 3,
-                        QCPConnector::arms(-90, QCP::PixelLength { 30 }, 0,
-                                           QCP::PixelLength { 30 }),
+                        QCPConnector::arms(-90, 30_px, 0,
+                                           30_px),
                         QStringLiteral("arms(-90, 30 px,\n0, 30 px)") },
                       { 1, 3,
-                        QCPConnector::arms(-90, QCP::PixelLength { 30 }, 0,
-                                           QCP::PixelLength { 30 }, QCP::PixelLength { 5 }),
+                        QCPConnector::arms(-90, 30_px, 0,
+                                           30_px, 5_px),
                         QStringLiteral("arms(-90, 30 px,\n0, 30 px, 5 px)") },
                       { 2, 3,
-                        QCPConnector::arms(-90, QCP::PixelLength { 0 }, 0,
-                                           QCP::PixelLength { 40 }),
+                        QCPConnector::arms(-90, 0_px, 0,
+                                           40_px),
                         QStringLiteral("arms(-90, 0 px,\n0, 40 px)") },
                       { 0, 4, QCPConnector::bracket(0.3), QStringLiteral("bracket(0.3)") },
                       { 1, 4, QCPConnector::bracket(-0.3), QStringLiteral("bracket(-0.3)") },
@@ -1922,7 +1922,7 @@ void TestReferenceM4e::annotationsTarget()
                       ax->annotation(point, label, QString(),
                                      { .connector = demo.connector, .pen = QPen(grey),
                                        .head = QCPLineEnding::esLineArrow,
-                                       .shrink = QCP::PixelLength { 5 } });
+                                       .shrink = 5_px });
                       ax->text(QCP::AxisRatio { 0.05, 0.05 }, demo.name);
                   }
 
@@ -1932,10 +1932,10 @@ void TestReferenceM4e::annotationsTarget()
                   showPanel(spare);
                   spare->annotation(
                       point, label, QStringLiteral("text and\narrow"),
-                      { .connector = QCPConnector::elbow(-90, 180, QCP::PixelLength { 5 }),
+                      { .connector = QCPConnector::elbow(-90, 180, 5_px),
                         .pen = QPen(grey),
                         .head = QCPLineEnding::esLineArrow,
-                        .shrink = QCP::PixelLength { 5 },
+                        .shrink = 5_px,
                         .textStyle = { .pen = QPen(grey),
                                        .brush = Qt::white,
                                        .padding = QMarginsF(4, 2, 4, 2) } });
