@@ -340,36 +340,14 @@ bool dropInsetChildren(const QPointer<QCustomPlot>& plot, QCPArea& area)
     return true;
 }
 
-//! Drops a rect the way its owners do: plottables and items first (the legend loses their rows),
-//! then the rect, whose destructor drops its colour scale and inset layout.
+//! Drops a rect the way its owners do: its inset children first, then the rect, whose destructor
+//! sweeps its plottables and items and drops its colour scale and inset layout.
 bool dropRect(const QPointer<QCustomPlot>& plot, QCPAxisRect& rect)
 {
     QCPHandle<QCPAxisRect> alive(&rect);
     if (!dropInsetChildren(plot, rect))
         return false;
     if (!plot || !alive) // a destroyed slot took the rect with its last inset child
-        return static_cast<bool>(plot);
-    const QList<QCPHandle<QCPPlottable>> drawn = rect.plottables();
-    for (const QCPHandle<QCPPlottable>& plottable : drawn)
-    {
-        if (!plot)
-            return false;
-        if (!plottable) // a destroyed slot took it between the listing and here
-            continue;
-        static_cast<void>(plot->removePlottable(plottable.get()));
-    }
-    if (!plot || !alive)
-        return static_cast<bool>(plot);
-    const QList<QCPHandle<QCPItem>> bound = rect.items();
-    for (const QCPHandle<QCPItem>& item : bound)
-    {
-        if (!plot)
-            return false;
-        if (!item)
-            continue;
-        static_cast<void>(plot->removeItem(item.get()));
-    }
-    if (!plot || !alive)
         return static_cast<bool>(plot);
     alive.remove();
     return static_cast<bool>(plot);
@@ -416,8 +394,11 @@ void QCPAxisRect::forgetParentPlot(QCPLayoutElement* element)
 
 /*! \internal
 
-  Removes the plottables whose frame is this rect and the items bound to it, the way the grid's own
-  cell drop does before it deletes a cell.
+  Removes the plottables whose frame is this rect and the items whose positions name it, the way the
+  grid's own cell drop does before it deletes a cell.
+
+  An item that only clips to this rect is not removed: it has a place of its own (pixels, viewport
+  ratios), and its clip falls back to the viewport, as it did before the rect ever existed.
 
   Nothing is removed from a plot that is going: the plot deletes its plottables and items itself, and
   QCustomPlot::removePlottable refuses the call while that happens.
@@ -433,7 +414,7 @@ void QCPAxisRect::removeDrawables()
     // Both listings while the plot is certainly alive: a slot a removal runs may take it, and the
     // listings themselves read the plot's own lists.
     const QList<QCPHandle<QCPPlottable>> drawn = plottables();
-    const QList<QCPHandle<QCPItem>> bound = items();
+    const QList<QCPHandle<QCPItem>> bound = ownedItems();
     for (const QCPHandle<QCPPlottable>& plottable : drawn)
     {
         if (!plottable)
@@ -1002,6 +983,17 @@ bool isOn(const QCPAxis* axis, const QCPAxisRect* rect)
 {
     return axis && axis->axisRect() == rect;
 }
+
+// A position placed in the viewport alone (pixels or viewport ratios) names no rect: it outlives
+// the rect it was made on, as it did before a rect ever existed.
+bool namesAFrame(const QCPItemPosition* position)
+{
+    const auto frameType = [](QCPItemPosition::PositionType type)
+    {
+        return type != QCPItemPosition::ptAbsolute && type != QCPItemPosition::ptViewportRatio;
+    };
+    return frameType(position->typeX()) || frameType(position->typeY());
+}
 } // namespace
 
 /*!
@@ -1073,6 +1065,36 @@ QList<QCPHandle<QCPItem>> QCPAxisRect::items() const
         {
             if (position->axisRectRaw() == this || isOn(position->keyAxisRaw(), this)
                 || isOn(position->valueAxisRaw(), this))
+            {
+                result.append(QCPHandle<QCPItem>(item));
+                break;
+            }
+        }
+    }
+    return result;
+}
+
+//! The items drawn in this rect: the ones whose positions name it, and the ones that have no
+//! position at all (they draw in the rect they clip to).
+QList<QCPHandle<QCPItem>> QCPAxisRect::ownedItems() const
+{
+    QList<QCPHandle<QCPItem>> result;
+    for (QCPItem* item : mParentPlot->mItems)
+    {
+        if (item->positions().isEmpty())
+        {
+            if (item->clipAxisRect().get() == this)
+                result.append(QCPHandle<QCPItem>(item));
+            continue;
+        }
+        for (QCPItemPosition* position : item->positions())
+        {
+            if (!namesAFrame(position))
+                continue;
+            const QCPHandle<QCPCoordinateSystem> system = position->system();
+            if (position->axisRectRaw() == this || isOn(position->keyAxisRaw(), this)
+                || isOn(position->valueAxisRaw(), this)
+                || (system && system->area() == this))
             {
                 result.append(QCPHandle<QCPItem>(item));
                 break;

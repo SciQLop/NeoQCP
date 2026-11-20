@@ -380,6 +380,9 @@ protected:
 private:
     Q_DISABLE_COPY_MOVE(QCPAxisRect)
 
+    // The items whose positions name this rect, one of its axes or one of its systems: the ones
+    // that go with it. An item that only clips to it stays (its clip falls back to the viewport).
+    QList<QCPHandle<QCPItem>> ownedItems() const;
     // The rect's own scale while at least one user colours through it, otherwise null.
     QCPColorScale* usedColorScale() const;
     // The width a vertical scale takes in the margin, or the height of a horizontal one.

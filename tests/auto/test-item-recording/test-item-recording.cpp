@@ -501,11 +501,7 @@ void TestItemRecording::aPixelOnlyItemDrawsWithoutAxes()
     pixmap->topLeft->setCoords(0.5, 0.5);
     pixmap->bottomRight->setType(QCPItemPosition::ptViewportRatio);
     pixmap->bottomRight->setCoords(0.9, 0.9);
-    // The items keep the rect they were placed in, which loses every axis: no transform is left.
-    const QList<QCPHandle<QCPAxis>> axes = plot.axisRect()->axes();
-    for (const QCPHandle<QCPAxis>& axis : axes)
-        if (axis)
-            plot.axisRect()->removeAxis(axis.get());
+    plot.plotLayout()->clear(); // the plot loses its axes after the items were placed on it
     plot.replot();
     QVERIFY2(rect->recordings() > 0, "the pixel rectangle has no recording without axes");
     QVERIFY2(pixmap->recordings() > 0, "the viewport ratio pixmap has no recording without axes");
@@ -515,6 +511,29 @@ void TestItemRecording::aPixelOnlyItemDrawsWithoutAxes()
     // The pixmap spans 0.5..0.9 of the 400x300 viewport, and its top left quadrant is blue.
     QVERIFY2(bluePixelsNear(image, QPointF(240, 180), 8) > 20,
              "the viewport ratio pixmap did not draw without axes");
+}
+
+// A watermark in pixels outlives the layout: clearing it takes the rect the text only clips to, not
+// the text, whose place names no rect, axis or system.
+void TestItemRecording::aPixelWatermarkSurvivesClearingTheLayout()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto* text = plot.add<QCPItemText>().get();
+    text->setText(QStringLiteral("W"));
+    text->setColor(QColor(0, 0, 200));
+    QFont big;
+    big.setPointSize(60);
+    text->setFont(big);
+    text->position->setType(QCPItemPosition::ptViewportRatio);
+    text->position->setCoords(0.5, 0.5);
+    text->setClipToAxisRect(true);
+    plot.plotLayout()->clear();
+    plot.replot();
+    QCOMPARE(plot.itemCount(), 1);
+    const QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(bluePixelsNear(image, QPointF(200, 150), 40) > 0,
+             "the pixel watermark did not draw without the rect it clips to");
 }
 
 void TestItemRecording::aDataItemWithoutAxesDrawsNothing()

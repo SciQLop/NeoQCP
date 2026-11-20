@@ -18,6 +18,7 @@ private slots:
     void aTracerOnAnotherLayerFollowsItsGraph();
     void anErrorBarOnAnotherLayerFollowsItsGraph();
     void aPixelOnlyItemDrawsWithoutAxes();
+    void aPixelWatermarkSurvivesClearingTheLayout();
     void aDataItemWithoutAxesDrawsNothing();
     void aHugeDataEllipseExports();
     void everyStyleSetterReRecords();
