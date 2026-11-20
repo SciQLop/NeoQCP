@@ -243,6 +243,18 @@ QCPAxisRect::QCPAxisRect(QCustomPlot* parentPlot, bool setupDefaultAxes)
 
 QCPAxisRect::~QCPAxisRect()
 {
+    // A slot that a deletion below runs may delete this rect: it is going already, and the ways of
+    // deleting it (its handle, its layout) ask isBeingDestroyed() before they free it again.
+    mBeingDestroyed = true;
+    // It may also delete the plot, as the grid's own cell drop allows: every step below that needs the
+    // plot is inert once it is gone, and a null parent plot is what says so.
+    const QPointer<QCustomPlot> plot(mParentPlot);
+    const auto plotGone = [this, &plot]
+    {
+        if (!plot)
+            mParentPlot = nullptr;
+        return !plot;
+    };
     // Out of its layout and the plot's children: a slot that the scope below runs may delete the
     // plot, which would delete this rect a second time.
     if (qobject_cast<QCustomPlot*>(mParentPlot))
@@ -265,9 +277,11 @@ QCPAxisRect::~QCPAxisRect()
     }
     // Elements leave the inset layout by emitting, so it goes while the plot still delivers.
     destroyInsetLayout();
+    plotGone();
     // The rect owns what is drawn in it: a plottable or an item left behind would draw into a frame
-    // whose area is gone.
+    // whose area is gone. The sweep refuses to run without a plot of its own.
     removeDrawables();
+    plotGone();
     // The rect owns its scale: it goes with the rect, and its users detach (they emit inside the
     // scope above).
     if (mColorScale)
@@ -277,10 +291,22 @@ QCPAxisRect::~QCPAxisRect()
         delete scale;
         mColorScale = nullptr;
     }
+    plotGone();
     delete mTitle.data();
-    removeOwnLayers();
+    plotGone();
+    // Only a live plot can take objects off the layers it no longer has; a gone one took them with it.
+    if (!plotGone())
+        removeOwnLayers();
+    plotGone();
 
-    for (const auto& axis : qcp::guarded(axesRaw()))
+    // The axes go now, and one that names a plot a slot deleted would read it in its destructor: it is
+    // given none first. Everything else the axis touches is this rect's, which is still here.
+    const QList<QCPAxis*> axes = axesRaw();
+    if (!plot)
+        for (QCPAxis* axis : axes)
+            if (axis)
+                axis->mParentPlot = nullptr;
+    for (const auto& axis : qcp::guarded(axes))
         if (axis)
             removeAxis(axis);
 }
@@ -295,10 +321,17 @@ QCPAxisRect::~QCPAxisRect()
 */
 void QCPAxisRect::removeDrawables()
 {
+    // simplify: each removal searches the plot's list again, so this is quadratic in the number of
+    // items and plottables; a bulk removal on the plot would make it linear if a rect ever holds
+    // hundreds of them.
     const QPointer<QCustomPlot> plot(mParentPlot);
     if (!plot || plot->isBeingDestroyed())
         return;
-    for (const QCPHandle<QCPPlottable>& plottable : plottables())
+    // Both listings while the plot is certainly alive: a slot a removal runs may take it, and the
+    // listings themselves read the plot's own lists.
+    const QList<QCPHandle<QCPPlottable>> drawn = plottables();
+    const QList<QCPHandle<QCPItem>> bound = items();
+    for (const QCPHandle<QCPPlottable>& plottable : drawn)
     {
         if (!plottable)
             continue;
@@ -306,7 +339,7 @@ void QCPAxisRect::removeDrawables()
             return;
         static_cast<void>(plot->removePlottable(plottable.get()));
     }
-    for (const QCPHandle<QCPItem>& item : items())
+    for (const QCPHandle<QCPItem>& item : bound)
     {
         if (!item)
             continue;

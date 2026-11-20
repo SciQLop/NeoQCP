@@ -1001,6 +1001,93 @@ void TestQCPAxisRect::anItemFollowsTheAreaItIsIn()
 }
 
 
+void TestQCPAxisRect::aRemovedInsetHandsItsLayerBack()
+{
+    // A graph of the parent's, put on the inset's data layer by name, goes back to its default layer
+    // when the inset leaves: the layer it named goes with the inset.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* parent = plot.axisRect().get();
+    auto inset = parent->addInset(QRectF(0.25, 0.25, 0.5, 0.5));
+    const QCPHandle<QCPGraph> graph
+        = parent->line(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 });
+    QCPLayer* insetData = plot.layer(QStringLiteral("inset 1 data")).get();
+    QVERIFY(insetData);
+    graph->setLayer(insetData);
+    QCOMPARE(graph->layer()->name(), QStringLiteral("inset 1 data"));
+
+    inset.remove();
+    QVERIFY2(graph, "the graph is drawn in the parent, so it outlives the inset");
+    QCOMPARE(graph->layer()->name(), QStringLiteral("main"));
+    plot.replot();
+}
+
+void TestQCPAxisRect::aDestroyedSlotMayDeleteThePlotUnderARect()
+{
+    // A rect deletes the plottables drawn in it from its own destructor. A slot on their destroyed()
+    // may delete the plot, as the grid's own cell drop allows: the rest of the destruction must not
+    // touch the plot afterwards.
+    QCustomPlot* plot = new QCustomPlot;
+    plot->resize(400, 300);
+    const QCPHandle<QCPAxisRect> inset = plot->axisRect()->addInset(QRectF(0.2, 0.2, 0.5, 0.5));
+    const QCPHandle<QCPGraph> graph
+        = inset->add<QCPGraph>(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 });
+    QVERIFY(inset && graph);
+    connect(graph.get(), &QObject::destroyed, plot,
+            [&plot]
+            {
+                QCustomPlot* const dying = plot;
+                plot = nullptr;
+                delete dying;
+            });
+
+    inset.remove();
+
+    QVERIFY2(!plot, "the slot did not delete the plot");
+    QVERIFY(!graph);
+    QVERIFY(!inset);
+}
+
+void TestQCPAxisRect::aDestroyedSlotMayRemoveTheRectBeingDeleted()
+{
+    // The same slot may take the rect being deleted out of the world: through its handle, or through
+    // its layout. Neither may delete it a second time.
+    {
+        QCustomPlot plot;
+        plot.resize(400, 300);
+        const QCPHandle<QCPAxisRect> inset = plot.axisRect()->addInset(QRectF(0.2, 0.2, 0.5, 0.5));
+        const QCPHandle<QCPGraph> graph
+            = inset->add<QCPGraph>(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 });
+        QVERIFY(inset && graph);
+        connect(graph.get(), &QObject::destroyed, &plot, [inset]() mutable { inset.remove(); });
+
+        inset.remove();
+
+        QVERIFY(!inset);
+        QVERIFY(!graph);
+        plot.replot();
+    }
+    {
+        QCustomPlot plot;
+        plot.resize(400, 300);
+        const QCPHandle<QCPAxisRect> inset = plot.axisRect()->addInset(QRectF(0.2, 0.2, 0.5, 0.5));
+        const QCPHandle<QCPGraph> graph
+            = inset->add<QCPGraph>(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 });
+        QVERIFY(inset && graph);
+        // Its own layout handle is gone by then (it detached first), so the slot goes through the
+        // layout it was in.
+        const QCPHandle<QCPLayoutInset> layout = plot.axisRect()->insetLayout();
+        connect(graph.get(), &QObject::destroyed, &plot,
+                [layout, inset] { static_cast<void>(layout->remove(inset.get())); });
+
+        inset.remove();
+
+        QVERIFY(!inset);
+        QVERIFY(!graph);
+        plot.replot();
+    }
+}
+
 void TestQCPAxisRect::aChosenLayerSurvivesAMoveOntoAnInset()
 {
     // Only a default layer moves with the area: an object on a layer of the user's own stays there,

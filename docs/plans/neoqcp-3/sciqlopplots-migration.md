@@ -622,6 +622,9 @@ that no section above lists, and the behaviour changes of 5f.
 - A fit leaves a margin: `rescale()` and `rescaleAxes()` keep `rescaleMargin()` (5 % by default) of the span blank on
   each side, in the axis' own scale space. SciQLopPlots' own autoscale margin can move to `setRescaleMargin`.
 - Deleting an axis rect takes the plottables and items drawn in it with it (its own insets' included), where
-  2.x left them in the plot, orphaned. SciQLopPlots' panel removal can drop its explicit plottable sweep.
+  2.x left them in the plot, orphaned. Every raw `QCPGraph*` or `QCPItem*` kept for a panel's plot dangles once
+  its rect is deleted: hold handles instead. A panel's explicit plottable sweep can be dropped, but not kept
+  *after* the rect delete, which would delete twice. An item counts as drawn in a rect when its clip area is
+  that rect or a position names it, so spans and other pixel-positioned items go with their rect too.
 - An impulse graph's value range holds its baseline, as bars do: value 0 is a sticky value, so the fit includes it on
   a linear or symlog value axis whatever `setRescaleMargin` says. A log value axis has no zero to keep.

@@ -49,6 +49,9 @@ private slots:
   void aPlottableMovedOntoAnInsetIsDrawn();
   void anItemFollowsTheAreaItIsIn();
   void aRemovedInsetTakesItsDataWithIt();
+  void aRemovedInsetHandsItsLayerBack();
+  void aDestroyedSlotMayDeleteThePlotUnderARect();
+  void aDestroyedSlotMayRemoveTheRectBeingDeleted();
   void aChosenLayerSurvivesAMoveOntoAnInset();
   void aClearedPixmapLetsTheThemeBack();
   void thePlotBackgroundReachesAnInset();

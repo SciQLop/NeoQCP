@@ -638,9 +638,9 @@ void TestItemSystem::setSystemTwiceRetakesTheArea()
     QVERIFY2(position->area() == area, "a repeated setSystem did not retake the system's area");
 }
 
-// An item that names an axis rect in its positions goes with that rect, and an item moved to
-// another plot takes that plot's default axes and rect.
-void TestItemSystem::theProjectionsFollowDeletionAndAMoveToAnotherPlot()
+// An item that names an axis rect in its positions goes with that rect, and one moved to another
+// plot takes that plot's default axes and rect.
+void TestItemSystem::anItemGoesWithItsRectAndFollowsAMoveToAnotherPlot()
 {
     auto* lower = new QCPAxisRect(mPlot);
     mPlot->plotLayout()->addElement(1, 0, lower);

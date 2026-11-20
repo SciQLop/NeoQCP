@@ -6076,6 +6076,9 @@ void removeObject(QCPLayer& layer)
 
 void removeObject(QCPLayoutElement& element)
 {
+    // A slot run by a destructor reaches an element that is going: it must not be deleted twice.
+    if (element.isBeingDestroyed())
+        return;
     if (QCPLayout* layout = element.layout())
         layout->take(&element);
     delete &element;

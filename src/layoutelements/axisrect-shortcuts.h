@@ -266,20 +266,21 @@ inline QCPHandle<QCPItemEllipse> QCPAxisRect::ellipse(QCP::Position a, QCP::Posi
   The zoom indicator of \a inset: the box its bottom and left axis ranges cover in this rect, and
   the connectors that join the box to the inset's corners, styled by \a options.
 
-  A rect that is not an inset of this one, a layout cell or an inset of another rect or plot, is
-  misuse: setInset() reports it once and this returns an empty handle. No inset at all is no misuse:
-  the item is made and draws nothing until it is given one.
+  An empty handle, and a rect that is not an inset of this one (a layout cell, an inset of another
+  rect or plot), are misuse: one report and an empty handle. The report for the rect comes from
+  setInset(), which is the rule's only home. An item may be given no inset later with setInset(nullptr).
 */
 inline QCPHandle<QCPItemZoomIndicator>
 QCPAxisRect::zoomIndicator(const QCPHandle<QCPAxisRect>& inset, const QCPShapeOptions& options)
 {
+    QCP_CHECK_OR_RETURN(inset, "a zoom indicator needs an inset", { });
     const QCPHandle<QCPItemZoomIndicator> item = add<QCPItemZoomIndicator>();
     if (!item)
         return item;
     item->setPen(options.pen);
     item->setBrush(options.brush);
     item->setInset(inset.get()); // a rect that is not an inset of this one is reported there
-    if (inset && !item->inset())
+    if (!item->inset())
     {
         item.remove();
         return QCPHandle<QCPItemZoomIndicator>();

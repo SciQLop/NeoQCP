@@ -203,7 +203,7 @@ The connectors are the two that reach the inset from the corners of the box, cho
 The indicator is an item of the parent's, so it draws on the parent's `"annotations"` layer, under the inset's own layers, and `setPen` and `setBrush` style the box and the connectors.
 It is remade when the inset's ranges change and when the frame moves under it, so dragging or zooming the inset, panning the parent or resizing the plot all leave the box on the data and the connectors on the inset's corners.
 A hidden inset draws no indicator, and deleting the inset, or the indicator, leaves the other drawing nothing and crashing nothing.
-A rect that is not an inset of this one, a grid cell, an inset of another rect or an inset of another plot, is misuse: one report and an empty handle.
+A rect that is not an inset of this one, a grid cell, an inset of another rect or an inset of another plot, is misuse: one report and an empty handle. So is no inset at all; an item made by the helper can still be given none later with `setInset(nullptr)`.
 
 ## Align edges with an alignment group
 

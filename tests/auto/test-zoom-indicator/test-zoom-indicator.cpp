@@ -321,6 +321,9 @@ void TestZoomIndicator::connectorsEndAtTheInsetCorners()
 
 void TestZoomIndicator::theBoxFollowsAnInsetThatMovesInItsLayout()
 {
+    // The settle first, as aPlainReplotKeepsTheRecording does: the inset's auto margins and outer rect
+    // are computed in the first replots, and that is a reason of its own to remake the recording.
+    mPlot->replot();
     mPlot->replot();
     const QRectF before(mInset->rect());
     const int index = indexIn(mAx->insetLayout(), mInset);
@@ -328,6 +331,10 @@ void TestZoomIndicator::theBoxFollowsAnInsetThatMovesInItsLayout()
     const int recorded = mIndicator->mCore.recordingCount();
 
     mAx->insetLayout()->setInsetRect(index, QRectF(0.6, 0.03, 0.35, 0.35));
+    // Two replots: the layout places the inset during the first, and the geometry signal a rect emits
+    // is deferred to the end of that replot, so the repaint it asks for is the second one. This is
+    // the one queued replot a move costs on screen; an export reads the new rect at once.
+    mPlot->replot();
     mPlot->replot();
 
     const QRectF after(mInset->rect());
@@ -448,14 +455,13 @@ void TestZoomIndicator::aNullInsetIsNoInset()
     QVERIFY2(!hasInkNear(rendered(*mPlot), pointIn(*mAx->xAxis(), *mAx->yAxis(), -1.5, -2.2)),
              "an indicator with no inset drew a box");
 
-    // The one-call helper takes null too: it makes the item, and the item draws nothing.
+    // The one-call helper insists on one: an empty handle is misuse, one report, no item.
     const auto again = qcp::setMisuseHandler(test_misuse::record);
     test_misuse::calls.clear();
     const QCPHandle<QCPItemZoomIndicator> empty = mAx->zoomIndicator(QCPHandle<QCPAxisRect>());
     qcp::setMisuseHandler(again);
-    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
-    QVERIFY(empty);
-    QVERIFY(!empty->inset());
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QVERIFY2(!empty, "the helper made an indicator with no inset");
 }
 
 void TestZoomIndicator::aRectGoesWithWhatIsDrawnInIt()

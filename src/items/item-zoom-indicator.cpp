@@ -62,7 +62,10 @@ QRectF pixelsOf(const QCPTransform& transform, const QRectF& box)
 /*! \class QCPItemZoomIndicator
   \brief The box an inset's ranges cover in its parent, and the connectors that join it to the inset.
 
-  \snippet docs/snippets/layout.cpp layout_zoom_indicator
+  A line, an inset on a sub-range, and this call: the "An inset" section of the layout guide has the
+  example. A layout that moves the inset, or a parent axis that pans, remakes the recording; a move
+  costs one queued replot on screen (the geometry signal a rect emits is delivered after the paint),
+  and an export is right at once.
 
   The box runs from the inset's bottom axis range to its left axis range, in this rect's bottom and
   left axes. Each of the four corners may carry a connector to the same corner of the inset's data

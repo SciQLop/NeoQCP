@@ -36,7 +36,7 @@ private slots:
     void setSystemTwiceRetakesTheArea();
     void aTakeClearsAOneAxisPosition();
     void theProjectionsFollowEveryFrame();
-    void theProjectionsFollowDeletionAndAMoveToAnotherPlot();
+    void anItemGoesWithItsRectAndFollowsAMoveToAnotherPlot();
 private:
     QCustomPlot* mPlot = nullptr;
 };

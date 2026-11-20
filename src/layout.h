@@ -112,6 +112,9 @@ public:
     //! The group this element's \a side aligns with, if any: an element joins one group per side.
     QPointer<QCPAlignmentGroup> alignmentGroup(QCP::MarginSide side) const;
 
+    //! Whether this element's destructor has started. A slot that runs there must not delete it again.
+    [[nodiscard]] bool isBeingDestroyed() const { return mBeingDestroyed; }
+
     // setters:
     void setOuterRect(const QRect& rect);
     void setMargins(const QMargins& margins);
@@ -155,6 +158,8 @@ protected:
     QCP::MarginSides mAutoMargins;
     // One alignment group per side, in the order of alignmentSlot(): left, right, top, bottom.
     std::array<QPointer<QCPAlignmentGroup>, 4> mAlignmentGroups;
+    //! Set by a destructor that runs user slots, so a slot that deletes this element is refused.
+    bool mBeingDestroyed = false;
 
     // introduced virtual methods:
     virtual int calculateAutoMargin(QCP::MarginSide side);
