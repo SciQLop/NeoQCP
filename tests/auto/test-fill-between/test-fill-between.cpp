@@ -3,6 +3,8 @@
 #include "misuse-recorder.h"
 #include "qcustomplot.h"
 
+#include <painting/draw-commands.h>
+
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -395,6 +397,47 @@ void TestFillBetween::aDenseFillIsRebinnedAfterAZoom()
                             .arg(filled)));
 }
 
+void TestFillBetween::aZoomedFillRecordsOnlyItsWindow()
+{
+    // One band per row: a 1% view records the rows around it, not the whole data set. Four
+    // times the rows over four times the span is the same density, so the same window holds
+    // the same rows and the count must not follow the data.
+    const auto recordedPoints = [this](int count, double from, double to, double view)
+    {
+        std::vector<double> keys;
+        std::vector<double> upper(std::size_t(count), 1.0);
+        std::vector<double> lower(std::size_t(count), 0.0);
+        keys.reserve(std::size_t(count));
+        for (int i = 0; i < count; ++i)
+            keys.push_back(from + (to - from) * i / (count - 1));
+        mFirst->setData(keys, upper);
+        mSecond->setData(keys, lower);
+        mPlot->yAxis->setRange(-0.1, 1.1);
+        mPlot->xAxis->setRange(view, view + 1.0);
+        const QCPHandle<QCPFillBetween> fill = mPlot->axisRect()->fillBetween(
+            QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(mSecond), greenAbove());
+        mPlot->replot();
+        int points = 0;
+        for (const qcp::QCPDrawCommand& command : fill->mCore.recordedList().commands)
+            if (const auto* band = std::get_if<qcp::FillBetweenCmd>(&command))
+                points += int(band->upper->size());
+        return points;
+    };
+
+    const int small = recordedPoints(10000, 0.0, 100.0, 50.0);
+    QVERIFY2(small > 20, qPrintable(QStringLiteral("%1 points: the band is gone").arg(small)));
+    QVERIFY2(small < 1000,
+             qPrintable(QStringLiteral("%1 points for a 1%% window of 10k rows: the fill read "
+                                       "its whole data set")
+                            .arg(small)));
+    const int large = recordedPoints(40000, -150.0, 250.0, 50.0);
+    QVERIFY2(large <= 2 * small,
+             qPrintable(QStringLiteral("%1 points for four times the rows, %2 for one: the "
+                                       "fill reads its whole data set")
+                            .arg(large)
+                            .arg(small)));
+}
+
 void TestFillBetween::aSteppedFillSwapsColourWhereTheLinesSwap()
 {
     mFirst->setLineStyle(QCPGraph::lsStepLeft);
@@ -461,8 +504,8 @@ void TestFillBetween::aFillsLegendIconShowsItsBrushes()
     QVERIFY2(isGreen(plain.pixelColor(20, 14)), "one brush fills both halves of the icon");
 }
 
-// A cartesian fill is a pixel recording: panning inside the data must reuse it, as the graph's own
-// fills did, so the GPU can shift the band instead of rebuilding it.
+// A cartesian fill is a pixel recording: panning inside the window it recorded must reuse it, as the
+// graph's own fills did, so the GPU can shift the band instead of rebuilding it.
 void TestFillBetween::aCartesianFillIsNotReRecordedByAPan()
 {
     const QCPHandle<QCPFillBetween> fill = mPlot->axisRect()->fillBetween(
@@ -474,9 +517,14 @@ void TestFillBetween::aCartesianFillIsNotReRecordedByAPan()
     mPlot->replot();
     QCOMPARE(fill->mCore.recordingCount(), recorded);
 
-    mPlot->xAxis->setRange(0.2, 2.6); // a pan and a zoom-out, inside the lines' own keys
+    mPlot->xAxis->setRange(0.2, 3.2); // a pan, the same span, inside the recorded window
     mPlot->replot();
     QCOMPARE(fill->mCore.recordingCount(), recorded);
+
+    // The band is cropped to the view and binned to its pixels: another scale is another recording.
+    mPlot->xAxis->setRange(0.2, 2.6);
+    mPlot->replot();
+    QVERIFY2(fill->mCore.recordingCount() > recorded, "a zoom kept the band's recording");
 }
 
 // Before the first data neither line has a column to fill to: the call is kept, as the graph's fills

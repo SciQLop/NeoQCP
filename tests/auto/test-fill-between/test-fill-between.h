@@ -29,6 +29,7 @@ private slots:
     void aFillIsNotSelectableByDefault();
     void aFillAcrossTwoValueAxesFollowsTheSecondAxis();
     void aDenseFillIsRebinnedAfterAZoom();
+    void aZoomedFillRecordsOnlyItsWindow();
     void aSteppedFillSwapsColourWhereTheLinesSwap();
     void aFillsLegendIconShowsItsBrushes();
     void aCartesianFillIsNotReRecordedByAPan();

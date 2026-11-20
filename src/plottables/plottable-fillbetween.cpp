@@ -40,16 +40,16 @@ std::optional<Interval> sharedKeys(const QCPMultiDataSource& first,
     return shared;
 }
 
-// One component's rows, cropped to the shared range with one row on each side for the
+// One component's rows, cropped to \a window with one row on each side for the
 // interpolation at its ends. Across two value axes the values go through their pixel onto
 // \a toValue, exactly as a graph-to-graph fill reads its partner.
 std::vector<qcp::fill::SeriesRow> rowsOf(const QCPMultiDataSource& source, int component,
-                                         const QCPScale& keyScale, const Interval& shared,
+                                         const QCPScale& keyScale, const Interval& window,
                                          bool dataSpace, const QCPAxis* fromValue,
                                          const QCPAxis* toValue)
 {
-    const int begin = std::max(0, source.findBegin(shared.lower) - 1);
-    const int end = std::min(source.size(), source.findEnd(shared.upper) + 1);
+    const int begin = std::max(0, source.findBegin(window.lower) - 1);
+    const int end = std::min(source.size(), source.findEnd(window.upper) + 1);
     const auto gaps = source.gapsBefore(begin, end, /*cacheGaps=*/!dataSpace, keyScale);
     std::vector<qcp::fill::SeriesRow> rows;
     rows.reserve(std::size_t(std::max(0, end - begin)));
@@ -173,17 +173,30 @@ void QCPFillBetween::draw(QCPDrawContext& context) const
     if (!componentDraws(*first, mFirstComponent) || !componentDraws(*second, mSecondComponent))
         return;
 
-    const std::optional<Interval> shared = sharedKeys(*first->dataSource(), *second->dataSource());
+    // What the lines themselves draw from, and only the window the view reads: one row outside
+    // each side is where the band reaches the edge. A pan inside a binned range then costs the
+    // window, not the whole data set.
+    const QCPMultiDataSource* firstSource = first->drawnDataSource();
+    const QCPMultiDataSource* secondSource = second->drawnDataSource();
+    if (!firstSource || !secondSource)
+        return;
+    const std::optional<Interval> shared = sharedKeys(*firstSource, *secondSource);
     if (!shared || !(shared->upper > shared->lower))
+        return;
+    const QCPKeyWindow window = context.keyWindow();
+    const Interval crop = window.keys.size() > 0.0
+        ? Interval { std::max(shared->lower, window.keys.lower),
+                     std::min(shared->upper, window.keys.upper) }
+        : *shared;
+    if (!(crop.upper > crop.lower))
         return;
     const QCPScale keyScale = keyBase->scale();
     const bool dataSpace = system()->kind() != QCPTransform::Kind::Cartesian;
     const bool across = first != second && qcp::fill::fillsAcrossValueAxes(*first, *second);
     std::vector<qcp::fill::SeriesRow> firstRows
-        = rowsOf(*first->dataSource(), mFirstComponent, keyScale, *shared, dataSpace, nullptr,
-                 nullptr);
+        = rowsOf(*firstSource, mFirstComponent, keyScale, crop, dataSpace, nullptr, nullptr);
     std::vector<qcp::fill::SeriesRow> secondRows
-        = rowsOf(*second->dataSource(), mSecondComponent, keyScale, *shared, dataSpace,
+        = rowsOf(*secondSource, mSecondComponent, keyScale, crop, dataSpace,
                  across ? second->valueAxis().get() : nullptr, across ? valueAxisRaw() : nullptr);
 
     std::vector<qcp::fill::StripPoint> rows = qcp::fill::unionRows(firstRows, secondRows);

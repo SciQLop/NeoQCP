@@ -78,6 +78,9 @@ public:
     void setDataSource(std::unique_ptr<QCPMultiDataSource> source);
     virtual void setDataSource(std::shared_ptr<QCPMultiDataSource> source);
     [[nodiscard]] QCPMultiDataSource* dataSource() const { return mDataSource.get(); }
+    //! The rows this line records from in the frame being drawn: its L2 bins when they are
+    //! fresh for it, its own data otherwise. A fill between lines reads what they draw.
+    [[nodiscard]] const QCPMultiDataSource* drawnDataSource() const;
     virtual void dataChanged();
     //! A content change: drops a fill whose partner lost its component, then marks the layer.
     void update() override;

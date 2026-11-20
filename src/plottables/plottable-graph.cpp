@@ -743,6 +743,21 @@ bool QCPGraph::commitPendingData()
     return true;
 }
 
+// A fill between lines draws under them, so it runs before they would rebuild their bins: it
+// rebuilds them here, the same frame's, and the line's own draw then finds them fresh. Reading the
+// raw data instead would make the band follow bins the line does not draw.
+const QCPMultiDataSource* QCPGraph::drawnDataSource() const
+{
+    if (drawsInDataSpace() || !mNeedsResampling || !mL1Cache)
+        return mDataSource.get();
+    if (mL2Dirty)
+    {
+        rebuildL2(ViewportParams::fromAxes(keyAxisRaw(), valueAxisRaw()));
+        mL2Dirty = false;
+    }
+    return mL2Result ? mL2Result.get() : mDataSource.get();
+}
+
 void QCPGraph::dataChanged()
 {
     // The colour size rule may drop the scale and signal: deliver once this graph is done.
