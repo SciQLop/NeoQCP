@@ -22,7 +22,7 @@ private slots:
     void changingTextFlagsRemeasuresTheAnnotation();
     void aDefaultPenTakesTheThemeForeground();
     void aFarDataTargetRecordsNothing();
-    void aLongConnectorSamplesWithinTheCap();
+    void aLongStraightConnectorKeepsItsTwoEnds();
     void theTargetCutIsAtTheFirstApproach();
     void aTargetOutsideTheRectHidesTheAnnotation();
     void aTargetAtTheTopOfTheRangeStillDraws();

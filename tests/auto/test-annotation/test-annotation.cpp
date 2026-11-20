@@ -445,7 +445,7 @@ void TestAnnotation::aFarDataTargetRecordsNothing()
              "a data target a trillion units away is outside the rect, so nothing is recorded");
 }
 
-void TestAnnotation::aLongConnectorSamplesWithinTheCap()
+void TestAnnotation::aLongStraightConnectorKeepsItsTwoEnds()
 {
     QPainterPath path;
     path.moveTo(0, 0);
@@ -453,8 +453,7 @@ void TestAnnotation::aLongConnectorSamplesWithinTheCap()
 
     const qcp::TrimmedConnector trimmed = qcp::trimConnector(path, QRectF(), 0);
 
-    QVERIFY2(trimmed.line.size() <= 4096,
-             "a path longer than the cap is sampled coarser, not unbounded");
+    QCOMPARE(trimmed.line.size(), 2);
     QCOMPARE(trimmed.line.first(), QPointF(0, 0));
     QCOMPARE(trimmed.line.last(), QPointF(10000, 0));
 
@@ -463,9 +462,8 @@ void TestAnnotation::aLongConnectorSamplesWithinTheCap()
     far.lineTo(4.4e14, 0);
     const qcp::TrimmedConnector huge = qcp::trimConnector(far, QRectF(), 0);
 
-    QVERIFY2(huge.line.size() <= 4096,
-             "a path of any length is sampled in a bounded number of points");
-    QVERIFY(huge.line.size() > 1);
+    QCOMPARE(huge.line.size(), 2);
+    QCOMPARE(huge.line.last(), QPointF(4.4e14, 0));
 }
 
 void TestAnnotation::theTargetCutIsAtTheFirstApproach()

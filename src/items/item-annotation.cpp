@@ -197,7 +197,6 @@ void QCPItemAnnotation::setPen(const QPen& pen)
         return;
     update();
     mPen = pen;
-    mPenFromTheme = (pen == QPen());
     qcpEmit(this, mParentPlot, &QCPItemAnnotation::penChanged, this->pen());
 }
 
@@ -258,7 +257,7 @@ QPen QCPItemAnnotation::mainPen(const QColor& foreground) const
 {
     if (mSelected)
         return mSelectedPen;
-    if (!mPenFromTheme)
+    if (mPen != QPen())
         return mPen;
     QPen themed = mPen;
     themed.setColor(foreground);

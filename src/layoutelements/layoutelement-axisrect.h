@@ -122,7 +122,8 @@ struct QCPShapeOptions
   named after the setter it feeds, so a designated initialiser list reads as the setters it
   replaces.
 
-  \a shrink applies to both ends, the text's box and the target. \a textStyle is the same
+  \a shrink applies to both ends, the text's box and the target; a negative shrink counts as zero. A
+  default \a pen takes the theme's foreground. \a textStyle is the same
   QCPTextStyle the drawing context takes; its padding is inside the box the connector leaves.
 */
 struct QCPAnnotationOptions

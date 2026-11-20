@@ -92,7 +92,7 @@ protected:
     QSize glyphSize(const QCPTextStyle& style) const;
     bool hiddenForItsTarget() const;
     //! The pen the connector is drawn with: the selected one while selected, else the one set, or
-    //! the theme's foreground while no pen was ever set.
+    //! the theme's foreground while the pen is a default QPen.
     QPen mainPen(const QColor& foreground) const;
     //! Records the connector and its head: the part of \a path between the box and the target.
     void recordConnector(QCPDrawContext& context, const QTransform& frame, const QPainterPath& path,
@@ -103,8 +103,6 @@ protected:
     QCPTextStyle mTextStyle;
     QCPConnector mConnector;
     QPen mPen, mSelectedPen;
-    //! Whether \ref mPen is still the constructor's default, and so the theme's foreground to fill.
-    bool mPenFromTheme = true;
     QCPLineEnding mHead;
     QCP::PixelLength mShrink;
 
