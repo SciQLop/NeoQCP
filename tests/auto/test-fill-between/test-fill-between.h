@@ -31,6 +31,7 @@ private slots:
     void aDenseFillIsRebinnedAfterAZoom();
     void aZoomedFillRecordsOnlyItsWindow();
     void aSteppedFillSwapsColourWhereTheLinesSwap();
+    void aFillThatCrossesOftenRecordsOneBandPerSide();
     void aFillsLegendIconShowsItsBrushes();
     void aCartesianFillIsNotReRecordedByAPan();
     void aFillMadeBeforeTheDataDrawsWhenItComes();

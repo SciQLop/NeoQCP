@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace
@@ -61,6 +62,41 @@ std::vector<qcp::fill::SeriesRow> rowsOf(const QCPMultiDataSource& source, int c
         rows.push_back({ source.keyAt(i), value, gaps[std::size_t(i - begin)] != 0, i });
     }
     return rows;
+}
+
+// One side's runs as one series: the first row of each run after the first breaks the series, so
+// fillSeries pinches the band to nothing there instead of joining it across the other side.
+std::vector<qcp::fill::StripPoint> joinedSide(std::span<const qcp::fill::SideRun> runs,
+                                              bool firstAbove)
+{
+    std::vector<qcp::fill::StripPoint> rows;
+    bool joined = false;
+    for (const qcp::fill::SideRun& run : runs)
+    {
+        if (run.firstAbove != firstAbove || run.rows.empty())
+            continue;
+        const std::size_t at = rows.size();
+        rows.insert(rows.end(), run.rows.begin(), run.rows.end());
+        if (joined)
+            rows[at].breakBefore = true;
+        joined = true;
+    }
+    return rows;
+}
+
+// One filled band from \a rows, binned to the frame's pixels. A side with nothing to draw records
+// nothing. A user system has no key pixel to bin against: every row is recorded, as the graph's
+// fills did.
+void recordBand(QCPDrawContext& context, const QCPAxis* keyAxis, const QBrush& brush,
+                std::vector<qcp::fill::StripPoint> rows)
+{
+    if (rows.empty() || brush.style() == Qt::NoBrush || brush.color().alpha() == 0)
+        return;
+    if (keyAxis)
+        rows = qcp::fill::binnedForAxis(context, *keyAxis, std::move(rows));
+    const auto [upper, lower] = qcp::fill::fillSeries(rows);
+    if (upper)
+        context.fillBetween(upper, lower, brush);
 }
 } // namespace
 
@@ -222,20 +258,17 @@ void QCPFillBetween::draw(QCPDrawContext& context) const
     // drawn edges swap, not at the crossing of the straight segments the data would draw.
     const std::vector<qcp::fill::StripPoint> shaped
         = qcp::fill::steppedOnScreen(std::move(rows), step, keyScale);
-    for (const qcp::fill::SideRun& run : qcp::fill::splitAtCrossings(shaped))
+    // One command per brush: crossings change nothing a shared brush would draw, and two brushes are
+    // two bands, each joined across its own runs. Binning comes after the joining, so a band that
+    // crosses a thousand times still bins once.
+    if (!mBelowBrush)
     {
-        const QBrush& runBrush = run.firstAbove ? above : below;
-        if (runBrush.style() == Qt::NoBrush || runBrush.color().alpha() == 0)
-            continue;
-        // Binned per run: a bin keeps one side, where binning the union would merge the two. A user
-        // system has no key pixel to bin against: every row is recorded, as the graph's fills did.
-        const std::vector<qcp::fill::StripPoint> binned
-            = keyAxisRaw() ? qcp::fill::binnedForAxis(context, *keyAxisRaw(), run.rows) : run.rows;
-        const auto [upper, lower] = qcp::fill::fillSeries(binned);
-        if (!upper)
-            continue;
-        context.fillBetween(upper, lower, runBrush);
+        recordBand(context, keyAxisRaw(), above, shaped);
+        return;
     }
+    const std::vector<qcp::fill::SideRun> runs = qcp::fill::splitAtCrossings(shaped);
+    recordBand(context, keyAxisRaw(), above, joinedSide(runs, /*firstAbove=*/true));
+    recordBand(context, keyAxisRaw(), below, joinedSide(runs, /*firstAbove=*/false));
 }
 
 // The legend row is a swatch, not a replay of the band: the fill's brush where the first line is

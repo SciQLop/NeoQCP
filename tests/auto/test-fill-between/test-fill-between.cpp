@@ -474,6 +474,57 @@ void TestFillBetween::aFillIsNotSelectableByDefault()
 
 // The legend row of a fill is a swatch of its brushes: the upper half where the first line is above,
 // the lower half where it is below. The row must not replay the band into a 24 px icon.
+// Each side is one band whatever the lines do: a thousand crossings still record one command per
+// brush, and a shared brush records one command, crossings and all.
+void TestFillBetween::aFillThatCrossesOftenRecordsOneBandPerSide()
+{
+    const int count = 1001;
+    std::vector<double> keys;
+    std::vector<double> upper;
+    std::vector<double> lower;
+    keys.reserve(std::size_t(count));
+    upper.reserve(std::size_t(count));
+    lower.reserve(std::size_t(count));
+    for (int i = 0; i < count; ++i)
+    {
+        const bool firstAbove = i % 2 == 0;
+        keys.push_back(3.0 * i / (count - 1));
+        upper.push_back(firstAbove ? 0.8 : 0.2);
+        lower.push_back(firstAbove ? 0.2 : 0.8);
+    }
+    mFirst->setData(keys, upper);
+    mSecond->setData(keys, lower);
+
+    const auto brushesOf = [](const QCPFillBetween& fill)
+    {
+        std::vector<QColor> brushes;
+        for (const qcp::QCPDrawCommand& command : fill.mCore.recordedList().commands)
+            if (const auto* band = std::get_if<qcp::FillBetweenCmd>(&command))
+                brushes.push_back(band->brush.color());
+        return brushes;
+    };
+
+    QCPFillOptions twoBrushes = greenAbove();
+    twoBrushes.belowBrush = kRed;
+    const QCPHandle<QCPFillBetween> split = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(mSecond), twoBrushes);
+    QVERIFY(split);
+    mPlot->replot();
+    QCOMPARE(split->mCore.recordedCommandCount(), 2);
+    const std::vector<QColor> brushes = brushesOf(*split);
+    QVERIFY2(std::find(brushes.begin(), brushes.end(), kGreen) != brushes.end(),
+             "the above side is not one green band");
+    QVERIFY2(std::find(brushes.begin(), brushes.end(), kRed) != brushes.end(),
+             "the below side is not one red band");
+
+    mPlot->removePlottable(split.get());
+    const QCPHandle<QCPFillBetween> oneSide = mPlot->axisRect()->fillBetween(
+        QCPHandle<QCPGraph>(mFirst), QCPHandle<QCPGraph>(mSecond), greenAbove());
+    QVERIFY(oneSide);
+    mPlot->replot();
+    QCOMPARE(oneSide->mCore.recordedCommandCount(), 1);
+}
+
 void TestFillBetween::aFillsLegendIconShowsItsBrushes()
 {
     QCPFillOptions options = greenAbove();
