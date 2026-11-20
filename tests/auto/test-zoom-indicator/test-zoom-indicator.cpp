@@ -437,10 +437,10 @@ void TestZoomIndicator::aRectThatIsNotAnInsetIsRefused()
     QVERIFY(indicator);
     const auto fourth = qcp::setMisuseHandler(test_misuse::record);
     test_misuse::calls.clear();
-    indicator->setInset(cell.get());
+    indicator->setInset(QCPHandle<QCPAxisRect>(cell.get()));
     qcp::setMisuseHandler(fourth);
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
-    QCOMPARE(indicator->inset(), ownInset.get());
+    QCOMPARE(indicator->inset().get(), ownInset.get());
 }
 
 void TestZoomIndicator::aNullInsetIsNoInset()

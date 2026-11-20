@@ -116,7 +116,7 @@ std::optional<double> QCPGraph::impulseBaseline() const
 double QCPGraph::dataSpaceFillValue(double value) const
 {
     const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
-    return valueAxis ? fillValue(*valueAxis, value) : value;
+    return valueAxis ? qcp::fill::fillValue(*valueAxis, value) : value;
 }
 
 quint64 QCPGraph::dependencyRevision() const
@@ -2339,7 +2339,10 @@ QCPGraph::fillRows(const Fill& fill, const QCPMultiDataSource& ds, int begin, in
     const QCPScale keyScale = shownKeyScale();
     const auto gaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace(), keyScale);
     const auto edge = [this](double value)
-    { return drawsInDataSpace() ? dataSpaceFillValue(value) : fillValue(*valueAxisRaw(), value); };
+    {
+        return drawsInDataSpace() ? dataSpaceFillValue(value)
+                                  : qcp::fill::fillValue(*valueAxisRaw(), value);
+    };
     Q_ASSERT(gaps.size() == std::max(0, end - begin)); // gapsBefore() holds one entry per row
     const double constant = edge(fill.target);
     std::vector<qcp::fill::StripPoint> rows;
@@ -2348,14 +2351,6 @@ QCPGraph::fillRows(const Fill& fill, const QCPMultiDataSource& ds, int begin, in
         rows.push_back({ ds.keyAt(i), edge(ds.valueAt(fill.owner, i)), constant,
                          gaps[i - begin] != 0, i });
     return rows;
-}
-
-// A log value axis has no zero: a value it cannot place goes to the range bound on zero's side
-// (upper on a negative range, lower on a positive one), as 2.x's getFillBasePoint closed it. The
-// recording then follows that bound, so it is transform-dependent.
-double QCPGraph::fillValue(const QCPAxis& valueAxis, double value)
-{
-    return qcp::fill::fillValue(valueAxis, value);
 }
 
 // A straight-segment frame spaces its corners in the space its reader sees. Binned when the rows
@@ -2371,12 +2366,6 @@ std::vector<qcp::fill::StripPoint> QCPGraph::shapeFillRows(
     const QCPScale keyScale = shownKeyScale();
     return qcp::fill::steppedOnScreen(std::move(rows), ownerStep(mComponents[fill.owner]),
                                       keyScale);
-}
-
-std::vector<qcp::fill::StripPoint> QCPGraph::binnedWhenDense(
-    std::vector<qcp::fill::StripPoint> rows) const
-{
-    return qcp::fill::binnedWhenDense(*keyAxisRaw(), std::move(rows));
 }
 
 // The selection is simplified (sorted, disjoint): a binary search finds the one range that can
@@ -2508,7 +2497,7 @@ std::vector<qcp::errorbars::Bar> QCPGraph::errorBarRows(const ErrorBars& spec,
     bars.reserve(std::max(0, end - begin));
     const bool dataSpace = drawsInDataSpace();
     const auto edge = [this, dataSpace](double value)
-    { return dataSpace ? value : fillValue(*valueAxisRaw(), value); };
+    { return dataSpace ? value : qcp::fill::fillValue(*valueAxisRaw(), value); };
     for (int i = begin; i < end; ++i)
     {
         const double y = edge(ds.valueAt(spec.value, i));
@@ -2560,7 +2549,7 @@ std::vector<qcp::fill::StripPoint> QCPGraph::errorBandRows(
         qcp::errorbars::resolve(bar);
         rows.push_back({bar.key, bar.lower, bar.upper, gaps[k] != 0});
     }
-    return binnedWhenDense(std::move(rows));
+    return qcp::fill::binnedWhenDense(*keyAxisRaw(), std::move(rows));
 }
 
 // Sparse bars are one command: the replay draws every stem and cap. Dense bars are the band they

@@ -114,26 +114,26 @@ QCPFillBetween::~QCPFillBetween()
     detachLines();
 }
 
-QCPGraph* QCPFillBetween::firstLine() const
+QCPHandle<QCPGraph> QCPFillBetween::firstLine() const
 {
-    return mFirstLine.data();
+    return QCPHandle<QCPGraph>(mFirstLine.data());
 }
 
-QCPGraph* QCPFillBetween::secondLine() const
+QCPHandle<QCPGraph> QCPFillBetween::secondLine() const
 {
-    return mSecondLine.data();
+    return QCPHandle<QCPGraph>(mSecondLine.data());
 }
 
-void QCPFillBetween::setLines(QCPGraph* first, int firstComponent, QCPGraph* second,
-                              int secondComponent)
+void QCPFillBetween::setLines(QCPHandle<QCPGraph> first, int firstComponent,
+                              QCPHandle<QCPGraph> second, int secondComponent)
 {
-    if (mFirstLine == first && mFirstComponent == firstComponent && mSecondLine == second
-        && mSecondComponent == secondComponent)
+    if (mFirstLine == first.get() && mFirstComponent == firstComponent
+        && mSecondLine == second.get() && mSecondComponent == secondComponent)
         return;
     detachLines();
-    mFirstLine = first;
+    mFirstLine = first.get();
     mFirstComponent = firstComponent;
-    mSecondLine = second;
+    mSecondLine = second.get();
     mSecondComponent = secondComponent;
     attachLines();
     update();

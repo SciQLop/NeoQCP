@@ -1014,8 +1014,8 @@ void TestCoordinateSystem::dualValueAxesKeepTheirRelationships()
     const QCPHandle<QCPFillBetween> fill
         = plot.axisRect()->fillBetween(QCPHandle<QCPGraph>(here), QCPHandle<QCPGraph>(there));
     QVERIFY(fill);
-    QCOMPARE(fill->firstLine(), here);
-    QCOMPARE(fill->secondLine(), there);
+    QCOMPARE(fill->firstLine().get(), here);
+    QCOMPARE(fill->secondLine().get(), there);
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 
     // Both really paint: the two bar colours beside each other at a bar's key.

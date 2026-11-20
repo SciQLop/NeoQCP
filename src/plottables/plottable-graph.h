@@ -491,11 +491,8 @@ protected:
     [[nodiscard]] QCPScatterStyle selectedMarkerStyle(const QCPGraphComponent& comp) const;
     //! A decorator subclass's own decoration (the bracket), after the lines.
     void recordSelectionDecoration(QCPDrawContext& context) const;
-    [[nodiscard]] static double fillValue(const QCPAxis& valueAxis, double value);
     void recordFills(QCPDrawContext& context, const QCPMultiDataSource& ds, int begin,
                      int end) const;
-    [[nodiscard]] std::vector<qcp::fill::StripPoint>
-    binnedWhenDense(std::vector<qcp::fill::StripPoint> rows) const;
     [[nodiscard]] bool errorBarsDrawable(const ErrorBars& spec, int columnCount) const;
     [[nodiscard]] QPen errorBarPen(const ErrorBars& spec) const;
     [[nodiscard]] std::vector<qcp::errorbars::Bar>

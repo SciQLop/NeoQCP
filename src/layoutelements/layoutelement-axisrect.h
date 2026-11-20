@@ -383,6 +383,18 @@ private:
     // The items whose positions name this rect, one of its axes or one of its systems: the ones
     // that go with it. An item that only clips to it stays (its clip falls back to the viewport).
     QList<QCPHandle<QCPItem>> ownedItems() const;
+    // The axes one of a fill's lines draws through on this rect: its own pair, or the pair its user
+    // system maps through. Null when the line is drawn elsewhere, or has no pair of axes here.
+    struct FillFrame
+    {
+        QCPCoordinateSystem* system = nullptr;
+        QCPAxis* keyAxis = nullptr;
+        QCPAxis* valueAxis = nullptr;
+    };
+    [[nodiscard]] std::optional<FillFrame> fillFrameOf(const QCPGraph& line) const;
+    // Puts \a fill just below the lower of the two lines, scanning their layer once.
+    void placeBelowTheLowerLine(QCPFillBetween& fill, const QCPGraph& first,
+                                const QCPGraph& second) const;
     // The rect's own scale while at least one user colours through it, otherwise null.
     QCPColorScale* usedColorScale() const;
     // The width a vertical scale takes in the margin, or the height of a horizontal one.

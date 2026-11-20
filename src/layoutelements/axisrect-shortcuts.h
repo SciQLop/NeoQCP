@@ -8,6 +8,7 @@
 #ifndef QCP_LAYOUTELEMENT_AXISRECT_SHORTCUTS_H
 #define QCP_LAYOUTELEMENT_AXISRECT_SHORTCUTS_H
 
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -41,6 +42,46 @@ QCPHandle<QCPGraph> QCPAxisRect::line(const K& keys, const V& values, const QCPL
     return graph;
 }
 
+inline std::optional<QCPAxisRect::FillFrame>
+QCPAxisRect::fillFrameOf(const QCPGraph& line) const
+{
+    QCPCoordinateSystem* system = line.system().get();
+    if (!system || system->area().get() != this)
+        return std::nullopt;
+    QCPAxis* keyAxis = line.keyAxis().get();
+    QCPAxis* valueAxis = line.valueAxis().get();
+    if (!keyAxis || !valueAxis)
+    {
+        // A user system keeps no key or value axis of its own: it maps through the pair it was made
+        // with, and a system without a pair of QCPAxis has no fill to draw in.
+        keyAxis = qobject_cast<QCPAxis*>(system->keyAxis().get());
+        valueAxis = qobject_cast<QCPAxis*>(system->valueAxis().get());
+    }
+    const QList<QCPAxis*> own = axesRaw();
+    if (!keyAxis || !valueAxis || !own.contains(keyAxis) || !own.contains(valueAxis))
+        return std::nullopt;
+    return FillFrame { system, keyAxis, valueAxis };
+}
+
+inline void QCPAxisRect::placeBelowTheLowerLine(QCPFillBetween& fill, const QCPGraph& first,
+                                               const QCPGraph& second) const
+{
+    const QCPHandle<QCPLayer> layer = first.layer();
+    if (!layer)
+        return;
+    // The fill stays on the first line's layer: below both is below the first, unless the second
+    // draws on that layer before it.
+    const QCPGraph* lower = &first;
+    if (second.layer() && second.layer().get() == layer.get())
+        for (const QCPHandle<QCPLayerable>& child : layer->children())
+            if (child.get() == &first || child.get() == &second)
+            {
+                lower = child.get() == &first ? &first : &second;
+                break;
+            }
+    fill.moveBelow(lower);
+}
+
 /*!
   The area between \a first and \a second on this rect, styled by \a options.
 
@@ -64,22 +105,10 @@ inline QCPHandle<QCPFillBetween> QCPAxisRect::fillBetween(const QCPHandle<QCPGra
                         "a fill of a line with itself needs two components of it", { });
     QCP_CHECK_OR_RETURN(first.get() == second.get() || qcp::fill::canFillTo(*first, *second),
                         "the two lines of a fill must fill to each other", { });
-    // In this rect, and in this rect's frame: its axes carry a cartesian line, its system carries a
-    // line drawn through a user system (which keeps no key or value axis).
-    const QList<QCPAxis*> own = axesRaw();
-    const auto onThisRect = [this, &own](const QCPGraph& line)
-    {
-        QCPCoordinateSystem* frame = line.system().get();
-        if (!frame || frame->area().get() != this)
-            return false;
-        const QCPAxis* key = line.keyAxis().get();
-        const QCPAxis* value = line.valueAxis().get();
-        if (!key || !value)
-            return true; // a user system: its own mapping says where the line lands
-        return own.contains(const_cast<QCPAxis*>(key)) && own.contains(const_cast<QCPAxis*>(value));
-    };
-    QCP_CHECK_OR_RETURN(onThisRect(*first) && onThisRect(*second),
-                        "the two lines of a fill must be on this rect", { });
+    const std::optional<FillFrame> frame = fillFrameOf(*first);
+    const std::optional<FillFrame> otherFrame
+        = first.get() == second.get() ? frame : fillFrameOf(*second);
+    QCP_CHECK_OR_RETURN(frame && otherFrame, "the two lines of a fill must be on this rect", { });
     const auto namesAColumn = [](const QCPGraph& line, int component)
     {
         const QCPMultiDataSource* source = line.dataSource();
@@ -91,44 +120,19 @@ inline QCPHandle<QCPFillBetween> QCPAxisRect::fillBetween(const QCPHandle<QCPGra
                             && namesAColumn(*second, options.secondComponent),
                         "the fill's component does not name a column of its line", { });
 
-    // The fill joins the frame the lines draw in: their own axis pair when they have one, else the
-    // axes their system maps through. No system(...) lookup: the lines already carry the system.
-    QCPCoordinateSystem* frame = first->system().get();
-    QCPAxis* keyAxis = first->keyAxis().get();
-    QCPAxis* valueAxis = first->valueAxis().get();
-    if (!keyAxis || !valueAxis)
-    {
-        keyAxis = qobject_cast<QCPAxis*>(frame ? frame->keyAxis().get() : nullptr);
-        valueAxis = qobject_cast<QCPAxis*>(frame ? frame->valueAxis().get() : nullptr);
-        QCP_CHECK_OR_RETURN(keyAxis && valueAxis && axesRaw().contains(keyAxis)
-                                && axesRaw().contains(valueAxis),
-                            "the two lines of a fill must draw in this rect's system", { });
-    }
-    const QCPHandle<QCPFillBetween> fill = add<QCPFillBetween>(keyAxis, valueAxis);
+    const QCPHandle<QCPFillBetween> fill
+        = add<QCPFillBetween>(frame->keyAxis, frame->valueAxis);
     if (!fill)
         return fill;
-    fill->setSystem(frame); // the lines' own system, whatever pair its axes are on
-    fill->setLines(first.get(), options.firstComponent, second.get(), options.secondComponent);
+    fill->setSystem(frame->system); // the lines' own system, whatever pair its axes are on
+    fill->setLines(first, options.firstComponent, second, options.secondComponent);
     fill->setBrush(options.brush);
     fill->setBelowBrush(options.belowBrush);
     fill->setName(options.name);
-
-    // Whichever line draws first is the lower one, and the fill goes just below it.
-    const QCPHandle<QCPLayer> layer = first->layer();
-    if (layer)
-    {
-        const auto siblings = layer->children();
-        const auto indexOf = [&siblings](const QCPLayerable* child)
-        {
-            for (int i = 0; i < siblings.size(); ++i)
-                if (siblings.at(i).get() == child)
-                    return i;
-            return int(siblings.size());
-        };
-        const QCPGraph* lower
-            = indexOf(second.get()) < indexOf(first.get()) ? second.get() : first.get();
-        fill->moveBelow(lower);
-    }
+    if (first.get() == second.get())
+        fill->moveBelow(first.get()); // the only line draws first, so below it is where a fill goes
+    else
+        placeBelowTheLowerLine(*fill, *first, *second);
     return fill;
 }
 
@@ -279,7 +283,7 @@ QCPAxisRect::zoomIndicator(const QCPHandle<QCPAxisRect>& inset, const QCPShapeOp
         return item;
     item->setPen(options.pen);
     item->setBrush(options.brush);
-    item->setInset(inset.get()); // a rect that is not an inset of this one is reported there
+    item->setInset(inset); // a rect that is not an inset of this one is reported there
     if (!item->inset())
     {
         item.remove();

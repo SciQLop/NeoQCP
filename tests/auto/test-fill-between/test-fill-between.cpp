@@ -255,7 +255,7 @@ void TestFillBetween::aFillDrawsAgainWhenSetLinesNamesLiveLines()
 
     auto* fresh = mPlot->add<QCPGraph>().get();
     fresh->setData(kKeys, std::vector<double> { 0.2, 0.2, 0.2, 0.2 });
-    fill->setLines(mFirst, 0, fresh, 0);
+    fill->setLines(QCPHandle<QCPGraph>(mFirst), 0, QCPHandle<QCPGraph>(fresh), 0);
     mPlot->replot();
     QVERIFY2(isGreen(pixelAt(rendered(*mPlot), *mPlot->xAxis, *mPlot->yAxis, 0.5, 0.5)),
              "the fill did not draw again for the live lines it was given");

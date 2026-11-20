@@ -3142,8 +3142,10 @@ void TestMultiGraph::denseFillRowsAreBinnedAboveFourPerPixel()
     const auto rowsAtOnePixel = [](std::size_t n) {
         return std::vector<qcp::fill::StripPoint>(n, {0.0, 0.0, 10.0});
     };
-    QCOMPARE(mg->binnedWhenDense(rowsAtOnePixel(4 * width)).size(), 4 * width);
-    QCOMPARE(mg->binnedWhenDense(rowsAtOnePixel(4 * width + 1)).size(), std::size_t(1));
+    QCOMPARE(qcp::fill::binnedWhenDense(*mg->keyAxis(), rowsAtOnePixel(4 * width)).size(),
+             4 * width);
+    QCOMPARE(qcp::fill::binnedWhenDense(*mg->keyAxis(), rowsAtOnePixel(4 * width + 1)).size(),
+             std::size_t(1));
 }
 
 void TestMultiGraph::errorBoundOfZeroOnALogAxisStopsAtTheEdge()

@@ -134,14 +134,14 @@ void QCPItemZoomIndicator::setBrush(const QBrush& brush)
   the inset stays as it was. The item's own rect is the one it was added to, the area its positions
   and its clip area are measured in.
 */
-void QCPItemZoomIndicator::setInset(QCPAxisRect* inset)
+void QCPItemZoomIndicator::setInset(QCPHandle<QCPAxisRect> inset)
 {
     const QCPAxisRect* frame = clipAxisRect().get();
     QCP_CHECK_OR_RETURN(!inset
                             || (frame && inset->parentPlot() == mParentPlot && inset->isInset()
                                 && inset->layout().get() == frame->insetLayout().get()),
                         "the rect a zoom indicator points at must be an inset of this item's rect");
-    if (inset == mInset.data())
+    if (inset.get() == mInset.data())
         return;
     // First, and alone on its own this: a slot a connection below runs may delete this item, and
     // nothing may touch it afterwards.
@@ -151,21 +151,23 @@ void QCPItemZoomIndicator::setInset(QCPAxisRect* inset)
         return;
     for (const QMetaObject::Connection& link : std::exchange(mInsetLinks, { }))
         disconnect(link);
-    mInset = inset;
+    mInset = inset.get();
     if (inset)
     {
         for (QCPAxis* axis : { inset->xAxis().get(), inset->yAxis().get() })
             if (axis)
                 mInsetLinks << connect(axis, &QCPAxis::rangeChanged, this, [this] { update(); });
         // The connectors end on the inset's rect: a layout that moves it must remake them.
-        mInsetLinks << connect(inset, &QCPLayoutElement::outerRectChanged, this,
+        mInsetLinks << connect(inset.get(), &QCPLayoutElement::outerRectChanged, this,
                                [this] { update(); });
-        mInsetLinks << connect(inset, &QCPLayoutElement::marginsChanged, this, [this] { update(); });
-        mInsetLinks << connect(inset, &QCPLayerable::visibleChanged, this, [this] { update(); });
+        mInsetLinks << connect(inset.get(), &QCPLayoutElement::marginsChanged, this,
+                               [this] { update(); });
+        mInsetLinks << connect(inset.get(), &QCPLayerable::visibleChanged, this,
+                               [this] { update(); });
         // A deleted inset leaves the box empty, and the replot that follows draws nothing.
-        mInsetLinks << connect(inset, &QObject::destroyed, this, [this] { update(); });
+        mInsetLinks << connect(inset.get(), &QObject::destroyed, this, [this] { update(); });
     }
-    qcpEmit(this, mParentPlot, &QCPItemZoomIndicator::insetChanged, inset);
+    qcpEmit(this, mParentPlot, &QCPItemZoomIndicator::insetChanged, inset.get());
 }
 
 /*!

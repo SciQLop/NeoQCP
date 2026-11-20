@@ -4278,7 +4278,7 @@ void TestPipeline::fillThinningOnSymlog()
     for (int i = 0; i < n; ++i)
         rows.push_back({ symlog.fromScale(keysLo + (keysHi - keysLo) * i / (n - 1)), 0.0,
                          (i % 2) ? 1.0 : -1.0, false, i });
-    const auto spans = g->binnedWhenDense(std::move(rows));
+    const auto spans = qcp::fill::binnedWhenDense(*g->keyAxis(), std::move(rows));
     QVERIFY2(spans.size() >= 2, "the fill was binned");
 
     // Four bins per pixel, so a full scan is about 4 * width spans: a 0 px rect would say 4.

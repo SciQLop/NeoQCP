@@ -32,11 +32,11 @@ public:
     ~QCPFillBetween() override;
 
     // getters:
-    [[nodiscard]] QCPGraph* firstLine() const;
+    [[nodiscard]] QCPHandle<QCPGraph> firstLine() const;
 
     [[nodiscard]] int firstComponent() const { return mFirstComponent; }
 
-    [[nodiscard]] QCPGraph* secondLine() const;
+    [[nodiscard]] QCPHandle<QCPGraph> secondLine() const;
 
     [[nodiscard]] int secondComponent() const { return mSecondComponent; }
 
@@ -47,7 +47,8 @@ public:
     //! components. Registers the fill as a dependent of both, so a data change on either makes it
     //! record again; a line that goes away leaves the fill drawing nothing until this is called
     //! again with live lines.
-    void setLines(QCPGraph* first, int firstComponent, QCPGraph* second, int secondComponent);
+    void setLines(QCPHandle<QCPGraph> first, int firstComponent, QCPHandle<QCPGraph> second,
+                  int secondComponent);
     //! The brush of the side where the first line is below the second; none fills both sides with
     //! \ref brush, and Qt::NoBrush leaves that side empty.
     void setBelowBrush(std::optional<QBrush> brush);

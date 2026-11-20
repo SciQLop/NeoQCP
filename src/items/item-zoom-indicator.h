@@ -69,7 +69,7 @@ class QCP_LIB_DECL QCPItemZoomIndicator : public QCPItem
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(QPen pen READ pen WRITE setPen NOTIFY penChanged)
     Q_PROPERTY(QBrush brush READ brush WRITE setBrush NOTIFY brushChanged)
-    Q_PROPERTY(QCPAxisRect* inset READ inset WRITE setInset NOTIFY insetChanged)
+    Q_PROPERTY(QCPAxisRect* inset READ insetRaw WRITE setInsetRaw NOTIFY insetChanged)
     /// \endcond
 
 public:
@@ -81,12 +81,13 @@ public:
 
     QBrush brush() const { return mBrush; }
 
-    QCPAxisRect* inset() const { return mInset.data(); }
+    QCPHandle<QCPAxisRect> inset() const { return QCPHandle<QCPAxisRect>(mInset.data()); }
 
     // setters:
     void setPen(const QPen& pen);
     void setBrush(const QBrush& brush);
-    void setInset(QCPAxisRect* inset);
+    //! The inset this indicator points at: null, or an inset of the rect this item is clipped to.
+    void setInset(QCPHandle<QCPAxisRect> inset);
 
     // reimplemented virtual methods:
     void draw(QCPDrawContext& context) const override;
@@ -107,6 +108,11 @@ protected:
     QList<QMetaObject::Connection> mInsetLinks;
 
     friend class TestZoomIndicator; // reads the recording's count
+
+private:
+    // The property form of inset(): moc needs a pointer to read and write, the API is handles.
+    [[nodiscard]] QCPAxisRect* insetRaw() const { return mInset.data(); }
+    void setInsetRaw(QCPAxisRect* inset) { setInset(QCPHandle<QCPAxisRect>(inset)); }
 };
 
 #endif // QCP_ITEM_ZOOM_INDICATOR_H
