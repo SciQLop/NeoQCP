@@ -240,18 +240,23 @@ QPen QCPItemAnnotation::mainPen() const
 
 /*! \internal
 
-  Whether the whole annotation is hidden: a target in data space that lies outside the rect holding
-  it is matplotlib's \c annotation_clip, and it hides the text along with the connector. A target
-  given in pixels, ratios or an anchor is never hidden this way.
+  Whether the whole annotation is hidden: a target that lies outside the rect holding it, with both
+  of its coordinates in data, is matplotlib's \c annotation_clip, and it hides the text along with
+  the connector. A target in pixels, ratios or an anchor - or with only one coordinate in data - is
+  never hidden this way.
 */
 bool QCPItemAnnotation::hiddenForItsTarget() const
 {
-    if (target->type() != QCPItemPosition::ptPlotCoords)
+    if (target->typeX() != QCPItemPosition::ptPlotCoords
+        || target->typeY() != QCPItemPosition::ptPlotCoords)
         return false;
     const QCPHandle<QCPAxisRect> rect = target->axisRect();
     if (!rect)
         return false;
-    return !QRectF(rect->rect()).contains(target->pixelPosition());
+    // Grown by a pixel, as matplotlib's contains_point(..., radius=1.0): a vertical axis maps its
+    // upper value to one pixel above the rect, and that target sits on the edge, not outside it.
+    const QRectF inside = QRectF(rect->rect()).adjusted(-1, -1, 1, 1);
+    return !inside.contains(target->pixelPosition());
 }
 
 /* inherits documentation from base class */

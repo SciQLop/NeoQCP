@@ -275,7 +275,33 @@ void TestAnnotation::aPanMovesTheTipNotTheText()
     QCOMPARE(pixelOf(after.text->at), textBefore);
 }
 
-void TestAnnotation::aFarTargetDrawsInBoundedTime()
+void TestAnnotation::aFarPixelTargetDrawsInBoundedTime()
+{
+    // A pixel target is never hidden by the rect, so this connector really is drawn, a trillion
+    // pixels long: it must still cost a bounded time and every sampled point must be a number.
+    QCustomPlot plot;
+    preparePlot(plot);
+    const QCPHandle<QCPItemAnnotation> item = plot.axisRect()->annotation(
+        QCP::Pixels { 1e12, 1e12 }, QCP::Pixels { 100, 100 }, QStringLiteral("label"),
+        { .head = QCPLineEnding::esLineArrow });
+    QVERIFY(item);
+
+    QElapsedTimer timer;
+    timer.start();
+    plot.replot();
+    QVERIFY2(timer.elapsed() < 1000, "a target a trillion pixels away costs no time");
+
+    const Recorded recorded = scan(*item);
+    QVERIFY2(recorded.line, "a target in pixels is not hidden by the rect");
+    for (const QCP::Position& point : recorded.line->points)
+    {
+        const QPointF pixel = pixelOf(point);
+        QVERIFY2(std::isfinite(pixel.x()) && std::isfinite(pixel.y()),
+                 "every sampled point of a huge connector is a number");
+    }
+}
+
+void TestAnnotation::aFarDataTargetRecordsNothing()
 {
     QCustomPlot plot;
     preparePlot(plot);
@@ -283,14 +309,10 @@ void TestAnnotation::aFarTargetDrawsInBoundedTime()
         QCP::Data { 1e12, 1e12 }, QCP::Data { 0.5, 0.5 }, QStringLiteral("label"),
         { .head = QCPLineEnding::esLineArrow });
     QVERIFY(item);
-
-    QElapsedTimer timer;
-    timer.start();
     plot.replot();
-    QVERIFY2(timer.elapsed() < 1000, "a target far outside the frame costs no time");
 
     QVERIFY2(AnnotationRecording::commands(*item).empty(),
-             "a target a trillion units away is outside the rect, so nothing is recorded");
+             "a data target a trillion units away is outside the rect, so nothing is recorded");
 }
 
 void TestAnnotation::aLongConnectorSamplesWithinTheCap()
@@ -316,11 +338,10 @@ void TestAnnotation::aLongConnectorSamplesWithinTheCap()
     QVERIFY(huge.line.size() > 1);
 }
 
-void TestAnnotation::theTargetCutMeasuresBackFromTheEnd()
+void TestAnnotation::theTargetCutIsAtTheFirstApproach()
 {
-    // The path passes within the cut of its own end half way along, then leaves and comes back.
-    // Measured forward from the start, the cut would be taken at that first approach and the last
-    // leg thrown away; matplotlib measures back from the end.
+    // The path comes within the cut of its own end half way along, then leaves and comes back.
+    // matplotlib's split_path_inout walks forward from the start: the cut is that first approach.
     QPainterPath path;
     path.moveTo(0, 0);
     path.lineTo(0, 20);
@@ -340,7 +361,58 @@ void TestAnnotation::theTargetCutMeasuresBackFromTheEnd()
     const bool keptTheReturn = std::any_of(trimmed.line.cbegin(), trimmed.line.cend(),
                                            [](QPointF point)
                                            { return point.x() > 15 && qAbs(point.y() - 2) < 0.5; });
-    QVERIFY2(keptTheReturn, "the leg back along the end is part of the connector");
+    QVERIFY2(!keptTheReturn, "the cut takes the first approach, so the last leg is not drawn");
+}
+
+void TestAnnotation::aTargetAtTheTopOfTheRangeStillDraws()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    plot.replot();
+    const QCPHandle<QCPItemAnnotation> top = plot.axisRect()->annotation(
+        QCP::Data { 0.5, 1.0 }, QCP::Data { 0.2, 0.5 }, QStringLiteral("top"));
+    const QCPHandle<QCPItemAnnotation> right = plot.axisRect()->annotation(
+        QCP::Data { 1.0, 0.5 }, QCP::Data { 0.2, 0.2 }, QStringLiteral("right"));
+    QVERIFY(top);
+    QVERIFY(right);
+    plot.replot();
+
+    QVERIFY2(scan(*top).line,
+             "a target at the top of the y range maps one pixel above the rect and still draws");
+    QVERIFY2(scan(*right).line, "a target at the top of the x range still draws");
+}
+
+void TestAnnotation::aTargetThreePixelsOutsideHides()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    plot.replot();
+    const QRect rect = plot.axisRect()->rect();
+    const double past = 1.0 + 3.0 / rect.width();
+    const QCPHandle<QCPItemAnnotation> item = plot.axisRect()->annotation(
+        QCP::Data { past, 0.5 }, QCP::Data { 0.2, 0.5 }, QStringLiteral("label"));
+    QVERIFY(item);
+    plot.replot();
+
+    QVERIFY2(AnnotationRecording::commands(*item).empty(),
+             "three pixels outside the rect is outside it");
+}
+
+void TestAnnotation::aTargetOnlyPartlyInDataIsNotHidden()
+{
+    // Only a target wholly in data is hidden: with y in pixels there is no data place to judge.
+    QCustomPlot plot;
+    preparePlot(plot);
+    plot.replot();
+    const QRect rect = plot.axisRect()->rect();
+    const QCPHandle<QCPItemAnnotation> item = plot.axisRect()->annotation(
+        QCP::Data { 0.5, 0.5 }, QCP::Data { 0.2, 0.5 }, QStringLiteral("label"));
+    QVERIFY(item);
+    item->target->setTypeY(QCPItemPosition::ptAbsolute);
+    item->target->setCoords(0.5, rect.bottom() + 50);
+    plot.replot();
+
+    QVERIFY2(scan(*item).text, "a target in pixels below the rect hides nothing");
 }
 
 void TestAnnotation::aTargetOutsideTheRectHidesTheAnnotation()

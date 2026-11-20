@@ -15,10 +15,14 @@ private slots:
     void theTipEndsShrinkPixelsFromTheTarget();
     void theHeadPointsAlongThePath();
     void aPanMovesTheTipNotTheText();
-    void aFarTargetDrawsInBoundedTime();
+    void aFarPixelTargetDrawsInBoundedTime();
+    void aFarDataTargetRecordsNothing();
     void aLongConnectorSamplesWithinTheCap();
-    void theTargetCutMeasuresBackFromTheEnd();
+    void theTargetCutIsAtTheFirstApproach();
     void aTargetOutsideTheRectHidesTheAnnotation();
+    void aTargetAtTheTopOfTheRangeStillDraws();
+    void aTargetThreePixelsOutsideHides();
+    void aTargetOnlyPartlyInDataIsNotHidden();
     void aLabelPastTheEdgeDrawsWhole();
     void theTextTakesTheThemeColour();
     void rotatedTextKeepsTheConnectorInScreenSpace();
